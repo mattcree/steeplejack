@@ -10,9 +10,9 @@ public class SteeplejackEditorTarget : TargetRules
 	{
 		Type = TargetType.Editor;
 
-		// See the note in Steeplejack.Target.cs on why this is `Latest` and not a pinned Vn.
-		DefaultBuildSettings = BuildSettingsVersion.Latest;
-		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
+		// See the note in Steeplejack.Target.cs on why these are pinned and not `Latest`.
+		DefaultBuildSettings = BuildSettingsVersion.V7;
+		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_8;
 
 		ExtraModuleNames.AddRange(new string[] { "SteeplejackSim", "SteeplejackGame" });
 	}
