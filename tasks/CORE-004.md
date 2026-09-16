@@ -4,8 +4,8 @@ title: Sim data types
 milestone: M0
 discipline: [ENG]
 estimate_days: 1
-status: ready
-assignee: null
+status: in_progress
+assignee: agent
 depends_on: [CORE-001]
 owns:
   - Source/SteeplejackSim/Public/Types.h
