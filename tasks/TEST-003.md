@@ -4,7 +4,7 @@ title: Make filtered test gates fail loudly on zero matches
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.5
-status: review
+status: done
 assignee: agent
 depends_on: [CORE-003, SETUP-004, CORE-011]
 owns:
