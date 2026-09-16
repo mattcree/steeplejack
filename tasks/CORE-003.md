@@ -4,8 +4,8 @@ title: Seeded RNG with independent substreams
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.5
-status: ready
-assignee: null
+status: review
+assignee: agent
 depends_on: [CORE-001]
 owns:
   - Source/SteeplejackSim/Public/Rng.h
