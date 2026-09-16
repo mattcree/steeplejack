@@ -295,7 +295,13 @@ def _land(tid: str) -> int:
 
     # 2. Rebase onto the trunk. rerere means a repeated conflict is solved once.
     print(f"rebasing {br} onto {TRUNK}...")
-    r = subprocess.run(["git", "rebase", TRUNK], cwd=wt,
+    # rerere OFF for the duration of the land. wt-start enables rerere.autoupdate so a human
+    # solves a conflict once; but in `land` the task-file conflict is resolved by this tool,
+    # every time, and rerere replaying a remembered resolution auto-stages it and leaves zero
+    # unmerged paths — which breaks the loop below (nothing to `checkout --theirs`) and makes
+    # the outcome depend on what this machine happens to have seen before. A merge queue must
+    # do the same thing on every machine.
+    r = subprocess.run(["git", "-c", "rerere.enabled=false", "rebase", TRUNK], cwd=wt,
                        capture_output=True, text=True)
 
     # A task's OWN file conflicts on every single land, by construction: `start` commits
@@ -312,12 +318,22 @@ def _land(tid: str) -> int:
         conflicted = git("diff", "--name-only", "--diff-filter=U", cwd=wt,
                          check=False).splitlines()
         if not conflicted:
-            # `rebase --continue` failed with nothing conflicted. The usual cause is a
-            # commit that became empty once the conflict was resolved. Say so, rather than
-            # falling through to the ownership lecture with an empty file list.
-            stalled = ("`git rebase --continue` failed with no conflicted paths. A commit "
-                       "probably became empty once its conflict was resolved.")
+            # A stop with NOTHING unmerged means rerere already staged a resolution for us
+            # (wt-start turns on rerere.autoupdate). The loop below cannot use
+            # `checkout --theirs` in that state — there is no stage 3 left to take — so the
+            # rebase runs with rerere disabled and this should not happen. If it still does,
+            # report what git said rather than guessing.
+            state = git("status", cwd=wt, check=False, quiet=True)
+            if "rebase in progress" in state.lower() and "unmerged" not in state.lower():
+                print(f"{C['dim']}  resolution already staged; continuing{C['off']}")
+                r = subprocess.run(["git", "rebase", "--continue"], cwd=wt,
+                                   capture_output=True, text=True,
+                                   env={**os.environ, "GIT_EDITOR": "true"})
+                continue
+            stalled = ("`git rebase --continue` failed with no conflicted paths.\n"
+                       f"        git said: {(r.stderr or r.stdout).strip()[-400:]}")
             break
+
         if conflicted != [own]:
             break
 
@@ -356,8 +372,9 @@ def _land(tid: str) -> int:
                        f"{co.stderr.strip() or 'unknown error'}")
             break
         git("add", own, cwd=wt)
-        r = subprocess.run(["git", "rebase", "--continue"], cwd=wt, capture_output=True,
-                           text=True, env={**os.environ, "GIT_EDITOR": "true"})
+        r = subprocess.run(["git", "-c", "rerere.enabled=false", "rebase", "--continue"],
+                           cwd=wt, capture_output=True, text=True,
+                           env={**os.environ, "GIT_EDITOR": "true"})
     else:
         # Only a stall if the rebase is still failing. Exhausting the loop on a 50th
         # `rebase --continue` that SUCCEEDED is a completed rebase, not a stall, and

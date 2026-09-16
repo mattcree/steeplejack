@@ -123,12 +123,26 @@ def make_repo_with_origin(tmp: str) -> str:
     # the branch: handoff plus an Outcome that must survive the resolution
     r("worktree", "add", "-q", "-b", "test-999-fixture-task",
       os.path.join(tmp, "sj-test-999"), "main")
+    # wt-start enables these on every real worktree, so the fixture must too — rerere
+    # replaying a remembered resolution is exactly what broke `land`.
+    for k, v in (("rerere.enabled", "true"), ("rerere.autoupdate", "true")):
+        subprocess.run(["git", "config", k, v], cwd=os.path.join(tmp, "sj-test-999"),
+                       capture_output=True)
     wt_path = os.path.join(tmp, "sj-test-999", "tasks", "TEST-999.md")
     open(wt_path, "w").write(TASK.format(status="review") + "\n## Outcome\nMUST-SURVIVE\n")
     subprocess.run(["git", "add", "-A"], cwd=os.path.join(tmp, "sj-test-999"),
                    capture_output=True)
     subprocess.run(["git", "commit", "-qm", "handoff"], cwd=os.path.join(tmp, "sj-test-999"),
                    capture_output=True)
+
+    # A SECOND branch commit touching the same file. Once the first is resolved to the
+    # branch's copy, this one has nothing left to apply and git reports it empty — which is
+    # what `land` must skip rather than stall on. Real branches always look like this:
+    # claim, plan, handoff, review fixes.
+    open(wt_path, "w").write(TASK.format(status="review")
+                             + "\n## Outcome\nMUST-SURVIVE\nreview fix\n")
+    subprocess.run(["git", "commit", "-qam", "review fixes"],
+                   cwd=os.path.join(tmp, "sj-test-999"), capture_output=True)
 
     # the trunk: the claim, on the same line — this is what conflicts, every time
     open(path, "w").write(TASK.format(status="in_progress"))
@@ -224,6 +238,9 @@ def main() -> int:
         log = subprocess.run(["git", "log", "--oneline", "-20"],
                              cwd=os.path.join(tmp, "sj-test-999"),
                              capture_output=True, text=True).stdout
+        check("land does not stall on a multi-commit branch with rerere enabled",
+              "STOPPED" not in out,
+              f"land stalled. got: {out.strip()[:300]}")
         check("the rebase used the LOCAL trunk, not origin/main", "claim" in log,
               f"branch does not contain main's claim commit — rebased onto the wrong ref. got: {log[:200]}")
 
