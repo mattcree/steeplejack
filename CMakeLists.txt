@@ -13,7 +13,9 @@
 cmake_minimum_required(VERSION 3.20)
 project(SteeplejackSim CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+# C++20 to match SteeplejackSim.Build.cs. UE 5.8 removed C++17 support; these two must
+# stay equal or the standalone gate stops proving what the engine will do.
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
