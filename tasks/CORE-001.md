@@ -58,7 +58,24 @@ No new sim interfaces. Creates the two `.Target.cs` files and the game module en
 No gameplay. No content. The fixed-step driver is CORE-005.
 
 ## Plan
-<!-- Filled in by the implementer before building, if estimate_days > 1. -->
+- **Verify the scaffold before changing it.** Done: `make build-sim` compiles clean under
+  `-Wall -Wextra -Werror -Wshadow -Wconversion` (GCC 16.2.1) with no Unreal installed, and
+  `make check` is green (0 violations, 4/4 tests). Acceptance 2, 3 and 5 are met by the
+  scaffold as it stood — this task's first job was proving it, and it holds.
+- **Create the three missing `owns:` files**: `Source/Steeplejack.Target.cs` (game target),
+  `Source/SteeplejackEditor.Target.cs` (editor target), and
+  `Source/SteeplejackGame/SteeplejackGame.cpp` (the primary game module entry point).
+  No gameplay in any of them — the fixed-step driver is CORE-005.
+- **Reconcile `.uproject` to the engine actually being installed.** `EngineAssociation` moves
+  `5.5` -> `5.8`; the plugin list is checked name-by-name against ADR-0004 (acceptance 4).
+  ADR-0004's decision line reads "5.5+", so this is inside the accepted decision, not a
+  reversal of it.
+- **Blocked on the engine for acceptance 1 and 6.** `make build-game` and "the editor opens an
+  empty map at the primary target's frame budget" cannot run until UE 5.8.2 is unpacked and
+  `UE_ROOT` is set. Everything else lands first so the engine-gated half is the only thing
+  waiting.
+- **Raise follow-ups rather than widening scope**: the ~15 files outside `owns:` that pin "5.5"
+  in prose, and this task's own `editor_required: false` tag, which contradicts acceptance 6.
 
 ## Blocked
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
