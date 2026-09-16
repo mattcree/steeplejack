@@ -28,6 +28,7 @@ CASES = ["Harness: doctest links and runs",
          "Types: defaults are known"]
 
 failures: list[str] = []
+ran = 0
 
 
 def run(task_bodies: dict[str, str], cases: list[str] | None = CASES) -> tuple[int, str]:
@@ -62,6 +63,8 @@ def task(tid: str, status: str, verify: str) -> str:
 def case(name: str, *, tasks: dict[str, str], want_exit: int,
          must_say: str | None = None, must_not_say: str | None = None,
          cases: list[str] | None = CASES):
+    global ran
+    ran += 1
     code, out = run(tasks, cases)
     if code != want_exit:
         failures.append(f"{name}: exit {code}, wanted {want_exit}\n{out}")
@@ -144,8 +147,12 @@ case("an unreadable test binary is an error, not an empty case list",
 def main() -> int:
     for f in failures:
         print(f"\033[31mFAIL\033[0m {f}")
-    n = 15
-    print(f"\n{n - len(failures)}/{n} check_verify cases passed")
+    # Counted as the cases run, never hardcoded. A test harness that reports a total it did not
+    # measure is the same decoration failure this whole task exists to remove, one level up.
+    if ran == 0:
+        print("\033[31mFAIL\033[0m no cases ran at all")
+        return 1
+    print(f"\n{ran - len(failures)}/{ran} check_verify cases passed")
     return 1 if failures else 0
 
 

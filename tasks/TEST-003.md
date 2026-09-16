@@ -112,8 +112,9 @@ task's filter repo-wide, and `docs/06-workflow/03-verification.md` no longer tea
   `test-tools`.
 - `tools/check_verify.py` — cross-checks every task's `verify:` filter against the case names the
   built binary actually exposes. Errors on `review`/`done` with zero matches; notes the rest.
-- `tools/test_check_verify.py` — 15 cases, each asserting the verdict rather than just the exit
-  code (acceptance 5 / the enforced-conventions rule "a rule with no test is not a rule").
+- `tools/test_check_verify.py` — 14 cases, each asserting the verdict rather than just the exit
+  code (acceptance 5 / the enforced-conventions rule "a rule with no test is not a rule"). The
+  harness counts the cases it actually ran and fails if that is zero — see the review note below.
 - `docs/06-workflow/03-verification.md` — see the ownership note below.
 
 **Decisions**
@@ -185,6 +186,15 @@ why, and adds `check-verify` to the ladder.
 - CORE-003 is the only task whose `verify:` currently runs anything at all. 25 of 26 filters match
   zero test cases today. That is expected — the modules are unwritten — but it means this gate was
   protecting one task, and `make check-verify` is what will keep it honest as the other 25 land.
+
+**Caught in review**
+
+The first version of `test_check_verify.py` printed `15/15 cases passed` from a hardcoded `n = 15`
+while running 14. Deleting a case left it still reporting 15/15 and exiting zero — a test harness
+reporting a total it had not measured, which is this task's own bug one level up, inside the fix
+for it. It now counts cases as they run and fails if none did. Worth recording rather than
+quietly fixing: the failure mode is attractive enough to have been written by someone who had
+just spent a day removing it.
 
 **Follow-ups**
 
