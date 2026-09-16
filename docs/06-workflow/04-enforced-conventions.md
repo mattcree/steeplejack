@@ -61,8 +61,15 @@ plan (12 levels, small team) and it evaporates the moment constants start living
 ## Rule 16 in detail
 
 `tools/check_conventions.py` greps the working tree **and the commit history** for a configured
-list of real names associated with the subject matter. The list lives in
-`tools/likeness_denylist.txt`.
+list of real names associated with the subject matter.
+
+The tracked `tools/likeness_denylist.txt` is **deliberately empty**: writing the terms into a public
+repository would publish the very association the policy exists to avoid, and would make the repo a
+search hit for them. The real list lives in `tools/likeness_denylist.local.txt`, which is gitignored.
+The checker reads both and concatenates them.
+
+**Until the local file is populated, rule 16 is inert and says so on every run.** Populating it is a
+pre-M0 task for the project lead.
 
 It is not a joke check. See [the IP policy](../05-legal/ip-and-likeness.md) — this is a blocking
 gate at every milestone, and catching it in CI is much cheaper than catching it in a VO session.

@@ -9,3 +9,7 @@ dist/
 # Research material must NOT be committed — see docs/05-legal/ip-and-likeness.md
 research/
 reference-footage/
+
+# The real likeness denylist is private — see tools/likeness_denylist.txt
+tools/likeness_denylist.local.txt
+*.local.txt

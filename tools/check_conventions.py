@@ -68,13 +68,21 @@ def check_sim_purity():
 
 # --- rule 16: likeness ------------------------------------------------------
 def check_likeness():
-    deny = os.path.join(ROOT, "tools", "likeness_denylist.txt")
-    if not os.path.exists(deny):
+    base = os.path.join(ROOT, "tools", "likeness_denylist.txt")
+    local = os.path.join(ROOT, "tools", "likeness_denylist.local.txt")
+    if not os.path.exists(base):
         errors.append("tools/likeness_denylist.txt is missing — rule 16 cannot run")
         return
-    terms = [t.strip() for t in open(deny, encoding="utf-8")
-             if t.strip() and not t.startswith("#")]
+    terms: list[str] = []
+    for path in (base, local):
+        if not os.path.exists(path):
+            continue
+        terms += [t.strip() for t in open(path, encoding="utf-8")
+                  if t.strip() and not t.startswith("#")]
     if not terms:
+        print("\033[33mnote\033[0m  rule 16 (likeness) is INERT — no terms configured. "
+              "Populate tools/likeness_denylist.local.txt before M0. "
+              "See docs/05-legal/ip-and-likeness.md")
         return
     skip_dirs = {".git", ".godot", "build", "dist", "node_modules"}
     for dirpath, dirs, files in os.walk(ROOT):
