@@ -1,9 +1,9 @@
 ---
 id: CORE-011
-title: Reconcile docs with UE 5.8 and C++20
+title: Reconcile docs with what CORE-001 actually built
 milestone: M0
 discipline: [ENG]
-estimate_days: 0.5
+estimate_days: 0.75
 status: ready
 assignee: null
 depends_on: [CORE-001]
@@ -23,6 +23,8 @@ owns:
   - docs/06-workflow/00-agent-workflow.md
   - docs/06-workflow/03-verification.md
   - docs/06-workflow/06-launch.md
+  - docs/04-production/work-breakdown.md
+  - tools/check_conventions.py
 reads:
   - Steeplejack.uproject
   - CMakeLists.txt
@@ -37,8 +39,9 @@ risk: R8
 ---
 
 ## Goal
-Every statement of the engine version and the C++ standard matches what CORE-001 actually
-built: **Unreal 5.8.2** and **C++20**.
+Every statement about the engine version, the C++ standard and how `SteeplejackSim` is built
+matches what CORE-001 actually built: **Unreal 5.8.2**, **C++20**, and a sim that is **linked
+as library code, not registered as a loadable UE module**.
 
 ## Why
 The repo says "Unreal 5.5" in about a dozen places and "plain C++17" in eleven, while the
@@ -77,8 +80,38 @@ Two files contain "5.5" for unrelated reasons and **must not be touched**:
 `docs/02-levels/level-02-sweepers-row.md` (a 5.5 m span) and
 `docs/06-workflow/02-parallel-execution.md` (5.5 ideal days).
 
+### The sim is no longer "a UE module" and two docs still say it is
+This is the one that is more than a string swap. CORE-001 set
+`bRequiresImplementModule = false` and removed `SteeplejackSim` from the `.uproject` module list,
+because every loadable UE module needs `IMPLEMENT_MODULE`, which needs `Modules/ModuleManager.h`,
+which convention rule 1 forbids anywhere under `Source/SteeplejackSim/`. The sim is still
+compiled and linked into the editor binary — `UnrealEditor.modules` lists it — it is simply never
+initialised by the module manager.
+
+Two docs still describe the old arrangement:
+
+- `docs/03-tech/adr/0004-engine-change-to-unreal.md` — the layout block says the sim "Builds TWO
+  ways: 1. as a UE module, linked into the game".
+- `docs/03-tech/architecture.md` — "builds two ways — as a UE module, and as a standalone
+  library".
+
+Both are now wrong in the same way, and AGENTS.md rule 9 says when code and a doc disagree one of
+them is a bug and you must say which. Here the **docs** are the bug: ADR-0004's own section
+heading is "SteeplejackSim is *not* a UE module", so the body text contradicts its own title.
+Reword to "linked into the game as library code" or similar — do not weaken rule 1 to match the
+old prose.
+
+### Two more stale-since-ADR-0004 files
+- `docs/04-production/work-breakdown.md:26` still describes CORE-001 as "Godot project, folder
+  structure, `.gitignore`, `project.godot` settings" with acceptance "project opens; Forward+
+  renderer". The row for CORE-002 is stale too. The Definition of Done's first checkbox points at
+  this file's acceptance column, so a stale row here quietly weakens every DoD check.
+- `tools/check_conventions.py` allows the bare literal `17` with the comment "widths, and C++17".
+  Harmless behaviour, stale comment. Fix the comment; do not change the allowed-literals list
+  without checking what else relies on it.
+
 ## Interface
-No code and no signature changes. Prose only.
+No code and no signature changes. Prose, one CI-adjacent comment, and one workflow value.
 
 ## Acceptance
 1. No owned file asserts "5.5" as the engine version or "C++17" as the standard.
@@ -86,10 +119,16 @@ No code and no signature changes. Prose only.
    was forced by the engine, with its original decision line intact.
 3. ADR-0003's determinism reasoning explicitly states both builds are C++20, rather than just
    having the number swapped.
-4. `make check` passes, including link checking.
-5. `BLOCKED.md` row 3 ("Install Unreal 5.5 somewhere and set `UE_ROOT`") reflects what actually
+4. ADR-0004 and `architecture.md` no longer describe `SteeplejackSim` as building "as a UE
+   module", and say which side was the bug. ADR-0004's body text agrees with its own section
+   heading.
+5. `work-breakdown.md`'s CORE-001 row describes the Unreal project it actually is, not a Godot
+   one.
+6. `check_conventions.py`'s stale "C++17" comment is corrected.
+7. `make check` passes, including link checking.
+8. `BLOCKED.md` row 3 ("Install Unreal 5.5 somewhere and set `UE_ROOT`") reflects what actually
    happened, including where the engine landed.
-6. The two unrelated "5.5" matches above are untouched.
+9. The two unrelated "5.5" matches above are untouched.
 
 ## Out of scope
 No engine upgrade work — CORE-001 already moved `.uproject`, `CMakeLists.txt` and the

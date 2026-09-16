@@ -16,6 +16,12 @@ public class SteeplejackSim : ModuleRules
 		// Unreal headers anywhere under this directory. UBT supports exactly this case.
 		bRequiresImplementModule = false;
 
+		// ADR-0003 rule 4: the sim must compile with fused multiply-add disabled so the
+		// standalone and in-engine builds agree on floats. On Clang this emits exactly the
+		// -ffp-contract=off that CMakeLists.txt sets; on MSVC it maps to /fp:precise, which
+		// is what the CMake MSVC branch sets. Without it only the CMake build was covered.
+		FPSemantics = FPSemanticsMode.Precise;
+
 		PCHUsage = PCHUsageMode.NoPCHs;
 		bUseUnity = false;
 		// C++20, not 17: UE 5.8 removed Cpp17 outright (UBT refuses the build, it is not a

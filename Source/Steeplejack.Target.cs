@@ -14,11 +14,12 @@ public class SteeplejackTarget : TargetRules
 	{
 		Type = TargetType.Game;
 
-		// `Latest` rather than a pinned Vn, because this file is authored before the engine
-		// is installed and an unknown Vn constant is a build failure. Pin it to the real
-		// constant once UE 5.8.2 is in place — see CORE-001's Outcome.
-		DefaultBuildSettings = BuildSettingsVersion.Latest;
-		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
+		// Pinned, not `Latest`. These were Latest while the engine was uninstalled and an
+		// unknown Vn constant would have failed the build; UE 5.8.2 defines V7 and
+		// Unreal5_8 as exactly what Latest resolves to today, so this is the same build
+		// with the silent-change-on-upgrade removed.
+		DefaultBuildSettings = BuildSettingsVersion.V7;
+		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_8;
 
 		ExtraModuleNames.AddRange(new string[] { "SteeplejackSim", "SteeplejackGame" });
 	}
