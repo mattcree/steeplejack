@@ -32,7 +32,10 @@ def check(name: str, cond: bool, detail: str = "") -> None:
 
 
 def run(args: list[str], cwd: str) -> subprocess.CompletedProcess:
-    return subprocess.run([sys.executable, WT] + args, cwd=cwd,
+    # -B: do not write tools/__pycache__. A tracked or even untracked .pyc here
+    # re-dirties the tree on every `make ci`, and a dirty tree makes `land` refuse
+    # and `wt-status` report AT RISK — in the tool meant to be trustworthy.
+    return subprocess.run([sys.executable, "-B", WT] + args, cwd=cwd,
                           capture_output=True, text=True, timeout=60,
                           env={**os.environ, "NO_COLOR": "1"})
 
@@ -89,7 +92,7 @@ def field_on(tmp: str, branch: str) -> str:
         "print(wt.task_field_on('TEST-999', 'status', %r))\n"
         "print(wt.task_field('TEST-999', 'status'))\n" % (TOOLS, branch)
     )
-    out = subprocess.run([sys.executable, "-c", script], cwd=tmp,
+    out = subprocess.run([sys.executable, "-B", "-c", script], cwd=tmp,
                          capture_output=True, text=True, timeout=60)
     return out.stdout.strip()
 
@@ -121,6 +124,21 @@ def main() -> int:
         check("unknown branch falls back to the trunk",
               missing and missing[0] == "in_progress",
               f"expected 'in_progress', got {missing!r}")
+
+    print("land gets PAST the status check when the BRANCH says review")
+    with tempfile.TemporaryDirectory() as tmp:
+        make_repo(tmp)
+        # Branch says review, trunk says in_progress — the exact shape of the deadlock.
+        # A land that reads the trunk refuses here; a land that reads the branch proceeds
+        # and fails later, on the missing worktree. Asserting the ABSENCE of the status
+        # refusal is what makes this a regression test rather than one more negative case:
+        # every other land case here passes even with the bug reintroduced.
+        p = run(["land", "TEST-999"], cwd=tmp)
+        out = p.stdout + p.stderr
+        check("land does not refuse on status", "not 'review'" not in out,
+              f"land read the trunk, not the branch — deadlock is back. got: {out.strip()[:200]}")
+        check("land proceeds past it", "no worktree at" in out,
+              f"expected to reach the worktree check, got: {out.strip()[:200]}")
 
     print("land refuses a task whose BRANCH is not at review")
     with tempfile.TemporaryDirectory() as tmp:
