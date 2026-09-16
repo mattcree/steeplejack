@@ -109,7 +109,7 @@ branch; never skippable for a PR, because CI runs the same gates.
   seconds, and it is the gate that catches most agent mistakes.
 - **sim** (no engine): CMake build plus the whole doctest suite — unit, property, level, replay,
   determinism, step budget. Under two minutes on a GitHub-hosted runner.
-- **game** (self-hosted runner with UE 5.5): editor build and UE automation tests. Enabled by
+- **game** (self-hosted runner with UE 5.8): editor build and UE automation tests. Enabled by
   CORE-002.
 
 Nightly adds frame-time capture and screenshot diffs.

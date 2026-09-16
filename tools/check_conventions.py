@@ -45,7 +45,7 @@ FORBIDDEN_IN_SIM = [
 # --- rule 4: no magic numbers in sim/ ----------------------------------------
 ALLOWED_LITERALS = {"0", "1", "-1", "2", "0.0", "1.0", "0.5", "100.0", "2.0", "-1.0",
                     "0f", "1f", "0.0f", "1.0f", "0.5f", "2.0f", "-1.0f", "100.0f",
-                    "8", "16", "32", "64", "17"}   # widths, and C++17
+                    "8", "16", "32", "64"}         # widths
 # C++ float literals carry an f/F suffix; integer literals may carry u/l/z.
 NUM = re.compile(r"(?<![\w.])(-?\d+\.?\d*)(?:[fFuUlLzZ]+)?(?![\w.])")
 

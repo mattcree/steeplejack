@@ -10,14 +10,14 @@ deliberately not padded; treat them as ordering and relative weight, not commitm
 
 Build the skeleton that everything else hangs on. No gameplay.
 
-- Unreal 5.5 project with **two modules**; `SteeplejackSim` building standalone under CMake
+- Unreal 5.8 project with **two modules**; `SteeplejackSim` building standalone under CMake
 - CI: the fast job group and the sim job group, both without Unreal installed
 - Git LFS and the `Content/` size gate, before the first binary asset
 - **Fixed-step sim driver + intent recording + replay playback** (ADR-0003)
 - `SteeplejackSim` skeleton: typed structs, seeded RNG, tuning loader, level loader
 - Procedural chimney builder (round profile, Nanite) + joint grid generation
 - Capsule character, basic camera, grey-box field
-- A self-hosted runner with UE 5.5, and the `game` CI job enabled
+- A self-hosted runner with UE 5.8, and the `game` CI job enabled
 
 **Gate:** `make ci` is green on a GitHub-hosted runner **with no Unreal installed** — the sim loads
 a level JSON, generates a joint grid, steps 10,000 times and produces identical results twice. Plus

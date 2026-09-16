@@ -5,9 +5,14 @@
 > [`adr/0003`](adr/0003-determinism-and-testing.md) first. This document is the shape that follows
 > from them.
 >
-> **The one structural idea:** `SteeplejackSim` is plain C++17 with no Unreal dependency, and builds
-> two ways — as a UE module, and as a standalone library with a CMake test binary. That is what keeps
-> the gameplay layer agent-executable and testable in seconds without a 40 GB engine install.
+> **The one structural idea:** `SteeplejackSim` is plain C++20 with no Unreal dependency, and builds
+> two ways — linked into the game as library code, and as a standalone library with a CMake test
+> binary. That is what keeps the gameplay layer agent-executable and testable in seconds without a
+> 40 GB engine install.
+>
+> It is **not** a loadable UE module and has no `IMPLEMENT_MODULE`: that would need
+> `Modules/ModuleManager.h`, and rule 1 forbids Unreal headers anywhere under the module. UBT's
+> `bRequiresImplementModule = false` covers exactly this case. See CORE-001.
 
 ## Repository layout
 
@@ -18,7 +23,7 @@ steeplejack/
 ├── CMakeLists.txt                 ← standalone build of the sim + its tests (no Unreal)
 │
 ├── Source/
-│   ├── SteeplejackSim/            ← PURE C++17. No UE types. 100% unit tested. AGENT-OWNED.
+│   ├── SteeplejackSim/            ← PURE C++20. No UE types. 100% unit tested. AGENT-OWNED.
 │   │   ├── Public/
 │   │   │   ├── Rng.h  Types.h  Tuning.h  Level.h  Joints.h  Anchor.h
 │   │   │   ├── Stack.h  Load.h  Meters.h  Wobble.h  Weather.h  Slip.h
@@ -89,7 +94,7 @@ structs in C++; this is not ambitious, and it is measured on every commit in the
 
 ```cpp
 // Source/SteeplejackSim/Public/Types.h
-// Plain C++17. No FVector, no TArray, no UObject — the standalone CMake build depends on it.
+// Plain C++20. No FVector, no TArray, no UObject — the standalone CMake build depends on it.
 namespace sj {
 
 struct Vec2 { float x, y; };

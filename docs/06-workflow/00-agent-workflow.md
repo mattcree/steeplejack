@@ -93,7 +93,7 @@ Every task carries one command in its `verify:` field. It must pass.
 make check          # the full local gate: conventions, data, tasks, links, sim build + tests
 ```
 
-`make check` needs `cmake`, `ninja` and a C++17 compiler — **not Unreal**. Only tasks that own
+`make check` needs `cmake`, `ninja` and a C++20 compiler — **not Unreal**. Only tasks that own
 `SteeplejackGame` or `Content/` paths need the engine.
 
 Then walk the applicable sections of

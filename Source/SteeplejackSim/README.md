@@ -1,6 +1,6 @@
 # SteeplejackSim — the pure simulation layer
 
-**Plain C++17. No Unreal. This module must compile standalone under CMake with no engine
+**Plain C++20. No Unreal. This module must compile standalone under CMake with no engine
 installed.** That is not a style preference — it is what keeps the gameplay layer testable in
 ~20 seconds and editable by agents. See [ADR-0004](../../docs/03-tech/adr/0004-engine-change-to-unreal.md).
 
