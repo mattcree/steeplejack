@@ -28,7 +28,7 @@ survive an engine change.
 └───────────────────────────▲──────────────┬───────────────────┘
                       state │              │ intents
 ┌───────────────────────────┴──────────────▼───────────────────┐
-│  SteeplejackSim  (plain C++17. No Unreal. Builds standalone.)│
+│  SteeplejackSim  (plain C++20. No Unreal. Builds standalone.)│
 │                                                              │
 │  Anchor.h    Rate(joint, depth, spall, tuning) -> AnchorRate │
 │  Load.h      LoadShare(stack, section, kN, tuning, out)      │
@@ -54,6 +54,13 @@ survive an engine change.
 4. Float determinism: we only need determinism **within a platform/build**, not across platforms.
    That is achievable with fixed-step + seeded RNG and does not require fixed-point math. Compile
    the sim with `-ffp-contract=off` so the standalone and in-engine builds agree.
+
+   **Both builds are C++20 and must stay equal.** CMake sets the standard directly;
+   `SteeplejackSim.Build.cs` sets `CppStandard = Cpp20` and `FPSemantics = Precise`, which is
+   how the in-engine build gets the same flag (Clang emits `-ffp-contract=off`, MSVC
+   `/fp:precise`). Without the latter the in-engine build on Windows would have compiled at
+   `/fp:fast` against CMake's `/fp:precise` — the two builds compile the same sources, so a
+   divergence in either the standard or the FP mode breaks this argument. See CORE-001.
 
 ### Recording and replay
 

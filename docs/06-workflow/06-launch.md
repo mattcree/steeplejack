@@ -9,11 +9,11 @@ These are one-time, and **every one of them is the project lead's, not an agent'
 | # | Check | Command / where | Status |
 |---|---|---|---|
 | 1 | `make check` is green on the machine agents will run on | `make check` | ✅ 0.4 s warm |
-| 2 | Toolchain present: cmake, ninja, a C++17 compiler | `cmake --version` | ✅ |
+| 2 | Toolchain present: cmake, ninja, a C++20 compiler | `cmake --version` | ✅ |
 | 3 | Convention checkers have their own tests | `python3 tools/test_conventions.py` | ✅ 20 cases |
 | 4 | **Likeness denylist populated** | `tools/likeness_denylist.local.txt` | ⬜ **inert** |
 | 5 | Git LFS enabled on the remote | CORE-010 | ⬜ |
-| 6 | Unreal 5.5 installed somewhere, `UE_ROOT` set | for CORE-001's second half | ⬜ |
+| 6 | Unreal 5.8 installed, `UE_ROOT` set | CORE-001 verified it | ✅ |
 | 7 | A human named for the editor queue | `make human-queue` | ⬜ |
 | 8 | You are reachable for escalations | `BLOCKED.md` | ⬜ |
 | 9 | The git guard hook is active | `.claude/settings.json` → `hooks.PreToolUse` | ✅ 25 cases |

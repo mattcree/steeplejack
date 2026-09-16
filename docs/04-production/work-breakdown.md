@@ -23,7 +23,7 @@ Status legend: ⬜ not started · 🟡 in progress · ✅ done · ⛔ blocked
 
 | ID | Task | Disc | Est | Depends on | Acceptance |
 |---|---|---|---|---|---|
-| ⬜ CORE-001 | Godot project, folder structure, `.gitignore`, `project.godot` settings | ENG | 0.5 | — | project opens; Forward+ renderer; 60 Hz physics tick |
+| ✅ CORE-001 | Unreal project, two modules, and the standalone sim build | ENG | 1.5 | PROD-001 | `make build-sim` with no engine; `make build-game` compiles the editor target |
 | ⬜ CORE-002 | CI: conventions, data, CMake sim build + doctest | ENG | 1 | CORE-001 | green on an empty test |
 | ⬜ CORE-003 | `Rng.h` seeded xorshift + tests | ENG | 0.5 | CORE-001 | same seed → same 10k sequence, twice |
 | ⬜ CORE-004 | `Types.h` plain structs (Joint, Anchor, Section, Stack, Meters…) | ENG | 1 | CORE-003 | no Unreal types anywhere in `SteeplejackSim` (CI rule) |

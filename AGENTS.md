@@ -13,7 +13,7 @@ make wip                     # commit + push. Run this constantly. It is the pan
 make check                   # the gate (no Unreal needed). Green before handoff.
 ```
 
-You need `cmake`, `ninja` and a C++17 compiler for `make check`. You need **Unreal 5.5 and
+You need `cmake`, `ninja` and a C++20 compiler for `make check`. You need **Unreal 5.8 and
 `UE_ROOT` set** only for tasks that touch `SteeplejackGame` or `Content/` — most tasks don't.
 
 Then open `tasks/<ID>.md` for the task you claimed. **It is self-contained.** Read it, read the
@@ -59,7 +59,7 @@ gameplay layer **is not an Unreal module**:
 
 | Layer | Owner | Format | Verified |
 |---|---|---|---|
-| `Source/SteeplejackSim/` | **agents** | plain C++17, no Unreal | ✅ CMake + doctest, ~20 s, **no engine needed** |
+| `Source/SteeplejackSim/` | **agents** | plain C++20, no Unreal | ✅ CMake + doctest, ~20 s, **no engine needed** |
 | `data/` `tools/` `tests/` `docs/` | **agents** | text | ✅ ~3 s |
 | `Source/SteeplejackGame/` | agents + humans | C++ with Unreal | partially (UE automation) |
 | `Content/` | **humans** | binary, Git LFS | ❌ visual review only |

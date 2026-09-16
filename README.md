@@ -53,12 +53,12 @@ See [`docs/04-production/roadmap.md`](docs/04-production/roadmap.md) and
 make check                 # conventions, data, task graph, links, sim build + tests
 make ready                 # what you can pick up right now
 
-# The game. Needs Unreal 5.5 and UE_ROOT set.
+# The game. Needs Unreal 5.8 and UE_ROOT set.
 make build-game
 make editor
 ```
 
-**Unreal Engine 5.5**, with the gameplay layer split into `SteeplejackSim` — plain C++17 with no
+**Unreal Engine 5.8**, with the gameplay layer split into `SteeplejackSim` — plain C++20 with no
 Unreal dependency, which builds standalone under CMake so it can be tested in seconds without the
 engine. See [`ADR-0004`](docs/03-tech/adr/0004-engine-change-to-unreal.md), which supersedes
 [`ADR-0001`](docs/03-tech/adr/0001-engine-choice.md) (Godot).

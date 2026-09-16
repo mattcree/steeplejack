@@ -1,6 +1,6 @@
 # Performance Budget
 
-> Rewritten following [ADR-0004](adr/0004-engine-change-to-unreal.md). Unreal Engine 5.5+,
+> Rewritten following [ADR-0004](adr/0004-engine-change-to-unreal.md). Unreal Engine 5.8.2,
 > Lumen + Nanite, deferred renderer.
 
 ## Targets

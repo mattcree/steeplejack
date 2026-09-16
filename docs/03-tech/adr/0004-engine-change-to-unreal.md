@@ -6,6 +6,27 @@
 - **Decision:** Unreal Engine 5.5+, with the simulation layer as a **UE-independent C++ module**
 - **Deciders:** project lead
 
+## Note — 2026-09-17, the concrete version
+
+The decision line above says "5.5+" and is unchanged. This records what "+" turned out to mean.
+
+**The engine is Unreal 5.8.2.** Chosen during CORE-001 by the project lead: Epic's Linux download
+page no longer leads with 5.5, nothing in the repo had ever been compiled so migration cost was
+zero, and 5.5.4 is a March 2025 build. 5.8.2 is inside the accepted decision, not a revision of it.
+
+**C++17 became C++20, and that was forced rather than chosen.** UE 5.8 removed
+`CppStandardVersion.Cpp17` outright — UBT fails the build with "C++17 is no longer allowed", and
+the engine's own shared PCH is `...Cpp20.h`. There is no configuration of 5.8 that keeps the sim
+at C++17. Both builds moved together deliberately; see ADR-0003 rule 4, whose argument depends on
+them not diverging.
+
+**The sim is not a loadable UE module.** Every loadable module needs `IMPLEMENT_MODULE`, which
+needs `Modules/ModuleManager.h`, which rule 1 forbids anywhere under `Source/SteeplejackSim/`.
+Resolved with UBT's `bRequiresImplementModule = false` and removing the sim from the `.uproject`
+module list: it is compiled and linked into the editor binary, just never registered with the
+module manager. This is what the section heading below already said — "SteeplejackSim is *not* a
+UE module" — and what the body text had contradicted.
+
 ## Context
 
 ADR-0001 chose Godot 4 primarily for agent-executability: text scene files, headless testing, and a
@@ -49,9 +70,9 @@ against this decision.
 
 ```
 Source/
-  SteeplejackSim/      pure C++17. No UE types. No FVector, no UObject, no TArray.
+  SteeplejackSim/      pure C++20. No UE types. No FVector, no UObject, no TArray.
     Public/*.h         Builds TWO ways:
-    Private/*.cpp        1. as a UE module, linked into the game
+    Private/*.cpp        1. as library code linked into the game (NOT a loadable module)
     CMakeLists.txt       2. as a standalone static lib + test binary, via CMake
   SteeplejackGame/     the UE module. Actors, components, subsystems, rendering.
 ```

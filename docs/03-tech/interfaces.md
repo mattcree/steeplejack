@@ -11,7 +11,7 @@ Scope: the modules needed for M0 and M1. M2+ interfaces are added at the start o
 
 ## Conventions
 
-Per [ADR-0004](adr/0004-engine-change-to-unreal.md), `SteeplejackSim` is **plain C++17 with no
+Per [ADR-0004](adr/0004-engine-change-to-unreal.md), `SteeplejackSim` is **plain C++20 with no
 Unreal dependency**, so that it builds standalone under CMake and its tests run in CI without the
 engine. That constraint is enforced by `tools/check_conventions.py` and it is not negotiable.
 
