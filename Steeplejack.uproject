@@ -5,11 +5,6 @@
 	"Description": "A game about climbing tall things and taking them down.",
 	"Modules": [
 		{
-			"Name": "SteeplejackSim",
-			"Type": "Runtime",
-			"LoadingPhase": "PreDefault"
-		},
-		{
 			"Name": "SteeplejackGame",
 			"Type": "Runtime",
 			"LoadingPhase": "Default",
