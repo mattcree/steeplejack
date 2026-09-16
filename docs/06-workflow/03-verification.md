@@ -10,6 +10,7 @@ Cheapest and fastest first. Everything above a rung only runs if the rungs below
 | # | Gate | Command | Runtime | When |
 |---|---|---|---|---|
 | 0 | **The checkers' own tests** | `make test-tools` | ~5 s | CI |
+| 0 | **Every `verify:` filter runs real tests** | `make check-verify` | ~2 s | CI |
 | 1 | **Enforced conventions** | `make check-conventions` | ~1 s | pre-commit, CI |
 | 2 | Data validation (schemas, tuning, task graph) | `make validate` | ~2 s | pre-commit, CI |
 | 3 | Doc link integrity + Blueprint rule | `make check-links check-blueprints` | ~1 s | CI |
@@ -25,18 +26,36 @@ Cheapest and fastest first. Everything above a rung only runs if the rungs below
 
 ### Empty gates must not report success
 
-Three gates (`test-levels`, `test-replay`, `test-determinism`) filter the test binary by name. Until
-the tests they select exist, a naive filter matches nothing and **exits zero** — a green gate that
-checks nothing, which is how a suite rots into decoration.
+A gate that filters the test binary by name and matches nothing still **exits zero** — a green gate
+that checks nothing, which is how a suite rots into decoration. Two mechanisms stop that, and they
+answer different questions.
 
-The Makefile counts matching test cases first and prints this instead:
+**`test-levels`, `test-replay`, `test-determinism`** run on every CI build, long before the tests
+they select exist. They count matching cases first and print a note rather than a tick:
 
 ```
   -- replay regression: no such tests yet (lands in CORE-006/TEST-002)
 ```
 
-The gate becomes real the moment its tests land, with no Makefile change. If you add a gate, add it
-this way.
+They stay green, because on a fresh clone those tests are *supposed* to be missing. The gate becomes
+real the moment its tests land, with no Makefile change. If you add a gate, add it this way.
+
+**`test-unit FILTER=...`** is the opposite case. Nobody runs it by accident: it is run by a task's
+own `verify:`, to prove that task was verified. A filter matching nothing there means the
+verification did not happen, so it **exits non-zero**:
+
+```
+FAILED  FILTER=test_types matched 0 of 31 test cases — nothing ran.
+        A gate that runs nothing must not report success (TEST-003).
+```
+
+`make check` never passes a `FILTER`, so this cannot turn a fresh clone red.
+
+**`make check-verify`** is the repo-wide version of the same question, because the Makefile only
+ever sees one filter at a time. It cross-checks every task's `verify:` filter against the test-case
+names the binary actually exposes, and fails on any task at `review` or `done` whose filter matches
+nothing — a task claiming it was verified by a command that ran zero tests. Filters belonging to
+unwritten modules are listed as pending, not failures. It runs in `make ci`.
 
 **Rungs 1–8 need neither Unreal nor a GPU.** They cover 100% of the gameplay logic and run on a
 GitHub-hosted runner in under two minutes. That is the practical payoff of ADR-0004's module split,
@@ -73,7 +92,13 @@ body. The diff *is* the justification.
 
 Every task's `verify:` field is a single command. Prefer, in order:
 
-1. An existing `make` target with a filter — `make test-unit FILTER=test_stack_spans`
+1. An existing `make` target with a filter — `make test-unit FILTER=stack`
+
+   **The filter matches TEST_CASE *names*, not file names.** Test cases in this repo are named
+   `<Module>: <what it asserts>`, so the filter is the module: `FILTER=stack` matches
+   `TEST_CASE("Stack: load shares across three anchors")`. `FILTER=test_stack` matches nothing,
+   and before TEST-003 that reported SUCCESS. Now it fails, and `make check-verify` catches it
+   across the whole repo.
 2. A new test file that the task also owns
 3. A script that asserts something about the repo — `make check-conventions`
 4. A documented manual procedure — only for art, audio and playtest tasks, and then it must name
