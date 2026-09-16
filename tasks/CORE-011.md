@@ -6,12 +6,11 @@ discipline: [ENG]
 estimate_days: 0.75
 status: ready
 assignee: null
-depends_on: [CORE-001]
+depends_on: [CORE-001, SETUP-004]
 owns:
   - AGENTS.md
   - CLAUDE.md
   - README.md
-  - Makefile
   - BLOCKED.md
   - Source/SteeplejackSim/README.md
   - docs/03-tech/adr/0003-determinism-and-testing.md
@@ -26,6 +25,7 @@ owns:
   - docs/04-production/work-breakdown.md
   - tools/check_conventions.py
 reads:
+  - Makefile
   - Steeplejack.uproject
   - CMakeLists.txt
   - Source/SteeplejackSim/SteeplejackSim.Build.cs
@@ -101,6 +101,17 @@ heading is "SteeplejackSim is *not* a UE module", so the body text contradicts i
 Reword to "linked into the game as library code" or similar — do not weaken rule 1 to match the
 old prose.
 
+### The Makefile is owned by SETUP-004, not by this task
+`Makefile:105` still prints "set UE_ROOT to your Unreal 5.5 install". It is **not** in this
+task's `owns:` because SETUP-004 owns the Makefile (it wires `tools/test_wt.py` into
+`test-tools`), and the task-graph validator rejects two tasks owning one file without a
+dependency between them — `make land` caught exactly that collision on the rebased result.
+
+This task therefore `depends_on: [CORE-001, SETUP-004]`. Once SETUP-004 has landed, add the
+Makefile to this task's `owns:` and fix the string, or hand the one-word change to whoever
+lands SETUP-004. Do not leave it: it is the error message a new contributor sees when their
+`UE_ROOT` is unset, so it is the single highest-traffic stale "5.5" in the repo.
+
 ### Two more stale-since-ADR-0004 files
 - `docs/04-production/work-breakdown.md:26` still describes CORE-001 as "Godot project, folder
   structure, `.gitignore`, `project.godot` settings" with acceptance "project opens; Forward+
@@ -114,7 +125,8 @@ old prose.
 No code and no signature changes. Prose, one CI-adjacent comment, and one workflow value.
 
 ## Acceptance
-1. No owned file asserts "5.5" as the engine version or "C++17" as the standard.
+1. No owned file asserts "5.5" as the engine version or "C++17" as the standard. (The
+   Makefile's "Unreal 5.5" is excluded — SETUP-004 owns that file; see Context.)
 2. ADR-0004 carries a dated note giving 5.8.2 as the concrete version and recording that C++20
    was forced by the engine, with its original decision line intact.
 3. ADR-0003's determinism reasoning explicitly states both builds are C++20, rather than just
