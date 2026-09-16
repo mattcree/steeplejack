@@ -75,7 +75,10 @@ assertions, `make test-unit FILTER=rng` green. This is the first real module in 
 - `Source/SteeplejackSim/Private/Rng.cpp` — implementation.
 - `tests/unit/test_rng.cpp` — 19 cases.
 - `tasks/CORE-003.md` — the Interface block was GDScript; replaced with the C++ from
-  `interfaces.md`. See below.
+  `interfaces.md`. The `spec:` anchor was corrected and the Outcome carries two corrections.
+- `tasks/TEST-003.md` — **new, and outside this task's `owns:`.** Raised by this task for the
+  `gate()` finding below. Declared here as well as in Follow-ups, because the out-of-owns list is
+  what an integrator scans.
 
 ### The task's Interface block was stale, and the spec link was not
 The `## Interface` section specified `class_name Rng extends RefCounted`, `func next_u32() -> int`
@@ -171,12 +174,18 @@ and there are 50-odd task files. **This is likely not the only one.**
   Each reports SUCCESS against zero cases unless that task happens to name its cases to match.
   Every one is a task that can be handed off, reviewed and landed with its stated verification
   never having run.
-- **`Restore()` has no all-zero guard**, while the constructor and `Fork` both do.
-  `Restore({0, 0})` puts the generator in xorshift's absorbing state permanently — 1,000
-  consecutive zeros, confirmed. A live stream cannot reach it, so this only bites on a corrupt or
-  hand-written save, which is exactly CORE-006's input. Left alone deliberately during review
-  rather than changing behaviour under a reviewer; CORE-006 should either validate on load or
-  this should gain a guard.
+- **`Restore({0, 0})` is the absorbing state, and the right fix is CORE-006's to choose.**
+  `Restore` has no all-zero guard while the constructor and `Fork` both do; restoring a zeroed
+  state yields zeros forever — 1,000 consecutive, confirmed. A live stream cannot reach it, so it
+  only arrives from a corrupt or hand-written save, which is exactly CORE-006's input.
+
+  Deliberately **not** guarded here, and the reviewer's reasoning for that is better than mine
+  was: the constructor's guard normalises a *legitimate* input (a human typing seed 0), whereas a
+  zeroed state arriving at `Restore` is a corrupt save. Silently repairing it turns "this replay
+  file is corrupt" into "this replay diverges from its recording for no visible reason" — much
+  the harder of the two to diagnose, and CORE-006 is what would be diagnosing it. So the real
+  question for CORE-006 is: **guard here, or validate-and-reject at the file boundary?** Probably
+  the latter, since CORE-006 owns the serialisation format.
 - **`RangeInt` is signed-overflow UB for spans above 2^31** (needs `lo < -1` and `hi` near
   `INT32_MAX`). No sim call will do it, `-Werror` does not catch it, no test covers it.
 - **The "one draw in, one value out" promise has undocumented exceptions.** `RangeInt(5, 5)` and
