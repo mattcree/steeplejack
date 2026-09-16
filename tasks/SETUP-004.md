@@ -118,6 +118,29 @@ Both CORE-001 and LVL-000 were sitting at `review` on their branches and neither
 This was not a reporting nuisance — integration was completely blocked, and the first attempt to
 land anything in the project's history was the thing that surfaced it.
 
+### Two more defects, found by actually landing something
+The first two fixes made `land` *run*. Running it then exposed two more, both of which had made
+integration impossible and neither of which was visible from reading the code:
+
+**3. `land` rebased onto `origin/TRUNK` but fast-forwarded the LOCAL trunk.** Those are not the
+same ref. `start` commits every claim to the local trunk, and `.claude/hooks/git_guard.py` stops
+agents pushing it — so the local trunk sits ahead of origin as soon as a single task is claimed,
+which is always. The merge died with `fatal: Not possible to fast-forward, aborting` after the
+gate had already passed. Now the trunk is brought up to date first and the branch rebases onto
+the local trunk.
+
+**4. A task's own file conflicts on every land, by construction.** `start` writes
+`status: in_progress` to the trunk copy; the branch writes `status: review` plus its Plan and
+Outcome to the same file. Same line, every task, guaranteed. `land` treated it as a generic
+conflict and printed *"A conflict here means the ownership model was violated"* — which is
+exactly wrong, and would send whoever hit it hunting for a nonexistent `owns:` overlap. `land`
+now resolves that one file to the branch's copy (the branch holds the handoff) and continues;
+any other conflicted path still aborts untouched with the original message.
+
+This also corrects decision 1 below. I rejected option 2 — writing the claim onto the branch too
+— on the grounds that it would "guarantee a conflict at land on the one line both sides changed".
+That conflict exists anyway. It is inherent to claim-on-trunk, not a cost of option 2.
+
 ### What changed
 - **`task_field_on(tid, field, branch)`** — reads a task field from a branch via `git show`,
   falling back to the trunk when there is no branch copy.
@@ -131,6 +154,9 @@ land anything in the project's history was the thing that surfaced it.
 - **`Makefile`** — `test-tools` runs them, so they are inside `make check`.
 - **`wt.py` module docstring** now states which source of truth is authoritative and why,
   which acceptance 4 asked for.
+- **`_land`** pulls the trunk first and rebases onto the local trunk, not `origin/TRUNK`.
+- **`_land`** auto-resolves a conflict in the task's own file to the branch copy, bounded to 50
+  rebase stops, and still aborts on anything else.
 
 ### Decisions
 1. **The branch is authoritative for status; the trunk keeps the claim.** SETUP-004's Context
@@ -144,13 +170,34 @@ land anything in the project's history was the thing that surfaced it.
    teaches the reader where status lives; showing only `review` would leave the next person to
    rediscover the split the same way this task did.
 
+### Proven on real merges, not just tests
+CORE-001 and LVL-000 were both landed with this build of `wt.py` — the first two merges in the
+project's history. LVL-000's run shows the conflict path working:
+
+```
+rebasing lvl-000-grey-box-mvp-level-55-m-four onto main...
+  tasks/LVL-000.md: taking the branch's copy (it holds the handoff)
+verifying rebased result...
+landed  LVL-000 is on main and marked done
+```
+
+The gate also did its job on the way: landing CORE-001 surfaced a real ownership conflict
+(CORE-011 and SETUP-004 both owning `Makefile`) that existed on **neither branch alone** and only
+appeared on the rebased result. That is the merge queue working exactly as designed, and it is
+the argument for verifying the rebase rather than the branch.
+
 ### Surprises
 - **The tool that gates integration had no tests**, while `check_conventions.py` has twenty. The
   rule "a rule with no test is not a rule" was applied to the conventions and not to the
   machinery enforcing the workflow around them.
-- **The missing-ID traceback and the deadlock share a root cause**: `wt.py` was written but never
-  run end to end, exactly like the C++ scaffold CORE-001 found. Nothing in this repo had been
-  executed before today.
+- **All four defects share one root cause**: `wt.py` was written but never run end to end,
+  exactly like the C++ scaffold CORE-001 found. Nothing in this repo had been executed before
+  today. Defects 3 and 4 in particular could not have been found by reading — only by trying to
+  merge something.
+- **Each fix revealed the next.** Fixing the status read let `land` reach the rebase, which
+  exposed the wrong rebase target, which let it reach the conflict, which exposed the
+  misdiagnosed task-file collision. A tool this central needed an end-to-end test on its first
+  day, not on the day of the first merge.
 
 ### Follow-ups
 - `make wt-status` run from inside a worktree lists the trunk checkout as a row with task `?`.
@@ -165,4 +212,5 @@ land anything in the project's history was the thing that surfaced it.
 | 2 | Tests for the no-argument path of all three | PASS — `tools/test_wt.py`, 19 cases, 0 failures |
 | 3 | `wt-status` does not report a status contradicted by the branch | PASS — reads the branch, shows both on divergence |
 | 4 | Authoritative source documented | PASS — `wt.py` module docstring |
-| 5 | `make check` passes | PASS — 0 violations, 55 tasks, 0 errors, tests green |
+| 5 | `make check` passes | PASS — 0 violations, 58 tasks, 0 errors, tests green |
+| — | *(beyond scope, proven in use)* | CORE-001 and LVL-000 both landed on main with this build |

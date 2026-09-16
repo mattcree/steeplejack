@@ -279,6 +279,13 @@ def _land(tid: str) -> int:
 
     git("fetch", "origin", quiet=True)
 
+    # Bring the local trunk up to date FIRST, then rebase onto the local trunk — not onto
+    # origin/TRUNK. The two are not the same: `start` commits each claim to the local trunk,
+    # and the git guard stops agents pushing it, so the local trunk routinely sits ahead of
+    # origin. Rebasing onto origin/TRUNK and then fast-forwarding the local one fails with
+    # "Not possible to fast-forward" the moment a single claim commit is outstanding.
+    git("pull", "--ff-only", "origin", TRUNK, cwd=ROOT, check=False)
+
     # 1. Backup ref, pushed. If everything below goes wrong, the work is still on origin.
     ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     backup = f"backup/{tid.lower()}-{ts}"
@@ -287,9 +294,31 @@ def _land(tid: str) -> int:
     print(f"{C['dim']}backup pushed: {backup}{C['off']}")
 
     # 2. Rebase onto the trunk. rerere means a repeated conflict is solved once.
-    print(f"rebasing {br} onto origin/{TRUNK}...")
-    r = subprocess.run(["git", "rebase", f"origin/{TRUNK}"], cwd=wt,
+    print(f"rebasing {br} onto {TRUNK}...")
+    r = subprocess.run(["git", "rebase", TRUNK], cwd=wt,
                        capture_output=True, text=True)
+
+    # A task's OWN file conflicts on every single land, by construction: `start` commits
+    # `status: in_progress` to the trunk, and the branch writes `status: review` plus its
+    # Plan and Outcome to the same file. That is not an ownership violation — it is the
+    # claim-on-trunk model meeting the handoff-on-branch model on one line. The branch is
+    # authoritative for its own task file (it holds the handoff), so resolve to the branch
+    # and carry on. Anything else conflicting is a real violation and still aborts.
+    own = os.path.relpath(task_path(tid), ROOT)
+    for _ in range(50):  # bounded: one stop per conflicting commit, never unbounded
+        if not r.returncode:
+            break
+        conflicted = git("diff", "--name-only", "--diff-filter=U", cwd=wt,
+                         check=False).splitlines()
+        if conflicted != [own]:
+            break
+        print(f"{C['dim']}  {own}: taking the branch's copy (it holds the handoff){C['off']}")
+        # mid-rebase, --theirs is the commit being replayed, i.e. the branch
+        git("checkout", "--theirs", own, cwd=wt, check=False)
+        git("add", own, cwd=wt)
+        r = subprocess.run(["git", "rebase", "--continue"], cwd=wt, capture_output=True,
+                           text=True, env={**os.environ, "GIT_EDITOR": "true"})
+
     if r.returncode:
         conflicted = git("diff", "--name-only", "--diff-filter=U", cwd=wt, check=False)
         subprocess.run(["git", "rebase", "--abort"], cwd=wt, capture_output=True)
@@ -321,7 +350,6 @@ def _land(tid: str) -> int:
     # 4. Fast-forward only. The trunk is never merged into; it only ever advances.
     git("push", "--force-with-lease", "origin", br, cwd=wt)
     git("checkout", TRUNK, cwd=ROOT)
-    git("pull", "--ff-only", "origin", TRUNK, cwd=ROOT)
     git("merge", "--ff-only", br, cwd=ROOT)
     git("push", "origin", TRUNK, cwd=ROOT)
 
