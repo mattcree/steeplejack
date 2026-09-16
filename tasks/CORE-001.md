@@ -121,9 +121,10 @@ mitigation had never been compiled before this task; it holds.
   depended on `GeometryScriptingCore`. UBT rejects the mismatch. Pure scaffold bug.
 - **Acceptance 4 is stronger than expected.** UBT validates plugin names at build time, so all
   seven ADR-0004 plugins are confirmed to exist in 5.8 — not just grep-matched.
-- **`editor_required: false` on this task is wrong.** Acceptance 6 requires a human at a screen.
-  Everything else here was agent-executable. The tag should be `true`, or 6 should be its own
-  task; `make ready` currently advertises this as fully agent-claimable and it is not.
+- **`editor_required: false` on this task was wrong when found.** Acceptance 6 required a human at
+  a screen while everything else was agent-executable. *Resolved during this task* by splitting
+  criterion 6 into CORE-013 — see below. Kept here as the trail that led to the split, not as an
+  open defect.
 
 ### Files touched outside `owns:`
 - `tasks/CORE-011.md`, `tasks/CORE-012.md`, `tasks/CORE-013.md` — new follow-up tasks
@@ -177,9 +178,17 @@ The procedure I should have followed is `## Blocked` with a recommendation.
 - **Fixed during review rather than filed:** `FPSemantics = FPSemanticsMode.Precise` added to
   `SteeplejackSim.Build.cs`. ADR-0003 rule 4 requires the sim to compile with FMA fusion off so
   both builds agree on floats, and only `CMakeLists.txt` had it — the exact divergence this task
-  argued against when moving both builds to C++20 together. On Clang the setting emits precisely
-  the `-ffp-contract=off` CMake sets; on MSVC it maps to `/fp:precise`, matching the CMake MSVC
-  branch. Note it has no effect *yet*: `SteeplejackSim` has no `.cpp` files, so nothing compiles
+  argued against when moving both builds to C++20 together.
+
+  **This was worse than it first looked, and the platforms differ.** On Clang/Linux
+  `FPSemanticsMode.Default` already falls through to `Precise` and emits `-ffp-contract=off`
+  (`ClangToolChain.cs:793`), so nothing changes today. On **MSVC**, `Default` falls through to
+  `Imprecise` and emits `/fp:fast` (`VCToolChain.cs:1336`) — so the in-engine sim would have
+  compiled at `/fp:fast` against CMake's `/fp:precise`. That is a live ADR-0003 rule 4 violation
+  on Windows, and a considerably worse one than a missing contract flag. Setting `Precise`
+  explicitly makes both platforms agree with CMake instead of relying on a per-toolchain default.
+
+  It has no effect *yet* either way: `SteeplejackSim` has no `.cpp` files, so nothing compiles
   under it until CORE-003.
 - **Fixed during review rather than filed:** `BuildSettingsVersion` and `EngineIncludeOrderVersion`
   pinned to `V7` / `Unreal5_8` in both target files. They were `Latest` because the engine was not
