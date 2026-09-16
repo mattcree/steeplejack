@@ -42,6 +42,13 @@ SIM_TESTS = os.path.join(ROOT, os.environ.get("BUILD", "build"), "sim_tests")
 # is still allowed to point at tests that do not exist yet.
 VERIFIED_STATUSES = ("review", "done")
 
+# Test cases in this repo are named "<Module>: <what it asserts>" (see tests/unit/), so a
+# useful filter names the module. A filter shaped like a *file* — `test_types`, `test_level`,
+# `test_recovery` — can never match one, whatever module lands later. That cannot be proven
+# until the tests exist, so it is a warning, not an error: it tells the agent claiming the
+# task to fix the filter before they discover it the hard way at handoff.
+FILE_SHAPED = re.compile(r"^test[_-]|\.cpp$", re.I)
+
 # `verify:` is prose as often as it is a command, so match the invocation rather
 # than assuming the whole line is shell. Only `test-unit` runs the doctest binary;
 # `test-automation` runs inside Unreal and cannot be checked from here.
@@ -153,6 +160,10 @@ def audit(tasks: list[dict], names: list[str]) -> list[tuple[str, str, str, str]
             rows.append(("error", tid, flt,
                          f"status '{status}' but the filter matches 0 of {len(names)} "
                          f"test cases — this task was never verified by its own command"))
+        elif FILE_SHAPED.search(flt):
+            rows.append(("suspect", tid, flt,
+                         "0 matches, and this names a file, not a test case — "
+                         "case names look like 'Rng: ...', so this can never match"))
         else:
             rows.append(("pending", tid, flt,
                          f"0 matches, status '{status}' — expected until the module lands"))
@@ -179,6 +190,7 @@ def main() -> int:
     if not args.quiet:
         print(f"{C['bold']}  {'task':<16}{'filter':<22}verdict{C['off']}")
         mark = {"ok": f"{C['grn']}ok{C['off']}", "pending": f"{C['yel']}--{C['off']}",
+                "suspect": f"{C['yel']}??{C['off']}",
                 "skip": f"{C['dim']}··{C['off']}", "error": f"{C['red']}!!{C['off']}"}
         for verdict, tid, flt, detail in rows:
             print(f"  {mark[verdict]}  {tid:<16}{flt:<22}{C['dim']}{detail}{C['off']}")
@@ -193,8 +205,10 @@ def main() -> int:
     for e in errors:
         print(f"{C['red']}error{C['off']} {e}")
 
-    counts = {v: sum(1 for r in rows if r[0] == v) for v in ("ok", "pending", "skip", "error")}
+    counts = {v: sum(1 for r in rows if r[0] == v)
+              for v in ("ok", "pending", "suspect", "skip", "error")}
     print(f"\n{counts['ok']} filter(s) run real tests, {counts['pending']} pending their module, "
+          f"{counts['suspect']} named after a file and cannot ever match, "
           f"{counts['skip']} not checkable here, {counts['error']} broken")
     return 1 if errors else 0
 
