@@ -135,10 +135,14 @@ def make_repo_with_origin(tmp: str) -> str:
     subprocess.run(["git", "commit", "-qm", "handoff"], cwd=os.path.join(tmp, "sj-test-999"),
                    capture_output=True)
 
-    # A SECOND branch commit touching the same file. Once the first is resolved to the
-    # branch's copy, this one has nothing left to apply and git reports it empty — which is
-    # what `land` must skip rather than stall on. Real branches always look like this:
-    # claim, plan, handoff, review fixes.
+    # A SECOND branch commit touching the same file, because every real branch has several:
+    # claim, plan, handoff, review fixes. `land` must resolve the same file once per
+    # conflicting commit and keep going, and BOTH commits must survive to the trunk.
+    #
+    # (This is not an empty-commit fixture. An earlier version of this task claimed the second
+    # commit would empty out and that `land` should `git rebase --skip` it. Both were wrong,
+    # and `--skip` discards a commit — run from the real stalled state it destroyed the
+    # handoff. Nothing here should skip anything.)
     open(wt_path, "w").write(TASK.format(status="review")
                              + "\n## Outcome\nMUST-SURVIVE\nreview fix\n")
     subprocess.run(["git", "commit", "-qam", "review fixes"],
@@ -241,6 +245,13 @@ def main() -> int:
         check("land does not stall on a multi-commit branch with rerere enabled",
               "STOPPED" not in out,
               f"land stalled. got: {out.strip()[:300]}")
+        # The failure mode that would have cost data: a resolution path that drops a commit
+        # rather than resolving it. "Nothing printed STOPPED" does not catch that.
+        check("every commit touching the task file survives",
+              "handoff" in log and "review fixes" in log,
+              f"a commit was discarded rather than resolved. log: {log[:300]}")
+        check("the later commit's content survives", "review fix" in landed,
+              f"the second commit's content was lost. got: {landed[:200]}")
         check("the rebase used the LOCAL trunk, not origin/main", "claim" in log,
               f"branch does not contain main's claim commit — rebased onto the wrong ref. got: {log[:200]}")
 
