@@ -4,7 +4,7 @@ title: Worktree tooling: usable errors and status drift
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.5
-status: in_progress
+status: review
 assignee: agent
 depends_on: []
 owns:
@@ -100,4 +100,69 @@ or backup behaviour, which works.
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+Fixed both defects, plus a third found while fixing them that was considerably worse than
+either: **`land` could never land anything.**
+
+### The deadlock
+`_land` read the task's status from the **trunk** checkout. `cmd_start` writes the claim
+(`status: in_progress`) to the trunk, and the worktree branch is cut from `origin/main`
+*before* that commit — so a handoff (`status: review`) can only ever be written on the branch.
+`land` never looked there. Every task read back as `in_progress` and was refused:
+
+```
+$ make land ID=CORE-001
+error CORE-001 is 'in_progress', not 'review'.
+```
+
+Both CORE-001 and LVL-000 were sitting at `review` on their branches and neither could merge.
+This was not a reporting nuisance — integration was completely blocked, and the first attempt to
+land anything in the project's history was the thing that surfaced it.
+
+### What changed
+- **`task_field_on(tid, field, branch)`** — reads a task field from a branch via `git show`,
+  falling back to the trunk when there is no branch copy.
+- **`_land`** now reads status from the branch, and its refusal names the branch it read and
+  tells you how to check it yourself.
+- **`cmd_status`** reports the branch's status, and where the trunk disagrees it shows both
+  (`review <- in_progress on main`) instead of silently reporting the stale one.
+- **`start` / `land` / `drop`** guard the missing-ID case with `die()` instead of an unguarded
+  `args[0]`, which raised `IndexError` and a traceback.
+- **`tools/test_wt.py`** — 19 cases. `wt.py` had no tests at all.
+- **`Makefile`** — `test-tools` runs them, so they are inside `make check`.
+- **`wt.py` module docstring** now states which source of truth is authoritative and why,
+  which acceptance 4 asked for.
+
+### Decisions
+1. **The branch is authoritative for status; the trunk keeps the claim.** SETUP-004's Context
+   offered three options. I took a combination of the first and third: `land` and `status` read
+   the branch (option 1), and `status` additionally surfaces the divergence rather than hiding it
+   (option 3). I did **not** take option 2 — writing the claim onto the branch as well — because
+   it guarantees a conflict at `land` on the one line both sides changed, on every single task.
+   The claim-on-trunk model is good and is not what was broken; only the reading of it was.
+2. **`status` shows both values rather than just the right one.** The divergence is a real and
+   permanent feature of the model, not an error state. Showing `review <- in_progress on main`
+   teaches the reader where status lives; showing only `review` would leave the next person to
+   rediscover the split the same way this task did.
+
+### Surprises
+- **The tool that gates integration had no tests**, while `check_conventions.py` has twenty. The
+  rule "a rule with no test is not a rule" was applied to the conventions and not to the
+  machinery enforcing the workflow around them.
+- **The missing-ID traceback and the deadlock share a root cause**: `wt.py` was written but never
+  run end to end, exactly like the C++ scaffold CORE-001 found. Nothing in this repo had been
+  executed before today.
+
+### Follow-ups
+- `make wt-status` run from inside a worktree lists the trunk checkout as a row with task `?`.
+  Harmless, pre-existing, cosmetic — not fixed here to keep this task to its stated scope.
+- Nothing else. The `land` path beyond the status check (backup ref, rebase, gate on the rebased
+  result, fast-forward) is untouched and was explicitly out of scope.
+
+### Verification
+| # | Criterion | Result |
+|---|---|---|
+| 1 | No-ID commands print a usable message, exit non-zero, no traceback | PASS — all three, verified by test and by hand |
+| 2 | Tests for the no-argument path of all three | PASS — `tools/test_wt.py`, 19 cases, 0 failures |
+| 3 | `wt-status` does not report a status contradicted by the branch | PASS — reads the branch, shows both on divergence |
+| 4 | Authoritative source documented | PASS — `wt.py` module docstring |
+| 5 | `make check` passes | PASS — 0 violations, 55 tasks, 0 errors, tests green |
