@@ -103,7 +103,7 @@ test-coverage:
 
 ## build-game: compile the UE game module
 build-game:
-	@test -n "$(UE_ROOT)" || (echo "set UE_ROOT to your Unreal 5.5 install" && exit 1)
+	@test -n "$(UE_ROOT)" || (echo "set UE_ROOT to your Unreal 5.8 install" && exit 1)
 	@$(UE_ROOT)/Engine/Build/BatchFiles/Linux/Build.sh SteeplejackEditor Linux Development \
 		-project=$(PWD)/Steeplejack.uproject
 

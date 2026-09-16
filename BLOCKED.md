@@ -34,5 +34,5 @@ See [`docs/06-workflow/06-launch.md`](docs/06-workflow/06-launch.md).
 
 | Task | Raised | Resolved | The question | The answer |
 |---|---|---|---|---|
-| PROD-001 | 2026-09-16 | 2026-09-16 | Which engine? | Unreal 5.5, with `SteeplejackSim` as a UE-independent C++ module. [ADR-0004](docs/03-tech/adr/0004-engine-change-to-unreal.md). *Concrete version later set to 5.8.2 during CORE-001; the answer as given on the day is left as it was.* |
+| PROD-001 | 2026-09-16 | 2026-09-16 | Which engine? | ~~Unreal 5.5~~, with `SteeplejackSim` as a UE-independent C++ module. [ADR-0004](docs/03-tech/adr/0004-engine-change-to-unreal.md). *Concrete version later set to 5.8.2 during CORE-001; the answer as given on the day is left as it was.* |
 | — | 2026-09-16 | 2026-09-16 | Photoreal or stylised, with no artist? | Photoreal where you look, stylised where you don't. Megascans for brick/timber/rope/metal, silhouette-and-fog for the town, one bespoke character. [Art direction](docs/01-gdd/13-art-direction.md). |
