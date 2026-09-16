@@ -1,0 +1,15 @@
+# Names and phrases that must never appear anywhere in this repository,
+# including code, comments, asset filenames, string tables and commit messages.
+#
+# See docs/05-legal/ip-and-likeness.md. This is a blocking gate, not a suggestion.
+#
+# Add the surname, the full name, and any distinctive catchphrase associated with
+# a real person connected to the subject matter. One per line, case-insensitive.
+#
+# This file is deliberately committed with placeholders only. The project lead
+# populates it before M0 and it is reviewed at every milestone gate.
+
+# --- example entries, commented out until the lead confirms the list ---
+# Dibnah
+# Fred Dibnah
+# did yer like that

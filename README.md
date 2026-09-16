@@ -21,12 +21,23 @@ down with your gear.
 | A producer / lead | [`docs/04-production/mvp.md`](docs/04-production/mvp.md) → [`docs/04-production/work-breakdown.md`](docs/04-production/work-breakdown.md) |
 | An artist | [`docs/01-gdd/13-art-direction.md`](docs/01-gdd/13-art-direction.md) |
 | A level designer | [`docs/02-levels/LEVEL-TEMPLATE.md`](docs/02-levels/LEVEL-TEMPLATE.md) → [`docs/02-levels/level-index.md`](docs/02-levels/level-index.md) |
-| An agent picking up work | [`AGENTS.md`](AGENTS.md) |
+| An agent picking up work | [`AGENTS.md`](AGENTS.md) → `make ready` |
+| Anyone, on how work actually flows | [`docs/06-workflow/`](docs/06-workflow/00-agent-workflow.md) |
 
 ## Status
 
-**Pre-production.** No code has been written beyond a scaffold. The design is complete enough to
-build M0–M2 without further design input. See [`docs/04-production/roadmap.md`](docs/04-production/roadmap.md).
+**Pre-production.** No engine code yet. The design is complete enough to build M0–M2 without further
+design input, and M0 + M1 are broken down into 47 self-contained work items in
+[`tasks/`](tasks/).
+
+```bash
+make ready       # 5 tasks are claimable today
+make board       # 47 tasks, 83 ideal days to the M1 gate
+make critical TARGET=PT-001
+```
+
+See [`docs/04-production/roadmap.md`](docs/04-production/roadmap.md) and
+[`docs/06-workflow/00-agent-workflow.md`](docs/06-workflow/00-agent-workflow.md).
 
 ## The three pillars
 
@@ -35,7 +46,7 @@ build M0–M2 without further design input. See [`docs/04-production/roadmap.md`
 3. **Controlled catastrophe** — you spend forty minutes stopping a thing from falling, so you can
    make it fall exactly where you said it would.
 
-## Quick start (scaffold)
+## Quick start
 
 ```bash
 # Godot 4.4+ required. See docs/03-tech/adr/0001-engine-choice.md

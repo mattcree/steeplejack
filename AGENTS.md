@@ -1,84 +1,111 @@
 # Working in this repo
 
-This file is for anyone — human or agent — picking up work. Read it before your first commit.
+For anyone — human or agent — picking up work. Read this before your first commit.
+The long form is [`docs/06-workflow/`](docs/06-workflow/00-agent-workflow.md).
 
-## Orientation, in order
-
-1. [`docs/00-vision.md`](docs/00-vision.md) — pillars and, importantly, **anti-pillars**
-2. [`docs/01-gdd/01-core-loop.md`](docs/01-gdd/01-core-loop.md) — the loop
-3. [`docs/01-gdd/02-climbing-system.md`](docs/01-gdd/02-climbing-system.md) — the spine
-4. [`docs/03-tech/adr/`](docs/03-tech/adr/) — all three ADRs. Non-negotiable.
-5. [`docs/04-production/work-breakdown.md`](docs/04-production/work-breakdown.md) — find your task ID
-
-Then [`docs/04-production/glossary.md`](docs/04-production/glossary.md), and use those words.
-
-## The rules that are actually enforced
-
-1. **`sim/` is pure.** No `Node`, no `get_node`, no engine `delta`, no `randi()`. CI checks this.
-2. **No magic numbers.** Every constant lives in `data/tuning/*.json`. CI greps for numeric literals
-   in `sim/` outside a small allowlist.
-3. **No hand-placed level geometry.** Levels are JSON. If you're tempted to open the editor to place
-   a chimney, you're doing it wrong.
-4. **Every failure has a telegraph, shipped in the same task.** See the fairness contract in
-   [`docs/01-gdd/10-failure-and-difficulty.md`](docs/01-gdd/10-failure-and-difficulty.md).
-5. **Every audio cue has a visual fallback.** See
-   [`docs/01-gdd/14-accessibility.md`](docs/01-gdd/14-accessibility.md).
-6. **The docs are the spec.** If your code and the doc disagree, one of them is a bug — decide which,
-   fix it, and say so in the PR.
-
-## Commits
-
-```
-CLIMB-004: seat the dog at 80% depth
-
-Anchors now require 80% depth before they rate. Under-driven dogs
-rate one tier lower. Tuning in data/tuning/climbing.json.
-```
-
-Task ID prefix, imperative mood, and say what changed in behaviour, not what files you touched.
-
-## Before you open a PR
-
-Run the Definition of Done checklist in
-[`docs/04-production/definition-of-done.md`](docs/04-production/definition-of-done.md). All of it.
+## Start here
 
 ```bash
-godot --path . --headless -s tests/run_tests.gd     # unit + property + replay + level validation
-gdlint sim/ game/ tests/
-gdformat --check sim/ game/ tests/
+make ready          # tasks you can claim right now
+make board          # where everything stands
+make waves          # what can run in parallel
+make check          # the local gate. Must be green before any PR.
 ```
 
-## Adding a level
+Then open `tasks/<ID>.md` for the task you claimed. **It is self-contained.** Read it, read the
+`spec:` sections it names, and nothing else. If it doesn't give you what you need, that's a bug in
+the task — fix the task file and say so in the PR.
 
-1. Copy `docs/02-levels/LEVEL-TEMPLATE.md` and fill in **every** heading.
-2. Write `data/levels/NN-slug.json` against `data/schemas/level.schema.json`.
-3. Run the validator. It checks the Ascent Beat Rule and reachability, among other things.
-4. Play it. Record an expert replay into `data/replays/`.
-5. Update the content-status table in `docs/02-levels/level-index.md`.
+## The loop
 
-**Target: idea → playable in under 30 minutes.** If that stops being true, stop and fix the tooling.
-It's the thing that makes twelve levels affordable.
+```
+CLAIM → CONTEXT → PLAN → BUILD → VERIFY → HANDOFF → REVIEW → MERGE
+```
 
-## Adding a band type
+1. **Claim** — edit your own task file: `status: in_progress`, set `assignee`. Commit that alone.
+   One file per task, so claiming never conflicts with anyone.
+2. **Context** — the task file and its `spec:` refs. Not the whole repo.
+3. **Plan** — if `estimate_days > 1`, write 3–8 bullets into `## Plan` and commit before coding.
+4. **Build** — **only in your task's `owns:` paths.** Branch `<id-lowercase>-<slug>`.
+5. **Verify** — your task's `verify:` command, then `make check`, then the applicable sections of
+   [`definition-of-done.md`](docs/04-production/definition-of-done.md).
+6. **Handoff** — fill in `## Outcome`: what changed, decisions you made, what surprised you,
+   follow-up task IDs. Set `status: review`.
+7. **Review** — a *different* agent, against the acceptance criteria. Not against taste.
+8. **Merge** — squash. `CLIMB-001: implement the ladder stack span model`. Set `status: done`.
 
-Exactly two files: a generator in `sim/joints.gd`, a visual treatment in the brick shader. Plus the
-enum in `data/schemas/level.schema.json` and a row in the band table in
-[`docs/03-tech/data-schemas.md`](docs/03-tech/data-schemas.md).
+## Orientation (first time only)
 
-## Things that will get a PR rejected
+1. [`docs/00-vision.md`](docs/00-vision.md) — pillars and **anti-pillars**
+2. [`docs/01-gdd/01-core-loop.md`](docs/01-gdd/01-core-loop.md) — the loop
+3. [`docs/01-gdd/02-climbing-system.md`](docs/01-gdd/02-climbing-system.md) — the spine
+4. [`docs/03-tech/interfaces.md`](docs/03-tech/interfaces.md) — every signature is already fixed
+5. [`docs/03-tech/adr/`](docs/03-tech/adr/) — all three ADRs. Non-negotiable.
+6. [`docs/04-production/glossary.md`](docs/04-production/glossary.md) — use these words
 
-- A `Node` reference in `sim/`
-- A numeric literal in `sim/` that should be tuning data
+## Rules that are actually enforced
+
+`make check-conventions` fails the build on all of these. Full list and rationale in
+[`04-enforced-conventions.md`](docs/06-workflow/04-enforced-conventions.md).
+
+1. **`sim/` is pure.** No `Node`, no `get_node`, no engine `delta`, no `randi()`, no `preload`.
+2. **No magic numbers in `sim/`.** Constants live in `data/tuning/*.json`. Annotate a genuine
+   exception with `# literal: <reason>`.
+3. **No hand-placed level geometry.** Levels are JSON. If you're opening the editor to place a
+   chimney, you're doing it wrong.
+4. **Ascent Beat Rule** — no `plain` band over 20 m. The validator enforces it.
+5. **No real person's name anywhere**, including commit messages. See
+   [the IP policy](docs/05-legal/ip-and-likeness.md).
+6. **Every failure has a telegraph, shipped in the same task.** See the
+   [fairness contract](docs/01-gdd/10-failure-and-difficulty.md#the-fairness-contract).
+7. **Every audio cue has a visual fallback.** See [accessibility](docs/01-gdd/14-accessibility.md).
+8. **The docs are the spec.** If your code and a doc disagree, one is a bug — decide which, fix it,
+   and say which in the PR.
+
+## Guess vs. escalate
+
+**Guess freely:** naming, file layout inside your owned paths, test structure, private helpers,
+formatting, log messages.
+
+**Never guess:** game design, tuning targets, whether a failure needs a telegraph, whether code
+belongs in `sim/` or `game/`, scope.
+
+When blocked: set `status: blocked`, fill in `## Blocked` with *the question, what you tried, the
+options, and your recommendation*, commit, and pick up another ready task. Don't sit on it and
+don't invent an answer.
+
+## Adding things
+
+**A level** — copy [`docs/02-levels/LEVEL-TEMPLATE.md`](docs/02-levels/LEVEL-TEMPLATE.md), fill in
+every heading, write `data/levels/NN-slug.json`, `make validate`, play it, record an expert replay,
+update the status table in [`level-index.md`](docs/02-levels/level-index.md).
+**Target: idea → playable in under thirty minutes.** If that stops being true, stop and fix the
+tooling — it's what makes twelve levels affordable.
+
+**A band type** — exactly two files: a generator in `sim/joints.gd`, a visual treatment in the brick
+shader. Plus the enum in the schema and a row in
+[`data-schemas.md`](docs/03-tech/data-schemas.md).
+
+**A task** — `make new-task ID=CLIMB-012 TITLE="..."`. Discovered work becomes a task, never a
+scope expansion.
+
+**An interface** — write the signature into
+[`interfaces.md`](docs/03-tech/interfaces.md) *first*, then the implementation tasks. Never change a
+signature while someone is implementing against it.
+
+## Things that get a PR rejected
+
+- A `Node` reference or a magic number in `sim/`
+- Files changed outside the task's `owns:` (undeclared)
 - A gameplay decision made in `game/` instead of `sim/`
-- A new mechanic with no telegraph
-- An audio cue with no visual fallback
+- A new mechanic with no telegraph, or an audio cue with no visual fallback
 - A third meter (see the anti-pillars)
-- Any use of a real person's name, anywhere — see
-  [`docs/05-legal/ip-and-likeness.md`](docs/05-legal/ip-and-likeness.md)
+- An empty `## Outcome`
 - "Press E to work" — any interaction the player cannot perform better or worse
+- A real person's name, anywhere
 
 ## If you disagree with the design
 
-Good. Say so in an issue with the task ID, and argue it against the pillars and anti-pillars. The
-design is written down precisely so it can be argued with. What you must not do is quietly
-implement something different.
+Good. Say so in the task's `## Blocked` or an issue, and argue it against the pillars and
+anti-pillars. The design is written down precisely so it can be argued with. What you must not do
+is quietly implement something different.
