@@ -104,9 +104,15 @@ and specified `git rebase --skip` as the fix. **`--skip` discards a commit.** Ha
 reproduced my theory instead of the real fault, `land` would have silently dropped a commit from
 every branch that tripped it, to fix a problem that did not exist.
 
+**Demonstrated, not hypothesised:** the reviewer ran `git rebase --skip` from the real stalled
+state. It discarded the `handoff` commit — the one carrying `status: review` and the whole Outcome
+— and continued with a corrupted file. The fixture now catches exactly this: sabotaging the
+resolution loop to `--skip` fails four assertions, including "every commit touching the task file
+survives".
+
 What caught it was not care — it was that the fix did not work. Landing CORE-003 with it produced
-"git does not report the commit as empty", which is the tool disagreeing with the task file. Only
-then did I print git's actual stderr and find `Staged '...' using previous resolution`.
+"git does not report the commit as empty", the tool disagreeing with the task file. Only then did
+I print git's actual stderr and find `Staged '...' using previous resolution`.
 
 This is the fifth time today I have asserted a checkable claim about what git would do without
 running the command that settles it, and the first where the wrong answer would have cost data
@@ -114,12 +120,12 @@ rather than credibility. The rule that would have prevented all five: **print wh
 before writing down what you think it meant.** The stall path now does exactly that.
 
 ### Surprises
-- **`wt-start` makes an unusable worktree for a task that is not yet on `origin/main`.** It cuts
-  the branch from `origin/main`, so a task created with `make new-task` and claimed immediately
-  produces a branch with **no task file on it**. Hit while setting this task up. Agents cannot
-  push main, so a freshly created task cannot be worked on until some other land pushes the trunk.
-  Not fixed here — it needs a decision about where new tasks enter, which is integration-model
-  territory. Recorded in follow-ups.
+- **`wt-start` silently yields a branch without its own task file**, for a task not yet on
+  `origin/main`. It cuts the branch from `origin/main`, so a task created with `make new-task` and
+  claimed immediately lands the agent in a worktree where its own task file does not exist, with
+  no error. Hit while setting this task up, and again on SETUP-004. It is recoverable — both times
+  the fix was to write the file onto the branch by hand, and this task was built and lands that
+  way — but "recoverable if you happen to notice" is not a workflow. Filed as **SETUP-006**.
 - **rerere is enabled precisely because conflicts here are repetitive**, which is also exactly why
   it broke the one conflict that is resolved automatically. The feature and the bug have the same
   cause.
