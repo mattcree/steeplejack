@@ -199,6 +199,15 @@ The procedure I should have followed is `## Blocked` with a recommendation.
   ADR-0004 dated note and ADR-0003's determinism reasoning.
 - **CORE-012** — decide whether `Config/` is version-controlled. Urgent-ish: `make wip` runs
   `git add -A`, so it will otherwise land silently in someone else's branch.
+- **For CORE-002, noted not filed — a headless editor smoke test cannot end itself.**
+  `UnrealEditor-Cmd <project>` in editor mode enters the editor loop and stays there;
+  `-ExecCmds="Quit"` does **not** break it. Both the implementer and the reviewer hit this
+  independently during this task and both had to kill the process — it looks exactly like a hang.
+  A CI smoke test must use a commandlet or `-run=`, or kill externally and judge the run by
+  parsing the log for severities rather than by exit code (the exit code will be the timeout's,
+  and a clean teardown ends `Received signal 15` / `Daemon is exiting without errors`, not a
+  crash). This is runner work and belongs to CORE-002, not here. CORE-013 is unaffected — its
+  steps are an interactive `make editor` session a human closes.
 - **Not raised, but noted:** `.github/workflows/ci.yml` and `tasks/CORE-002.md` still say 5.5;
   CORE-002 owns both and must pick up 5.8 when it provisions the runner. Rule 16 (likeness) is
   still INERT — `tools/likeness_denylist.local.txt` is empty, and `06-launch.md` calls that
