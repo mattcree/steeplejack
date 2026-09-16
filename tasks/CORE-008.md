@@ -6,7 +6,7 @@ discipline: [ENG]
 estimate_days: 1.5
 status: ready
 assignee: null
-depends_on: [CORE-004]
+depends_on: [CORE-004, CORE-014]
 owns:
   - Source/SteeplejackSim/Public/Level.h
   - Source/SteeplejackSim/Private/Level.cpp
@@ -17,10 +17,10 @@ reads:
   - data/schemas/level.schema.json
   - tools/validate_data.py
 spec:
-  - docs/03-tech/interfaces.md#simlevelgd--core-008
+  - docs/03-tech/interfaces.md#levelh--core-008
   - docs/03-tech/data-schemas.md#level-file
   - docs/01-gdd/01-core-loop.md#the-ascent-beat-rule
-verify: make test-unit FILTER=test_level && make validate
+verify: make test-unit FILTER=level && make validate
 editor_required: false
 risk: null
 ---
@@ -35,20 +35,29 @@ Levels are data, not scenes. This loader is the only path from a designer's JSON
 `tools/validate_data.py` already implements the rules in Python (band contiguity, quality sums, the Ascent Beat Rule, corridor/exclusion conflicts, scoring field names). `LevelData.validate()` must implement the same rules. A test must assert the two agree on both existing levels plus a deliberately broken fixture — a divergence between them is a bug in whichever is newer.
 
 ## Interface
+See `docs/03-tech/interfaces.md` section `Level.h`, which is the contract:
+
 ```cpp
-class_name LevelData extends RefCounted
-static func load_from(path: String) -> LevelData
-func band_at(height: float) -> Dictionary
-func total_height() -> float
-func validate() -> Array[String]
+class LevelData {
+public:
+    static LevelData LoadFrom(const std::string& path);
+    const std::string& Id() const noexcept;
+    const std::string& Archetype() const noexcept;
+    float TotalHeight() const noexcept;
+    const BandSpec& BandAt(float height) const;
+    std::vector<std::string> Validate() const;   // same rules as tools/validate_data.py
+    // Structure(), Site(), Mission(), Scoring() return parsed sub-structs
+};
 ```
+
+Parse through `sj::JsonValue` (CORE-014). Do not write a third JSON reader.
 
 ## Acceptance
 1. Both shipped levels load and `validate()` returns an empty array.
 2. A fixture with a 25 m `plain` band returns an error mentioning the Ascent Beat Rule.
 3. A fixture with a quality distribution summing to 1.35 returns an error.
 4. A fixture with an exclusion inside the fall corridor returns an error.
-5. `band_at(37.0)` on `06-waterside` returns the `existing-band` band.
+5. `BandAt(37.0)` on `06-waterside` returns the `existing-band` band.
 6. A test asserts C++ `validate()` and `tools/validate_data.py` produce the same error count on all fixtures.
 
 ## Out of scope
