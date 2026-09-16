@@ -293,7 +293,7 @@ def _land(tid: str) -> int:
     git("push", "origin", backup, cwd=wt)
     print(f"{C['dim']}backup pushed: {backup}{C['off']}")
 
-    # 2. Rebase onto the trunk. rerere means a repeated conflict is solved once.
+    # 2. Rebase onto the trunk, with rerere OFF — see below.
     print(f"rebasing {br} onto {TRUNK}...")
     # rerere OFF for the duration of the land. wt-start enables rerere.autoupdate so a human
     # solves a conflict once; but in `land` the task-file conflict is resolved by this tool,
@@ -326,8 +326,8 @@ def _land(tid: str) -> int:
             state = git("status", cwd=wt, check=False, quiet=True)
             if "rebase in progress" in state.lower() and "unmerged" not in state.lower():
                 print(f"{C['dim']}  resolution already staged; continuing{C['off']}")
-                r = subprocess.run(["git", "rebase", "--continue"], cwd=wt,
-                                   capture_output=True, text=True,
+                r = subprocess.run(["git", "-c", "rerere.enabled=false", "rebase", "--continue"],
+                                   cwd=wt, capture_output=True, text=True,
                                    env={**os.environ, "GIT_EDITOR": "true"})
                 continue
             stalled = ("`git rebase --continue` failed with no conflicted paths.\n"
@@ -380,7 +380,10 @@ def _land(tid: str) -> int:
         # `rebase --continue` that SUCCEEDED is a completed rebase, not a stall, and
         # aborting it here would throw away a good merge at exactly the bound.
         if r.returncode:
-            stalled = f"{own} still conflicted after 50 rebase stops."
+            # Careful with the wording: exhausting the loop does not prove the file is still
+            # conflicted — the last iteration may have stopped for some other reason.
+            stalled = (f"gave up after 50 rebase stops on {own}.\n"
+                       f"        git said: {(r.stderr or r.stdout).strip()[-300:]}")
 
     if stalled:
         subprocess.run(["git", "rebase", "--abort"], cwd=wt, capture_output=True)

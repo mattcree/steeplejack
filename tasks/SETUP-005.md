@@ -4,7 +4,7 @@ title: Land must not depend on rerere's memory
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.25
-status: in_progress
+status: review
 assignee: agent
 depends_on: [SETUP-004]
 owns:
@@ -20,7 +20,8 @@ risk: null
 ---
 
 ## Goal
-`make land` completes when resolving the task's own file leaves a commit with nothing in it.
+`make land` completes on a branch with several commits touching its own task file, and does
+not depend on which conflicts this particular disk has resolved before.
 
 ## Why
 `land` stopped mid-rebase and refused to merge CORE-003:
@@ -95,6 +96,7 @@ this build — it was the task the stall was blocking.
   `wt-start` does, and its branch carries two commits touching the task file.
 - `docs/06-workflow/07-integration.md` — records that the rebase runs with rerere off, and why.
 - `tasks/SETUP-005.md` — rewritten; the original diagnosis was wrong. See below.
+- `tasks/SETUP-006.md` — **new, outside `owns:`.** Raised for the `wt-start` surprise below.
 
 ### I diagnosed this wrong before measuring it, and the wrong fix would have destroyed work
 I wrote this task asserting the cause was "a commit became empty once its conflict was resolved",
@@ -123,13 +125,15 @@ before writing down what you think it meant.** The stall path now does exactly t
   cause.
 
 ### Follow-ups
-- **`wt-start` on a task that is not yet on `origin/main`** silently yields a branch without its
-  own task file. Either `wt-start` should refuse with a clear message, or it should branch from
-  the local trunk when the task exists there. Needs a decision, not a patch.
-- The rerere-replay path is covered by the real CORE-003 landing, not by a unit test: reproducing
-  it needs a recorded resolution in the fixture's rerere cache, which means running a conflicting
-  rebase first. The fixture now at least matches a real worktree's configuration, so a regression
-  would show up as a stall.
+- **SETUP-006** — `wt-start` on a task not yet on `origin/main` silently yields a branch without
+  its own task file. Filed rather than left in prose: it is latent for *every* newly created task,
+  and a follow-up buried in one task's Outcome is a follow-up nobody finds.
+- **A direct test for the rerere-replay path is cheaper than I claimed.** I wrote that reproducing
+  it needs more than the fixture can do; the reviewer built it in a sandbox in minutes — seed the
+  fixture's `rr-cache` by running one conflicting rebase-and-resolve in the worktree, reset the
+  branch back, then land. About ten lines. Not done here because with `rerere.enabled=false` the
+  replay state is unreachable by construction, so the test would guard against someone deleting
+  the `-c` flag rather than against a live fault. Worth having; not worth blocking on.
 
 ### Verification
 | # | Criterion | Result |
