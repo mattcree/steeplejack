@@ -17,7 +17,7 @@ comma   := ,
 check: check-conventions validate check-links test-unit
 
 ## ci: everything CI runs without Unreal installed (gates 1-8)
-ci: check test-tools check-blueprints test-levels test-replay test-determinism
+ci: check check-verify test-tools check-blueprints test-levels test-replay test-determinism
 
 # ---------------------------------------------------------------- fast (no engine, no cmake)
 
@@ -29,6 +29,11 @@ check-conventions:
 test-tools:
 	@$(PY) tools/test_conventions.py
 	@$(PY) tools/test_wt.py
+	@$(PY) tools/test_check_verify.py
+
+## check-verify: every task's verify: filter points at tests that exist
+check-verify: build-sim
+	@$(PY) tools/check_verify.py
 
 ## check-blueprints: rule 18 — Blueprints are glue only
 check-blueprints:
@@ -60,10 +65,32 @@ configure:
 build-sim: configure
 	@$(CMAKE) --build $(BUILD) -j
 
-## test-unit: sim unit + property tests (FILTER=Stack to narrow)
+## test-unit: sim unit + property tests (FILTER=rng to narrow)
+##
+## A FILTER matching zero test cases exits NON-ZERO. Nearly every task's `verify:`
+## runs through here, so a filter that silently matches nothing is a task that can be
+## handed off, reviewed and landed with its stated verification never having executed.
+## See TEST-003. Unfiltered runs are unchanged, which is what keeps `make check` green
+## on a fresh clone where most modules do not exist yet.
 test-unit: build-sim
-	@if [ -x $(BUILD)/sim_tests ]; then $(BUILD)/sim_tests $(if $(FILTER),--test-case=*$(FILTER)*,); \
-	else echo "  no sim tests yet — start with CORE-003"; fi
+	@if [ ! -x $(BUILD)/sim_tests ]; then echo "  no sim tests yet — start with CORE-003"; exit 0; fi; \
+	if [ -z "$(FILTER)" ]; then $(BUILD)/sim_tests; exit $$?; fi; \
+	count() { $(BUILD)/sim_tests $$1 --list-test-cases 2>/dev/null \
+	          | sed -n 's/.*passing the current filters: \([0-9]*\).*/\1/p'; }; \
+	n=$$(count "--test-case=*$(FILTER)*"); n=$${n:-0}; \
+	all=$$(count ""); all=$${all:-0}; \
+	if [ "$$n" -eq 0 ]; then \
+		printf '\033[31mFAILED\033[0m  FILTER=%s matched 0 of %s test cases — nothing ran.\n' \
+		       '$(FILTER)' "$$all"; \
+		printf '        A gate that runs nothing must not report success (TEST-003).\n'; \
+		printf '        Either this task'"'"'s tests do not exist yet, or the filter is wrong:\n'; \
+		printf '        doctest matches TEST_CASE *names*, not file names.\n'; \
+		printf '        Names in the binary start with: %s\n' \
+		       "$$($(BUILD)/sim_tests --list-test-cases 2>/dev/null \
+		          | sed -n 's/^\([A-Za-z0-9_]*\):.*/\1/p' | sort -u | tr '\n' ' ')"; \
+		exit 1; \
+	fi; \
+	$(BUILD)/sim_tests "--test-case=*$(FILTER)*"
 
 # A filtered gate that matches zero test cases must NOT report success — that is how a
 # suite rots into decoration. gate() prints an explicit "not yet meaningful" instead.
@@ -202,5 +229,5 @@ help:
         configure build-sim test-unit test-levels test-replay test-determinism test-perf \
         test-coverage build-game test-automation perf-capture editor \
         board ready waves critical editor-queue human-queue stale graph new-task \
-        test-tools check-blueprints install-hooks help \
+        test-tools check-verify check-blueprints install-hooks help \
         wt-start wip wt-status land wt-drop doctor
