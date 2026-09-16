@@ -8,12 +8,13 @@ status: ready
 assignee: null
 depends_on: [CORE-001]
 owns:
-  - sim/rng.gd
-  - tests/unit/test_rng.gd
+  - Source/SteeplejackSim/Public/Rng.h
+  - Source/SteeplejackSim/Private/Rng.cpp
+  - tests/unit/test_rng.cpp
 spec:
   - docs/03-tech/interfaces.md#simrnggd--core-003
   - docs/03-tech/adr/0003-determinism-and-testing.md#the-split
-verify: make test-unit FILTER=test_rng
+verify: make test-unit FILTER=rng
 editor_required: false
 risk: null
 ---
@@ -28,7 +29,7 @@ Determinism is the foundation of replay regression, which is the highest-leverag
 `fork(tag)` is the important part: each subsystem takes its own substream so that adding one random call in the weather system does not shift every value in the joint grid and invalidate every recorded replay. Same tag must always give the same stream.
 
 ## Interface
-```gdscript
+```cpp
 class_name Rng extends RefCounted
 func _init(seed: int) -> void
 func next_u32() -> int

@@ -8,8 +8,8 @@ status: ready
 assignee: null
 depends_on: [METER-005, CLIMB-006, VERB-007, CORE-009, VERB-002]
 owns:
-  - tests/coverage_gate.gd
   - tools/coverage.py
+  - tests/perf/test_step_budget.cpp
 spec:
   - docs/06-workflow/03-verification.md#coverage
   - docs/03-tech/adr/0003-determinism-and-testing.md#testing-strategy
@@ -19,7 +19,7 @@ risk: null
 ---
 
 ## Goal
-Fail CI if `sim/` line coverage drops below 90%.
+Fail CI if `SteeplejackSim` line coverage drops below 90%.
 
 ## Why
 The sim/presentation split exists so that all the logic lives somewhere it can be tested exhaustively. A coverage gate is what stops that eroding one untested branch at a time.
@@ -28,7 +28,7 @@ The sim/presentation split exists so that all the logic lives somewhere it can b
 `game/` is deliberately not coverage-gated — it is presentation and its correctness is visual. Report per-module so it is obvious which module regressed.
 
 ## Acceptance
-1. Coverage is measured across `sim/` only.
+1. Coverage is measured across `SteeplejackSim` only.
 2. The gate fails below 90%.
 3. Output is per-module so a regression is attributable.
 4. Runs in under 30 s.

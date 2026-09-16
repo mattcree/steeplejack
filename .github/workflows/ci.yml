@@ -4,22 +4,19 @@ on:
   push:
   pull_request:
 
-env:
-  GODOT_VERSION: "4.4.1"
-
 jobs:
-  # Everything that does not need the engine. Must stay under 60 seconds —
-  # this is the gate that catches most agent mistakes.
+  # Everything that needs neither Unreal nor a compiler. Under 30 seconds.
+  # This is the gate that catches most agent mistakes.
   fast:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0          # check_conventions inspects commit history (rule 16)
+          lfs: false              # no need for Content/ here
       - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install jsonschema gdtoolkit==4.*
+        with: { python-version: "3.12" }
+      - run: pip install jsonschema
 
       - name: Enforced conventions (sim purity, magic numbers, likeness)
         run: python3 tools/check_conventions.py
@@ -33,40 +30,42 @@ jobs:
       - name: Documentation links
         run: python3 tools/check_links.py
 
-      - name: GDScript format and lint
-        run: |
-          if [ -n "$(find sim game tests -name '*.gd' 2>/dev/null)" ]; then
-            gdformat --check sim game tests
-            gdlint sim game tests
-          else
-            echo "no GDScript yet — skipping"
-          fi
-
-  # Enabled by CORE-002. Remove continue-on-error in that task, not before.
-  engine:
+  # The gameplay layer. Builds and tests WITHOUT Unreal — this is the point of the
+  # SteeplejackSim module split (ADR-0004). Should stay under two minutes.
+  sim:
     runs-on: ubuntu-latest
     needs: fast
-    continue-on-error: true       # TODO(CORE-002): remove
     steps:
       - uses: actions/checkout@v4
-      - name: Install Godot ${{ env.GODOT_VERSION }}
+        with: { lfs: false }
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build g++-13
+
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_CXX_COMPILER=g++-13
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Unit, property, replay and determinism tests
         run: |
-          wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
-          unzip -q "Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
-          mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
-          chmod +x /usr/local/bin/godot
+          if [ -x build/sim_tests ]; then build/sim_tests; \
+          else echo "no sim sources yet — CORE-003 is the first"; fi
 
-      - name: Import assets
-        run: godot --path . --headless --import || true
+      - name: Sim step budget (< 0.5 ms)
+        run: |
+          if [ -x build/sim_tests ]; then build/sim_tests --test-case=*Perf*; fi
 
-      - name: Unit and property tests
-        run: make test-unit
-
-      - name: Level validation (schema, beat rule, reachability)
-        run: make test-levels
-
-      - name: Replay regression
-        run: make test-replay
-
-      - name: Determinism
-        run: make test-determinism
+  # The presentation layer. Requires a self-hosted runner with Unreal 5.5 installed;
+  # GitHub-hosted runners cannot do this. Enabled by CORE-002.
+  game:
+    runs-on: [self-hosted, unreal]
+    needs: sim
+    if: false          # TODO(CORE-002): enable once a self-hosted runner exists
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: true }
+      - name: Build editor target
+        run: make build-game
+      - name: UE automation tests
+        run: make test-automation

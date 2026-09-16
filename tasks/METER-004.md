@@ -8,9 +8,10 @@ status: ready
 assignee: null
 depends_on: [METER-002]
 owns:
-  - sim/recovery.gd
-  - game/player/states/tea.gd
-  - tests/unit/test_recovery.gd
+  - Source/SteeplejackSim/Public/Recovery.h
+  - Source/SteeplejackSim/Private/Recovery.cpp
+  - tests/unit/test_recovery.cpp
+  - Source/SteeplejackGame/Player/States/TeaState.cpp
 spec:
   - docs/01-gdd/03-meters-grip-nerve.md#recovery
   - docs/01-gdd/12-audio-design.md#music

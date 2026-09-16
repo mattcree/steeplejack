@@ -3,7 +3,8 @@
 Everything that can be data, is data. A level designer never opens a code file; an engineer never
 edits a balance number.
 
-JSON Schema files live in `data/schemas/` and are validated in CI by `tests/validate_levels.gd`.
+JSON Schema files live in `data/schemas/` and are validated in CI by `tools/validate_data.py`
+(fast, no engine) and by `LevelData::Validate()` in the sim (the same rules, asserted to agree).
 
 ## Level file
 
@@ -103,8 +104,8 @@ JSON Schema files live in `data/schemas/` and are validated in CI by `tests/vali
 `corbelled-cap` `lightning-tape` `wind-band` `ivy` `salt-bloom` `crack` `hot` `internal`
 `delaminated` `corroded-steel` `lattice-open` `lattice-pinch`
 
-Each band type maps to a generator in `sim/joints.gd` and a visual treatment in the brick shader.
-**Adding a band type is a pull request that touches exactly two files.**
+Each band type maps to a generator in `SteeplejackSim/Private/Joints.cpp` and a parameter on the
+brick master material. **Adding a band type is a pull request that touches exactly two places.**
 
 ### Validation rules (enforced in CI)
 1. Bands must be contiguous and cover `[0, height]` with no gaps or overlaps.

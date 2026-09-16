@@ -85,9 +85,16 @@ it tries to be an open-world simulation, a physics sandbox, or photorealistic.
 
 Non-negotiable scope guards:
 - Twelve levels, authored, no procedural generation of level content.
-- One character, no character customisation beyond hats.
-- Stylised low-poly / flat-shaded art (see [`13-art-direction.md`](01-gdd/13-art-direction.md)).
+- **One** character. No second hero asset, no customisation beyond hats.
+- **No bespoke material authoring.** Everything is Megascans plus per-instance parameters. If Fab
+  doesn't have it, we reconsider needing it. (See [`13-art-direction.md`](01-gdd/13-art-direction.md).)
+- **All structure geometry is procedural, from JSON.** No hand-modelled chimneys, ever.
 - Destruction is **pre-fractured and deterministic**, never a free rigid-body sandbox.
+
+The art direction changed in [ADR-0004](03-tech/adr/0004-engine-change-to-unreal.md) from
+flat-shaded stylisation to *photoreal where you look, stylised where you don't*. **The scope guards
+did not relax — they got more specific**, because higher fidelity with no art team only works if
+the geometry stays procedural and the materials stay bought.
 
 ## Definition of success
 

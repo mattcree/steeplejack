@@ -1,111 +1,139 @@
 # 13 — Art Direction
 
+> Rewritten following [ADR-0004](../03-tech/adr/0004-engine-change-to-unreal.md). The previous
+> version targeted flat-shaded low-poly. This one targets the key art.
+
 ## The pitch in one line
 
-**A 1970s British industrial postcard, hand-tinted.** Stylised, flat-shaded, low-poly, with
-enormous atmospheric depth and a colour palette built out of soot, brick, sodium light and rain.
+**A photographed brick chimney at arm's length, and an industrial North of England dissolving into
+haze behind it, at golden hour.** Photoreal where you look, stylised where you don't.
 
-## Why stylised (a scope decision, and a good one)
+## The governing principle
 
-Photorealism is out of reach and would actively hurt us: a photoreal 110 m chimney is a grey tube.
-Stylisation lets us **exaggerate the things that carry meaning** — the height, the weather, the
-silhouette of a town full of chimneys — and spend nothing on the things that don't.
+> **Spend fidelity where the gameplay needs it. Stylise where you'd otherwise need an artist.**
 
-Reference: *Firewatch*'s flat colour planes and layered fog; *Jusant*'s clean, readable geometry;
-*Kentucky Route Zero*'s use of a single light source in a dark scene; British Rail and Shell travel
-posters of the 1930s–50s for the colour blocking.
+This is not a compromise — it is how the project reaches the key art without an art team, and it
+happens to align exactly with where the player's attention is.
 
-## Palette
-
-Built from four families. Everything in the game is a member of one of them.
-
-| Family | Use | Values |
+| Distance | Treatment | Why |
 |---|---|---|
-| **Brick** | the structures | `#8C4A32` `#A35C3D` `#6B3626` `#C08466` — warm, sooted at the base, bleached at the top |
-| **Soot** | shadow, grime, smoke | `#2B2724` `#403A35` `#1A1715` — never pure black |
-| **Sky** | mood and time of day | `#B9C9D4` (flat grey day) `#E8A86B` (late sun) `#7A8FA6` (rain) `#2E3B4E` (dusk) |
-| **Sodium** | the town at dusk, the fire, the engine's paint | `#F2A03D` `#D9412E` `#3E6B4A` (engine green) |
+| **0–3 m — the brickwork** | Full photoreal. Scanned Megascans materials, parallax occlusion, real displacement on mortar joints. | **This is where gameplay information lives.** Joint quality is read here. It must be legible. |
+| **3–30 m — the structure, ladders, staging, tools** | Photoreal materials on simple procedural geometry. | The player's hands and work happen here. |
+| **30 m–horizon — the town** | Silhouette, atmospheric haze, emissive windows, minimal geometry. | It is already 90% fog in the key art. Nearly free, and it's what sells height. |
+| **The sky and the light** | The biggest spend after the brickwork. | 80% of why the key art works is lighting and atmosphere, not material fidelity. |
+| **The character** | The one bespoke hero asset. | Cannot be procedural or scanned. See "The single point of failure". |
 
-**One accent colour, used sparingly and only for the player's own work**: a **chalk white/blue**
-(`#DCE8F0`) for chalk marks, chalk lines, the survey pegs, and the load diagram. The player's
-intentions are the only bright thing in the world.
+## Materials — where the look comes from
 
-## Rendering approach
+Fab / Megascans, used directly, no bespoke authoring:
 
-- **Flat/toon shading** with a 2–3 band ramp. No PBR. No normal-mapped micro-detail.
-- **Vertex colour** for brick variation; no unique-texturing of chimneys (they're 100 m tall — that
-  way lies a texture budget disaster).
-- **Tri-planar-ish brick pattern** via a cheap procedural fragment shader, with a per-instance seed
-  for weathering, salt bloom, and soot gradient. **The brickwork must carry the joint-quality read
-  visually** — this shader is a gameplay feature, and it is the single highest-value shader in the
-  project.
-- **Fog is the star.** Exponential height fog + distance fog, tuned per level per weather. Layered,
-  slightly animated, with a visible inversion layer on cold mornings that you climb *through*. The
-  moment you break out of the fog into sunlight at 60 m is a designed set-piece and it must be in
-  at least two levels.
-- **One directional light + one ambient gradient.** No baked GI, no lightmaps on the chimneys (they
-  get destroyed). Shadows: cascaded, near-field only.
-- **Dust and smoke** are the only heavy particle systems. They get the whole particle budget.
-
-## Geometry budgets
-
-| Asset | Tris | Notes |
+| Surface | Source | Gameplay job |
 |---|---|---|
-| Player character | 12k | plus a 3k LOD |
-| Chimney (100 m, intact) | 8k | procedurally generated from a profile curve + band list |
-| Chimney (pre-fractured, 80 chunks) | 40k | only instantiated for FELL levels |
-| Ladder section | 400 | instanced heavily |
-| Town building (background) | 300–1,200 | ~40 unique, heavily instanced |
-| Traction engine (complete) | 30k | the game's hero asset; worth it |
-| Total scene | ≤ 900k tris | see performance budget |
+| Fired brick, ×6 weathering states | Megascans | **carries the four joint tiers** |
+| Lime mortar, sound / eroded / perished | Megascans + a blend mask | the tap-test read, visually |
+| Salt efflorescence | overlay layer | the salt-bloom band — mortar that *looks* perished and isn't |
+| Soot | vertical gradient overlay | the chimney is dirtiest at the bottom |
+| Gritstone (spire levels) | Megascans | |
+| Weathered timber (ladders, props, staging) | Megascans | |
+| Hemp rope | Megascans + a bespoke normal | |
+| Wrought iron, rusted | Megascans | bands, dogs, tie rings |
+| Concrete, spalled and delaminated | Megascans | Level 10 |
 
-## Procedural chimney generation
+**The brick master material is the single most important asset in the project.** It is one layered
+material with per-instance parameters for weathering, soot gradient, salt bloom, erosion and
+cracking, driven from the level JSON's `weathering` block and from per-joint quality. It is both the
+look *and* the gameplay read, and it deserves a dedicated look-dev task (ART-010).
 
-Chimneys are **generated from data, not modelled**. This is the key production decision — it means
-a level designer can author a new chimney in a JSON file in ten minutes.
+## Lighting and atmosphere
 
-```jsonc
-{
-  "height": 70, "baseRadius": 3.2, "topRadius": 1.9,
-  "profile": "octagonal",             // round | octagonal | square | square-to-round
-  "batter": [{ "at": 0.0, "step": 0 }, { "at": 0.45, "step": 0.15 }],
-  "bands": [{ "at": 22, "type": "iron" }, { "at": 48, "type": "iron" }],
-  "cap": "corbelled-oversail",
-  "weathering": { "sootTo": 0.3, "bleachFrom": 0.7, "saltBloomSeed": 41 },
-  "jointGrid": { "courseHeight": 0.075, "brickLength": 0.225 }
-}
-```
+This is where "big graphics" actually comes from, and it is cheap.
 
-The visual variety across 12 levels comes from profile, batter, cap type, band count and weathering
-— not from bespoke modelling. **A square-to-round chimney and a plain round one look and play
-completely differently** and cost the same.
+- **Lumen** global illumination and reflections. The bounce light off a brick face into the
+  character's underside is most of what makes the key art feel photographed.
+- **One key light** (the sun), a sky light, and nothing else in most scenes. The industrial North
+  is an overcast-or-golden-hour place; both are single-source.
+- **Volumetric fog**, layered, with a controllable **inversion layer** you can climb through. The
+  break-out-of-the-fog-into-sunlight moment is a designed set-piece for two levels and it is a
+  volumetric fog parameter, not an art asset.
+- **Atmospheric perspective is a gameplay system.** Fog density is per-level and per-weather, driven
+  from data, because it is how the player reads their own altitude.
+- Smoke from working chimneys: Niagara, one system, instanced. The key art's chimney forest is
+  mostly this.
+- Time of day is a **two-key lerp across the shift**, not a full cycle.
+
+## Geometry
+
+Simple, procedural, and almost entirely generated from JSON. This is what keeps twelve levels
+affordable at this fidelity.
+
+| Asset | Tris | Source |
+|---|---|---|
+| Chimney (100 m, intact) | 25k | procedural from a profile curve |
+| Chimney (pre-fractured, 80 chunks) | 120k | Chaos Geometry Collection, baked offline |
+| Ladder section | 1.5k | one mesh, instanced |
+| Staging / props / tools | 1–4k each | ~20 assets total |
+| Town building kit | 2k each | ~40 pieces, heavily instanced, LOD to silhouette by 200 m |
+| Character | 60k | the hero asset |
+| Traction engine (complete) | 120k | the second hero asset, and it is worth it |
+
+Nanite on the structures and the town; it is close to free for static geometry at this scale and it
+removes the LOD authoring burden entirely — which matters a lot when there is no artist.
 
 ## The town
 
-Each level's backdrop is a mill town seen from increasing height. Built from ~40 instanced building
-kits, a canal, a railway, and **other chimneys**. Critically:
+Instanced kit pieces, placed procedurally from a seed, resolving to silhouette-plus-emissive-windows
+beyond ~200 m. Canal, railway, viaduct, and **other chimneys** — the chimney forest is the game's
+signature image and it costs one instanced mesh and a Niagara smoke system.
 
 > **Chimneys you have already demolished do not appear in later levels' skylines.**
 
-This costs a boolean per level and it is the best storytelling in the game.
+Still the best storytelling in the game, still costs a boolean per level.
 
-## Character
+## The single point of failure: the character
 
-Flat cap, waistcoat, collarless shirt, heavy boots, a leather belt of tools. Silhouette must be
-readable at 4 m and at 400 m. Hats are the only customisation and they are earned, not bought.
+Everything else here is procedural, scanned, or instanced. The character is none of those.
 
-Animation priorities, in order:
-1. Hand IK to rungs (highest value in the project)
-2. Hammer swing (most-repeated action)
-3. Weight shift / lean with wind and nerve
-4. Ladder-carry gait
-5. Everything else
+At this fidelity a mediocre character standing next to a scanned brick wall looks *worse* than a
+stylised one, because photoreal has no tolerance for inconsistency. So the character must be
+genuinely good, and it is the one place to spend real money or real weeks.
+
+Options, in order of preference:
+1. **MetaHuman**, customised. Fast, high quality, integrates with Control Rig, and — relevant here —
+   a generated face carries no likeness risk. See [the IP policy](../05-legal/ip-and-likeness.md).
+2. **A commissioned character**, ~£500–2,000 and 3–4 weeks.
+3. Marketplace base mesh, heavily retextured. Last resort.
+
+Brief: a Northern English steeplejack in his sixties. Flat cap, collarless shirt, waistcoat or
+overalls, heavy boots, a leather tool belt, rope over one shoulder. Readable in silhouette at 4 m
+and at 400 m. **Briefed from a description, never from a photograph of a real person.**
+
+Clothing needs to move — Chaos Cloth on the jacket and cap. Wind is a mechanic and the character is
+how the player sees it.
+
+## Palette
+
+Unchanged from the original direction; it survives the fidelity change intact because it was always
+about light, not shading.
+
+| Family | Use | Values |
+|---|---|---|
+| **Brick** | the structures | `#8C4A32` `#A35C3D` `#6B3626` `#C08466` |
+| **Soot** | shadow, grime, smoke | `#2B2724` `#403A35` `#1A1715` — never pure black |
+| **Sky** | mood and time of day | `#B9C9D4` flat grey · `#E8A86B` late sun · `#7A8FA6` rain · `#2E3B4E` dusk |
+| **Sodium** | town at dusk, fire, engine paint | `#F2A03D` `#D9412E` `#3E6B4A` |
+
+**One accent, used only for the player's own work:** chalk white-blue `#DCE8F0` for chalk marks,
+sight lines, survey pegs and the load diagram. The player's intentions remain the only bright thing
+in the world.
 
 ## What we are explicitly not doing
 
-- No character face detail (he's mostly seen from behind, at distance, in a cap)
-- No unique textures on background buildings
-- No PBR, no baked GI, no screen-space reflections
-- No destruction beyond the authored pre-fracture
-- No day/night cycle *within* a level (light changes only via the shift's daylight ramp, which is a
-  simple two-key lerp)
+- **No bespoke material authoring.** If Megascans doesn't have it, we reconsider needing it.
+- **No unique texturing.** Everything is tiling materials plus per-instance parameters.
+- **No hand-placed level geometry.** Still true, still non-negotiable — it is what makes 12 levels
+  affordable. See [`../../AGENTS.md`](../../AGENTS.md).
+- **No second hero character.** The client, the crowd and the lad are distant, small, or offscreen.
+- **No interiors** beyond the two tower levels' stairwells.
+- **No ray-traced path tracing mode.** Lumen is the ceiling.
+- **No destruction beyond the authored pre-fracture.** [ADR-0002](../03-tech/adr/0002-physics-and-destruction.md)
+  is unchanged and is now easier to satisfy, not harder.

@@ -8,12 +8,12 @@ status: draft
 assignee: null
 depends_on: []
 owns:
-  - path/you/may/write.gd
+  - Source/SteeplejackSim/Public/YourThing.h
 reads:
-  - path/you/need/to/read.gd
+  - Source/SteeplejackSim/Public/Types.h
 spec:
   - docs/01-gdd/xx.md#section-anchor
-verify: make test-unit FILTER=test_yourthing
+verify: make test-unit FILTER=YourThing
 editor_required: false
 risk: null
 ---

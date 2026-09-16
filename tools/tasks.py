@@ -8,7 +8,7 @@ parallel agents never conflict on a shared board. The board is computed, never s
   tasks.py board      status overview
   tasks.py ready      tasks whose dependencies are all done
   tasks.py waves      dependency-ordered execution waves
-  tasks.py editor     tasks needing a human in the Godot editor
+  tasks.py editor     tasks needing a human in the Unreal editor
   tasks.py critical   longest dependency chain by estimate days [TARGET]
   tasks.py stale      in_progress tasks with an empty Outcome
   tasks.py graph      mermaid dependency graph
@@ -363,7 +363,7 @@ def cmd_editor(tasks):
         print("editor queue is empty")
         return 0
     days = sum(float(t.get("estimate_days") or 0) for t in q)
-    print(f"{C['bold']}{len(q)} task(s) need a human in the Godot editor · "
+    print(f"{C['bold']}{len(q)} task(s) need a human in the Unreal editor · "
           f"{days:.1f} ideal days{C['off']}\n")
     for t in sorted(q, key=lambda x: x["id"]):
         print(f"  {t['id']:<12} {t['title'][:56]:<58}{t['estimate_days']}d  [{t['status']}]")

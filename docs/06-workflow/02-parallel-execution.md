@@ -9,8 +9,8 @@ How to run many agents at once without them colliding, duplicating, or quietly d
 Every task declares `owns:` — the only paths it may write. Two tasks that could run at the same
 time may not own overlapping paths. `make validate-tasks` enforces this:
 
-> Ownership conflict: CLIMB-003 and CLIMB-004 both own `game/player/states/climb.gd`
-> and neither depends on the other.
+> Ownership conflict: METER-001 and VERB-007 both own
+> `Source/SteeplejackSim/Private/MetersGrip.cpp` and neither depends on the other.
 
 Tasks connected by a dependency chain *may* overlap, because they can't run concurrently.
 
@@ -23,7 +23,7 @@ A wave is the set of tasks whose dependencies are all satisfied. `make waves` co
 
 ```
 WAVE 1  (5 tasks, 8.5 ideal days, max parallel 5)
-  CORE-001  Godot project skeleton                    ENG   0.5
+  CORE-001  Unreal project, two modules, standalone    ENG   1.5
   AUD-001   The four tap sounds                       AUD   2.0
   AUD-004   Rope, ladder, boot and breathing foley    AUD   2.0
   ENV-002   Town silhouette backdrop                  ART   1.5
@@ -40,7 +40,7 @@ Waves are a *planning* tool, not a gate. A task becomes claimable the moment its
 
 ### 3. Interface-first
 
-The reason `sim/stack.gd` and `sim/meters_grip.gd` can be written simultaneously by two agents who
+The reason `Stack.cpp` and `MetersGrip.cpp` can be written simultaneously by two agents who
 never speak is that [`../03-tech/interfaces.md`](../03-tech/interfaces.md) already fixes every
 signature, type and contract between them.
 
@@ -48,7 +48,7 @@ signature, type and contract between them.
 
 ```
 1. One task writes the signatures into docs/03-tech/interfaces.md
-   and the stubs + failing tests into sim/
+   and the stubs + failing tests into `SteeplejackSim`
 2. N tasks, in parallel, each own one file and make their tests pass
 ```
 
@@ -74,21 +74,30 @@ Some work can't be parallelised by an agent at all:
 
 | Kind | Tag | How it's handled |
 |---|---|---|
-| Godot editor work (animation trees, material graphs, scene composition) | `editor_required: true` | batched into a human session; `make editor-queue` lists them |
+| Unreal editor work (materials, Control Rig, Niagara, MetaSounds, scene assembly) | `editor_required: true` | batched into a human session; `make editor-queue` lists them |
 | Foley recording | `discipline: [AUD]` | batched into a recording day |
 | Playtests | `discipline: [PROD, DES]` | scheduled, see the playtest plan |
 
 `make editor-queue` exists so that editor work accumulates visibly instead of silently blocking a
-wave. If that queue is growing faster than it's being cleared, that's risk **R8** triggering — see
+wave. If that queue is growing faster than it's being cleared, that's risk **R8** triggering — and
+under [ADR-0004](../03-tech/adr/0004-engine-change-to-unreal.md) **R8 is the top risk on the
+register**. Watch this number weekly, not monthly. See
 [`../04-production/risks.md`](../04-production/risks.md).
+
+### Why the sim layer is where parallelism actually lives
+
+`SteeplejackSim` is plain C++ with no Unreal dependency, so any number of agents can build and test
+it in ~20 seconds each without an engine install, a GPU, or a licence. `Content/` is binary and
+serialises through one human. **Plan your waves so the agent-parallel work is always ahead of the
+human-serial work**, or the editor queue becomes the schedule.
 
 ## Choosing what to run in parallel
 
 Good parallel batches:
 - **The four-way mechanic split** (sim / animation / audio / UI) — different disciplines, different
   files, one shared spec section.
-- **Independent sim modules behind a fixed interface** — `stack.gd`, `meters_grip.gd`,
-  `weather.gd`, `haul.gd` can all be written at once.
+- **Independent sim modules behind a fixed interface** — `Stack.cpp`, `MetersGrip.cpp`,
+  `Weather.cpp`, `Haul.cpp` can all be written at once, and none of them needs Unreal installed.
 - **Content authoring** — two level JSONs, two audio banks, two art kits.
 
 Bad parallel batches:

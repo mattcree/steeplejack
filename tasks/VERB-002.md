@@ -8,8 +8,9 @@ status: ready
 assignee: null
 depends_on: [VERB-001, AUD-001]
 owns:
-  - game/ui/reticle.gd
-  - game/ui/reticle.tscn
+  - Source/SteeplejackGame/UI/ReticleWidget.h
+  - Source/SteeplejackGame/UI/ReticleWidget.cpp
+  - Content/UI/WBP_Reticle.uasset
 spec:
   - docs/01-gdd/14-accessibility.md#audio-dependent-mechanics
   - docs/01-gdd/02-climbing-system.md#audio-is-a-mechanic-not-a-garnish

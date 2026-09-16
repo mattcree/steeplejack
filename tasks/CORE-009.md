@@ -8,9 +8,9 @@ status: ready
 assignee: null
 depends_on: [STRUCT-002]
 owns:
-  - sim/reachability.gd
-  - tests/unit/test_reachability.gd
-  - tests/validate_levels.gd
+  - Source/SteeplejackSim/Public/Reachability.h
+  - Source/SteeplejackSim/Private/Reachability.cpp
+  - tests/unit/test_reachability.cpp
 spec:
   - docs/03-tech/interfaces.md#simreachabilitygd--core-009
   - docs/03-tech/data-schemas.md#validation-rules-enforced-in-ci
@@ -30,7 +30,7 @@ Authoring an unwinnable level is easy and the failure is invisible until someone
 A greedy upward search over the joint grid is sufficient — we need existence, not optimality. Treat Cracked joints as unusable and free fixtures as usable. `tools/validate_data.py` already does a coarse arithmetic version of this check; the real one needs the grid.
 
 ## Interface
-```gdscript
+```cpp
 class_name Reachability extends RefCounted
 class Route:
     var anchors: Array[int]
@@ -43,7 +43,7 @@ static func solve(grid: JointGrid, ladders: int, max_span: float) -> Route
 1. Both shipped levels return a valid route.
 2. A fixture level with a 9 m band of Cracked joints and no free fixtures returns null.
 3. A fixture with too few ladders for its height returns null.
-4. `tests/validate_levels.gd` runs every file in `data/levels/` and fails CI on any error.
+4. `make test-levels` runs every file in `data/levels/` and fails CI on any error.
 5. Solving a 110 m level takes under 500 ms.
 
 ## Out of scope

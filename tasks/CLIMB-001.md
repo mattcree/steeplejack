@@ -8,13 +8,14 @@ status: ready
 assignee: null
 depends_on: [VERB-005]
 owns:
-  - sim/stack.gd
-  - tests/unit/test_stack.gd
+  - Source/SteeplejackSim/Public/Stack.h
+  - Source/SteeplejackSim/Private/Stack.cpp
+  - tests/unit/test_stack.cpp
 spec:
   - docs/03-tech/interfaces.md#simstackgd--climb-001
   - docs/01-gdd/02-climbing-system.md#spans-and-flex
   - docs/01-gdd/02-climbing-system.md#3-ladders--the-resource
-verify: make test-unit FILTER=test_stack
+verify: make test-unit FILTER=stack
 editor_required: false
 risk: R1
 ---
@@ -29,7 +30,7 @@ The span table is the entire risk/reward economy of the ascent. MVP criterion 4 
 Span is measured anchor-to-anchor. Buckling is an 8 s timer under load, not an instant fail, so the player gets a warning they can act on — that is the fairness contract. The tuning table in `climbing.json` must be reproduced exactly; do not round or reinterpret it.
 
 ## Interface
-```gdscript
+```cpp
 class_name Stack extends RefCounted
 enum SpanBand { RIGID, FLEX, SWAY, BUCKLE }
 func add_anchor(a: Anchor) -> int

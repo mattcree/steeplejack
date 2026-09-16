@@ -8,13 +8,14 @@ status: ready
 assignee: null
 depends_on: [CORE-007, STRUCT-002]
 owns:
-  - sim/verbs/hammer.gd
-  - tests/unit/test_hammer.gd
+  - Source/SteeplejackSim/Public/Verbs/Hammer.h
+  - Source/SteeplejackSim/Private/Verbs/Hammer.cpp
+  - tests/unit/test_hammer.cpp
 spec:
   - docs/03-tech/interfaces.md#simverbshammergd--verb-003
   - docs/01-gdd/02-climbing-system.md#2-dogging-in--the-hammer
   - docs/01-gdd/04-tools-and-verbs.md#dog-in
-verify: make test-unit FILTER=test_hammer
+verify: make test-unit FILTER=hammer
 editor_required: false
 risk: R1
 ---
@@ -29,7 +30,7 @@ MVP criterion 5 is whether the verbs have a mastery curve. The hammer is the mos
 Three axes of skill, not a timing bar: power (arc length at release), angle (reticle offset, already wobble-affected by the caller), depth (persistent per-dog accumulation). The designed insight the player should discover is that 60-75% power with a clean angle beats 100% power — make sure the model actually produces that. Formulas are in the GDD section; implement them literally and tune from JSON.
 
 ## Interface
-```gdscript
+```cpp
 class_name HammerVerb extends RefCounted
 static func strike(joint: Joint, current_depth: float, power: float,
                    angle_error_deg: float, tool_condition: float,

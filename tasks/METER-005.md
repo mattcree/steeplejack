@@ -8,15 +8,16 @@ status: ready
 assignee: null
 depends_on: [METER-003, CLIMB-006]
 owns:
-  - sim/slip.gd
-  - game/player/states/fall.gd
-  - tests/unit/test_slip.gd
+  - Source/SteeplejackSim/Public/Slip.h
+  - Source/SteeplejackSim/Private/Slip.cpp
+  - tests/unit/test_slip.cpp
+  - Source/SteeplejackGame/Player/States/FallState.cpp
 spec:
   - docs/01-gdd/02-climbing-system.md#6-falling
   - docs/01-gdd/10-failure-and-difficulty.md#4-the-slip-save
   - docs/01-gdd/10-failure-and-difficulty.md#5-the-fall
   - docs/01-gdd/14-accessibility.md#motion--vertigo
-verify: make test-unit FILTER=test_slip
+verify: make test-unit FILTER=slip
 editor_required: false
 risk: R9
 ---

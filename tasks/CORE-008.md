@@ -8,8 +8,9 @@ status: ready
 assignee: null
 depends_on: [CORE-004]
 owns:
-  - sim/level.gd
-  - tests/unit/test_level.gd
+  - Source/SteeplejackSim/Public/Level.h
+  - Source/SteeplejackSim/Private/Level.cpp
+  - tests/unit/test_level.cpp
 reads:
   - data/levels/01-back-yard.json
   - data/levels/06-waterside.json
@@ -34,7 +35,7 @@ Levels are data, not scenes. This loader is the only path from a designer's JSON
 `tools/validate_data.py` already implements the rules in Python (band contiguity, quality sums, the Ascent Beat Rule, corridor/exclusion conflicts, scoring field names). `LevelData.validate()` must implement the same rules. A test must assert the two agree on both existing levels plus a deliberately broken fixture — a divergence between them is a bug in whichever is newer.
 
 ## Interface
-```gdscript
+```cpp
 class_name LevelData extends RefCounted
 static func load_from(path: String) -> LevelData
 func band_at(height: float) -> Dictionary
@@ -48,7 +49,7 @@ func validate() -> Array[String]
 3. A fixture with a quality distribution summing to 1.35 returns an error.
 4. A fixture with an exclusion inside the fall corridor returns an error.
 5. `band_at(37.0)` on `06-waterside` returns the `existing-band` band.
-6. A test asserts GDScript `validate()` and `tools/validate_data.py` produce the same error count on all fixtures.
+6. A test asserts C++ `validate()` and `tools/validate_data.py` produce the same error count on all fixtures.
 
 ## Out of scope
 Do not build the reachability solver here — that is CORE-009 and it needs the joint grid.

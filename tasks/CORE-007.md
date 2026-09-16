@@ -8,9 +8,10 @@ status: ready
 assignee: null
 depends_on: [CORE-004]
 owns:
-  - sim/tuning.gd
-  - game/tuning_hotreload.gd
-  - tests/unit/test_tuning.gd
+  - Source/SteeplejackSim/Public/Tuning.h
+  - Source/SteeplejackSim/Private/Tuning.cpp
+  - tests/unit/test_tuning.cpp
+  - Source/SteeplejackGame/TuningHotReload.cpp
 reads:
   - data/tuning/climbing.json
   - data/tuning/meters.json
@@ -18,7 +19,7 @@ spec:
   - docs/03-tech/interfaces.md#simtuninggd--core-007
   - docs/03-tech/data-schemas.md#tuning-files
   - docs/06-workflow/04-enforced-conventions.md#rule-4-in-detail-the-one-people-push-back-on
-verify: make test-unit FILTER=test_tuning
+verify: make test-unit FILTER=tuning
 editor_required: false
 risk: null
 ---
@@ -27,13 +28,13 @@ risk: null
 Load every `data/tuning/*.json` into one typed lookup, hash it, and reload it on F5 in dev builds.
 
 ## Why
-Rule 4 (no magic numbers in `sim/`) only works if reading tuning is easier than typing a number. Hot reload is what lets a designer rebalance while playing, which the production plan depends on.
+Rule 4 (no magic numbers in `SteeplejackSim`) only works if reading tuning is easier than typing a number. Hot reload is what lets a designer rebalance while playing, which the production plan depends on.
 
 ## Context
 Keys are accessed as `tuning.get_f("span_warn_metres")` or via a generated typed accessor `tuning.span_warn_metres`. Support both; the convention checker recognises both. `hash()` is stamped into every replay so a tuning change that invalidates a replay fails loudly rather than silently.
 
 ## Interface
-```gdscript
+```cpp
 class_name Tuning extends RefCounted
 static func load_all(dir: String) -> Tuning
 func get_f(key: String) -> float

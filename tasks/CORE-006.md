@@ -8,15 +8,17 @@ status: ready
 assignee: null
 depends_on: [CORE-005, CORE-003]
 owns:
-  - sim/intent.gd
-  - sim/recorder.gd
-  - sim/replay.gd
-  - tests/replay/test_replay_roundtrip.gd
+  - Source/SteeplejackSim/Public/Intent.h
+  - Source/SteeplejackSim/Public/Recorder.h
+  - Source/SteeplejackSim/Public/Replay.h
+  - Source/SteeplejackSim/Private/Recorder.cpp
+  - Source/SteeplejackSim/Private/Replay.cpp
+  - tests/replay/test_replay_roundtrip.cpp
 spec:
   - docs/03-tech/interfaces.md#simintentgd-simrecordergd-simreplaygd--core-006
   - docs/03-tech/adr/0003-determinism-and-testing.md#recording-and-replay
   - docs/06-workflow/03-verification.md#rung-7-is-the-one-that-matters
-verify: make test-unit FILTER=test_replay_roundtrip
+verify: make test-unit FILTER=replayroundtrip
 editor_required: false
 risk: R1
 ---
@@ -31,7 +33,7 @@ This is the single highest-leverage engineering decision in the project. It give
 An intent is a small struct, not an input event — `HAMMER_RELEASE(power, angle_error)`, not `mouse_up`. That keeps replays stable across input remapping and accessibility settings. The replay stores `tuning_hash`; loading a replay against different tuning must fail loudly with the two hashes, not silently produce different numbers.
 
 ## Interface
-See `docs/03-tech/interfaces.md` section `sim/intent.gd, sim/recorder.gd, sim/replay.gd`.
+See `docs/03-tech/interfaces.md` section `Intent.h`, `Recorder.h`, `Replay.h`.
 
 ## Acceptance
 1. Recording 3,600 ticks of synthetic intents and replaying them produces a tick-for-tick identical state trace.

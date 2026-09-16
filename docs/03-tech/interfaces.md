@@ -1,7 +1,7 @@
 # Interfaces
 
 > **Contract-first.** Every signature here is fixed *before* the implementations are written, so
-> that eight agents can implement eight modules simultaneously without talking to each other.
+> that several agents can implement several modules simultaneously without talking to each other.
 >
 > Changing anything on this page is a **breaking change**. Open a task, get it reviewed, and update
 > the dependent task files in the same PR. Do not change a signature while someone is implementing
@@ -11,322 +11,325 @@ Scope: the modules needed for M0 and M1. M2+ interfaces are added at the start o
 
 ## Conventions
 
-- All of `sim/` is `RefCounted` or plain classes. Never `Node`. ([ADR-0003](adr/0003-determinism-and-testing.md))
-- Time is always an explicit `dt: float` parameter in seconds.
-- Randomness is always an injected `Rng`.
-- Tuning is always an injected `Tuning`.
-- Angles are **degrees**; bearings are degrees clockwise from north. Distances are **metres**.
-  Forces are **kN**. Mass is **kg**.
-- Functions that can fail return a result struct with an explicit outcome enum, never `null`.
-- Static typing is mandatory. `sim/` must compile with `untyped_declaration` as an error.
+Per [ADR-0004](adr/0004-engine-change-to-unreal.md), `SteeplejackSim` is **plain C++17 with no
+Unreal dependency**, so that it builds standalone under CMake and its tests run in CI without the
+engine. That constraint is enforced by `tools/check_conventions.py` and it is not negotiable.
 
----
+- Namespace `sj`. Header-per-module in `Public/`, implementation in `Private/`.
+- **No UE types.** No `FVector`, `TArray`, `FString`, `UObject`, `FMath`, `UE_LOG`, no `.generated.h`.
+  Use `sj::Vec3`, `std::vector`, `std::string`, `<cmath>`.
+- **No allocation in `Step()`.** Buffers are sized at construction. The sim runs 60×/s forever.
+- Time is always an explicit `float dt` in seconds. Never a global clock.
+- Randomness is always an injected `Rng&`. Never `rand()`, never a static.
+- Tuning is always an injected `const Tuning&`. Never a constant in code.
+- Angles are **degrees**; bearings degrees clockwise from north; distances **metres**; forces **kN**;
+  mass **kg**.
+- Functions that can fail return a result struct with an explicit outcome enum, never a null pointer.
+- Everything that can be `const` and `noexcept` is.
 
-## `sim/rng.gd` — CORE-003
-
-```gdscript
-class_name Rng extends RefCounted
-
-func _init(seed: int) -> void
-func next_u32() -> int                         # xorshift128; deterministic across a build
-func next_float() -> float                     # [0.0, 1.0)
-func range_float(lo: float, hi: float) -> float
-func range_int(lo: int, hi: int) -> int        # inclusive lo, exclusive hi
-func pick_weighted(weights: Array[float]) -> int
-func fork(tag: int) -> Rng                     # independent substream; same tag = same stream
-func state() -> PackedInt64Array               # for save/replay
-func restore(s: PackedInt64Array) -> void
-```
-
-`fork()` matters: each subsystem takes its own substream so that adding a call in one place doesn't
-shift every other random value in the game and invalidate every replay.
-
----
-
-## `sim/types.gd` — CORE-004
-
-```gdscript
-enum JointTier  { CRACKED, PERISHED, FAIR, SOUND }
-enum AnchorRate { FAILED, POOR, FAIR, SOUND }
-enum Stance     { ONE_HAND, HOOKED_LEG, CLIPPED, BELTED, CHAIR }
-enum Lashing    { NONE, HITCH, FULL }
-enum Exposure   { PLATFORM, LADDER, HANGING, OVERHANG }
-
-class Joint extends RefCounted:
-    var id: int
-    var pos: Vector3            # world, metres
-    var normal: Vector3
-    var height: float           # metres above the structure base
-    var quality: float          # [0,1], hidden from the player until tapped
-    var tier: JointTier         # derived from quality via tuning thresholds
-    var occupied: bool
-
-class Anchor extends RefCounted:
-    var joint_id: int
-    var height: float
-    var depth: float            # [0,1]; seated at >= tuning.dog_seat_depth_fraction
-    var spall: float            # [0,1] brick damage from over-driving
-    var rate: AnchorRate
-    var capacity_kn: float
-    var load_kn: float          # updated by LoadModel
-    var is_free_fixture: bool   # an existing iron band / old dog; unrated until tapped
-
-class Section extends RefCounted:
-    var lower_anchor: int       # index into Stack.anchors
-    var upper_anchor: int
-    var span: float             # metres, anchor to anchor
-    var lashing: Lashing
-    var condition: float        # [0,1]; persists across jobs
-    var buckle_timer: float     # seconds under load beyond the buckle span; -1 if not buckling
-
-class Meters extends RefCounted:
-    var grip: float
-    var nerve: float
-    var nerve_max: float
-    var stance: Stance
-    var exposure: Exposure
-
-class StrikeResult extends RefCounted:
-    var depth_gain: float
-    var bent: bool
-    var spalled: float
-    var seated: bool
+```cpp
+// Common vocabulary, Types.h
+namespace sj {
+struct Vec2 { float x, y; };
+struct Vec3 { float x, y, z; };
+constexpr float kTick = 1.0f / 60.0f;
+constexpr int   kMaxCatchUpSteps = 5;
+}
 ```
 
 ---
 
-## `sim/tuning.gd` — CORE-007
+## `Rng.h` — CORE-003
 
-```gdscript
-class_name Tuning extends RefCounted
-
-static func load_all(dir: String) -> Tuning    # reads data/tuning/*.json
-func get_f(key: String) -> float               # flat or dotted, e.g. "grip_drain.one_hand"
-func get_i(key: String) -> int
-func get_b(key: String) -> bool
-func hash() -> String                          # sha256; stamped into replays
-func has(key: String) -> bool
+```cpp
+class Rng {
+public:
+    explicit Rng(uint64_t seed) noexcept;
+    uint32_t NextU32() noexcept;                       // xorshift128+
+    float    NextFloat() noexcept;                     // [0, 1)
+    float    RangeFloat(float lo, float hi) noexcept;
+    int32_t  RangeInt(int32_t lo, int32_t hi) noexcept;         // [lo, hi)
+    int32_t  PickWeighted(const float* weights, int n) noexcept;
+    Rng      Fork(uint32_t tag) const noexcept;        // independent substream
+    std::array<uint64_t, 2> State() const noexcept;
+    void     Restore(const std::array<uint64_t, 2>&) noexcept;
+};
 ```
 
-Keys are accessed as `tuning.get_f("span_warn_metres")`, or via generated typed accessors
-(`tuning.span_warn_metres`) — the convention checker recognises both forms.
+`Fork()` matters: each subsystem takes its own substream so that adding a call in one place doesn't
+shift every other random value in the game and invalidate every recorded replay.
 
 ---
 
-## `sim/clock.gd` — CORE-005
+## `Types.h` — CORE-004
 
-```gdscript
-class_name SimClock extends RefCounted
+```cpp
+enum class JointTier  : uint8_t { Cracked, Perished, Fair, Sound };
+enum class AnchorRate : uint8_t { Failed, Poor, Fair, Sound };
+enum class Stance     : uint8_t { OneHand, HookedLeg, Clipped, Belted, Chair };
+enum class Lashing    : uint8_t { None, Hitch, Full };
+enum class Exposure   : uint8_t { Platform, Ladder, Hanging, Overhang };
+enum class SpanBand   : uint8_t { Rigid, Flex, Sway, Buckle };
 
-const TICK: float = 1.0 / 60.0
+struct Joint   { int32_t id{}; Vec3 pos{}, normal{}; float height{}, quality{};
+                 JointTier tier{}; bool occupied{}; };
 
-func _init(tick: float = TICK) -> void
-func advance(real_delta: float) -> int          # returns how many fixed steps to run
-func alpha() -> float                           # [0,1) interpolation factor for rendering
+struct Anchor  { int32_t jointId{-1}; float height{}, depth{}, spall{};
+                 AnchorRate rate{AnchorRate::Failed};
+                 float capacityKN{}, loadKN{}; bool freeFixture{}; };
+
+struct Section { int32_t lowerAnchor{-1}, upperAnchor{-1};
+                 float span{}, condition{1.f}, buckleTimer{-1.f};
+                 Lashing lashing{Lashing::None}; };
+
+struct Meters  { float grip{}, nerve{}, nerveMax{};
+                 Stance stance{}; Exposure exposure{}; };
+
+struct MeterContext { float height{}, windSpeed{};
+                      bool carryingLadder{}, wet{}, cold{}, gloves{};
+                      const char* injury{""}; };   // "" | "cracked_rib" | "bad_ankle"
+
+struct StrikeResult { float depthGain{}, spalled{}; bool bent{}, seated{}; };
+```
+
+Aggregate initialisation only. No constructors, no virtuals, no inheritance — these are data.
+
+---
+
+## `Tuning.h` — CORE-007
+
+```cpp
+class Tuning {
+public:
+    static Tuning LoadAll(const std::string& dir);     // reads data/tuning/*.json
+    float       GetF(std::string_view key) const;      // dotted: "grip_drain.one_hand"
+    int32_t     GetI(std::string_view key) const;
+    bool        GetB(std::string_view key) const;
+    bool        Has(std::string_view key) const noexcept;
+    std::string Hash() const;                          // sha256; stamped into replays
+};
+```
+
+A missing key **throws with the key name and the file it was expected in**. It never returns zero —
+a silently-zero tuning value is the worst possible failure mode for a balance-driven game.
+
+---
+
+## `Clock.h` — CORE-005
+
+```cpp
+class SimClock {
+public:
+    explicit SimClock(float tick = kTick) noexcept;
+    int   Advance(float realDelta) noexcept;   // steps to run, capped at kMaxCatchUpSteps
+    float Alpha() const noexcept;              // [0, 1) render interpolation factor
+};
 ```
 
 ---
 
-## `sim/intent.gd`, `sim/recorder.gd`, `sim/replay.gd` — CORE-006
+## `Intent.h`, `Recorder.h`, `Replay.h` — CORE-006
 
-```gdscript
-enum IntentKind {
-    MOVE, LOOK, TAP, HAMMER_DRAW, HAMMER_RELEASE, LASH_WRAP, LASH_TIE,
-    HAUL_PULL, HAUL_STEER, CLIP, UNCLIP, SET_STANCE, CLIMB, SLIDE,
-    SELECT_TOOL, BREW, SMOKE, LOOK_AT_VIEW, GRAB_SAVE
+```cpp
+enum class IntentKind : uint8_t {
+    Move, Look, Tap, HammerDraw, HammerRelease, LashWrap, LashTie,
+    HaulPull, HaulSteer, Clip, Unclip, SetStance, Climb, Slide,
+    SelectTool, Brew, Smoke, LookAtView, GrabSave
+};
+
+struct Intent { IntentKind kind{}; float a{}, b{}; int32_t target{-1}; };
+
+using IntentBuffer = std::vector<Intent>;   // reused, never reallocated per tick
+
+class Recorder {
+public:
+    Recorder(std::string levelId, uint64_t seed, std::string tuningHash);
+    void        Record(int32_t tick, const IntentBuffer&);
+    std::string ToJson() const;
+};
+
+class Replay {
+public:
+    static Replay FromJson(const std::string&);
+    const std::string& LevelId() const noexcept;
+    uint64_t Seed() const noexcept;
+    const std::string& TuningHash() const noexcept;
+    const IntentBuffer& IntentsAt(int32_t tick) const noexcept;   // empty, no allocation
+    int32_t LengthTicks() const noexcept;
+};
+```
+
+Intents are **semantic, not input events** — `HammerRelease(power, angleError)`, never `MouseUp`.
+That keeps replays stable across input remapping and accessibility settings.
+
+---
+
+## `Level.h` — CORE-008
+
+```cpp
+class LevelData {
+public:
+    static LevelData LoadFrom(const std::string& path);
+    const std::string& Id() const noexcept;
+    const std::string& Archetype() const noexcept;
+    float TotalHeight() const noexcept;
+    const BandSpec& BandAt(float height) const;
+    std::vector<std::string> Validate() const;   // same rules as tools/validate_data.py
+    // Structure(), Site(), Mission(), Scoring() return parsed sub-structs
+};
+```
+
+`Validate()` must implement the same rules as the Python validator. A test asserts the two agree on
+every fixture — a divergence is a bug in whichever one is newer.
+
+---
+
+## `Joints.h` — STRUCT-002
+
+```cpp
+class JointGrid {
+public:
+    static JointGrid Generate(const LevelData&, Rng&, const Tuning&);
+    void  AtHeight(float h, float tol, std::vector<int32_t>& out) const;  // no allocation
+    const Joint& Nearest(Vec3 pos, float maxRange) const noexcept;        // null-object if none
+    const Joint& ById(int32_t id) const noexcept;
+    int32_t Count() const noexcept;
+    const std::string& BandAt(float h) const noexcept;
+};
+```
+
+Deterministic in `(level, seed)`. Tiers drawn from each band's distribution via a **forked** RNG
+substream. `params.forcePerishedAt` / `forceCrackedAt` place authored joints exactly — Level 1
+depends on this to put a Cracked joint on the obvious climbing line.
+
+---
+
+## `Verbs/Tap.h` — VERB-001
+
+```cpp
+struct TapResult { JointTier tier{}; float confidence{}; 
+                   std::string_view soundId; int32_t pipShape{}; };
+
+TapResult Tap(const Joint&, const Tuning&, bool wearingGloves) noexcept;
+```
+
+`pipShape` is a **shape** index, never a colour — the accessibility fallback must not rely on hue.
+
+---
+
+## `Verbs/Hammer.h` — VERB-003
+
+```cpp
+StrikeResult Strike(const Joint&, float currentDepth, float power,
+                    float angleErrorDeg, float toolCondition,
+                    const Tuning&) noexcept;
+```
+
+Pure. The caller owns the swing state machine and the wobble; this resolves one strike. Model in
+[the climbing system](../01-gdd/02-climbing-system.md#2-dogging-in--the-hammer).
+
+---
+
+## `Anchor.h` — VERB-004
+
+```cpp
+AnchorRate Rate(const Joint&, float depth, float spall, const Tuning&) noexcept;
+float      CapacityKN(AnchorRate, const Tuning&) noexcept;
+Anchor     Make(const Joint&, float depth, float spall, const Tuning&) noexcept;
+AnchorRate RateFreeFixture(const BandSpec&, Rng&, const Tuning&) noexcept;
+```
+
+---
+
+## `Stack.h` — CLIMB-001
+
+```cpp
+class Stack {
+public:
+    int32_t AddAnchor(const Anchor&);
+    int32_t AddSection(int32_t lower, int32_t upper, Lashing);
+    float    SpanOf(int32_t section) const noexcept;
+    SpanBand BandOf(int32_t section, const Tuning&) const noexcept;
+    float    FlexDeflectionM(int32_t section, float loadKN, const Tuning&) const noexcept;
+    void     Step(float dt, int32_t loadedSection, const Tuning&,
+                  std::vector<int32_t>& buckledOut);
+    float    TopHeight() const noexcept;
+
+    std::string ToJson() const;                  // CLIMB-006
+    static Stack FromJson(const std::string&);
+
+    const std::vector<Anchor>&  Anchors() const noexcept;
+    const std::vector<Section>& Sections() const noexcept;
+};
+```
+
+---
+
+## `Load.h` — CLIMB-002
+
+```cpp
+void LoadShare(const Stack&, int32_t atSection, float totalKN, const Tuning&,
+               std::vector<float>& out) noexcept;
+void ApplyLoad(Stack&, int32_t atSection, float totalKN, const Tuning&) noexcept;
+void Cascade(Stack&, int32_t failedAnchor, const Tuning&,
+             std::vector<int32_t>& failedInOrder) noexcept;
+```
+
+`Cascade` fills `failedInOrder` **in failure order**, so the HUD can burn anchors down the screen
+like a fuse. Fully deterministic — no RNG in this module.
+
+---
+
+## `Meters.h`, `Wobble.h` — METER-001/2/3
+
+```cpp
+namespace grip {
+    void  Step(Meters&, float dt, const MeterContext&, const Tuning&) noexcept;
+    float DrainRate(Stance, const MeterContext&, const Tuning&) noexcept;
+}
+namespace nerve {
+    void    Step(Meters&, float dt, const MeterContext&, const Tuning&) noexcept;
+    void    Shock(Meters&, std::string_view event, const Tuning&) noexcept;
+    int32_t Band(float nerve, const Tuning&) noexcept;   // 0 calm .. 3 bad
 }
 
-class Intent extends RefCounted:
-    var kind: IntentKind
-    var a: float        # meaning is per-kind; documented in the enum comment
-    var b: float
-    var target: int     # joint id / anchor index / -1
-
-class Recorder extends RefCounted:
-    func _init(level_id: String, seed: int, tuning_hash: String) -> void
-    func record(tick: int, intents: Array[Intent]) -> void
-    func to_json() -> String
-    static func from_json(s: String) -> Replay
-
-class Replay extends RefCounted:
-    var level_id: String
-    var seed: int
-    var tuning_hash: String
-    var expected_invoice: Dictionary
-    func intents_at(tick: int) -> Array[Intent]
-    func length_ticks() -> int
+float WobbleAmplitudeDeg(const Meters&, const MeterContext&,
+                         float gust, const Tuning&) noexcept;
 ```
+
+> **`WobbleAmplitudeDeg` is the only place wobble is computed.** Every skill verb reads it. A verb
+> that computes its own wobble is rejected in review — see the anti-pillars. A verb needing
+> different behaviour takes a multiplier; it does not reimplement the function.
 
 ---
 
-## `sim/joints.gd` — STRUCT-002
+## `Weather.h` — ENV-003
 
-```gdscript
-class_name JointGrid extends RefCounted
-
-static func generate(level: LevelData, rng: Rng, tuning: Tuning) -> JointGrid
-
-func at_height(h: float, tolerance: float) -> Array[Joint]
-func nearest(pos: Vector3, max_range: float) -> Joint    # null-object Joint if none
-func by_id(id: int) -> Joint
-func count() -> int
-func band_at(h: float) -> String                         # band type name
+```cpp
+class Weather {
+public:
+    Weather(const LevelData&, Rng&, const Tuning&);
+    void  Step(float dt, float shiftFraction) noexcept;
+    float WindAt(float height) const noexcept;
+    float GustNow() const noexcept;        // [0, 1]
+    float GustIncoming() const noexcept;   // seconds until next gust, or -1
+    const char* Precipitation() const noexcept;
+};
 ```
 
-Generation is deterministic in `(level, rng seed)`. Joint tiers are drawn from each band's
-`quality` distribution; `params.forcePerishedAt` / `forceCrackedAt` place authored joints exactly.
+`GustIncoming()` is a **promise**: once it returns a value below `gust_pre_roll_seconds`, the gust
+*will* happen. Never surprise the player with a gust. This drives both the 1.2 s audio pre-roll and
+its visual fallback.
 
 ---
 
-## `sim/verbs/tap.gd` — VERB-001
+## `Verbs/Haul.h` — VERB-007
 
-```gdscript
-class_name TapVerb extends RefCounted
+```cpp
+struct HaulState { float height{}, swingDeg{}, swingVel{}; bool fouled{}; };
 
-class TapResult extends RefCounted:
-    var tier: JointTier
-    var confidence: float     # 1.0 bare-handed; reduced by gloves (tuning.gloves.tap_tier_penalty)
-    var sound_id: String      # audio bank key
-    var pip_shape: int        # 0-3; SHAPE not colour (accessibility)
-
-static func tap(joint: Joint, tuning: Tuning, wearing_gloves: bool) -> TapResult
-```
-
----
-
-## `sim/verbs/hammer.gd` — VERB-003
-
-```gdscript
-class_name HammerVerb extends RefCounted
-
-static func strike(
-    joint: Joint,
-    current_depth: float,
-    power: float,             # [0,1] arc length at release
-    angle_error_deg: float,   # reticle offset at release, already wobble-affected
-    tool_condition: float,    # [0,1]
-    tuning: Tuning
-) -> StrikeResult
-```
-
-Pure. The caller owns the swing state machine and the wobble; this function resolves one strike.
-See [the climbing system](../01-gdd/02-climbing-system.md#2-dogging-in--the-hammer) for the model.
-
----
-
-## `sim/anchor.gd` — VERB-004
-
-```gdscript
-class_name AnchorModel extends RefCounted
-
-static func rate(joint: Joint, depth: float, spall: float, tuning: Tuning) -> AnchorRate
-static func capacity_kn(rate: AnchorRate, tuning: Tuning) -> float
-static func make(joint: Joint, depth: float, spall: float, tuning: Tuning) -> Anchor
-static func rate_free_fixture(band_params: Dictionary, rng: Rng, tuning: Tuning) -> AnchorRate
-```
-
----
-
-## `sim/stack.gd` — CLIMB-001
-
-```gdscript
-class_name Stack extends RefCounted
-
-enum SpanBand { RIGID, FLEX, SWAY, BUCKLE }
-
-var anchors: Array[Anchor]
-var sections: Array[Section]
-
-func add_anchor(a: Anchor) -> int
-func add_section(lower: int, upper: int, lashing: Lashing) -> int
-func span_of(section_index: int) -> float
-func span_band(section_index: int, tuning: Tuning) -> SpanBand
-func flex_deflection_m(section_index: int, load_kn: float, tuning: Tuning) -> float
-func step(dt: float, loaded_section: int, tuning: Tuning) -> Array[int]   # sections that buckled
-func top_height() -> float
-func to_dict() -> Dictionary        # CLIMB-006 serialisation
-static func from_dict(d: Dictionary) -> Stack
-```
-
----
-
-## `sim/load.gd` — CLIMB-002
-
-```gdscript
-class_name LoadModel extends RefCounted
-
-static func share(stack: Stack, at_section: int, total_kn: float, tuning: Tuning) -> Array[float]
-static func apply(stack: Stack, at_section: int, total_kn: float, tuning: Tuning) -> void
-static func cascade(stack: Stack, failed_anchor: int, tuning: Tuning) -> Array[int]
-```
-
-`cascade` returns the anchor indices that fail, **in failure order**, so the HUD can burn them down
-the screen like a fuse. Deterministic — no RNG.
-
----
-
-## `sim/meters_grip.gd`, `sim/meters_nerve.gd`, `sim/wobble.gd` — METER-001/2/3
-
-```gdscript
-class_name GripModel extends RefCounted
-static func step(m: Meters, dt: float, ctx: MeterContext, tuning: Tuning) -> void
-static func drain_rate(stance: Stance, ctx: MeterContext, tuning: Tuning) -> float
-
-class_name NerveModel extends RefCounted
-static func step(m: Meters, dt: float, ctx: MeterContext, tuning: Tuning) -> void
-static func shock(m: Meters, event: String, tuning: Tuning) -> void
-static func band(nerve: float, tuning: Tuning) -> int    # 0 calm .. 3 bad
-
-class_name MeterContext extends RefCounted:
-    var height: float
-    var wind_speed: float
-    var carrying_ladder: bool
-    var wet: bool
-    var cold: bool
-    var injury: String          # "" | "cracked_rib" | "bad_ankle"
-    var gloves: bool
-
-class_name Wobble extends RefCounted
-static func amplitude_deg(m: Meters, ctx: MeterContext, gust: float, tuning: Tuning) -> float
-```
-
-> **`Wobble.amplitude_deg` is the only place wobble is computed.** Every skill verb reads it.
-> A verb that computes its own wobble will be rejected in review — see the anti-pillars.
-
----
-
-## `sim/weather.gd` — ENV-003
-
-```gdscript
-class_name Weather extends RefCounted
-
-func _init(level: LevelData, rng: Rng, tuning: Tuning) -> void
-func step(dt: float, shift_fraction: float) -> void
-func wind_at(height: float) -> float                 # m/s
-func gust_now() -> float                             # [0,1] current gust intensity
-func gust_incoming() -> float                        # seconds until the next gust, or -1
-func precipitation() -> String
-```
-
-`gust_incoming()` is what drives the **1.2 s audio pre-roll** and its visual fallback. It is a
-promise: once it returns a value below `tuning.gust_pre_roll_seconds`, the gust *will* happen.
-Never surprise the player with a gust.
-
----
-
-## `sim/verbs/haul.gd` — VERB-007
-
-```gdscript
-class_name HaulVerb extends RefCounted
-
-class HaulState extends RefCounted:
-    var height: float
-    var swing_deg: float
-    var swing_vel: float
-    var fouled: bool
-
-static func step(s: HaulState, dt: float, pull: float, steer: float,
-                 wind: float, load_kg: float, tuning: Tuning) -> void
+void StepHaul(HaulState&, float dt, float pull, float steer,
+              float wind, float loadKg, const Tuning&) noexcept;
 ```
 
 A 2-DOF pendulum integrated at the fixed step. Not a rope simulation.
@@ -334,78 +337,60 @@ A 2-DOF pendulum integrated at the fixed step. Not a rope simulation.
 
 ---
 
-## `sim/verbs/lash.gd` — VERB-005
+## `Verbs/Lash.h` — VERB-005
 
-```gdscript
-class_name LashVerb extends RefCounted
+```cpp
+struct LashState { int32_t wraps{}; float tension{}; bool tied{}, slipping{}; };
 
-class LashState extends RefCounted:
-    var wraps: int
-    var tension: float          # [0,1], decays if the player pauses
-    var tied: bool
-    var slipping: bool
-
-static func step(s: LashState, dt: float, rotation_rate: float, tuning: Tuning) -> void
-static func tie_off(s: LashState, tuning: Tuning) -> Lashing
-static func drift_per_minute_cm(l: Lashing, tuning: Tuning) -> float
+void    StepLash(LashState&, float dt, float rotationRate, const Tuning&) noexcept;
+Lashing TieOff(LashState&, const Tuning&) noexcept;
+float   DriftPerMinuteCm(Lashing, const Tuning&) noexcept;
 ```
 
 ---
 
-## `sim/slip.gd` — METER-005
+## `Slip.h` — METER-005
 
-```gdscript
-class_name SlipModel extends RefCounted
+```cpp
+enum class SlipOutcome : uint8_t { None, Saved, Fell };
 
-enum SlipOutcome { NONE, SAVED, FELL }
-
-func can_slip_save(now: float, tuning: Tuning) -> bool
-func begin_slip(now: float, tuning: Tuning) -> float        # window in seconds
-func resolve(grabbed_at: float, tuning: Tuning) -> SlipOutcome
+class SlipModel {
+public:
+    bool        CanSlipSave(float now, const Tuning&) const noexcept;
+    float       BeginSlip(float now, const Tuning&) noexcept;   // window, seconds
+    SlipOutcome Resolve(float grabbedAt, const Tuning&) noexcept;
+};
 ```
 
 ---
 
-## `sim/level.gd` — CORE-008
+## `Reachability.h` — CORE-009
 
-```gdscript
-class_name LevelData extends RefCounted
+```cpp
+struct Route { std::vector<int32_t> anchors; int32_t sections{}; float maxSpan{}; bool valid{}; };
 
-static func load_from(path: String) -> LevelData
-var id: String
-var archetype: String
-var structure: Dictionary
-var bands: Array[Dictionary]
-var weather_spec: Dictionary
-var site: Dictionary
-var mission: Dictionary
-var scoring: Dictionary
-
-func band_at(height: float) -> Dictionary
-func total_height() -> float
-func validate() -> Array[String]       # same rules as tools/validate_data.py
+Route Solve(const JointGrid&, int32_t ladders, float maxSpan);
 ```
 
-`validate()` must implement the same rules as the Python validator. They are checked against each
-other by a test — a divergence between the two is a bug in whichever one is newer.
-
----
-
-## `sim/reachability.gd` — CORE-009
-
-```gdscript
-class_name Reachability extends RefCounted
-
-class Route extends RefCounted:
-    var anchors: Array[int]
-    var sections: int
-    var max_span: float
-
-static func solve(grid: JointGrid, ladders: int, max_span: float) -> Route   # null if unreachable
-```
-
-Used by the level validator. A level whose top cannot be reached at `max_span` with the authored
+Used by the level validator. A level whose top cannot be reached at `maxSpan` with the authored
 ladder allowance is a broken level, and this catches it in seconds rather than in playtest.
+
+---
+
+## The UE boundary
+
+`SteeplejackGame` may call into `sj::` freely. **`sj::` may never call into UE.** There is exactly
+one adapter layer:
+
+```cpp
+// Source/SteeplejackGame/SimBridge.h — the only place the two worlds meet
+FVector  ToUE(sj::Vec3) noexcept;
+sj::Vec3 ToSim(const FVector&) noexcept;
+sj::IntentBuffer CollectIntents(const UEnhancedInputComponent&);
+void ApplySimState(const sj::JobState&, ASteeplejackCharacter&, UHUDWidget&);
+```
+
+If you find yourself wanting a second adapter, the boundary is in the wrong place — escalate.
 
 ---
 
@@ -416,4 +401,4 @@ ladder allowance is a broken level, and this catches it in seconds rather than i
 3. List every task that will consume it, and add this file to their `spec:` refs.
 4. Only then write the implementation task(s).
 
-The whole point is that step 2 happens before anyone starts typing GDScript.
+The whole point is that step 2 happens before anyone starts typing C++.

@@ -8,13 +8,14 @@ status: ready
 assignee: null
 depends_on: [VERB-004]
 owns:
-  - sim/verbs/lash.gd
-  - tests/unit/test_lash.gd
+  - Source/SteeplejackSim/Public/Verbs/Lash.h
+  - Source/SteeplejackSim/Private/Verbs/Lash.cpp
+  - tests/unit/test_lash.cpp
 spec:
   - docs/03-tech/interfaces.md#simverbslashgd--verb-005
   - docs/01-gdd/04-tools-and-verbs.md#lash
   - docs/01-gdd/02-climbing-system.md#the-verbs
-verify: make test-unit FILTER=test_lash
+verify: make test-unit FILTER=lash
 editor_required: false
 risk: null
 ---
@@ -29,7 +30,7 @@ The only continuous, physical input in the game. It is what makes tying a rope f
 Smooth continuous rotation must be meaningfully faster than jerky input — that is where the skill lives. Tension decays if the player pauses. A quick hitch holds but drifts `tuning.lash_hitch_drift_cm_per_minute`, so over a long job the ladder walks off the anchor; that delayed consequence is deliberate.
 
 ## Interface
-```gdscript
+```cpp
 class_name LashVerb extends RefCounted
 class LashState:
     var wraps: int

@@ -9,8 +9,11 @@ The long form is [`docs/06-workflow/`](docs/06-workflow/00-agent-workflow.md).
 make ready          # tasks you can claim right now
 make board          # where everything stands
 make waves          # what can run in parallel
-make check          # the local gate. Must be green before any PR.
+make check          # the local gate (no Unreal needed). Green before any PR.
 ```
+
+You need `cmake`, `ninja` and a C++17 compiler for `make check`. You need **Unreal 5.5 and
+`UE_ROOT` set** only for tasks that touch `SteeplejackGame` or `Content/` — most tasks don't.
 
 Then open `tasks/<ID>.md` for the task you claimed. **It is self-contained.** Read it, read the
 `spec:` sections it names, and nothing else. If it doesn't give you what you need, that's a bug in
@@ -40,26 +43,49 @@ CLAIM → CONTEXT → PLAN → BUILD → VERIFY → HANDOFF → REVIEW → MERGE
 2. [`docs/01-gdd/01-core-loop.md`](docs/01-gdd/01-core-loop.md) — the loop
 3. [`docs/01-gdd/02-climbing-system.md`](docs/01-gdd/02-climbing-system.md) — the spine
 4. [`docs/03-tech/interfaces.md`](docs/03-tech/interfaces.md) — every signature is already fixed
-5. [`docs/03-tech/adr/`](docs/03-tech/adr/) — all three ADRs. Non-negotiable.
+5. [`docs/03-tech/adr/`](docs/03-tech/adr/) — **ADR-0004 first** (it supersedes 0001), then 0002
+   and 0003. Non-negotiable.
 6. [`docs/04-production/glossary.md`](docs/04-production/glossary.md) — use these words
+
+## The two-layer split — read this before anything else
+
+Per [ADR-0004](docs/03-tech/adr/0004-engine-change-to-unreal.md), this is an Unreal 5 project whose
+gameplay layer **is not an Unreal module**:
+
+| Layer | Owner | Format | Verified |
+|---|---|---|---|
+| `Source/SteeplejackSim/` | **agents** | plain C++17, no Unreal | ✅ CMake + doctest, ~20 s, **no engine needed** |
+| `data/` `tools/` `tests/` `docs/` | **agents** | text | ✅ ~3 s |
+| `Source/SteeplejackGame/` | agents + humans | C++ with Unreal | partially (UE automation) |
+| `Content/` | **humans** | binary, Git LFS | ❌ visual review only |
+
+**`SteeplejackSim` must compile standalone under CMake with no Unreal installed.** That is not a
+style rule — it is what keeps the gameplay layer fast to test and editable by agents on an engine
+whose asset formats are binary. `make build-sim` proves it on every commit.
+
+If a task needs the editor, it is tagged `editor_required: true` and batched. `make editor-queue`
+keeps that visible; if that queue grows faster than it is cleared, that is risk **R8**.
 
 ## Rules that are actually enforced
 
 `make check-conventions` fails the build on all of these. Full list and rationale in
 [`04-enforced-conventions.md`](docs/06-workflow/04-enforced-conventions.md).
 
-1. **`sim/` is pure.** No `Node`, no `get_node`, no engine `delta`, no `randi()`, no `preload`.
-2. **No magic numbers in `sim/`.** Constants live in `data/tuning/*.json`. Annotate a genuine
-   exception with `# literal: <reason>`.
-3. **No hand-placed level geometry.** Levels are JSON. If you're opening the editor to place a
-   chimney, you're doing it wrong.
-4. **Ascent Beat Rule** — no `plain` band over 20 m. The validator enforces it.
-5. **No real person's name anywhere**, including commit messages. See
+1. **`SteeplejackSim` is pure.** No Unreal headers, no `FVector`/`TArray`/`UObject`/`FMath`, no
+   `.generated.h`, no `std::chrono`, no `rand()`, no mutable statics, no `printf`.
+2. **No magic numbers in `SteeplejackSim`.** Constants live in `data/tuning/*.json`. Annotate a
+   genuine exception with `// literal: <reason>`.
+3. **No hand-placed level geometry.** Levels are JSON; structures are generated at runtime. A
+   `.umap` holds lighting, sky and spawn points — nothing else.
+4. **Blueprints are glue only.** No Blueprint may tick or contain a gameplay decision. If it has an
+   `if` about game rules, it belongs in `SteeplejackSim`.
+5. **Ascent Beat Rule** — no `plain` band over 20 m. The validator enforces it.
+6. **No real person's name anywhere**, including commit messages. See
    [the IP policy](docs/05-legal/ip-and-likeness.md).
-6. **Every failure has a telegraph, shipped in the same task.** See the
+7. **Every failure has a telegraph, shipped in the same task.** See the
    [fairness contract](docs/01-gdd/10-failure-and-difficulty.md#the-fairness-contract).
-7. **Every audio cue has a visual fallback.** See [accessibility](docs/01-gdd/14-accessibility.md).
-8. **The docs are the spec.** If your code and a doc disagree, one is a bug — decide which, fix it,
+8. **Every audio cue has a visual fallback.** See [accessibility](docs/01-gdd/14-accessibility.md).
+9. **The docs are the spec.** If your code and a doc disagree, one is a bug — decide which, fix it,
    and say which in the PR.
 
 ## Guess vs. escalate
@@ -82,8 +108,8 @@ update the status table in [`level-index.md`](docs/02-levels/level-index.md).
 **Target: idea → playable in under thirty minutes.** If that stops being true, stop and fix the
 tooling — it's what makes twelve levels affordable.
 
-**A band type** — exactly two files: a generator in `sim/joints.gd`, a visual treatment in the brick
-shader. Plus the enum in the schema and a row in
+**A band type** — exactly two places: a generator in `SteeplejackSim/Private/Joints.cpp`, and a
+parameter on the brick master material. Plus the enum in the schema and a row in
 [`data-schemas.md`](docs/03-tech/data-schemas.md).
 
 **A task** — `make new-task ID=CLIMB-012 TITLE="..."`. Discovered work becomes a task, never a
@@ -93,11 +119,16 @@ scope expansion.
 [`interfaces.md`](docs/03-tech/interfaces.md) *first*, then the implementation tasks. Never change a
 signature while someone is implementing against it.
 
+**A material or an asset** — that is `Content/`, it is binary, it is human-owned, and it goes
+through Git LFS. Agents brief it; they do not author it.
+
 ## Things that get a PR rejected
 
-- A `Node` reference or a magic number in `sim/`
+- An Unreal include, an Unreal type, or a magic number in `SteeplejackSim`
+- A gameplay decision in a Blueprint, or a ticking Blueprint
+- A binary asset committed without Git LFS
 - Files changed outside the task's `owns:` (undeclared)
-- A gameplay decision made in `game/` instead of `sim/`
+- A gameplay decision made in `SteeplejackGame` instead of `SteeplejackSim`
 - A new mechanic with no telegraph, or an audio cue with no visual fallback
 - A third meter (see the anti-pillars)
 - An empty `## Outcome`

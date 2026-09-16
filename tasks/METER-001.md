@@ -8,13 +8,14 @@ status: ready
 assignee: null
 depends_on: [CORE-007]
 owns:
-  - sim/meters_grip.gd
-  - tests/unit/test_grip.gd
+  - Source/SteeplejackSim/Public/Meters.h
+  - Source/SteeplejackSim/Private/MetersGrip.cpp
+  - tests/unit/test_grip.cpp
 spec:
   - docs/03-tech/interfaces.md#simmeters_gripgd-simmeters_nervegd-simwobblegd--meter-0123
   - docs/01-gdd/03-meters-grip-nerve.md#grip--the-short-meter
   - docs/01-gdd/02-climbing-system.md#5-grip-and-why-climbing-is-free-but-working-is-not
-verify: make test-unit FILTER=test_grip
+verify: make test-unit FILTER=grip
 editor_required: false
 risk: null
 ---

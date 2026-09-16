@@ -8,13 +8,13 @@ status: ready
 assignee: null
 depends_on: [PLAYER-001, CLIMB-001]
 owns:
-  - game/player/states/climb.gd
-  - game/player/states/slide.gd
+  - Source/SteeplejackGame/Player/States/ClimbState.cpp
+  - Source/SteeplejackGame/Player/States/SlideState.cpp
 spec:
   - docs/01-gdd/02-climbing-system.md#the-verbs
   - docs/01-gdd/11-camera-controls-feel.md#feel--the-non-negotiables
   - docs/01-gdd/03-meters-grip-nerve.md#grip--the-short-meter
-verify: godot --path . --headless -s tests/smoke_climb.gd
+verify: make test-automation FILTER=Smokeclimb
 editor_required: false
 risk: null
 ---

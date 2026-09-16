@@ -1,45 +1,61 @@
 ---
 id: CORE-001
-title: Godot project skeleton and bootstrap scene
+title: Unreal project, two modules, and the standalone sim build
 milestone: M0
 discipline: [ENG]
-estimate_days: 0.5
+estimate_days: 1.5
 status: ready
 assignee: null
 depends_on: [PROD-001]
 owns:
-  - project.godot
-  - game/bootstrap.gd
-  - game/bootstrap.tscn
+  - Steeplejack.uproject
+  - CMakeLists.txt
+  - Source/SteeplejackSim/SteeplejackSim.Build.cs
+  - Source/SteeplejackGame/SteeplejackGame.Build.cs
+  - Source/SteeplejackGame/SteeplejackGame.cpp
+  - Source/Steeplejack.Target.cs
+  - Source/SteeplejackEditor.Target.cs
 reads:
   - docs/03-tech/architecture.md
-  - docs/03-tech/adr/0001-engine-choice.md
 spec:
-  - docs/03-tech/adr/0001-engine-choice.md#decision
+  - docs/03-tech/adr/0004-engine-change-to-unreal.md#the-key-structural-move-steeplejacksim-is-not-a-ue-module
   - docs/03-tech/architecture.md#repository-layout
   - docs/03-tech/performance-budget.md#targets
-verify: godot --path . --headless --quit
+verify: make build-sim && make build-game
 editor_required: false
-risk: null
+risk: R8
 ---
 
 ## Goal
-A Godot 4.4 project that opens, runs headless, and exits zero.
+A UE 5.5 project with two modules, where `SteeplejackSim` **also** builds standalone under CMake
+with no Unreal installed.
 
 ## Why
-Everything in M0 depends on a project that boots. Nothing else.
+The dual build is the entire mitigation for the cost of ADR-0004. If `SteeplejackSim` ever stops
+building standalone, the gameplay layer stops being agent-executable and CI stops being fast.
 
 ## Context
-`project.godot` already exists in skeleton form. Set the Forward+ renderer, a 60 Hz physics tick, Jolt, and GDScript warnings-as-errors for untyped declarations (that last one is what makes rule 1 of the conventions enforceable at compile time).
+The scaffold already exists (`Steeplejack.uproject`, `CMakeLists.txt`, both `.Build.cs` files) but
+has never been compiled — `cmake` and Unreal are not installed on the authoring machine. This task
+is the first real verification of it.
+
+`SteeplejackSim.Build.cs` depends only on `Core`, and that is for build glue, not for types.
+Do not add engine dependencies to it; if the sim appears to need one, the boundary is wrong.
+
+## Interface
+No new sim interfaces. Creates the two `.Target.cs` files and the game module entry point.
 
 ## Acceptance
-1. `godot --path . --headless --quit` exits 0 with no errors or warnings.
-2. `physics/common/physics_ticks_per_second` is 60 and `physics_jitter_fix` is 0.0.
-3. `debug/gdscript/warnings/untyped_declaration` is set to error (2).
-4. `game/bootstrap.tscn` is the main scene and prints one line confirming the tuning directory was found.
+1. `make build-game` compiles the editor target on a machine with UE 5.5.
+2. `make build-sim` compiles `SteeplejackSim` with **no Unreal installed** — verify in a container.
+3. `-Wall -Wextra -Werror` is on for the standalone build and the module compiles clean.
+4. The plugin list in the `.uproject` matches ADR-0004 (Chaos, GeometryCollection, ControlRig,
+   FullBodyIK, MetaSound, Niagara, EnhancedInput).
+5. `make check-conventions` passes against the module.
+6. The editor opens and runs an empty map at the primary target's frame budget.
 
 ## Out of scope
-Do not add the fixed-step driver — that is CORE-005, which replaces bootstrap with main.
+No gameplay. No content. The fixed-step driver is CORE-005.
 
 ## Plan
 <!-- Filled in by the implementer before building, if estimate_days > 1. -->

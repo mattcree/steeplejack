@@ -1,70 +1,97 @@
 # Performance Budget
 
+> Rewritten following [ADR-0004](adr/0004-engine-change-to-unreal.md). Unreal Engine 5.5+,
+> Lumen + Nanite, deferred renderer.
+
 ## Targets
 
-| Platform | Resolution | Target | Floor |
-|---|---|---|---|
-| Mid-range desktop (RX 6600 / RTX 3060 class) | 1080p | 120 fps | 90 fps |
-| Steam Deck | 800p | 60 fps | 45 fps |
-| Integrated graphics (Radeon 780M class) | 1080p | 60 fps | 40 fps |
+| Platform | Resolution | Upscaling | Target | Floor |
+|---|---|---|---|---|
+| **Primary** — RX 7800 XT / RTX 4070 class | 1440p | TSR Quality | 60 fps | 50 fps |
+| **Minimum** — RX 6600 / RTX 3060 class | 1080p | TSR Balanced | 60 fps | 45 fps |
+| **High** — RX 7900 / RTX 4080 class | 4K | TSR Quality | 60 fps | — |
+| **Steam Deck** | 800p | TSR Performance, Lumen off, Nanite on | 30 fps | **stretch goal** |
 
-Godot Forward+ on desktop, Mobile renderer as a fallback option.
+Steam Deck moved from a target to a stretch goal in ADR-0004. Revisit at M4 once the fall's cost is
+known; the honest answer may be "no Deck build", and that is acceptable.
 
-## Frame budget at 60 fps (16.6 ms)
+**60 fps is the target, not 120.** This is a game about deliberate, careful movement; the frame
+budget is better spent on Lumen and volumetrics than on refresh rate.
+
+## Frame budget at 60 fps (16.6 ms), primary target
 
 | | Budget | Notes |
 |---|---|---|
-| `sim.step` | **1.0 ms** | hard limit. It's arithmetic. |
-| Player + animation + IK | 1.5 ms | the IK solver is the cost |
-| Structure rendering | 2.0 ms | 1–3 draw calls for the chimney |
-| Town backdrop | 2.5 ms | instanced, LOD'd, fog-culled |
-| Weather + dust | 2.0 ms | GPU particles |
-| Shadows | 2.0 ms | 2 cascades, near field only |
-| Post (fog, tonemap, vignette) | 1.5 ms | |
-| UI | 0.5 ms | |
-| Audio | 0.5 ms | |
-| Headroom | 3.1 ms | |
+| `SteeplejackSim::Step` | **0.5 ms** | hard limit. It is arithmetic over a few hundred structs in plain C++. |
+| Base pass (Nanite) | 3.0 ms | structures, town, props — Nanite makes this scale well |
+| **Lumen GI + reflections** | 4.0 ms | the single largest cost, and the thing that makes it look photographed |
+| Shadows (virtual shadow maps) | 2.0 ms | one directional light |
+| **Volumetric fog** | 2.0 ms | atmospheric perspective is a gameplay system here, not a garnish |
+| Character + Control Rig + cloth | 1.5 ms | one character, full-body IK, Chaos Cloth |
+| Niagara (smoke, dust, weather) | 1.5 ms | |
+| Post + TSR | 1.5 ms | |
+| UI + audio | 0.6 ms | |
+| **Headroom** | 0.0 ms | tight by design — see the scalability plan |
+
+This budget has no slack, deliberately. Lumen and volumetrics are what the project is buying with
+the engine change, and cutting them to chase headroom would defeat the decision. Slack comes from
+scalability settings, not from the budget.
 
 ## Scene budgets
 
 | | Limit |
 |---|---|
-| Triangles, typical frame | 900k |
-| Triangles, fall moment | 1.4M (accepted spike) |
-| Draw calls | ≤ 180 |
-| Rigid bodies, typical | ≤ 6 |
-| Rigid bodies, fall moment | ≤ 90, for ≤ 4 s |
-| GPU particle systems, typical | 2 |
-| GPU particle systems, fall | 5 |
-| Unique materials | ≤ 24 |
-| Texture memory | ≤ 512 MB |
-| Shadow-casting lights | 1 (the sun) |
+| Nanite triangles, typical frame | 8M (Nanite cost is resolution-bound, not triangle-bound) |
+| Non-Nanite triangles | 400k |
+| Draw calls (post-Nanite) | ≤ 400 |
+| Chaos rigid bodies, typical | ≤ 8 |
+| Chaos rigid bodies, the fall | ≤ 120, for ≤ 5 s |
+| Niagara systems, typical | 3 |
+| Niagara systems, the fall | 7 |
+| Unique master materials | ≤ 12 (heavy use of material instances) |
+| Texture streaming pool | ≤ 4 GB primary, ≤ 2 GB minimum spec |
+| `Content/` on disk | ≤ 25 GB (Git LFS; see the repo policy) |
 
-## The fall spike
+## The two spikes
 
-The only moment the budget is deliberately blown. Mitigations, applied for the 6 s around impact:
-1. Drop town backdrop to LOD2 (−40% tris).
-2. Disable shadow cascade 2.
-3. Chunks become static rubble 4 s after their first contact.
-4. Cap concurrent dynamic chunks at 90; any beyond that spawn as pre-settled rubble.
+### 1. The fall (levels 6, 7, 12)
 
-A frame-time regression test asserts the fall spike stays under **33 ms** (30 fps) on the reference
-machine. Dipping to 30 fps for two seconds during a controlled demolition is acceptable; stuttering
-is not.
+The only moment the budget is deliberately blown, for about five seconds. Mitigations applied
+automatically for a 6 s window around impact:
+
+1. Town backdrop forced to its silhouette LOD (−60% of its cost).
+2. Lumen final gather quality dropped one step.
+3. Chunks convert to static rubble 4 s after first contact.
+4. Concurrent dynamic chunks capped at 120; overflow spawns pre-settled.
+5. Dust plume gets the entire Niagara budget; other systems are culled.
+
+**Regression test: the fall spike must stay under 33 ms (30 fps) on the primary target.** Dipping to
+30 fps for two seconds during a controlled demolition is acceptable. Stuttering is not.
+
+### 2. Topping (levels 5, 9, 12)
+
+Hundreds of individually removable bricks. **Never individual actors.** One `InstancedStaticMesh`
+per course; removal sets an instance transform to zero scale. The wall below the working face is a
+single Nanite mesh whose top is clipped by a material parameter. Budget: the whole topping surface
+is ≤ 3 draw calls regardless of how many bricks remain.
 
 ## Things that will hurt if we let them
 
 | Risk | Mitigation | Owner |
 |---|---|---|
-| Per-brick meshes on a topping level | MultiMesh + shader clipping, never individual nodes | ENG |
-| The joint grid as scene nodes | it's sim data; **nothing in the joint grid is a Node** | ENG |
-| Fog + transparency overdraw at height | height fog in the material, not a volumetric pass | ENG |
-| Hand IK every frame at distance | IK only when the player is on-screen within 30 m | ENG |
-| Audio: 40 concurrent falling-brick sounds | one looping "rush" voice + a terminating thump | AUDIO |
-| Town uniqueness creep | hard cap: 40 building kits, no unique textures | ART |
+| An actor per brick | ISM + material clipping, enforced in review | ENG |
+| The joint grid as actors or components | it is sim data; **nothing in the joint grid touches UE** | ENG |
+| Lumen cost in the fog | tune volumetric fog scattering distribution before touching Lumen quality | TECH-ART |
+| Megascans at source resolution | 2K virtual textures, 4K only on the brick master | ART |
+| `Content/` bloat | Git LFS, and a nightly size check that fails over 25 GB | PROD |
+| Blueprint tick | Blueprints are glue only; no Blueprint may tick | ENG |
+| Chaos Cloth on distant characters | cloth disabled beyond 15 m | ENG |
+| Audio: 40 concurrent falling-brick voices | one looping "rush" MetaSound + a terminating thump | AUD |
 
 ## Measurement
 
-- `tests/perf/reference_scene.gd` runs headless nightly, capturing frame times on:
+- `tools/perf_capture.py` drives a headless UE run with `-benchmark` over three reference scenes:
   Level 01 (trivial), Level 09 (two stacks, many bricks), Level 12 act 2 (the fall).
-- Results are appended to `docs/03-tech/perf-history.csv` and a regression > 10% fails the nightly.
+- Results append to `docs/03-tech/perf-history.csv`; a >10% regression fails the nightly.
+- **`SteeplejackSim::Step` is measured separately, in the standalone CMake build**, with no engine
+  involved. That number must never exceed 0.5 ms and it is checked on every commit, not nightly.

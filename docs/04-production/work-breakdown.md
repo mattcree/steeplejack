@@ -4,7 +4,16 @@ Task IDs are stable and referenced from commits (`CLIMB-004: seat the dog`). Est
 **ideal days** for one competent worker.
 
 **Discipline tags:** `ENG` engineering · `DES` design · `ART` art · `AUD` audio · `TECH-ART` ·
-`PROD` production · `EDITOR` requires a human in the Godot editor
+`PROD` production · `EDITOR` requires a human in the Unreal editor
+
+> **M0 and M1 are superseded by [`tasks/`](../../tasks/).** Those milestones are expanded into 51
+> self-contained work items with dependencies, owned paths, interface contracts and verify commands.
+> Use `make ready` / `make waves` / `make critical`, not the tables below, for anything in M0 or M1.
+> The tables remain the source for M2–M6 shape and estimates until each milestone is expanded at its
+> predecessor's gate.
+>
+> The M0/M1 tables below predate [ADR-0004](../03-tech/adr/0004-engine-change-to-unreal.md) and name
+> Godot; the task files are current.
 
 Status legend: ⬜ not started · 🟡 in progress · ✅ done · ⛔ blocked
 
@@ -15,9 +24,9 @@ Status legend: ⬜ not started · 🟡 in progress · ✅ done · ⛔ blocked
 | ID | Task | Disc | Est | Depends on | Acceptance |
 |---|---|---|---|---|---|
 | ⬜ CORE-001 | Godot project, folder structure, `.gitignore`, `project.godot` settings | ENG | 0.5 | — | project opens; Forward+ renderer; 60 Hz physics tick |
-| ⬜ CORE-002 | CI: `gdlint`, `gdformat --check`, headless GUT run | ENG | 1 | CORE-001 | green on an empty test |
-| ⬜ CORE-003 | `sim/rng.gd` seeded xorshift + tests | ENG | 0.5 | CORE-001 | same seed → same 10k sequence, twice |
-| ⬜ CORE-004 | `sim/types.gd` plain structs (Joint, Anchor, Section, Stack, Meters…) | ENG | 1 | CORE-003 | no `Node` anywhere in `sim/` (CI lint rule) |
+| ⬜ CORE-002 | CI: conventions, data, CMake sim build + doctest | ENG | 1 | CORE-001 | green on an empty test |
+| ⬜ CORE-003 | `Rng.h` seeded xorshift + tests | ENG | 0.5 | CORE-001 | same seed → same 10k sequence, twice |
+| ⬜ CORE-004 | `Types.h` plain structs (Joint, Anchor, Section, Stack, Meters…) | ENG | 1 | CORE-003 | no Unreal types anywhere in `SteeplejackSim` (CI rule) |
 | ⬜ CORE-005 | Fixed-step driver with accumulator + render interpolation | ENG | 1.5 | CORE-004 | sim steps exactly 60×/s at 30 and 144 fps |
 | ⬜ CORE-006 | Intent recorder + replay playback | ENG | 2 | CORE-005 | record 60 s, replay, states identical tick-for-tick |
 | ⬜ CORE-007 | Tuning JSON loader + hot reload (F5) | ENG | 1 | CORE-004 | editing `meters.json` changes behaviour without restart |
@@ -54,9 +63,9 @@ Status legend: ⬜ not started · 🟡 in progress · ✅ done · ⛔ blocked
 
 | ID | Task | Disc | Est | Depends on | Acceptance |
 |---|---|---|---|---|---|
-| ⬜ CLIMB-001 | `sim/stack.gd`: sections, spans, span bands, buckle | ENG | 2 | VERB-005 | the span table in the GDD is reproduced exactly |
+| ⬜ CLIMB-001 | `Stack.h`: sections, spans, span bands, buckle | ENG | 2 | VERB-005 | the span table in the GDD is reproduced exactly |
 | ⬜ CLIMB-002 | Load sharing (0.55 falloff) + cascade failure | ENG | 2 | CLIMB-001 | a cascade from anchor 8 fails 7,6,5 in order, deterministically |
-| ⬜ CLIMB-003 | Ladder MultiMesh + **flex vertex shader** driven by span & load | TECH-ART | 2 | CLIMB-001 | visible bend at 5 m span; none at 3 m |
+| ⬜ CLIMB-003 | Ladder ISM + **flex WPO material** driven by span & load | TECH-ART | 2 | CLIMB-001 | visible bend at 5 m span; none at 3 m |
 | ⬜ CLIMB-004 | Climb/transition states + slide-down | ENG | 2 | PLAYER-001 | transition onto a new section costs grip and feels deliberate |
 | ⬜ CLIMB-005 | **Hand & foot IK onto rungs** | ENG/ART/EDITOR | 4 | CLIMB-004 | hands land on actual rungs at every span and lean |
 | ⬜ CLIMB-006 | Stack serialisation (the checkpoint) | ENG | 1 | CLIMB-002 | quit mid-climb, reload, stack is identical |
@@ -65,9 +74,9 @@ Status legend: ⬜ not started · 🟡 in progress · ✅ done · ⛔ blocked
 
 | ID | Task | Disc | Est | Depends on | Acceptance |
 |---|---|---|---|---|---|
-| ⬜ METER-001 | `sim/meters.gd`: grip, all five stances, tremor | ENG | 1.5 | CORE-007 | matches `meters.json` exactly; unit tested |
+| ⬜ METER-001 | `Meters.h`: grip, all five stances, tremor | ENG | 1.5 | CORE-007 | matches `meters.json` exactly; unit tested |
 | ⬜ METER-002 | Nerve: height/wind/exposure factors, shocks, thresholds | ENG | 1.5 | METER-001 | the four low-nerve effect bands trigger at spec values |
-| ⬜ METER-003 | `sim/wobble.gd` — the one number | ENG | 0.5 | METER-002 | every verb reads it; no verb computes its own wobble |
+| ⬜ METER-003 | `Wobble.h` — the one number | ENG | 0.5 | METER-002 | every verb reads it; no verb computes its own wobble |
 | ⬜ METER-004 | Recovery actions: stand, **brew up**, cigarette, look at view | ENG/ART | 2 | METER-002 | tea is a 12 s camera-locked set-piece |
 | ⬜ METER-005 | Slip-save + fall + resume-at-stack | ENG | 2 | CLIMB-006 | slip-save budget of 1/60 s enforced |
 | ⬜ UI-001 | HUD: grip/nerve arcs, anchor pips (in-world), material counts | ENG/ART | 2 | METER-003 | fades out when idle; readable at 720p |
@@ -106,7 +115,7 @@ Status legend: ⬜ not started · 🟡 in progress · ✅ done · ⛔ blocked
 | ⬜ MISS-003 | Earth pit + continuity test (the payoff beat) | ENG/ART/AUD | 1 | MISS-002 | needle + buzzer, satisfying |
 | ⬜ SHIFT-001 | Daylight clock, the top-edge bar, end-of-shift handling | ENG/UI | 1.5 | M1 | bar appears only after 60% elapsed |
 | ⬜ WEATH-001 | Weather ramp (the storm), precipitation, wet-grip modifier | ENG/TECH-ART | 2.5 | ENV-003 | 90 s audiovisual front; no cliff edge |
-| ⬜ SCORE-001 | `sim/scoring.gd` + the reckoning screen (handwritten invoice) | ENG/ART | 3 | MISS-001 | every line item traces to a player action |
+| ⬜ SCORE-001 | `Scoring.h` + the reckoning screen (handwritten invoice) | ENG/ART | 3 | MISS-001 | every line item traces to a player action |
 | ⬜ FAIL-001 | Fall consequences: hospital beat, lost fee, **persistent injuries** | ENG/ART | 2 | METER-005 | max one injury carried; 2–3 job duration |
 | ⬜ HUB-001 | Van / loadout screen | ENG/UI | 2 | SCORE-001 | no "recommended loadout" button |
 | ⬜ LVL-001 | Level 01 — The Back Yard (full) | DES | 2 | MISS-001 | including the Great Aire reveal |
@@ -137,8 +146,8 @@ Status legend: ⬜ not started · 🟡 in progress · ✅ done · ⛔ blocked
 | ⬜ HUB-002 | The yard: bench, board, kettle, whippet | ART/ENG | 5 |
 | ⬜ HUB-003 | **The engine**: 40 progressive states, purchase flow | ART/ENG | 6 |
 | ⬜ ECON-001 | Money, reputation, upgrades, tool condition, the lad | ENG | 3 |
-| ⬜ ART-010 | **Brick shader** (procedural, weathering, quality read) | TECH-ART | 5 |
-| ⬜ ART-011 | Character model + rig + animation set | ART | 8 |
+| ⬜ ART-010 | *(moved to M1 by ADR-0004 — see `tasks/ART-010.md`)* | TECH-ART | — |
+| ⬜ ART-011 | *(the character moved to M1 as ART-020 — see `tasks/ART-020.md`)* | ART | — |
 | ⬜ ART-012 | Town building kit (40 pieces) + canal + railway | ART | 6 |
 | ⬜ AUD-010 | Music cues (yard, setting off, the top, brew up) | AUD | 5 |
 | ⬜ AUD-011 | First voice session | AUD | 3 |
@@ -163,14 +172,14 @@ Status legend: ⬜ not started · 🟡 in progress · ✅ done · ⛔ blocked
 | ⬜ TOP-006 | Strike-your-own-stack handling | ENG | 2 |
 | ⬜ TOP-007 | Complications: nest, tie bar, soot fall, perished band | ENG/ART | 3 |
 | ⬜ FELL-001 | Survey mode: plumb bob, pacing, pegs, sight lines, fan overlay | ENG/UI | 4 |
-| ⬜ FELL-002 | `sim/gob.gd`: cells, support polygon, CoG, margin bands | ENG | 3 |
+| ⬜ FELL-002 | `Gob.h`: cells, support polygon, CoG, margin bands | ENG | 3 |
 | ⬜ FELL-003 | Props: placement, load, splitting, the dud | ENG | 2 |
 | ⬜ FELL-004 | Chalk load diagram (diegetic + HUD) | ENG/ART | 3 |
 | ⬜ FELL-005 | Escalating groan/dust audio-visual dread system | AUD/TECH-ART | 3 |
 | ⬜ FELL-006 | Pack, light (wind vs. match), **run** | ENG | 2 |
-| ⬜ FELL-007 | Pre-fracture pipeline (60–90 chunks from the builder) | TECH-ART | 4 |
-| ⬜ FELL-008 | `sim/fell.gd`: hinge solver, bending fracture, angular error | ENG | 5 |
-| ⬜ FELL-009 | Impact, rubble freeze, **the dust column** | TECH-ART | 5 |
+| ⬜ FELL-007 | Chaos Geometry Collection pre-fracture pipeline (60–120 chunks) | TECH-ART | 3 |
+| ⬜ FELL-008 | `Fell.h`: hinge solver, bending fracture, angular error | ENG | 5 |
+| ⬜ FELL-009 | Impact, rubble freeze, **the Niagara dust column** | TECH-ART | 4 |
 | ⬜ FELL-010 | Fall audio: silence, crack, roar, thump, rain, birds, cheer | AUD | 4 |
 | ⬜ FELL-011 | Fall perf work (LOD drop, body cap, 33 ms ceiling) | ENG | 3 |
 | ⬜ LVL-005/6/7 | Levels 05, 06, 07 | DES | 12 |
@@ -224,5 +233,13 @@ STRUCT-002 → VERB-001/003 → CLIMB-001 → CLIMB-002 → CLIMB-005 → PT-001
                                               TOP-00x → FELL-00x → LVL-006
 ```
 
-**CLIMB-005 (hand IK) is the longest single task before the M1 gate and the highest-value piece of
-animation work in the project. Start it early and give it to your best person.**
+**Superseded by `make critical TARGET=PT-001`,** which computes this from the task graph. Under
+ADR-0004 the critical path moved off CLIMB-005 (Control Rig made it cheaper) and onto the sim chain:
+
+```
+CORE-004 → CORE-008 → STRUCT-002 → VERB-003 → VERB-004 → VERB-005
+         → CLIMB-001 → CLIMB-002 → CLIMB-006 → METER-005 → TEST-001 → PT-001
+```
+
+23 ideal days, 14 tasks, **all of it agent-executable with no engine installed.** VERB-003 (the
+hammer, 3 days) is the largest item on it — start that early.

@@ -9,22 +9,27 @@ Cheapest and fastest first. Everything above a rung only runs if the rungs below
 
 | # | Gate | Command | Runtime | When |
 |---|---|---|---|---|
-| 1 | Format & lint | `make lint` | ~2 s | pre-commit, CI |
-| 2 | **Enforced conventions** | `make check-conventions` | ~1 s | pre-commit, CI |
-| 3 | Data validation (schemas, tuning, task graph) | `make validate` | ~2 s | pre-commit, CI |
-| 4 | Doc link integrity | `make check-links` | ~1 s | CI |
-| 5 | Sim unit + property tests | `make test-unit` | ~20 s | pre-commit, CI |
-| 6 | Level validation (schema + beat rule + reachability) | `make test-levels` | ~30 s | CI |
-| 7 | Replay regression | `make test-replay` | ~60 s | CI |
-| 8 | Determinism (fell ×100, sim ×2) | `make test-determinism` | ~2 min | CI |
-| 9 | Performance smoke | `make test-perf` | ~5 min | nightly |
-| 10 | Screenshot diff | `make test-visual` | ~5 min | nightly |
-| 11 | **Human playtest** | see the playtest plan | hours | per milestone |
+| 1 | **Enforced conventions** | `make check-conventions` | ~1 s | pre-commit, CI |
+| 2 | Data validation (schemas, tuning, task graph) | `make validate` | ~2 s | pre-commit, CI |
+| 3 | Doc link integrity | `make check-links` | ~1 s | CI |
+| 4 | Sim build (**no Unreal needed**) | `make build-sim` | ~20 s | pre-commit, CI |
+| 5 | Sim unit + property tests | `make test-unit` | ~10 s | pre-commit, CI |
+| 6 | Level validation (schema + beat rule + reachability) | `make test-levels` | ~10 s | CI |
+| 7 | Replay regression | `make test-replay` | ~20 s | CI |
+| 8 | Determinism + `Sim::Step` budget | `make test-determinism test-perf` | ~40 s | CI |
+| 9 | Game module build | `make build-game` | ~10 min | CI (self-hosted) |
+| 10 | UE automation tests | `make test-automation` | ~5 min | CI (self-hosted) |
+| 11 | Frame-time capture, screenshot diff | `make perf-capture` | ~15 min | nightly |
+| 12 | **Human playtest** | see the playtest plan | hours | per milestone |
 
-`make check` runs 1–5. That's your local gate and it must be under 30 seconds, forever. If it
+**Rungs 1–8 need neither Unreal nor a GPU.** They cover 100% of the gameplay logic and run on a
+GitHub-hosted runner in under two minutes. That is the practical payoff of ADR-0004's module split,
+and it is why the gameplay layer stays agent-executable on an engine whose asset formats are binary.
+
+`make check` runs 1–5. That's your local gate and it must stay under **60 seconds**, forever. If it
 creeps past that, people stop running it, and then rungs 1–5 stop being real.
 
-`make ci` runs 1–8.
+`make ci` runs 1–8 — everything that does not need the engine.
 
 ## Rung 7 is the one that matters
 
@@ -84,11 +89,17 @@ branch; never skippable for a PR, because CI runs the same gates.
 
 `.github/workflows/ci.yml`. Two job groups:
 
-- **fast** (no engine): lint, conventions, data validation, task graph, doc links. Runs on every
-  push in well under a minute, and is the gate that catches most agent mistakes.
-- **engine**: Godot headless — unit, property, level, replay, determinism.
+- **fast** (no engine, no compiler): conventions, data validation, task graph, doc links. Under 30
+  seconds, and it is the gate that catches most agent mistakes.
+- **sim** (no engine): CMake build plus the whole doctest suite — unit, property, level, replay,
+  determinism, step budget. Under two minutes on a GitHub-hosted runner.
+- **game** (self-hosted runner with UE 5.5): editor build and UE automation tests. Enabled by
+  CORE-002.
 
-Nightly adds perf and visual.
+Nightly adds frame-time capture and screenshot diffs.
+
+**A red `sim` job is more urgent than a red `game` job**, because the sim holds every gameplay
+decision and the game module holds none.
 
 **A red CI blocks merge. There is no override.** If CI is flaky, fixing the flake is the highest
 priority task in the repo, because a flaky gate is worse than no gate — it trains everyone to
@@ -96,8 +107,9 @@ ignore red.
 
 ## Coverage
 
-`sim/` must hold **≥ 90% line coverage**, enforced at the M1 gate and thereafter. `game/` is not
-coverage-gated — it's presentation, and its correctness is visual.
+`SteeplejackSim` must hold **≥ 90% line coverage** (llvm-cov on the standalone build), enforced at
+the M1 gate and thereafter. `SteeplejackGame` and `Content/` are not coverage-gated — they are
+presentation, and their correctness is visual.
 
 This asymmetry is the point of the sim/presentation split: we put all the logic somewhere it can be
 tested exhaustively and cheaply, and we test the rest with our eyes.

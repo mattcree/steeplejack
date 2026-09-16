@@ -8,13 +8,13 @@ status: ready
 assignee: null
 depends_on: [CLIMB-002]
 owns:
-  - sim/save.gd
-  - tests/unit/test_save.gd
+  - Source/SteeplejackSim/Private/StackSerialise.cpp
+  - tests/unit/test_save.cpp
 spec:
   - docs/01-gdd/02-climbing-system.md#the-ladder-stack-is-the-checkpoint
   - docs/03-tech/architecture.md#save-data
   - docs/01-gdd/10-failure-and-difficulty.md#5-the-fall
-verify: make test-unit FILTER=test_save
+verify: make test-unit FILTER=save
 editor_required: false
 risk: null
 ---

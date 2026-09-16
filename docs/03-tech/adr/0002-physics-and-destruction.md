@@ -14,6 +14,10 @@ Two systems look like they want a physics engine and must not get one:
 2. **Topping a chimney.** The player removes hundreds of bricks. Simulating the remaining structure's
    stability with real statics is both expensive and uncontrollable.
 
+> **Unchanged by [ADR-0004](0004-engine-change-to-unreal.md)**, and easier to satisfy under Unreal:
+> Chaos Geometry Collections implement the pre-fracture and chunk simulation described below
+> natively. This ADR was describing a first-class Unreal workflow without knowing it.
+
 ## Decision
 
 ### Destruction: pre-fractured chunks + a hinge solver
@@ -58,9 +62,9 @@ That is enough for the gameplay and it is testable in a unit test.
 
 Base stability is a **2D centre-of-gravity vs. support-polygon** problem, solved analytically:
 
-```gdscript
-support_polygon = convex_hull(intact_cells.map(centroid) + props.map(position))
-margin = signed_distance(cog_xz, support_polygon)
+```cpp
+const Polygon support = ConvexHull(Centroids(intactCells), PropPositions(props));
+const float   margin  = SignedDistance(cogXZ, support);
 ```
 
 Runs in well under 0.1 ms at 32 segments. Recomputed every time a cell or prop changes, never
@@ -74,7 +78,7 @@ per-frame. Fully unit-testable with no engine.
 | Dropped tools | ≤ 3 at once | short-lived |
 | Bricks down the flue | 0 | **faked**: a scripted path + the audio. Nobody can see inside the flue. |
 | Bricks thrown over the side | ≤ 6 at once | short-lived, for the damage check |
-| Fall impact chunks | ≤ 90, ≤ 4 s | the only heavy moment in the game |
+| Fall impact chunks | ≤ 120, ≤ 5 s | Chaos Geometry Collection; the only heavy moment in the game |
 | Ladders | 0 | **kinematic + a vertex-shader flex spring.** Never dynamic. |
 | Rope / haul loads | 0 | a 2-DOF pendulum ODE, integrated at fixed step. Not a rope sim. |
 

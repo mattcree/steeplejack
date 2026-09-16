@@ -5,20 +5,21 @@ A task is done when **every** applicable box is ticked. Not "mostly". Partial wo
 ## Every task
 
 - [ ] Meets the acceptance criterion written in [`work-breakdown.md`](work-breakdown.md)
-- [ ] `gdlint` and `gdformat --check` pass
+- [ ] The standalone sim build compiles clean at `-Wall -Wextra -Werror -Wconversion`
 - [ ] CI is green (unit + property + replay + level validation)
 - [ ] No new warnings
 - [ ] Commit message starts with the task ID (`CLIMB-004: seat the dog`)
 - [ ] The relevant doc in `docs/` is updated if behaviour differs from what it says
       — **the docs are the spec; a divergence is a bug in one of them, and you must say which**
 
-## Any task touching `sim/`
+## Any task touching `SteeplejackSim`
 
-- [ ] No `extends Node`, no `get_node`, no `randi()`, no engine `delta`
+- [ ] **`make build-sim` succeeds with no Unreal installed** — no engine headers, no engine types
+- [ ] No ambient RNG, no clocks, no mutable statics, no stdout
 - [ ] All constants come from `data/tuning/*.json` — **zero magic numbers**
 - [ ] Unit tests cover every branch, including the failure outcomes
 - [ ] Deterministic: same seed + same intents → identical state, verified twice in the test
-- [ ] Steps in < 1.0 ms combined with the rest of the sim
+- [ ] `Sim::Step` stays under 0.5 ms combined with the rest of the sim
 
 ## Any gameplay mechanic
 
@@ -53,8 +54,11 @@ A task is done when **every** applicable box is ticked. Not "mostly". Partial wo
 
 - [ ] Within the triangle and draw-call budget for its category
 - [ ] Palette members only (see [`../01-gdd/13-art-direction.md`](../01-gdd/13-art-direction.md))
+- [ ] Megascans or an instance of an existing master material — **no bespoke material authoring**
+- [ ] Binary assets committed through Git LFS
 - [ ] Readable in silhouette
 - [ ] No unique textures on background assets
+- [ ] Nanite enabled on static geometry; no hand-authored LOD chains
 - [ ] LODs authored where the budget requires them
 
 ## Any audio task

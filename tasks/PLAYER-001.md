@@ -8,16 +8,19 @@ status: ready
 assignee: null
 depends_on: [CORE-005]
 owns:
-  - game/player/controller.gd
-  - game/player/state_machine.gd
-  - game/player/player.tscn
-  - game/player/states/idle.gd
-  - game/player/states/walk.gd
+  - Source/SteeplejackGame/Player/SteeplejackCharacter.h
+  - Source/SteeplejackGame/Player/SteeplejackCharacter.cpp
+  - Source/SteeplejackGame/Player/StateMachine.h
+  - Source/SteeplejackGame/Player/StateMachine.cpp
+  - Source/SteeplejackGame/Player/States/IdleState.cpp
+  - Source/SteeplejackGame/Player/States/WalkState.cpp
+  - Source/SteeplejackGame/SimBridge.h
+  - Source/SteeplejackGame/SimBridge.cpp
 spec:
   - docs/01-gdd/11-camera-controls-feel.md#controls
   - docs/01-gdd/11-camera-controls-feel.md#feel--the-non-negotiables
   - docs/03-tech/architecture.md#the-frame
-verify: godot --path . --headless -s tests/smoke_player.gd
+verify: make test-automation FILTER=Smokeplayer
 editor_required: false
 risk: null
 ---

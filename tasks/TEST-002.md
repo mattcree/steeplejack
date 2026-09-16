@@ -8,7 +8,7 @@ status: ready
 assignee: null
 depends_on: [CORE-006, LVL-000]
 owns:
-  - tests/replay/regression.gd
+  - tests/replay/regression.cpp
   - data/replays/00-greybox-expert.replay
 spec:
   - docs/06-workflow/03-verification.md#rung-7-is-the-one-that-matters

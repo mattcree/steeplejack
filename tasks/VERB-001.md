@@ -8,13 +8,14 @@ status: ready
 assignee: null
 depends_on: [STRUCT-002, CORE-007]
 owns:
-  - sim/verbs/tap.gd
-  - tests/unit/test_tap.gd
+  - Source/SteeplejackSim/Public/Verbs/Tap.h
+  - Source/SteeplejackSim/Private/Verbs/Tap.cpp
+  - tests/unit/test_tap.cpp
 spec:
   - docs/03-tech/interfaces.md#simverbstapgd--verb-001
   - docs/01-gdd/02-climbing-system.md#1-reading-the-brickwork
   - docs/01-gdd/04-tools-and-verbs.md#tap-test
-verify: make test-unit FILTER=test_tap
+verify: make test-unit FILTER=tap
 editor_required: false
 risk: R1
 ---
@@ -29,7 +30,7 @@ This is the game's signature action and the one players should perform constantl
 Deliberately cheap so players tap constantly. Gloves reduce resolution by one tier (`tuning.gloves.tap_tier_penalty`) — a real trade the player opts into. `pip_shape` is a SHAPE index, not a colour, because the accessibility fallback must not rely on colour.
 
 ## Interface
-```gdscript
+```cpp
 class_name TapVerb extends RefCounted
 class TapResult:
     var tier: JointTier

@@ -1,43 +1,48 @@
 ---
 id: CORE-002
-title: Enable the Godot headless jobs in CI
+title: Self-hosted Unreal runner and the engine CI job
 milestone: M0
-discipline: [ENG]
-estimate_days: 1
+discipline: [ENG, PROD]
+estimate_days: 2
 status: ready
 assignee: null
 depends_on: [CORE-001]
 owns:
   - .github/workflows/ci.yml
-  - tests/run_tests.gd
-  - Makefile
-reads:
-  - docs/06-workflow/03-verification.md
+  - docs/06-workflow/07-ci-runner.md
 spec:
   - docs/06-workflow/03-verification.md#ci
-  - docs/03-tech/adr/0003-determinism-and-testing.md#testing-strategy
-verify: make ci
+  - docs/03-tech/adr/0004-engine-change-to-unreal.md#what-it-costs-and-the-mitigation
+verify: a green run of the `game` job on a pull request
 editor_required: false
-risk: null
+risk: R8
 ---
 
 ## Goal
-Turn on the `engine` job group in CI so Godot unit tests run on every push.
+Stand up a self-hosted runner with UE 5.5 and enable the `game` CI job.
 
 ## Why
-The fast (Python) checks already run. Until the engine jobs run, `sim/` correctness is unverified and rungs 5-8 of the verification ladder are aspirational.
+GitHub-hosted runners cannot build Unreal — the engine is too large and the licence terms complicate
+caching. Without a self-hosted runner the presentation layer has no automated verification at all.
 
 ## Context
-`.github/workflows/ci.yml` currently has the engine job marked `continue-on-error` with a note pointing at this task. GUT is the test runner. Pin the Godot version; do not use `latest`.
+The `fast` and `sim` jobs already run on GitHub-hosted runners and cover the whole gameplay layer;
+this job only covers presentation. That asymmetry is by design (ADR-0004) and it means a red `game`
+job is less urgent than a red `sim` job — but it still blocks merge once enabled.
+
+The runner needs: UE 5.5, ~200 GB disk, Git LFS, and a warm DerivedDataCache. Document the setup in
+`docs/06-workflow/07-ci-runner.md` so it can be rebuilt.
 
 ## Acceptance
-1. `tests/run_tests.gd` runs GUT headlessly and exits non-zero on any failure.
-2. The `engine` job no longer sets `continue-on-error`.
-3. A deliberately failing test fails the workflow (demonstrate in the PR, then remove it).
-4. The fast job group still completes in under 60 seconds.
+1. A self-hosted runner tagged `unreal` is registered and building.
+2. The `game` job's `if: false` is removed and it passes on a PR.
+3. A deliberately broken UE automation test fails the job (demonstrate, then remove).
+4. The `fast` job still completes in under 30 s and the `sim` job in under 2 minutes.
+5. Runner setup is documented well enough to rebuild from scratch.
+6. DerivedDataCache is shared between runs; a warm incremental build is under 10 minutes.
 
 ## Out of scope
-Do not add perf or visual jobs — those are nightly and come at M6.
+No perf or screenshot jobs — nightly, at M6.
 
 ## Plan
 <!-- Filled in by the implementer before building, if estimate_days > 1. -->

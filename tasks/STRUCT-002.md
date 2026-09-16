@@ -8,13 +8,14 @@ status: ready
 assignee: null
 depends_on: [CORE-008, CORE-003]
 owns:
-  - sim/joints.gd
-  - tests/unit/test_joints.gd
+  - Source/SteeplejackSim/Public/Joints.h
+  - Source/SteeplejackSim/Private/Joints.cpp
+  - tests/unit/test_joints.cpp
 spec:
   - docs/03-tech/interfaces.md#simjointsgd--struct-002
   - docs/01-gdd/02-climbing-system.md#1-reading-the-brickwork
   - docs/03-tech/data-schemas.md#band-types-enum
-verify: make test-unit FILTER=test_joints
+verify: make test-unit FILTER=joints
 editor_required: false
 risk: R1
 ---
@@ -29,7 +30,7 @@ The joint grid is the gameplay surface of every structure in the game. Everythin
 Candidate density is roughly one joint per 0.25 m^2 of face (`structure.jointGrid.candidateDensity`). Quality is drawn from each band's distribution using a forked RNG substream so that other systems' random calls never shift it. `params.forcePerishedAt` / `forceCrackedAt` place authored joints at exact heights — level 1 depends on this to put a cracked joint on the obvious climbing line.
 
 ## Interface
-```gdscript
+```cpp
 class_name JointGrid extends RefCounted
 static func generate(level: LevelData, rng: Rng, tuning: Tuning) -> JointGrid
 func at_height(h: float, tolerance: float) -> Array[Joint]

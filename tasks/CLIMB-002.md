@@ -8,13 +8,14 @@ status: ready
 assignee: null
 depends_on: [CLIMB-001]
 owns:
-  - sim/load.gd
-  - tests/unit/test_load.gd
+  - Source/SteeplejackSim/Public/Load.h
+  - Source/SteeplejackSim/Private/Load.cpp
+  - tests/unit/test_load.cpp
 spec:
   - docs/03-tech/interfaces.md#simloadgd--climb-002
   - docs/01-gdd/02-climbing-system.md#load-sharing--why-old-mistakes-matter
   - docs/01-gdd/10-failure-and-difficulty.md#the-fairness-contract
-verify: make test-unit FILTER=test_load
+verify: make test-unit FILTER=load
 editor_required: false
 risk: R1
 ---
@@ -29,7 +30,7 @@ This is what makes the corner you cut ten minutes ago still matter. Cascade fail
 Falloff 0.55, so the top three anchors take about 80%. Cascade returns failed anchor indices in failure order so the HUD can burn them down the screen like a fuse. Fully deterministic — no RNG anywhere in this module.
 
 ## Interface
-```gdscript
+```cpp
 class_name LoadModel extends RefCounted
 static func share(stack: Stack, at_section: int, total_kn: float, tuning: Tuning) -> Array[float]
 static func apply(stack: Stack, at_section: int, total_kn: float, tuning: Tuning) -> void

@@ -10,16 +10,18 @@ deliberately not padded; treat them as ordering and relative weight, not commitm
 
 Build the skeleton that everything else hangs on. No gameplay.
 
-- Godot project, CI, lint/format, GUT harness
+- Unreal 5.5 project with **two modules**; `SteeplejackSim` building standalone under CMake
+- CI: the fast job group and the sim job group, both without Unreal installed
+- Git LFS and the `Content/` size gate, before the first binary asset
 - **Fixed-step sim driver + intent recording + replay playback** (ADR-0003)
-- `sim/` module skeleton with typed structs and a seeded RNG
-- Tuning JSON loader with hot reload
-- Level JSON schema + validator + reachability solver stub
-- Procedural chimney builder (round profile only) + joint grid generation
+- `SteeplejackSim` skeleton: typed structs, seeded RNG, tuning loader, level loader
+- Procedural chimney builder (round profile, Nanite) + joint grid generation
 - Capsule character, basic camera, grey-box field
+- A self-hosted runner with UE 5.5, and the `game` CI job enabled
 
-**Gate:** a headless test can load a level JSON, generate a joint grid, step the sim 10,000 times,
-and produce identical results twice. Plus: `godot --headless -s tests/run_tests.gd` is green in CI.
+**Gate:** `make ci` is green on a GitHub-hosted runner **with no Unreal installed** — the sim loads
+a level JSON, generates a joint grid, steps 10,000 times and produces identical results twice. Plus
+`make build-game` compiles on the self-hosted runner.
 
 ---
 
@@ -58,7 +60,8 @@ The build that goes to external playtest and, if wanted, to a publisher.
 - Levels 01–04 complete
 - Hub complete: the yard, the job board, the bench, the kettle, **the engine**
 - Economy, reputation, upgrades
-- **Art pass on levels 01–04** — brick shader, fog, town kit, character model, animation
+- **Art pass on levels 01–04** — town kit, hub, set dressing (the brick material, lighting and
+  character already landed in M1, because they became gameplay dependencies under ADR-0004)
 - **Audio pass** — the full tap bank, height mix, music cues, first voice lines
 - Options menus + accessibility complete
 
@@ -74,8 +77,8 @@ The two big systems.
 - **TOP system**: staging, coping interlock, prise verb, cell grid, jams, complications
 - **FELL system**: survey, gob solver, props, fire, hinge/fracture solver, the fall, scoring
 - Levels 05, 06, 07
-- Pre-fracture pipeline and the fall perf work
-- Dust and destruction VFX
+- **Chaos Geometry Collection** pre-fracture pipeline and the fall perf work
+- Niagara dust and destruction VFX
 
 **Gate:** all three fellings pass the determinism regression test 100 times. A playtester correctly
 predicts the fall direction of Level 06 before lighting it. The Level 06 fall makes somebody swear.
@@ -106,6 +109,22 @@ difficulties, on all three platform targets.
 - Store page, trailer (**the Level 06 fall is the trailer**), demo build (Levels 01–02)
 
 **Gate:** ship.
+
+## What ADR-0004 changed about this plan
+
+The engine change did not move the milestone structure, but it moved three things inside M1:
+
+- **ART-010 (brick master material)** and **ENV-010 (lighting baseline)** moved from M3 to M1.
+  Under the old art direction they were polish; under the new one the material *is* the
+  joint-quality read, so they are gameplay dependencies of the MVP test.
+- **ART-020 (the character)** is new in M1 and is the art direction's single point of failure.
+- **CLIMB-005 (hand IK)** left the critical path, because Control Rig made it cheaper. The critical
+  path is now the sim chain: `CORE-004 → CORE-008 → STRUCT-002 → VERB-003 → VERB-004 → VERB-005 →
+  CLIMB-001 → CLIMB-002 → CLIMB-006 → METER-005`. That chain is entirely agent-executable and needs
+  no engine, which is a good property for the schedule to have.
+
+M1 grew from 63 to ~78 ideal days. The M1 gate is unchanged and still the only one that can kill
+the project.
 
 ---
 

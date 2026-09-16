@@ -8,13 +8,14 @@ status: ready
 assignee: null
 depends_on: [VERB-003]
 owns:
-  - sim/anchor.gd
-  - tests/unit/test_anchor.gd
+  - Source/SteeplejackSim/Public/Anchor.h
+  - Source/SteeplejackSim/Private/Anchor.cpp
+  - tests/unit/test_anchor.cpp
 spec:
   - docs/03-tech/interfaces.md#simanchorgd--verb-004
   - docs/01-gdd/02-climbing-system.md#anchor-rating
   - docs/01-gdd/10-failure-and-difficulty.md#the-fairness-contract
-verify: make test-unit FILTER=test_anchor
+verify: make test-unit FILTER=anchor
 editor_required: false
 risk: R1
 ---
@@ -29,7 +30,7 @@ The anchor rating is the game's central promise of fairness: the player is alway
 Player plus gear is 1.2 kN static, times 2.5 on a hard step. So Poor (1.0 kN) is a gamble on every move, Fair (2.5 kN) is fine if you are gentle, Sound (5.0 kN) is forgotten about. Free fixtures (old dogs, iron bands) are rated on inspection, not on placement — that is the speed-for-uncertainty gamble the grey-box level's third band is built around.
 
 ## Interface
-```gdscript
+```cpp
 class_name AnchorModel extends RefCounted
 static func rate(joint: Joint, depth: float, spall: float, tuning: Tuning) -> AnchorRate
 static func capacity_kn(rate: AnchorRate, tuning: Tuning) -> float

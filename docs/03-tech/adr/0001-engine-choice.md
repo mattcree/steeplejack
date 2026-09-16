@@ -1,8 +1,14 @@
 # ADR-0001 — Engine choice
 
-- **Status:** Proposed — **confirm before M0 begins**
+> **SUPERSEDED.** The visual target changed after this was written: the project now targets a
+> photoreal-materials look that Godot cannot reach without a rendering programmer. See
+> [ADR-0004](0004-engine-change-to-unreal.md). The reasoning below remains correct for the premise
+> it was given, and its rule 5 — keep the simulation layer engine-independent — is what made the
+> change affordable. Kept for the record.
+
+- **Status:** **Superseded by [ADR-0004](0004-engine-change-to-unreal.md)** (2026-09-16)
 - **Date:** 2026-09-16
-- **Decision:** Godot 4.4+, with a code-first authoring discipline
+- **Decision:** ~~Godot 4.4+, with a code-first authoring discipline~~ — see ADR-0004
 - **Deciders:** project lead (pending)
 
 ## Context

@@ -59,13 +59,15 @@ add it here in the same PR.
 
 | Term | Meaning |
 |---|---|
-| **sim / presentation split** | ADR-0003. `sim/` is pure; `game/` renders it. |
+| **sim / presentation split** | ADR-0003. `SteeplejackSim` is pure C++ with no Unreal; `SteeplejackGame` renders it. |
 | **Intent** | a player action sent from presentation into the sim |
 | **Replay** | seed + tuning hash + intent log. Reproduces a whole job. |
 | **Tick** | one fixed sim step, 1/60 s |
 | **Reachability solver** | headless check that a level's top can actually be reached |
-| **Pre-fracture** | baked chunk decomposition for a fellable structure |
-| **Hinge solver** | `sim/fell.gd` — the deterministic fall |
+| **The standalone build** | `SteeplejackSim` compiled by CMake with no Unreal present. The thing that keeps the gameplay layer fast and agent-editable. |
+| **The editor queue** | `editor_required` tasks a human must do in Unreal. Risk R8's gauge. |
+| **Pre-fracture** | baked chunk decomposition for a fellable structure (a Chaos Geometry Collection) |
+| **Hinge solver** | `Fell.h` — the deterministic fall |
 | **Cell** | one removable unit of the gob or topping grid |
 | **Cascade** | progressive anchor failure down the stack |
 

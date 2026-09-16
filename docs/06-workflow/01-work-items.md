@@ -19,15 +19,16 @@ status: ready
 assignee: null
 depends_on: [VERB-005]
 owns:
-  - sim/stack.gd
-  - tests/unit/test_stack_spans.gd
+  - Source/SteeplejackSim/Public/Stack.h
+  - Source/SteeplejackSim/Private/Stack.cpp
+  - tests/unit/test_stack.cpp
 reads:
-  - sim/types.gd
+  - Source/SteeplejackSim/Public/Types.h
   - data/tuning/climbing.json
 spec:
   - docs/01-gdd/02-climbing-system.md#3--ladders--the-resource
   - docs/03-tech/interfaces.md#simstackgd
-verify: make test-unit FILTER=test_stack_spans
+verify: make test-unit FILTER=Stack
 editor_required: false
 risk: R1
 ---
@@ -78,7 +79,7 @@ What a well-meaning agent will be tempted to also do. Say no here so it doesn't 
 | `reads` | no | paths it needs to read. Advisory — helps an agent load the right context. |
 | `spec` | yes (code/design tasks) | `path#anchor` refs. Validated that the file exists. |
 | `verify` | yes | one shell command that proves the task is done |
-| `editor_required` | yes | `true` if a human must drive the Godot editor. Batched separately. |
+| `editor_required` | yes | `true` if a human must drive the Unreal editor. Batched separately — see risk R8. |
 | `risk` | no | `R1`…`R10` from [`../04-production/risks.md`](../04-production/risks.md) |
 
 ## Writing good acceptance criteria
@@ -107,10 +108,10 @@ Split a task when any of these is true:
 The canonical split for a mechanic is:
 
 ```
-VERB-00x   sim logic + unit tests        (ENG, no editor, parallelisable)
-ART-00x    animation                     (ART, editor)
-AUD-00x    sound                         (AUD, no editor)
-UI-00x     the HUD/telegraph for it      (ENG)
+VERB-00x   sim logic + unit tests     (ENG, no editor, no engine needed, parallelisable)
+ART-00x    animation / material       (ART, editor_required)
+AUD-00x    sound                      (AUD, no editor)
+UI-00x     the HUD/telegraph for it   (ENG)
 ```
 
 Four agents, four owned file sets, one mechanic, no conflicts. **This is the shape to aim for.**

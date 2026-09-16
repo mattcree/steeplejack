@@ -1,107 +1,136 @@
 # Architecture
 
-> Read [`adr/0001`](adr/0001-engine-choice.md), [`adr/0002`](adr/0002-physics-and-destruction.md) and
+> Read [`adr/0004`](adr/0004-engine-change-to-unreal.md) (which supersedes
+> [`adr/0001`](adr/0001-engine-choice.md)), [`adr/0002`](adr/0002-physics-and-destruction.md) and
 > [`adr/0003`](adr/0003-determinism-and-testing.md) first. This document is the shape that follows
 > from them.
+>
+> **The one structural idea:** `SteeplejackSim` is plain C++17 with no Unreal dependency, and builds
+> two ways — as a UE module, and as a standalone library with a CMake test binary. That is what keeps
+> the gameplay layer agent-executable and testable in seconds without a 40 GB engine install.
 
 ## Repository layout
 
 ```
 steeplejack/
-├── project.godot
-├── AGENTS.md                    ← how to work in this repo
+├── Steeplejack.uproject
+├── AGENTS.md                      ← how to work in this repo
+├── CMakeLists.txt                 ← standalone build of the sim + its tests (no Unreal)
+│
+├── Source/
+│   ├── SteeplejackSim/            ← PURE C++17. No UE types. 100% unit tested. AGENT-OWNED.
+│   │   ├── Public/
+│   │   │   ├── Rng.h  Types.h  Tuning.h  Level.h  Joints.h  Anchor.h
+│   │   │   ├── Stack.h  Load.h  Meters.h  Wobble.h  Weather.h  Slip.h
+│   │   │   ├── Gob.h  Fell.h  Topping.h  Scoring.h  Economy.h  Job.h
+│   │   │   ├── Intent.h  Recorder.h  Replay.h  Clock.h  Reachability.h
+│   │   │   └── Verbs/{Tap,Hammer,Lash,Haul,Prise,Bolt,Gild,Measure}.h
+│   │   ├── Private/*.cpp
+│   │   └── SteeplejackSim.Build.cs   ← the ONLY UE-aware file in this module
+│   │
+│   └── SteeplejackGame/           ← the UE module. HUMAN-OWNED (mostly).
+│       ├── Player/                controller, camera, Control Rig glue, IK
+│       ├── Structures/            procedural chimney/spire/lattice builders
+│       ├── Destruction/           Chaos Geometry Collection driving
+│       ├── VFX/  Audio/  UI/  Hub/
+│       └── SteeplejackGame.Build.cs
+│
+├── Content/                       ← BINARY. Git LFS. Materials, meshes, Control Rig,
+│                                     Niagara, MetaSounds, levels-as-shells. HUMAN-OWNED.
 ├── data/
-│   ├── tuning/                  ← ALL balance numbers. Hot-reloadable.
-│   │   ├── climbing.json
-│   │   ├── meters.json
-│   │   ├── topping.json
-│   │   ├── felling.json
-│   │   └── economy.json
-│   ├── levels/*.json            ← 12 levels + side jobs. No hand-placed geometry anywhere.
-│   ├── schemas/*.schema.json    ← JSON Schema for the above. CI validates.
-│   └── replays/*.replay         ← recorded expert runs, used as regression tests
-├── sim/                         ← PURE. No Node. No engine calls. 100% unit tested.
-│   ├── rng.gd                   seeded xorshift
-│   ├── types.gd                 plain data structs
-│   ├── joints.gd                joint grid generation + quality
-│   ├── anchor.gd                dog-in resolution, ratings
-│   ├── stack.gd                 the ladder stack: spans, flex, load sharing, cascade
-│   ├── meters.gd                grip, nerve, wobble
-│   ├── wobble.gd                the single number every verb reads
-│   ├── verbs/                   hammer.gd lash.gd haul.gd prise.gd bolt.gd gild.gd measure.gd
-│   ├── gob.gd                   support polygon, CoG, margin
-│   ├── fell.gd                  hinge solver, fracture, angular error
-│   ├── topping.gd               cell grid, coping interlock, jams
-│   ├── weather.gd               wind, gusts, the storm ramp
-│   ├── shift.gd                 daylight clock
-│   ├── scoring.gd               the invoice
-│   ├── economy.gd               money, reputation, the engine
-│   └── job.gd                   the job state machine; owns everything above
-├── game/                        ← PRESENTATION (Godot nodes)
-│   ├── main.gd                  fixed-step driver + interpolation
-│   ├── player/                  controller, camera, IK, animation
-│   ├── structures/              procedural chimney/spire/lattice builders
-│   ├── vfx/                     dust, smoke, debris, weather
-│   ├── audio/                   buses, height mix, the tap bank, gust pre-roll
-│   ├── ui/                      HUD, reckoning, hub screens, options
-│   └── hub/
+│   ├── tuning/*.json              ← ALL balance numbers. Hot-reloadable.
+│   ├── levels/*.json              ← 12 levels. No hand-placed geometry, anywhere.
+│   ├── schemas/*.schema.json
+│   └── replays/*.replay
 ├── tests/
-│   ├── unit/                    one file per sim module
+│   ├── unit/                      ← doctest, runs via CMake in ~20s with no Unreal
 │   ├── property/
-│   ├── replay/                  runs data/replays against sim
-│   └── validate_levels.gd       schema + reachability
+│   ├── replay/
+│   └── perf/
+├── tools/                         ← Python. Validation, task graph, conventions, perf capture.
 └── docs/
 ```
 
+### Who owns what
+
+| Layer | Owner | Format | Testable headlessly |
+|---|---|---|---|
+| `Source/SteeplejackSim/` | **agents** | text C++ | ✅ in ~20 s, no engine |
+| `data/`, `tools/`, `tests/`, `docs/` | **agents** | text | ✅ in ~3 s |
+| `Source/SteeplejackGame/` | agents + humans | text C++ | partially (UE automation) |
+| `Content/` | **humans** | binary | ❌ visual review only |
+
+Roughly 45% of the work and ~100% of the gameplay logic stays in the top two rows.
+
 ## The frame
 
-```
-_physics_process(delta):
-    accumulator += delta
-    while accumulator >= TICK (1/60):
-        intents = InputMapper.collect()        # presentation → sim
-        prev_state = sim.state.snapshot()
-        sim.step(intents, TICK)                # pure
-        recorder.record(tick, intents)         # for replay
-        accumulator -= TICK
+```cpp
+// ASteeplejackGameMode::Tick(float DeltaSeconds)
+Accumulator += DeltaSeconds;
+int Steps = 0;
+while (Accumulator >= sj::kTick && Steps++ < sj::kMaxCatchUpSteps)   // 1/60, cap 5
+{
+    const sj::IntentBuffer Intents = InputMapper.Collect();   // presentation -> sim
+    PrevState = Sim.Snapshot();
+    Sim.Step(Intents, sj::kTick);                             // pure C++, no UE
+    Recorder.Record(Tick++, Intents);                         // for replay
+    Accumulator -= sj::kTick;
+}
 
-_process(delta):
-    alpha = accumulator / TICK
-    presentation.render(lerp(prev_state, sim.state, alpha))
+// rendering
+const float Alpha = Accumulator / sj::kTick;
+Presentation.Render(sj::Lerp(PrevState, Sim.State(), Alpha));
 ```
 
-`sim.step` must complete in **< 1.0 ms** at all times. It is arithmetic over a few hundred structs;
-this is not ambitious.
+`Sim.Step` must complete in **< 0.5 ms** at all times. It is arithmetic over a few hundred plain
+structs in C++; this is not ambitious, and it is measured on every commit in the standalone build.
 
 ## Key data structures
 
-```gdscript
-# sim/types.gd  — all plain Dictionaries/Arrays or RefCounted structs, no Nodes
+```cpp
+// Source/SteeplejackSim/Public/Types.h
+// Plain C++17. No FVector, no TArray, no UObject — the standalone CMake build depends on it.
+namespace sj {
 
-class Joint:      var pos: Vector3; var quality: float; var tier: int; var used: bool
-class Anchor:     var joint: Joint; var depth: float; var spall: float
-                  var rating: int      # 0 failed 1 poor 2 fair 3 sound
-                  var capacity_kn: float; var current_load_kn: float
-class Section:    var bottom: Anchor; var top: Anchor; var span: float
-                  var condition: float; var lashing: int   # 0 none 1 hitch 2 full
-class Stack:      var sections: Array[Section]
-                  func load_share(total_kn) -> Array[float]
-                  func cascade_from(index) -> Array[int]   # which anchors fail, in order
-class Meters:     var grip: float; var nerve: float; var max_nerve: float
-class GobCell:    var seg: int; var course: int; var removed: bool; var strength: float
-class Prop:       var seg: int; var load_kn: float; var dud: bool; var burnt: bool
-class FallPlan:   var hinge_bearing: float; var fracture_heights: Array[float]
-                  var angular_error: float; var debris_fan: Array[Vector2]
+struct Vec2 { float x, y; };
+struct Vec3 { float x, y, z; };                      // ours, not FVector
+
+enum class JointTier  : uint8_t { Cracked, Perished, Fair, Sound };
+enum class AnchorRate : uint8_t { Failed, Poor, Fair, Sound };
+enum class Stance     : uint8_t { OneHand, HookedLeg, Clipped, Belted, Chair };
+enum class Lashing    : uint8_t { None, Hitch, Full };
+enum class SpanBand   : uint8_t { Rigid, Flex, Sway, Buckle };
+
+struct Joint   { int32_t id; Vec3 pos, normal; float height, quality;
+                 JointTier tier; bool occupied; };
+struct Anchor  { int32_t jointId; float height, depth, spall;
+                 AnchorRate rate; float capacityKN, loadKN; bool freeFixture; };
+struct Section { int32_t lowerAnchor, upperAnchor;
+                 float span, condition, buckleTimer; Lashing lashing; };
+struct Meters  { float grip, nerve, nerveMax; Stance stance; Exposure exposure; };
+struct GobCell { int16_t seg, course; bool removed, propped; float strength; };
+struct Prop    { int16_t seg; float loadKN; bool dud, burnt; };
+struct FallPlan{ float hingeBearing, angularError;
+                 std::vector<float> fractureHeights; std::vector<Vec2> debrisFan; };
+
+class Stack {
+public:
+    std::vector<float>   LoadShare(int atSection, float totalKN, const Tuning&) const;
+    std::vector<int32_t> CascadeFrom(int failedAnchor, const Tuning&) const;  // in failure order
+    // ...
+};
+
+} // namespace sj
 ```
 
 ## Procedural structure generation
 
-`game/structures/chimney_builder.gd` takes a level's `structure` block and emits:
+`Source/SteeplejackGame/Structures/ChimneyBuilder.cpp` takes a level's `structure` block and emits:
 - a shaft mesh (lathe from a profile curve, with batter steps and bands)
-- a **joint grid** (`sim/joints.gd`) — the gameplay data
+- a **joint grid** (`sj::JointGrid`, sim data — never scene objects) — the gameplay surface
 - a cell grid for topping, if the level tops
-- a pre-fractured chunk set, if the level fells
-- per-instance weathering parameters for the brick shader
+- a **Chaos Geometry Collection** (baked offline, loaded here), if the level fells
+- per-instance parameters for the brick master material (soot gradient, salt bloom, erosion, cracking)
 
 Nothing about a chimney is hand-modelled. Adding a level is: write a JSON file, run the validator,
 play it. **A level designer must be able to go from idea to playable in under thirty minutes.** If
@@ -132,12 +161,12 @@ player resumes at the bottom of their own ladders with the shift reset.
 
 | Path | Budget | Approach |
 |---|---|---|
-| `sim.step` | < 1.0 ms | plain arithmetic; gob solver recomputed on change only |
-| Chimney shaft render | 1 draw call | single mesh + procedural brick fragment shader |
-| Ladder sections | 1 draw call | `MultiMeshInstance3D`, flex via per-instance uniform |
-| Interactive bricks | 1 draw call | MultiMesh, hidden by setting instance scale to 0 |
-| Town backdrop | ≤ 12 draw calls | instanced kits + aggressive LOD + fog culling |
-| Fall (4 s) | ≤ 90 bodies | the only heavy moment; drop town LOD during it |
-| Dust column | 1 GPU particle system | the whole particle budget lives here |
+| `Sim.Step` | < 0.5 ms | plain C++ arithmetic; gob solver recomputed on change only |
+| Chimney shaft | Nanite, 1 primitive | procedural mesh + the brick master material |
+| Ladder sections | 1 ISM | instanced; flex via a per-instance custom data float |
+| Interactive bricks | ≤ 3 draw calls | ISM per course; removal = zero-scale the instance |
+| Town backdrop | ≤ 40 primitives | instanced kit, Nanite, silhouette LOD beyond 200 m |
+| Fall (5 s) | ≤ 120 Chaos bodies | the only heavy moment; scalability drops applied |
+| Dust column | 1 Niagara system | the whole particle budget lives here |
 
 See [`performance-budget.md`](performance-budget.md).

@@ -8,12 +8,12 @@ status: ready
 assignee: null
 depends_on: [VERB-005]
 owns:
-  - game/player/input_lash.gd
-  - tests/unit/test_lash_input.gd
+  - Source/SteeplejackGame/Player/LashInput.cpp
+  - Source/SteeplejackGame/Player/LashInput.h
 spec:
   - docs/01-gdd/14-accessibility.md#motor
   - docs/01-gdd/11-camera-controls-feel.md#controls
-verify: make test-unit FILTER=test_lash_input
+verify: make test-unit FILTER=lashinput
 editor_required: false
 risk: null
 ---

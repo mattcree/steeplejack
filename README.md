@@ -27,12 +27,12 @@ down with your gear.
 ## Status
 
 **Pre-production.** No engine code yet. The design is complete enough to build M0–M2 without further
-design input, and M0 + M1 are broken down into 47 self-contained work items in
+design input, and M0 + M1 are broken down into 51 self-contained work items in
 [`tasks/`](tasks/).
 
 ```bash
-make ready       # 5 tasks are claimable today
-make board       # 47 tasks, 83 ideal days to the M1 gate
+make ready       # 6 tasks are claimable today
+make board       # 51 tasks, ~94 ideal days to the M1 gate
 make critical TARGET=PT-001
 ```
 
@@ -49,15 +49,22 @@ See [`docs/04-production/roadmap.md`](docs/04-production/roadmap.md) and
 ## Quick start
 
 ```bash
-# Godot 4.4+ required. See docs/03-tech/adr/0001-engine-choice.md
-godot --path . --editor            # open the project
-godot --path . --headless -s tests/run_tests.gd   # run the deterministic sim tests
+# The gameplay layer. No Unreal required — ~20 seconds.
+make check                 # conventions, data, task graph, links, sim build + tests
+make ready                 # what you can pick up right now
+
+# The game. Needs Unreal 5.5 and UE_ROOT set.
+make build-game
+make editor
 ```
 
-The engine choice (Godot 4) is documented in
-[`ADR-0001`](docs/03-tech/adr/0001-engine-choice.md) with a fully costed alternative. **Confirm it
-before M0 starts** — it is cheap to change now and expensive later. Every design document in
-`docs/01-gdd/` and `docs/02-levels/` is engine-agnostic and survives the decision either way.
+**Unreal Engine 5.5**, with the gameplay layer split into `SteeplejackSim` — plain C++17 with no
+Unreal dependency, which builds standalone under CMake so it can be tested in seconds without the
+engine. See [`ADR-0004`](docs/03-tech/adr/0004-engine-change-to-unreal.md), which supersedes
+[`ADR-0001`](docs/03-tech/adr/0001-engine-choice.md) (Godot).
+
+Every design document in `docs/01-gdd/` and `docs/02-levels/` is engine-agnostic and survived that
+change untouched. That was the point.
 
 ## Licence & likeness
 

@@ -8,15 +8,16 @@ status: ready
 assignee: null
 depends_on: [CORE-004, CORE-007]
 owns:
-  - sim/clock.gd
-  - game/main.gd
-  - game/main.tscn
-  - tests/unit/test_clock.gd
+  - Source/SteeplejackSim/Public/Clock.h
+  - Source/SteeplejackSim/Private/Clock.cpp
+  - tests/unit/test_clock.cpp
+  - Source/SteeplejackGame/SteeplejackGameMode.h
+  - Source/SteeplejackGame/SteeplejackGameMode.cpp
 spec:
   - docs/03-tech/interfaces.md#simclockgd--core-005
   - docs/03-tech/adr/0003-determinism-and-testing.md#the-split
   - docs/03-tech/architecture.md#the-frame
-verify: make test-unit FILTER=test_clock
+verify: make test-unit FILTER=clock
 editor_required: false
 risk: null
 ---
@@ -31,7 +32,7 @@ Everything downstream — determinism, replay, the whole test strategy — rests
 Accumulator pattern; see the pseudocode in `docs/03-tech/architecture.md` under 'The frame'. Clamp the accumulator to avoid a spiral of death after a long frame (cap at 5 steps). `alpha()` is what presentation lerps with. Delete `game/bootstrap.*` as part of this task and point `project.godot` at `main.tscn`.
 
 ## Interface
-```gdscript
+```cpp
 class_name SimClock extends RefCounted
 const TICK: float = 1.0 / 60.0
 func advance(real_delta: float) -> int

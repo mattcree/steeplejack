@@ -8,12 +8,12 @@ status: ready
 assignee: null
 depends_on: [METER-001]
 owns:
-  - sim/meters_nerve.gd
-  - tests/unit/test_nerve.gd
+  - Source/SteeplejackSim/Private/MetersNerve.cpp
+  - tests/unit/test_nerve.cpp
 spec:
   - docs/01-gdd/03-meters-grip-nerve.md#nerve--the-long-meter
   - docs/01-gdd/03-meters-grip-nerve.md#low-nerve-effects-this-is-the-whole-point
-verify: make test-unit FILTER=test_nerve
+verify: make test-unit FILTER=nerve
 editor_required: false
 risk: R1
 ---

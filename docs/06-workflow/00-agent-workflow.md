@@ -28,8 +28,8 @@ Three ideas do all the work:
 2. **A work item is self-contained.** An agent should be able to do a task having read *only* the
    task file and the spec sections it names. If you need context the task didn't give you, that is
    a bug in the task, and you fix the task file as part of the work.
-3. **Conventions are machine-enforced or they don't exist.** "Don't put Nodes in `sim/`" is a
-   script, not a sentence. See [`04-enforced-conventions.md`](04-enforced-conventions.md).
+3. **Conventions are machine-enforced or they don't exist.** "Don't put Unreal types in
+   `SteeplejackSim`" is a script, not a sentence. See [`04-enforced-conventions.md`](04-enforced-conventions.md).
 
 ---
 
@@ -90,8 +90,11 @@ isolation available, use it — see [`02-parallel-execution.md`](02-parallel-exe
 Every task carries one command in its `verify:` field. It must pass.
 
 ```bash
-make check          # the full local gate: lint, purity, data, tasks, links, unit tests
+make check          # the full local gate: conventions, data, tasks, links, sim build + tests
 ```
+
+`make check` needs `cmake`, `ninja` and a C++17 compiler — **not Unreal**. Only tasks that own
+`SteeplejackGame` or `Content/` paths need the engine.
 
 Then walk the applicable sections of
 [`../04-production/definition-of-done.md`](../04-production/definition-of-done.md). All of it,
@@ -106,7 +109,7 @@ needs and cannot get from the diff.
 ```markdown
 ## Outcome
 
-**What changed:** `sim/stack.gd` implements spans, the four span bands and buckling.
+**What changed:** `Stack.cpp` implements spans, the four span bands and buckling.
 Buckling is a timer, not an instant fail, so the player gets the 8s warning the GDD specifies.
 
 **Decisions made:** span is measured anchor-to-anchor, not ladder-foot-to-ladder-foot. The GDD was
@@ -134,7 +137,7 @@ not against taste. Specifically:
 - [ ] Applicable DoD sections ticked
 - [ ] Spec updated if behaviour diverged
 
-Style nits are fine to raise but never block a merge; `gdformat` decides formatting, not people.
+Style nits are fine to raise but never block a merge; `clang-format` decides formatting, not people.
 
 ### 8. MERGE
 
@@ -157,7 +160,7 @@ Set `status: done`. Run `make board` and check nothing is unexpectedly unblocked
 helpers, formatting, log messages.
 
 **Never guess about:** game design, tuning targets, whether a failure needs a telegraph, whether
-something belongs in `sim/` or `game/`, scope. Those are decided in `docs/` or by the design lead.
+something belongs in `SteeplejackSim` or `SteeplejackGame`, scope. Those are decided in `docs/` or by the design lead.
 
 When blocked:
 

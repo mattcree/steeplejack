@@ -8,13 +8,14 @@ status: ready
 assignee: null
 depends_on: [CORE-005, CORE-007]
 owns:
-  - sim/verbs/haul.gd
-  - tests/unit/test_haul.gd
+  - Source/SteeplejackSim/Public/Verbs/Haul.h
+  - Source/SteeplejackSim/Private/Verbs/Haul.cpp
+  - tests/unit/test_haul.cpp
 spec:
   - docs/03-tech/interfaces.md#simverbshaulgd--verb-007
   - docs/01-gdd/02-climbing-system.md#4--hauling--the-gin-wheel
   - docs/03-tech/adr/0002-physics-and-destruction.md#what-the-physics-engine-is-used-for
-verify: make test-unit FILTER=test_haul
+verify: make test-unit FILTER=haul
 editor_required: false
 risk: null
 ---
@@ -29,7 +30,7 @@ The haul is the game's quiet moment and its best camera shot. It is also where t
 An ODE at the fixed step, not a rope simulation (ADR-0002). Hauling faster adds amplitude; steering in antiphase damps it. Past `haul_foul_amplitude_degrees` the load fouls. Roughly thirty lines of code that carry enormous feel value — get the damping response right and it is instantly learnable.
 
 ## Interface
-```gdscript
+```cpp
 class_name HaulVerb extends RefCounted
 class HaulState:
     var height: float
