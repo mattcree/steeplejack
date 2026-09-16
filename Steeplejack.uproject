@@ -24,6 +24,7 @@
 		{ "Name": "MetaSound", "Enabled": true },
 		{ "Name": "Niagara", "Enabled": true },
 		{ "Name": "EnhancedInput", "Enabled": true },
+		{ "Name": "GeometryScripting", "Enabled": true },
 		{ "Name": "ModelingToolsEditorMode", "Enabled": true }
 	]
 }
