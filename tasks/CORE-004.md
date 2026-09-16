@@ -11,7 +11,7 @@ owns:
   - Source/SteeplejackSim/Public/Types.h
   - tests/unit/test_types.cpp
 spec:
-  - docs/03-tech/interfaces.md#simtypesgd--core-004
+  - docs/03-tech/interfaces.md#typesh--core-004
   - docs/03-tech/adr/0003-determinism-and-testing.md#the-split
   - docs/03-tech/architecture.md#key-data-structures
 verify: make test-unit FILTER=types && make check-conventions
