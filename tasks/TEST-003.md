@@ -6,7 +6,7 @@ discipline: [ENG]
 estimate_days: 0.5
 status: ready
 assignee: null
-depends_on: [CORE-003, SETUP-004]
+depends_on: [CORE-003, SETUP-004, CORE-011]
 owns:
   - Makefile
   - tools/check_verify.py
@@ -64,7 +64,7 @@ clone where most modules do not exist yet.
 `tools/tasks.py` already parses every task's frontmatter, so the audit half of this is a loop over
 `verify:` strings, not new parsing.
 
-**Ownership note:** SETUP-004 also owns the `Makefile` (it wires `tools/test_wt.py` into
+**Ownership note:** SETUP-004 and CORE-011 also own the `Makefile` (it wires `tools/test_wt.py` into
 `test-tools`). It has already landed, so this dependency is satisfied — it is declared because the
 task-graph validator rejects two tasks owning one path without one, and because whoever picks this
 up should read SETUP-004's Outcome first: it is the other half of "the tooling was written but

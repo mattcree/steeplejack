@@ -217,6 +217,12 @@ library code rather than registered as a loadable UE module. 15 files, `make che
   GDScript-era anchor that resolves to nothing, with the gate green. 17 task files share the
   pattern and this task does not own them.
 
+### Files touched outside `owns:`
+- `tasks/TEST-003.md` — one line, adding `CORE-011` to its `depends_on`. It was raised during
+  CORE-003 and also claims the `Makefile`; `make land` caught the collision on the rebased result,
+  which is the third time today that check has earned its keep. TEST-003 genuinely should land
+  after this task, since this one fixes the version string and that one adds a target.
+
 ### Follow-ups
 - **`.gitignore` has no `__pycache__` rule, and the trap has now fired twice.** SETUP-004
   committed `wt.cpython-314.pyc`, a reviewer caught it, and the file was deleted — but nobody
