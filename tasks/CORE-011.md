@@ -4,8 +4,8 @@ title: Reconcile docs with what CORE-001 actually built
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.75
-status: ready
-assignee: null
+status: review
+assignee: agent
 depends_on: [CORE-001, SETUP-004]
 owns:
   - AGENTS.md
@@ -154,4 +154,78 @@ target number; only version and standard statements.
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+The docs now say what CORE-001 actually built: **Unreal 5.8.2**, **C++20**, and a sim linked as
+library code rather than registered as a loadable UE module. 15 files, `make check` green.
+
+### What changed
+- **Version and standard pins** — `AGENTS.md`, `README.md`, `Source/SteeplejackSim/README.md`,
+  `docs/03-tech/interfaces.md`, `docs/03-tech/performance-budget.md`,
+  `docs/04-production/roadmap.md`, `docs/06-workflow/00-agent-workflow.md`,
+  `docs/06-workflow/03-verification.md`, `docs/06-workflow/06-launch.md`.
+- **ADR-0004** — a dated note recording the concrete version, the forced C++20 move, and the
+  not-a-UE-module resolution. **The decision line is untouched**: it says "5.5+", 5.8.2 is inside
+  that, and this was never a reversal.
+- **ADR-0003** — rule 4's determinism argument now states that both builds are C++20 and explains
+  how the in-engine build gets the same FP mode (`FPSemantics = Precise` → `-ffp-contract=off` on
+  Clang, `/fp:precise` on MSVC). The argument was always right; it was resting on a number that
+  had changed underneath it.
+- **`architecture.md` and ADR-0004's layout block** — both said `SteeplejackSim` "builds as a UE
+  module". It does not, and cannot: `IMPLEMENT_MODULE` needs `Modules/ModuleManager.h` and rule 1
+  forbids Unreal headers anywhere under that directory. Both now say library code, with the reason.
+- **`work-breakdown.md`** — the CORE-001 row described a *Godot* project with a Forward+ renderer.
+  Replaced with what the task actually is, and ticked.
+- **`BLOCKED.md`** — row 3 (install Unreal) closed with where the engine landed.
+- **`tools/check_conventions.py`** — see below.
+
+### Decisions
+1. **ADR-0004 gets a note, not an edit.** Acceptance 2 asked for the decision line intact and that
+   is the right instinct: an ADR is a record of what was decided and when, and rewriting it to
+   match later reality destroys the thing it exists for. The note is dated and says what "+"
+   turned out to mean.
+2. **`BLOCKED.md`'s PROD-001 row is annotated, not rewritten.** It records the answer given on
+   2026-09-16, which was "Unreal 5.5". That was true on the day. I appended a note that the
+   concrete version was later set to 5.8.2 rather than editing the historical answer — same
+   reasoning as the ADR, and the same reasoning that kept `tasks/SETUP-001.md` out of scope.
+3. **`CLAUDE.md` is owned by this task and deliberately untouched.** It names no engine version
+   and no C++ standard, so there was nothing to reconcile. Recorded so the next reader does not
+   assume it was missed.
+4. **Removed `"17"` from `check_conventions.py`'s allowed literals** rather than re-commenting it.
+   It was there for "C++17" and that reason is gone. Verified: `make check-conventions` reports 0
+   violations without it and `make test-tools` still passes, so nothing depended on it. The
+   comment claiming it was a bit-width would have been a lie — 8/16/32/64 are widths, 17 never was.
+
+### Surprises
+- **The `Makefile`'s stale "5.5" is still there, and deliberately.** It prints `set UE_ROOT to your
+  Unreal 5.5 install` — the highest-traffic stale version string in the repo, since it is the error
+  a new contributor sees. It is **not** in this task's `owns:` because SETUP-004 owns the Makefile,
+  and `make land` caught that collision on the rebased result when both claimed it. This task now
+  `depends_on: [CORE-001, SETUP-004]` and reads the file instead. It needs a one-word fix from
+  whoever next owns that file.
+- **`work-breakdown.md` is worse than one stale row.** Its header already warns that the M0/M1
+  tables predate ADR-0004 and name Godot, and the CORE-001 row was the only one with Godot-specific
+  text — but **121 rows are still ⬜**, including every task landed today. The file has never been
+  maintained. Fixing one row does not make the table true.
+- **`make check-links` proves less than it looks.** Rule 14 checks that a linked *file* exists, not
+  that its **anchor** does. CORE-003 found its `spec:` pointing at `#simrnggd--core-003`, a
+  GDScript-era anchor that resolves to nothing, with the gate green. 17 task files share the
+  pattern and this task does not own them.
+
+### Follow-ups
+- The `Makefile`'s "Unreal 5.5" string, above.
+- `work-breakdown.md`'s ⬜ column, which has never been updated for any task.
+- Anchor checking in rule 14, and the 17 task files with GDScript-era `spec:` anchors.
+- `CORE-003`'s Interface block was GDScript and was fixed in that task. **Nobody has swept
+  `tasks/` for the others**, and there are 50-odd task files written before ADR-0004.
+
+### Verification
+| # | Criterion | Result |
+|---|---|---|
+| 1 | No owned file asserts 5.5 or C++17 | PASS — remaining matches are ADR-0004's note *explaining* the C++17→C++20 move and BLOCKED.md's annotated historical row, neither of which asserts the old value |
+| 2 | ADR-0004 dated note, decision line intact | PASS |
+| 3 | ADR-0003 states both builds are C++20 | PASS — with the FP-mode mechanism, not just the number |
+| 4 | ADR-0004 and architecture.md drop "as a UE module", say which side was the bug | PASS — the docs were the bug; ADR-0004's body had contradicted its own section heading |
+| 5 | work-breakdown.md's CORE-001 row is Unreal | PASS |
+| 6 | check_conventions.py's stale C++17 comment | PASS — the allowance itself removed, not just the comment |
+| 7 | `make check` passes | PASS — 0 violations, 60 tasks, 0 broken links |
+| 8 | BLOCKED.md row 3 reflects reality | PASS |
+| 9 | The two unrelated "5.5" matches untouched | PASS — `level-02-sweepers-row.md` (a 5.5 m span) and `02-parallel-execution.md` (5.5 ideal days) |
