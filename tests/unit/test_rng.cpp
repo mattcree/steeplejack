@@ -10,6 +10,7 @@
 #include "Rng.h"
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <vector>
 
@@ -227,10 +228,15 @@ TEST_CASE("Rng: Acceptance 5: PickWeighted lands within 1% of its weights")
         counts[k] += 1;
     }
 
+    // Absolute tolerance, deliberately not doctest::Approx().epsilon(). Approx compares
+    // against epsilon * (scale + max(|lhs|,|rhs|)) with scale defaulting to 1.0, so
+    // .epsilon(0.01) on an expected 0.1 is a +/-0.011 window — 11% relative, not the 1%
+    // the criterion asks for. It would have passed at 0.089. The criterion says "within
+    // 1% of those proportions", so assert exactly that.
     const float n = static_cast<float>(kDrawsForProportion);
-    CHECK(static_cast<float>(counts[0]) / n == doctest::Approx(0.6f).epsilon(0.01));
-    CHECK(static_cast<float>(counts[1]) / n == doctest::Approx(0.3f).epsilon(0.01));
-    CHECK(static_cast<float>(counts[2]) / n == doctest::Approx(0.1f).epsilon(0.01));
+    CHECK(std::fabs(static_cast<float>(counts[0]) / n - 0.6f) <= 0.01f);
+    CHECK(std::fabs(static_cast<float>(counts[1]) / n - 0.3f) <= 0.01f);
+    CHECK(std::fabs(static_cast<float>(counts[2]) / n - 0.1f) <= 0.01f);
 }
 
 TEST_CASE("Rng: PickWeighted never returns a zero-weighted option")
