@@ -14,6 +14,7 @@ spec:
   - docs/06-workflow/03-verification.md#ci
   - docs/03-tech/adr/0004-engine-change-to-unreal.md#what-it-costs-and-the-mitigation
 verify: a green run of the `game` job on a pull request
+human_required: true  # provisioning physical CI hardware
 editor_required: false
 risk: R8
 ---

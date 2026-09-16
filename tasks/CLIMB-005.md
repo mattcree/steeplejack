@@ -16,6 +16,7 @@ spec:
   - docs/01-gdd/02-climbing-system.md#the-verbs
   - docs/03-tech/adr/0004-engine-change-to-unreal.md#what-unreal-buys-that-is-specific-to-this-game
 verify: Video review: hands land on actual rungs at 3, 5 and 7 m spans and on a flexing section.
+human_required: true
 editor_required: true
 risk: R2
 ---

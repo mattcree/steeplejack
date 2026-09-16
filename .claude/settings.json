@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make:*)",
+      "Bash(cmake:*)",
+      "Bash(ninja:*)",
+      "Bash(ctest:*)",
+      "Bash(python3 tools/:*)",
+      "Bash(./build/sim_tests:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)",
+      "Bash(git switch:*)",
+      "Bash(git branch:*)",
+      "Bash(git stash:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git worktree:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(clang-format:*)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(gh pr:*)",
+      "Bash(git rebase:*)",
+      "Bash(git reset:*)"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(rm -rf:*)",
+      "Read(./tools/likeness_denylist.local.txt)"
+    ]
+  }
+}

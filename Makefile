@@ -7,6 +7,7 @@ CMAKE   ?= cmake
 UE      ?= $(UE_ROOT)/Engine/Binaries/Linux/UnrealEditor-Cmd
 BUILD   ?= build
 FILTER  ?=
+comma   := ,
 
 .DEFAULT_GOAL := help
 
@@ -16,13 +17,21 @@ FILTER  ?=
 check: check-conventions validate check-links test-unit
 
 ## ci: everything CI runs without Unreal installed (gates 1-8)
-ci: check test-levels test-replay test-determinism
+ci: check test-tools check-blueprints test-levels test-replay test-determinism
 
 # ---------------------------------------------------------------- fast (no engine, no cmake)
 
 ## check-conventions: sim purity, magic numbers, tuning keys, likeness denylist
 check-conventions:
 	@$(PY) tools/check_conventions.py
+
+## test-tools: the convention checkers have their own tests (rule: no untested rules)
+test-tools:
+	@$(PY) tools/test_conventions.py
+
+## check-blueprints: rule 18 — Blueprints are glue only
+check-blueprints:
+	@$(PY) tools/check_blueprints.py
 
 ## validate: level + tuning data, and the task graph
 validate: validate-data validate-tasks
@@ -55,24 +64,35 @@ test-unit: build-sim
 	@if [ -x $(BUILD)/sim_tests ]; then $(BUILD)/sim_tests $(if $(FILTER),--test-case=*$(FILTER)*,); \
 	else echo "  no sim tests yet — start with CORE-003"; fi
 
+# A filtered gate that matches zero test cases must NOT report success — that is how a
+# suite rots into decoration. gate() prints an explicit "not yet meaningful" instead.
+# $(1)=doctest filter  $(2)=human name  $(3)=the task that makes it real
+define gate
+	@n=$$($(BUILD)/sim_tests --test-case=$(1) --list-test-cases 2>/dev/null \
+	      | sed -n 's/.*passing the current filters: \([0-9]*\).*/\1/p'); \
+	n=$${n:-0}; \
+	if [ "$$n" -eq 0 ]; then \
+		printf '  \033[33m--\033[0m %s: no such tests yet (lands in %s)\n' "$(2)" "$(3)"; \
+	else \
+		$(BUILD)/sim_tests --test-case=$(1); \
+	fi
+endef
+
 ## test-levels: schema, Ascent Beat Rule and reachability for every level
-test-levels: build-sim
-	@if [ -x $(BUILD)/sim_tests ]; then $(BUILD)/sim_tests --test-case=*Level*,*Reachability*; \
-	else $(PY) tools/validate_data.py; fi
+test-levels: build-sim validate-data
+	$(call gate,*Level*$(comma)*Reachability*,level validation,CORE-008/CORE-009)
 
 ## test-replay: recorded expert runs must reproduce their outcome
 test-replay: build-sim
-	@if [ -x $(BUILD)/sim_tests ]; then $(BUILD)/sim_tests --test-case=*Replay*; \
-	else echo "  no replays yet — TEST-002"; fi
+	$(call gate,*Replay*,replay regression,CORE-006/TEST-002)
 
 ## test-determinism: same seed + same intents -> same state, repeatedly
 test-determinism: build-sim
-	@if [ -x $(BUILD)/sim_tests ]; then $(BUILD)/sim_tests --test-case=*Determinism*; \
-	else echo "  no determinism tests yet — CORE-006"; fi
+	$(call gate,*Determinism*,determinism,CORE-003/CORE-006)
 
 ## test-perf: assert Sim::Step stays under 0.5 ms (no engine needed)
 test-perf: build-sim
-	@if [ -x $(BUILD)/sim_tests ]; then $(BUILD)/sim_tests --test-case=*Perf*; fi
+	$(call gate,*Perf*,sim step budget,CORE-005)
 
 ## test-coverage: sim line coverage gate (>= 90%)
 test-coverage:
@@ -121,6 +141,10 @@ critical:
 editor-queue:
 	@$(PY) tools/tasks.py editor
 
+## human-queue: ALL work a human must do — editor, recording, playtests
+human-queue:
+	@$(PY) tools/tasks.py human
+
 ## stale: in_progress tasks with no plan and no outcome
 stale:
 	@$(PY) tools/tasks.py stale
@@ -149,4 +173,5 @@ help:
 .PHONY: check ci check-conventions validate validate-data validate-tasks check-links \
         configure build-sim test-unit test-levels test-replay test-determinism test-perf \
         test-coverage build-game test-automation perf-capture editor \
-        board ready waves critical editor-queue stale graph new-task install-hooks help
+        board ready waves critical editor-queue human-queue stale graph new-task \
+        test-tools check-blueprints install-hooks help

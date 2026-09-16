@@ -9,9 +9,10 @@ Cheapest and fastest first. Everything above a rung only runs if the rungs below
 
 | # | Gate | Command | Runtime | When |
 |---|---|---|---|---|
+| 0 | **The checkers' own tests** | `make test-tools` | ~5 s | CI |
 | 1 | **Enforced conventions** | `make check-conventions` | ~1 s | pre-commit, CI |
 | 2 | Data validation (schemas, tuning, task graph) | `make validate` | ~2 s | pre-commit, CI |
-| 3 | Doc link integrity | `make check-links` | ~1 s | CI |
+| 3 | Doc link integrity + Blueprint rule | `make check-links check-blueprints` | ~1 s | CI |
 | 4 | Sim build (**no Unreal needed**) | `make build-sim` | ~20 s | pre-commit, CI |
 | 5 | Sim unit + property tests | `make test-unit` | ~10 s | pre-commit, CI |
 | 6 | Level validation (schema + beat rule + reachability) | `make test-levels` | ~10 s | CI |
@@ -21,6 +22,21 @@ Cheapest and fastest first. Everything above a rung only runs if the rungs below
 | 10 | UE automation tests | `make test-automation` | ~5 min | CI (self-hosted) |
 | 11 | Frame-time capture, screenshot diff | `make perf-capture` | ~15 min | nightly |
 | 12 | **Human playtest** | see the playtest plan | hours | per milestone |
+
+### Empty gates must not report success
+
+Three gates (`test-levels`, `test-replay`, `test-determinism`) filter the test binary by name. Until
+the tests they select exist, a naive filter matches nothing and **exits zero** — a green gate that
+checks nothing, which is how a suite rots into decoration.
+
+The Makefile counts matching test cases first and prints this instead:
+
+```
+  -- replay regression: no such tests yet (lands in CORE-006/TEST-002)
+```
+
+The gate becomes real the moment its tests land, with no Makefile change. If you add a gate, add it
+this way.
 
 **Rungs 1–8 need neither Unreal nor a GPU.** They cover 100% of the gameplay logic and run on a
 GitHub-hosted runner in under two minutes. That is the practical payoff of ADR-0004's module split,
@@ -100,6 +116,14 @@ Nightly adds frame-time capture and screenshot diffs.
 
 **A red `sim` job is more urgent than a red `game` job**, because the sim holds every gameplay
 decision and the game module holds none.
+
+### Rung 0 — testing the tests
+
+`tools/test_conventions.py` tests the convention checkers themselves: 20 cases, each asserting
+**both** that a rule catches its bad input **and** that it leaves a legitimate equivalent alone.
+That second half is what stops a rule getting switched off the first time it fires a false positive.
+
+A rule with no test is not a rule; it is a future false positive that someone will disable.
 
 **A red CI blocks merge. There is no override.** If CI is flaky, fixing the flake is the highest
 priority task in the repo, because a flaky gate is worse than no gate — it trains everyone to

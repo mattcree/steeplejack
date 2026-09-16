@@ -1,0 +1,5 @@
+doctest is licensed under the MIT License.
+Copyright (c) 2016-2023 Viktor Kirilov
+Full text: https://github.com/doctest/doctest/blob/master/LICENSE.txt
+Vendored at v2.4.11. Single header, no build system, no transitive dependencies —
+which is why it was chosen. See docs/06-workflow/03-verification.md.
