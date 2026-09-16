@@ -4,8 +4,8 @@ title: Reconcile docs with what CORE-001 actually built
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.75
-status: ready
-assignee: null
+status: in_progress
+assignee: agent
 depends_on: [CORE-001, SETUP-004]
 owns:
   - AGENTS.md
