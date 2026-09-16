@@ -17,6 +17,11 @@ Twelve levels. Nine mission archetypes. One verb set, taught by level 6, never a
 | 11 | [The Pleasure Tower](level-11-pleasure-tower.md) | 120 m | LATTICE | steel movement set, riveting, 3D route | £2,200 | 150 | 6 |
 | 12 | [The Great Aire Chimney](level-12-great-aire.md) | 110 m | TOP → FELL | everything, in two acts | £3,400 | 150 | 6 |
 
+**Outside the sequence:** [Level 00 — The Grey Box](level-00-greybox.md), 55 m, four bands, no
+mission. Not a campaign level — it is the rig "The Ascent" is built and judged on
+([`mvp.md`](../04-production/mvp.md#mvp-scope--the-ascent)). It carries `order: 99` only because
+the schema has no way to express "unordered".
+
 ## Sequencing rules (enforced)
 
 1. Never two of the same archetype back to back. (9 sits between the two TOP-heavy runs; 7 follows 6
@@ -38,6 +43,7 @@ Twelve levels. Nine mission archetypes. One verb set, taught by level 6, never a
 
 | | Design | Data | Grey box | Art | Audio | Playable |
 |---|---|---|---|---|---|---|
+| **L0 grey box** | ✅ spec complete | ✅ | ⬜ | n/a — grey box | ⬜ | ⬜ |
 | L1–L4 | ✅ spec complete | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | L5–L7 | ✅ spec complete | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | L8–L12 | ✅ spec complete | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
