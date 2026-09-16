@@ -4,8 +4,8 @@ title: Land must skip commits its own resolution empties
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.25
-status: ready
-assignee: null
+status: in_progress
+assignee: agent
 depends_on: [SETUP-004]
 owns:
   - tools/wt.py
