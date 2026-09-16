@@ -6,10 +6,11 @@ The long form is [`docs/06-workflow/`](docs/06-workflow/00-agent-workflow.md).
 ## Start here
 
 ```bash
-make ready          # tasks you can claim right now
-make board          # where everything stands
-make waves          # what can run in parallel
-make check          # the local gate (no Unreal needed). Green before any PR.
+make ready                   # tasks you can claim right now
+make wt-start ID=CORE-003    # isolated worktree + branch, pushed immediately
+cd ../sj-core-003
+make wip                     # commit + push. Run this constantly. It is the panic button.
+make check                   # the gate (no Unreal needed). Green before handoff.
 ```
 
 You need `cmake`, `ninja` and a C++17 compiler for `make check`. You need **Unreal 5.5 and
@@ -29,13 +30,17 @@ CLAIM → CONTEXT → PLAN → BUILD → VERIFY → HANDOFF → REVIEW → MERGE
    One file per task, so claiming never conflicts with anyone.
 2. **Context** — the task file and its `spec:` refs. Not the whole repo.
 3. **Plan** — if `estimate_days > 1`, write 3–8 bullets into `## Plan` and commit before coding.
-4. **Build** — **only in your task's `owns:` paths.** Branch `<id-lowercase>-<slug>`.
+4. **Build** — **only in your task's `owns:` paths**, in the worktree `wt-start` made for you.
+   Run `make wip` constantly: it commits and pushes in one command, so your work exists off this
+   disk from the first minute. See [integration](docs/06-workflow/07-integration.md).
 5. **Verify** — your task's `verify:` command, then `make check`, then the applicable sections of
    [`definition-of-done.md`](docs/04-production/definition-of-done.md).
 6. **Handoff** — fill in `## Outcome`: what changed, decisions you made, what surprised you,
    follow-up task IDs. Set `status: review`.
 7. **Review** — a *different* agent, against the acceptance criteria. Not against taste.
-8. **Merge** — squash. `CLIMB-001: implement the ladder stack span model`. Set `status: done`.
+8. **Merge** — **you do not merge.** The integrator runs `make land ID=<your-task>`, which backs up
+   your branch, rebases it onto main, re-runs the full gate on the *rebased* result, and
+   fast-forwards. One task at a time. If it conflicts, your branch is left untouched.
 
 ## Orientation (first time only)
 
@@ -87,6 +92,22 @@ keeps that visible; if that queue grows faster than it is cleared, that is risk 
 8. **Every audio cue has a visual fallback.** See [accessibility](docs/01-gdd/14-accessibility.md).
 9. **The docs are the spec.** If your code and a doc disagree, one is a bug — decide which, fix it,
    and say which in the PR.
+
+## Never lose work
+
+Two commands and one rule:
+
+```bash
+make wip        # commit + push. Before anything structural, and whenever you pause.
+make doctor     # what exists only on this disk?
+```
+
+**The rule:** if `.claude/hooks/git_guard.py` blocks a command, that means *commit first* — not
+*find another way to run it*. It blocks `reset --hard`, `checkout -- .`, `restore`, `clean -fd`,
+`worktree remove`, `push --force`, `branch -D` and bare `rebase`, because those destroy work that
+the reflog cannot recover. Every one of them has a safe alternative in the block message.
+
+Never `git worktree remove`. Use `make wt-drop`, which refuses if anything would be lost.
 
 ## Guess vs. escalate
 

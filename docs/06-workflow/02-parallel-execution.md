@@ -57,16 +57,22 @@ Changing an interface under three other agents is how a day gets lost.
 
 ## Worktrees
 
-Where the harness supports it, each agent works in its own git worktree. This gives real filesystem
-isolation on top of the logical isolation that `owns:` provides, so a stray write can't affect
-anyone else's build.
+One worktree per task — real filesystem isolation on top of the logical isolation that `owns:`
+provides. **Never create or remove one by hand**; the lifecycle is scripted so that work cannot be
+stranded on a local disk:
 
 ```bash
-git worktree add ../sj-climb-001 -b climb-001-ladder-stack
+make wt-start ID=CLIMB-001    # worktree + branch, pushed to origin immediately
+make wip                      # commit + push, constantly
+make land ID=CLIMB-001        # the merge queue — backup, rebase, verify, fast-forward
+make wt-drop ID=CLIMB-001     # refuses unless merged and pushed
 ```
 
-One worktree per task, removed on merge. Without worktrees, one branch per task is sufficient —
-`owns:` is still the real protection.
+`git worktree remove` is blocked by the git guard: it takes unmerged branches and uncommitted edits
+with no warning, and is the most common way agent work is lost.
+
+**Full model, and the evidence it works:**
+[`07-integration.md`](07-integration.md).
 
 ## Batching by discipline
 
@@ -116,8 +122,14 @@ rather than in a batch at the end of a wave.
 
 ## Merge discipline
 
-- Trunk-based. Branch off `main`, merge back within a day or two, squash.
-- Rebase onto `main` before opening a PR, never merge `main` into your branch.
+**Parallel generation, sequential merging.** Agents generate all at once; work integrates one task
+at a time through `make land`, which is lock-serialized.
+
+- Trunk-based, fast-forward only. `main` never has a merge commit and is always green.
+- Agents never merge and never push to `main`. The integrator lands.
+- `land` re-runs the full gate on the **rebased** result, not on what the agent tested. The trunk
+  moved while they were working; that is the whole point.
 - Because of `owns:`, rebases should be trivially clean. **A conflicting rebase means an ownership
   violation happened somewhere** — find it and say so rather than just resolving it.
-- Never merge with a red `make check`.
+
+See [`07-integration.md`](07-integration.md) for the full model.

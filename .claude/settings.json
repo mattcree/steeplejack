@@ -26,18 +26,39 @@
       "Bash(head:*)",
       "Bash(tail:*)",
       "Bash(wc:*)",
-      "Bash(clang-format:*)"
+      "Bash(clang-format:*)",
+      "Bash(python3 tools/wt.py:*)",
+      "Bash(git fetch:*)",
+      "Bash(git pull --ff-only:*)",
+      "Bash(git merge --ff-only:*)",
+      "Bash(git worktree add:*)",
+      "Bash(git worktree list:*)",
+      "Bash(git ls-remote:*)"
     ],
     "ask": [
-      "Bash(git push:*)",
-      "Bash(gh pr:*)",
-      "Bash(git rebase:*)",
-      "Bash(git reset:*)"
+      "Bash(gh pr:*)"
     ],
     "deny": [
       "Bash(git push --force:*)",
       "Bash(rm -rf:*)",
-      "Read(./tools/likeness_denylist.local.txt)"
+      "Read(./tools/likeness_denylist.local.txt)",
+      "Bash(git worktree remove:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean -f:*)",
+      "Bash(git branch -D:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/git_guard.py"
+          }
+        ]
+      }
     ]
   }
 }

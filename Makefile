@@ -119,6 +119,33 @@ perf-capture:
 editor:
 	@$(UE_ROOT)/Engine/Binaries/Linux/UnrealEditor $(PWD)/Steeplejack.uproject
 
+# ---------------------------------------------------------------- parallel work
+# Parallel generation, sequential merging. See docs/06-workflow/07-integration.md
+
+## wt-start: claim a task in an isolated worktree — make wt-start ID=CORE-003
+wt-start:
+	@$(PY) tools/wt.py start $(ID)
+
+## wip: commit everything and push. The panic button. Run it constantly.
+wip:
+	@$(PY) tools/wt.py save "$(M)"
+
+## wt-status: every worktree, and exactly what is not yet safe
+wt-status:
+	@$(PY) tools/wt.py status
+
+## land: the merge queue — backup, rebase, verify, merge. One task at a time.
+land:
+	@$(PY) tools/wt.py land $(ID)
+
+## wt-drop: remove a worktree, refusing if anything would be lost
+wt-drop:
+	@$(PY) tools/wt.py drop $(ID)
+
+## doctor: find work that exists only on this disk
+doctor:
+	@$(PY) tools/wt.py doctor
+
 # ---------------------------------------------------------------- work items
 
 ## board: task status by milestone
@@ -174,4 +201,5 @@ help:
         configure build-sim test-unit test-levels test-replay test-determinism test-perf \
         test-coverage build-game test-automation perf-capture editor \
         board ready waves critical editor-queue human-queue stale graph new-task \
-        test-tools check-blueprints install-hooks help
+        test-tools check-blueprints install-hooks help \
+        wt-start wip wt-status land wt-drop doctor

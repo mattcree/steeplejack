@@ -65,7 +65,7 @@ def die(msg: str, *extra: str) -> None:
 
 
 def slug(text: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:40]
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:28].rstrip("-")
 
 
 def task_path(tid: str) -> str:
@@ -193,14 +193,16 @@ def cmd_status() -> int:
         print("no task worktrees")
         return 0
     total_problems = 0
-    print(f"{C['bold']}{'worktree':<22}{'branch':<34}{'task':<10}state{C['off']}")
+    print(f"{C['bold']}  {'worktree':<20}{'branch':<34}{'task':<13}state{C['off']}")
     for w in wts:
         tid = os.path.basename(w["path"]).replace("sj-", "").upper()
         st = task_field(tid, "status") if os.path.exists(os.path.join(TASKS, f"{tid}.md")) else "?"
         problems = unsafe(w["path"], w.get("branch", ""))
         total_problems += len(problems)
         mark = f"{C['grn']}safe{C['off']}" if not problems else f"{C['red']}AT RISK{C['off']}"
-        print(f"  {os.path.basename(w['path']):<20}{w.get('branch','?'):<34}{st:<10}{mark}")
+        br = w.get("branch", "?")
+        br = br if len(br) <= 32 else br[:29] + "..."
+        print(f"  {os.path.basename(w['path'])[:19]:<20}{br:<34}{st:<13}{mark}")
         for p in problems:
             print(f"    {C['red']}!{C['off']} {p}")
     if total_problems:

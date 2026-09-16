@@ -16,6 +16,8 @@ These are one-time, and **every one of them is the project lead's, not an agent'
 | 6 | Unreal 5.5 installed somewhere, `UE_ROOT` set | for CORE-001's second half | ⬜ |
 | 7 | A human named for the editor queue | `make human-queue` | ⬜ |
 | 8 | You are reachable for escalations | `BLOCKED.md` | ⬜ |
+| 9 | The git guard hook is active | `.claude/settings.json` → `hooks.PreToolUse` | ✅ 25 cases |
+| 10 | `make doctor` reports nothing at risk | `make doctor` | ✅ |
 
 **Items 4, 7 and 8 are not optional.** Without 4, rule 16 is decorative on the project's highest-IP-
 risk task. Without 7, a third of the work has no owner. Without 8, the fleet stalls the first time
@@ -43,14 +45,20 @@ parallel with the fleet, not after it.
 
 ```
 1.  make ready
-2.  spawn one `implementer` agent per AGENT-CLAIMABLE task, capped at 4
+2.  spawn one `implementer` agent per AGENT-CLAIMABLE task, capped at 4.
+       each starts with:  make wt-start ID=<task>
 3.  keep 1 `reviewer` free per 3 implementers
 4.  as each agent reports:
        status: review   -> hand to a reviewer
        status: blocked  -> it has appended to BLOCKED.md. Answer it, or park it.
-       PASS from review -> merge, set status: done
-5.  goto 1
+       PASS from review -> make land ID=<task>      (one at a time, lock-serialized)
+                           make wt-drop ID=<task>
+5.  make doctor                                      (is anything only on this disk?)
+6.  goto 1
 ```
+
+Integration is [`07-integration.md`](07-integration.md) and it is not optional: agents never merge
+and never push to `main`.
 
 ### The caps, and why
 

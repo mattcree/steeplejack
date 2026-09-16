@@ -10,13 +10,24 @@ and the cross-tool standard. Everything below is a summary of it — if the two 
 ## The thirty-second version
 
 ```bash
-make ready      # what you can claim (agent-claimable vs. needs-a-human)
-make check      # the gate. ~20s. Needs cmake/ninja/g++, NOT Unreal.
+make ready                   # what you can claim (agent-claimable vs. needs-a-human)
+make wt-start ID=CORE-003    # isolated worktree, branch pushed immediately
+make wip                     # commit + push. The panic button. Run it constantly.
+make check                   # the gate. ~1s. Needs cmake/ninja/g++, NOT Unreal.
 ```
 
 Pick a task from **AGENT-CLAIMABLE**. Open `tasks/<ID>.md`. It is self-contained — read it and the
 `spec:` sections it names, and nothing else. Work only in its `owns:` paths. Fill in `## Outcome`
 before you hand off.
+
+## Never lose work
+
+`make wip` commits and pushes in one command. Run it before anything structural and whenever you
+pause. If the git guard blocks a command, that means **commit first**, not find another way — it
+blocks only the commands whose damage the reflog cannot undo.
+
+You never merge. The integrator runs `make land ID=<task>`. See
+[`docs/06-workflow/07-integration.md`](docs/06-workflow/07-integration.md).
 
 ## The four things that get a PR rejected
 
@@ -44,6 +55,7 @@ Guess freely about naming, file layout inside your owned paths, test structure, 
 | The contract | [`AGENTS.md`](AGENTS.md) |
 | How work flows | [`docs/06-workflow/00-agent-workflow.md`](docs/06-workflow/00-agent-workflow.md) |
 | Starting a run | [`docs/06-workflow/06-launch.md`](docs/06-workflow/06-launch.md) |
+| Parallel work and merging | [`docs/06-workflow/07-integration.md`](docs/06-workflow/07-integration.md) |
 | Every C++ signature, fixed in advance | [`docs/03-tech/interfaces.md`](docs/03-tech/interfaces.md) |
 | Why the engine is what it is | [`docs/03-tech/adr/0004-engine-change-to-unreal.md`](docs/03-tech/adr/0004-engine-change-to-unreal.md) |
 | What the game is | [`docs/00-vision.md`](docs/00-vision.md) |
