@@ -44,6 +44,6 @@ the schema has no way to express "unordered".
 | | Design | Data | Grey box | Art | Audio | Playable |
 |---|---|---|---|---|---|---|
 | **L0 grey box** | ✅ spec complete | ✅ | ⬜ | n/a — grey box | ⬜ | ⬜ |
-| L1–L4 | ✅ spec complete | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| L5–L7 | ✅ spec complete | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| L1–L4 | ✅ spec complete | 🟡 L1 only | ⬜ | ⬜ | ⬜ | ⬜ |
+| L5–L7 | ✅ spec complete | 🟡 L6 only | ⬜ | ⬜ | ⬜ | ⬜ |
 | L8–L12 | ✅ spec complete | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
