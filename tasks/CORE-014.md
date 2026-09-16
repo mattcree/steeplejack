@@ -67,8 +67,8 @@ public:
 
     Kind Kind() const noexcept;
     bool Has(std::string_view key) const noexcept;
-    const JsonValue& operator[](std::string_view key) const;   // object member; throws if absent
-    const JsonValue& operator[](std::size_t index) const;      // array element; throws if absent
+    const JsonValue& At(std::string_view key) const;    // object member; throws if absent
+    const JsonValue& At(std::size_t index) const;      // array element; throws if absent
     std::size_t Size() const noexcept;                         // array/object element count
 
     double             AsNumber() const;
@@ -81,6 +81,12 @@ public:
 ```
 
 `JsonError` carries origin, line and what was expected — the existing messages are the bar.
+
+Named `At()` rather than a subscript operator, for a reason worth knowing before you change it
+back: `tools/check_links.py` does not skip fenced code blocks, so an empty subscript followed by a
+parenthesised parameter list parses as a markdown link with an empty label and fails
+`make check-links`. Fixing the checker is a follow-up; until then, keep square brackets
+immediately followed by a parenthesis out of code samples in any `.md` file.
 
 ## Acceptance
 1. `Json.h`/`Json.cpp` exist and `tests/unit/test_json.cpp` covers objects, arrays, nesting,

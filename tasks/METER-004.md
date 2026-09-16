@@ -16,7 +16,7 @@ spec:
   - docs/01-gdd/03-meters-grip-nerve.md#recovery
   - docs/01-gdd/12-audio-design.md#music
   - docs/01-gdd/11-camera-controls-feel.md#camera
-verify: make test-unit FILTER=test_recovery, plus a video of the tea break for review.
+verify: make test-unit FILTER=recovery
 editor_required: false
 risk: null
 ---
@@ -36,7 +36,11 @@ Tea: 12 s, camera locks to a slow fixed framing, wind noise drops, a flugelhorn 
 3. Tea requires a stable stance and both hands free; it is refused otherwise with a clear reason.
 4. Interrupting tea part-way grants proportional recovery, not zero.
 5. 'Look at the view' requires facing outward above 20 m.
-6. The tea camera framing, audio duck and duration match the spec.
+6. The tea camera framing, audio duck and duration match the spec. **Verified manually**, since
+   no command can check framing: attach a screen capture of one uninterrupted tea break to the
+   handoff, and have one reviewer confirm the framing, the duck and the twelve seconds against
+   `11-camera-controls-feel.md#camera`. Acceptance 1–5 are covered by `make test-unit
+   FILTER=recovery`.
 
 ## Out of scope
 The music cue itself is an M3 audio task; use a placeholder. No flask inventory (M3).
