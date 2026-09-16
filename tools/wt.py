@@ -326,8 +326,23 @@ def _land(tid: str) -> int:
         # than dropping it silently.
         base = git("show", f"{TRUNK}:{own}", cwd=wt, check=False, quiet=True)
         head = git("show", f":3:{own}", cwd=wt, check=False, quiet=True)
-        lost = len([ln for ln in base.splitlines() if ln and ln not in head.splitlines()])
-        note = f", discarding {lost} line(s) that differ on {TRUNK}" if lost else ""
+        # Set membership, not a diff: counts trunk lines whose exact text appears nowhere
+        # in the branch's copy. A heads-up, not an accounting — it under-reports a line
+        # that merely moved.
+        #
+        # The claim line and the unfilled template placeholders differ on EVERY task by
+        # construction, so counting them would print a warning on every single land and
+        # train everyone to ignore it. Excluding them makes zero the normal case, which
+        # is what makes a non-zero count worth reading.
+        def carries_content(line: str) -> bool:
+            s = line.strip()
+            return bool(s) and not s.startswith(("status:", "assignee:", "<!--"))
+
+        head_lines = set(head.splitlines())
+        lost = len([ln for ln in base.splitlines()
+                    if carries_content(ln) and ln not in head_lines])
+        note = (f", dropping {lost} line(s) present on {TRUNK} but not on the branch"
+                if lost else "")
         print(f"{C['dim']}  {own}: taking the branch's copy (it holds the handoff)"
               f"{note}{C['off']}")
 
@@ -344,7 +359,11 @@ def _land(tid: str) -> int:
         r = subprocess.run(["git", "rebase", "--continue"], cwd=wt, capture_output=True,
                            text=True, env={**os.environ, "GIT_EDITOR": "true"})
     else:
-        stalled = f"{own} still conflicted after 50 rebase stops."
+        # Only a stall if the rebase is still failing. Exhausting the loop on a 50th
+        # `rebase --continue` that SUCCEEDED is a completed rebase, not a stall, and
+        # aborting it here would throw away a good merge at exactly the bound.
+        if r.returncode:
+            stalled = f"{own} still conflicted after 50 rebase stops."
 
     if stalled:
         subprocess.run(["git", "rebase", "--abort"], cwd=wt, capture_output=True)

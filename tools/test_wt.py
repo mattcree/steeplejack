@@ -216,6 +216,17 @@ def main() -> int:
         check("the resolved file carries the branch's status",
               "status: review" in landed, f"got: {landed[:200]}")
 
+        # Defect 3, on the same fixture: make_repo_with_origin pushes main to origin and
+        # THEN commits the claim, so the local trunk is ahead of origin/main — the shape
+        # every real repo is in, because agents cannot push main. A land that rebased onto
+        # origin/main would not carry the claim commit, and would later die on
+        # "Not possible to fast-forward".
+        log = subprocess.run(["git", "log", "--oneline", "-20"],
+                             cwd=os.path.join(tmp, "sj-test-999"),
+                             capture_output=True, text=True).stdout
+        check("the rebase used the LOCAL trunk, not origin/main", "claim" in log,
+              f"branch does not contain main's claim commit — rebased onto the wrong ref. got: {log[:200]}")
+
     print()
     for f in failures:
         print(f"\033[31mFAIL\033[0m {f}")

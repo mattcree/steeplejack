@@ -138,9 +138,13 @@ exactly wrong, and would send whoever hit it hunting for a nonexistent `owns:` o
 now resolves that one file to the branch's copy (the branch holds the handoff) and continues;
 any other conflicted path still aborts untouched with the original message.
 
-This also corrects decision 1 below. I rejected option 2 — writing the claim onto the branch too
-— on the grounds that it would "guarantee a conflict at land on the one line both sides changed".
-That conflict exists anyway. It is inherent to claim-on-trunk, not a cost of option 2.
+This conflict is inherent to claim-on-trunk **without** mirroring the claim onto the branch —
+which is exactly what option 2 would have done. Measured, not argued: replaying the branch onto
+the trunk without mirroring conflicts on `tasks/<ID>.md`; with mirroring, the duplicate claim
+commit becomes empty and is dropped, and the handoff then applies clean. So option 2 was the
+one-commit structural fix for this defect, and what is implemented here instead is ~40 lines of
+auto-resolution. See decision 1 for why option 2 was still rightly rejected, and for the two
+wrong explanations I gave before measuring it.
 
 ### What changed
 - **`task_field_on(tid, field, branch)`** — reads a task field from a branch via `git show`,
@@ -151,7 +155,7 @@ That conflict exists anyway. It is inherent to claim-on-trunk, not a cost of opt
   (`review <- in_progress on main`) instead of silently reporting the stale one.
 - **`start` / `land` / `drop`** guard the missing-ID case with `die()` instead of an unguarded
   `args[0]`, which raised `IndexError` and a traceback.
-- **`tools/test_wt.py`** — 24 cases. `wt.py` had no tests at all.
+- **`tools/test_wt.py`** — 25 cases. `wt.py` had no tests at all.
 - **`Makefile`** — `test-tools` runs them. That target is in `make ci`, **not** `make check`
   (`check` is conventions, validate, links, unit tests). That is the right place: it is where
   `test_conventions.py` already sat, and `land` gates on `make ci`, so these run on every merge.
@@ -159,9 +163,13 @@ That conflict exists anyway. It is inherent to claim-on-trunk, not a cost of opt
   which acceptance 4 asked for.
 - **`_land`** pulls the trunk first and rebases onto the local trunk, not `origin/TRUNK`.
 - **`_land`** auto-resolves a conflict in the task's own file to the branch copy, bounded to 50
-  rebase stops, and still aborts on anything else. It reports how many trunk-side lines the
-  whole-file resolution discards, because task files *do* get edited on main directly — this
-  session edited two — and a silent drop there would lose real work.
+  stops, and still aborts on anything else. It reports how many trunk-side lines the whole-file
+  resolution discards, because task files *do* get edited on main directly — this session edited
+  two — and a silent drop there would lose real work. The count deliberately ignores the claim
+  line and the unfilled template placeholders: those differ on every task by construction, so
+  counting them would print a warning on every single land and train everyone to ignore it.
+  Measured against both real landings before excluding them — LVL-000 would have printed 2 and
+  CORE-001 4, every one of them noise.
 - **`_land`'s fall-throughs** no longer print the ownership lecture for the one file the tool just
   tried to resolve itself. Hitting the bound, `rebase --continue` failing with nothing conflicted
   (usually a commit that became empty), and `checkout --theirs` failing all abort with an accurate
@@ -261,6 +269,22 @@ the argument for verifying the rebase rather than the branch.
   misdiagnosed task-file collision. A tool this central needed an end-to-end test on its first
   day, not on the day of the first merge.
 
+### Every defect here has a regression test, each verified by reintroducing its bug
+Not asserted — demonstrated. For each one the bug went back in, the suite ran, and it went red
+with a message naming the fault:
+
+| Defect | Reintroduced by | Result |
+|---|---|---|
+| 1 — missing ID tracebacks | n/a, covered directly | 12 cases |
+| 2 — status read from the trunk | `st = task_field(tid, "status")` | 2 failures, "deadlock is back" |
+| 3 — wrong target for the replay | targeting `origin/main` again | 2 failures, "wrong ref" |
+| 4 — task-file resolution | `--theirs` -> `--ours` | 2 failures, "the trunk's copy won" |
+
+Defects 3 and 4 needed a heavier fixture than the rest: a bare repo as origin, a real worktree,
+and a local trunk deliberately left ahead of origin — the shape every real repo is in, because
+agents cannot push main. That fixture is `make_repo_with_origin`, and it is why no follow-up task
+was filed for these tests: the harness the reviewer expected to be missing now exists.
+
 ### Follow-ups
 - `make wt-status` run from inside a worktree lists the trunk checkout as a row with task `?`.
   Harmless, pre-existing, cosmetic — not fixed here to keep this task to its stated scope.
@@ -271,7 +295,7 @@ the argument for verifying the rebase rather than the branch.
 | # | Criterion | Result |
 |---|---|---|
 | 1 | No-ID commands print a usable message, exit non-zero, no traceback | PASS — all three, verified by test and by hand |
-| 2 | Tests for the no-argument path of all three | PASS — `tools/test_wt.py`, 24 cases, 0 failures |
+| 2 | Tests for the no-argument path of all three | PASS — `tools/test_wt.py`, 25 cases, 0 failures |
 | 3 | `wt-status` does not report a status contradicted by the branch | PASS — reads the branch, shows both on divergence |
 | 4 | Authoritative source documented | PASS — `wt.py` module docstring |
 | 5 | `make check` passes | PASS — 0 violations, 0 errors; `make ci` also passes, which is what `land` gates on |
