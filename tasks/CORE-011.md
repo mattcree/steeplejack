@@ -101,7 +101,7 @@ heading is "SteeplejackSim is *not* a UE module", so the body text contradicts i
 Reword to "linked into the game as library code" or similar — do not weaken rule 1 to match the
 old prose.
 
-### The Makefile is owned by SETUP-004, not by this task
+### The Makefile, and why it is owned here
 `Makefile:105` still prints "set UE_ROOT to your Unreal 5.5 install". It is **not** in this
 task's `owns:` because SETUP-004 owns the Makefile (it wires `tools/test_wt.py` into
 `test-tools`), and the task-graph validator rejects two tasks owning one file without a
@@ -218,6 +218,11 @@ library code rather than registered as a loadable UE module. 15 files, `make che
   pattern and this task does not own them.
 
 ### Follow-ups
+- **`.gitignore` has no `__pycache__` rule, and the trap has now fired twice.** SETUP-004
+  committed `wt.cpython-314.pyc`, a reviewer caught it, and the file was deleted — but nobody
+  added the ignore rule, so it fired again on *this* branch when `make wip` swept up a `.pyc` the
+  reviewer's own `python3 -c "import tasks"` had left behind. The fix was the symptom, not the
+  trap. `.gitignore` is owned by **CORE-012**, which is the right home.
 - **`docs/03-tech/adr/0003-determinism-and-testing.md:112`** still reads "Code review rejects any
   `sim/` import of a **Godot node type**". Both halves are stale — the path is
   `Source/SteeplejackSim/` and the forbidden thing is Unreal headers. It is in an owned file, but
