@@ -9,8 +9,8 @@ Cheapest and fastest first. Everything above a rung only runs if the rungs below
 
 | # | Gate | Command | Runtime | When |
 |---|---|---|---|---|
-| 0 | **The checkers' own tests** | `make test-tools` | ~5 s | CI |
-| 0 | **Every `verify:` filter runs real tests** | `make check-verify` | ~2 s | CI |
+| 0a | **The checkers' own tests** | `make test-tools` | ~5 s | CI |
+| 0b | **Every `verify:` filter runs real tests** | `make check-verify` | ~2 s | CI |
 | 1 | **Enforced conventions** | `make check-conventions` | ~1 s | pre-commit, CI |
 | 2 | Data validation (schemas, tuning, task graph) | `make validate` | ~2 s | pre-commit, CI |
 | 3 | Doc link integrity + Blueprint rule | `make check-links check-blueprints` | ~1 s | CI |
