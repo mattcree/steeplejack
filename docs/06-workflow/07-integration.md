@@ -234,6 +234,17 @@ carries the handoff plus the Plan and the Outcome, and both write the same `stat
 resolves that one path to the branch's copy and continues. Any other conflicted path — including
 that file *plus* another — still aborts with the branch untouched.
 
+The rebase runs with **`rerere.enabled=false`**. `wt-start` turns rerere on for every worktree so
+a human solves a given conflict once — but `land` resolves the task-file conflict itself, every
+time, and a replayed rerere resolution is auto-staged, leaving the rebase stopped with nothing
+unmerged and nothing for `land` to take. A merge queue must behave the same on every machine; it
+must not depend on which conflicts this disk has seen before.
+
+A branch normally touches its own task file several times — claim, plan, handoff, review fixes —
+so `land` resolves it once per commit that conflicts. If the rebase ever stops for a reason `land`
+does not recognise, it aborts with the branch untouched and prints **git's own message** rather
+than a guess about what happened.
+
 This is the only place the merge queue resolves anything on its own authority, and the scope is
 deliberately narrow: the path is computed from the task ID, not matched by pattern, and `make ci`
 still runs on the resolved result before anything merges.
