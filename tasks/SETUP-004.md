@@ -4,7 +4,7 @@ title: Worktree tooling: usable errors and status drift
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.5
-status: review
+status: done
 assignee: agent
 depends_on: []
 owns:
