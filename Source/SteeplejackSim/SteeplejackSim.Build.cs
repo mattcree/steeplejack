@@ -11,6 +11,11 @@ public class SteeplejackSim : ModuleRules
 {
 	public SteeplejackSim(ReadOnlyTargetRules Target) : base(Target)
 	{
+		// SteeplejackSim is library code, not a loadable UE module: it has no IMPLEMENT_MODULE
+		// and cannot have one, because that needs Modules/ModuleManager.h and rule 1 forbids
+		// Unreal headers anywhere under this directory. UBT supports exactly this case.
+		bRequiresImplementModule = false;
+
 		PCHUsage = PCHUsageMode.NoPCHs;
 		bUseUnity = false;
 		// C++20, not 17: UE 5.8 removed Cpp17 outright (UBT refuses the build, it is not a
