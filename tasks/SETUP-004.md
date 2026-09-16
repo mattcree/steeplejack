@@ -150,8 +150,10 @@ That conflict exists anyway. It is inherent to claim-on-trunk, not a cost of opt
   (`review <- in_progress on main`) instead of silently reporting the stale one.
 - **`start` / `land` / `drop`** guard the missing-ID case with `die()` instead of an unguarded
   `args[0]`, which raised `IndexError` and a traceback.
-- **`tools/test_wt.py`** — 19 cases. `wt.py` had no tests at all.
-- **`Makefile`** — `test-tools` runs them, so they are inside `make check`.
+- **`tools/test_wt.py`** — 20 cases. `wt.py` had no tests at all.
+- **`Makefile`** — `test-tools` runs them. That target is in `make ci`, **not** `make check`
+  (`check` is conventions, validate, links, unit tests). That is the right place: it is where
+  `test_conventions.py` already sat, and `land` gates on `make ci`, so these run on every merge.
 - **`wt.py` module docstring** now states which source of truth is authoritative and why,
   which acceptance 4 asked for.
 - **`_land`** pulls the trunk first and rebases onto the local trunk, not `origin/TRUNK`.
@@ -162,10 +164,26 @@ That conflict exists anyway. It is inherent to claim-on-trunk, not a cost of opt
 1. **The branch is authoritative for status; the trunk keeps the claim.** SETUP-004's Context
    offered three options. I took a combination of the first and third: `land` and `status` read
    the branch (option 1), and `status` additionally surfaces the divergence rather than hiding it
-   (option 3). I did **not** take option 2 — writing the claim onto the branch as well — because
-   it guarantees a conflict at `land` on the one line both sides changed, on every single task.
-   The claim-on-trunk model is good and is not what was broken; only the reading of it was.
-2. **`status` shows both values rather than just the right one.** The divergence is a real and
+   (option 3).
+
+   I rejected option 2 — mirroring the claim onto the branch — and my first stated reason for
+   doing so was **wrong**, twice over. I claimed it would conflict at `land` on the line both
+   sides changed. It would not: both sides would make the *identical* edit from the same base,
+   which git's three-way merge resolves silently, and the claim commit simply becomes empty on
+   replay. The correct and much stronger argument is that **option 2 does not fix the deadlock at
+   all** — the handoff (`status: review`) is still written only on the branch, so a `land` that
+   reads the trunk still never sees it. Reading the branch is both necessary and sufficient;
+   option 2 is redundant work either way.
+
+   Option 3 alone — the route the task itself proposed as cheapest — would have left `land`
+   broken. The task's author did not know about the deadlock when writing those options.
+2. **The `owns:` widening is deliberate and declared here.** `tools/test_wt.py` is unavoidable:
+   acceptance 2 demands tests. `Makefile` is one line inside the existing `test-tools` target.
+   `SETUP-001` owns the Makefile and `SETUP-002` owns `test_conventions.py`, but both are `done`
+   and `tools/tasks.py` skips completed tasks when computing ownership conflicts, so no live task
+   contests either path. CORE-011 *did* contest the Makefile and has since ceded it and taken a
+   dependency on this task.
+3. **`status` shows both values rather than just the right one.** The divergence is a real and
    permanent feature of the model, not an error state. Showing `review <- in_progress on main`
    teaches the reader where status lives; showing only `review` would leave the next person to
    rediscover the split the same way this task did.
@@ -194,6 +212,20 @@ the argument for verifying the rebase rather than the branch.
   exactly like the C++ scaffold CORE-001 found. Nothing in this repo had been executed before
   today. Defects 3 and 4 in particular could not have been found by reading — only by trying to
   merge something.
+- **This task committed a `.pyc` and nearly shipped the disease it was curing.**
+  `tools/test_wt.py` imports `wt` in a subprocess, which wrote `tools/__pycache__/`, which
+  `make wip`'s `git add -A` then committed. Because it was tracked and regenerated on every
+  `make ci`, every tree would have gone dirty straight after the gate — and a dirty tree is
+  exactly what makes `land` refuse and `wt-status` report AT RISK. A task whose whole purpose is
+  making the worktree tooling trustworthy would have handed every future agent a permanent false
+  AT RISK. Caught in review. Fixed by running the subprocesses with `python3 -B` so no bytecode is
+  written at all, which keeps the fix inside this task's `owns:` and needs no `.gitignore` change.
+- **The first test suite did not test the bug it was written for.** All three `land` cases were
+  negative — they asserted refusals — so reintroducing the deadlock left the suite green. The
+  reviewer proved it by reverting one line. The missing case asserts the *absence* of the status
+  refusal: branch at `review`, trunk at `in_progress`, `land` must get past the status check and
+  fail later on the missing worktree. Verified by reintroducing the bug: 2 failures, specific
+  message. A negative test that passes both with and without the fix is not a test.
 - **Each fix revealed the next.** Fixing the status read let `land` reach the rebase, which
   exposed the wrong rebase target, which let it reach the conflict, which exposed the
   misdiagnosed task-file collision. A tool this central needed an end-to-end test on its first
@@ -209,8 +241,8 @@ the argument for verifying the rebase rather than the branch.
 | # | Criterion | Result |
 |---|---|---|
 | 1 | No-ID commands print a usable message, exit non-zero, no traceback | PASS — all three, verified by test and by hand |
-| 2 | Tests for the no-argument path of all three | PASS — `tools/test_wt.py`, 19 cases, 0 failures |
+| 2 | Tests for the no-argument path of all three | PASS — `tools/test_wt.py`, 20 cases, 0 failures |
 | 3 | `wt-status` does not report a status contradicted by the branch | PASS — reads the branch, shows both on divergence |
 | 4 | Authoritative source documented | PASS — `wt.py` module docstring |
-| 5 | `make check` passes | PASS — 0 violations, 58 tasks, 0 errors, tests green |
+| 5 | `make check` passes | PASS — 0 violations, 0 errors; `make ci` also passes, which is what `land` gates on |
 | — | *(beyond scope, proven in use)* | CORE-001 and LVL-000 both landed on main with this build |

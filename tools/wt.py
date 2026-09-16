@@ -239,7 +239,7 @@ def cmd_status() -> int:
         mark = f"{C['grn']}safe{C['off']}" if not problems else f"{C['red']}AT RISK{C['off']}"
         br = w.get("branch", "?")
         br = br if len(br) <= 32 else br[:29] + "..."
-        st = st if len(st) <= 28 else st[:25] + "..."
+        st = st if len(st) <= 30 else st[:27] + "..."
         print(f"  {os.path.basename(w['path'])[:19]:<20}{br:<34}{st:<30}{mark}")
         for p in problems:
             print(f"    {C['red']}!{C['off']} {p}")
