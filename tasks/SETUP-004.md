@@ -11,6 +11,7 @@ owns:
   - tools/wt.py
   - tools/test_wt.py
   - Makefile
+  - docs/06-workflow/07-integration.md
 reads:
   - AGENTS.md
   - docs/06-workflow/07-integration.md
@@ -150,7 +151,7 @@ That conflict exists anyway. It is inherent to claim-on-trunk, not a cost of opt
   (`review <- in_progress on main`) instead of silently reporting the stale one.
 - **`start` / `land` / `drop`** guard the missing-ID case with `die()` instead of an unguarded
   `args[0]`, which raised `IndexError` and a traceback.
-- **`tools/test_wt.py`** — 20 cases. `wt.py` had no tests at all.
+- **`tools/test_wt.py`** — 24 cases. `wt.py` had no tests at all.
 - **`Makefile`** — `test-tools` runs them. That target is in `make ci`, **not** `make check`
   (`check` is conventions, validate, links, unit tests). That is the right place: it is where
   `test_conventions.py` already sat, and `land` gates on `make ci`, so these run on every merge.
@@ -158,7 +159,17 @@ That conflict exists anyway. It is inherent to claim-on-trunk, not a cost of opt
   which acceptance 4 asked for.
 - **`_land`** pulls the trunk first and rebases onto the local trunk, not `origin/TRUNK`.
 - **`_land`** auto-resolves a conflict in the task's own file to the branch copy, bounded to 50
-  rebase stops, and still aborts on anything else.
+  rebase stops, and still aborts on anything else. It reports how many trunk-side lines the
+  whole-file resolution discards, because task files *do* get edited on main directly — this
+  session edited two — and a silent drop there would lose real work.
+- **`_land`'s fall-throughs** no longer print the ownership lecture for the one file the tool just
+  tried to resolve itself. Hitting the bound, `rebase --continue` failing with nothing conflicted
+  (usually a commit that became empty), and `checkout --theirs` failing all abort with an accurate
+  message. The last one mattered most: it previously ran `git add` unconditionally afterwards,
+  which would have staged the **trunk's** side — the exact inverse resolution — silently.
+- **`docs/06-workflow/07-integration.md`** — the `make land` step list now matches the code, and
+  gained two sections explaining why status is read from the branch and why `land` resolves one
+  conflict itself.
 
 ### Decisions
 1. **The branch is authoritative for status; the trunk keeps the claim.** SETUP-004's Context
@@ -166,19 +177,38 @@ That conflict exists anyway. It is inherent to claim-on-trunk, not a cost of opt
    the branch (option 1), and `status` additionally surfaces the divergence rather than hiding it
    (option 3).
 
-   I rejected option 2 — mirroring the claim onto the branch — and my first stated reason for
-   doing so was **wrong**, twice over. I claimed it would conflict at `land` on the line both
-   sides changed. It would not: both sides would make the *identical* edit from the same base,
-   which git's three-way merge resolves silently, and the claim commit simply becomes empty on
-   replay. The correct and much stronger argument is that **option 2 does not fix the deadlock at
-   all** — the handoff (`status: review`) is still written only on the branch, so a `land` that
-   reads the trunk still never sees it. Reading the branch is both necessary and sufficient;
-   option 2 is redundant work either way.
+   I rejected option 2 — mirroring the claim onto the branch — and **got the reason wrong twice
+   before the reviewer built both models and measured it.** The record, because the reasoning is
+   what the next person inherits:
+
+   - *My first claim:* option 2 would conflict at `land` on every task. **Backwards.** It is the
+     *absence* of option 2 that guarantees that conflict.
+   - *My correction:* the conflict is inherent to claim-on-trunk and happens either way.
+     **Also wrong.** Under option 2 the duplicate claim commit becomes empty and is dropped on
+     replay, which realigns the merge base for the handoff hunk from `ready` to `in_progress`, so
+     `in_progress -> review` applies cleanly against a trunk already at `in_progress`. Measured,
+     not argued: `'T-1: claim (branch copy too)' -> became EMPTY, dropped` then
+     `'T-1: handoff + Outcome' -> clean`.
+   - *The actual reason the conclusion survives:* **option 2 does not fix the deadlock.** The
+     handoff is written only on the branch under either model, so a `land` that reads the trunk
+     still never sees `review`. `task_field_on` is necessary regardless, and option 1 was
+     required.
+
+   **What that cost:** option 2 was the one-commit structural removal of defect 4, and instead
+   defect 4 got ~40 lines of conflict auto-resolution inside the merge queue — the only place
+   this tool resolves anything on its own authority. The task's own Out of scope explicitly
+   permitted option 2 ("unless option 2 is deliberately chosen"), so it was never scope creep.
+   It is not being reversed now: `land` works, two tasks landed on it, and the auto-resolve path
+   is tested against a real rebase. But a future task that wants to simplify the merge queue
+   should start here, with the evidence above rather than with my first two explanations of it.
 
    Option 3 alone — the route the task itself proposed as cheapest — would have left `land`
    broken. The task's author did not know about the deadlock when writing those options.
-2. **The `owns:` widening is deliberate and declared here.** `tools/test_wt.py` is unavoidable:
-   acceptance 2 demands tests. `Makefile` is one line inside the existing `test-tools` target.
+2. **I widened this task's `owns:` three times, deliberately, and this is the declaration.**
+   Added `tools/test_wt.py` (acceptance 2 demands tests), `Makefile` (one line inside the existing
+   `test-tools` target, so the tests run under the gate) and `docs/06-workflow/07-integration.md`
+   (the DoD requires the doc to match changed behaviour, and `land`'s documented steps described
+   the old rebase target and said nothing about auto-resolution).
    `SETUP-001` owns the Makefile and `SETUP-002` owns `test_conventions.py`, but both are `done`
    and `tools/tasks.py` skips completed tasks when computing ownership conflicts, so no live task
    contests either path. CORE-011 *did* contest the Makefile and has since ceded it and taken a
@@ -241,7 +271,7 @@ the argument for verifying the rebase rather than the branch.
 | # | Criterion | Result |
 |---|---|---|
 | 1 | No-ID commands print a usable message, exit non-zero, no traceback | PASS — all three, verified by test and by hand |
-| 2 | Tests for the no-argument path of all three | PASS — `tools/test_wt.py`, 20 cases, 0 failures |
+| 2 | Tests for the no-argument path of all three | PASS — `tools/test_wt.py`, 24 cases, 0 failures |
 | 3 | `wt-status` does not report a status contradicted by the branch | PASS — reads the branch, shows both on divergence |
 | 4 | Authoritative source documented | PASS — `wt.py` module docstring |
 | 5 | `make check` passes | PASS — 0 violations, 0 errors; `make ci` also passes, which is what `land` gates on |
