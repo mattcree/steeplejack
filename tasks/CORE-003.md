@@ -12,7 +12,7 @@ owns:
   - Source/SteeplejackSim/Private/Rng.cpp
   - tests/unit/test_rng.cpp
 spec:
-  - docs/03-tech/interfaces.md#simrnggd--core-003
+  - docs/03-tech/interfaces.md#rngh--core-003
   - docs/03-tech/adr/0003-determinism-and-testing.md#the-split
 verify: make test-unit FILTER=rng
 editor_required: false
@@ -80,8 +80,8 @@ assertions, `make test-unit FILTER=rng` green. This is the first real module in 
 ### The task's Interface block was stale, and the spec link was not
 The `## Interface` section specified `class_name Rng extends RefCounted`, `func next_u32() -> int`
 and `PackedInt64Array` — **GDScript**, left over from before ADR-0004. Following it literally was
-impossible. `docs/03-tech/interfaces.md#rngh--core-003`, which the task's own `spec:` points at,
-was already correct C++ and is what I built against. AGENTS.md rule 9 says when a doc and reality
+impossible. `docs/03-tech/interfaces.md`, which the task's own `spec:` points at, was already correct C++
+and is what I built against. AGENTS.md rule 9 says when a doc and reality
 disagree one of them is a bug and you say which: here the task file was the bug and
 `interfaces.md` was right, so the task file now matches it.
 
@@ -108,8 +108,13 @@ and there are 50-odd task files. **This is likely not the only one.**
    across a `Fork` call.
 5. **`PickWeighted` never returns a zero-weighted option.** A caller passing `0.0` for an option
    means "not available", and float rounding in the accumulate-and-sweep could otherwise return
-   it on the final index. The fallback walks backwards to the last *positive* weight. Tested over
-   20,000 draws against `{0.5, 0, 0.5, 0}`.
+   it on the final index. The fallback walks backwards to the last *positive* weight.
+
+   **The fallback itself is defensive and unreached in testing.** The 20,000-draw test against
+   `{0.5, 0, 0.5, 0}` proves the guarantee holds, but it exercises the main sweep only — gcov
+   marks the backwards walk `#####`. I originally wrote that the fallback was "tested over 20,000
+   draws", which was false. The final `return -1` in that walk is unreachable by construction,
+   since `total > 0` guarantees at least one positive weight.
 6. **Algorithm constants are named `constexpr`, not annotated literals.** `check_conventions.py`
    exempts `constexpr` lines from rule 2, so `kShiftA = 23` documents itself and passes the gate,
    where `// literal:` on a bare `23` would not have explained what it was.
@@ -118,12 +123,36 @@ and there are 50-odd task files. **This is likely not the only one.**
 - **`make test-unit FILTER=rng` silently passed with zero tests run.** doctest's `--test-case`
   filter matches test *names*, and mine did not contain "rng" — so the task's own `verify:`
   command reported `SUCCESS` against 0 of 23 cases. Every case is now prefixed `Rng:`. A verify
-  command that passes vacuously is worse than one that fails, and nothing in the gate would have
-  caught it.
+  command that passes vacuously is worse than one that fails.
+
+  **I wrote "nothing in the gate would have caught it", and that was wrong** — the repo already
+  solved this. `Makefile:68-75` defines a `gate()` helper whose comment reads: *"A filtered gate
+  that matches zero test cases must NOT report success — that is how a suite rots into
+  decoration."* It counts matching cases and prints an explicit "no such tests yet" instead of a
+  green tick. `test-unit` (`Makefile:63-65`) simply does not use it. The mechanism exists and the
+  one target every task's `verify:` runs through is the one that skips it. See follow-ups — this
+  is repo-wide, not mine.
 - **The magic-number rule and an RNG are a bad fit on their face** — the file is nothing but
   constants — but the `constexpr` exemption turns out to be exactly the right shape. Naming
   `kSplitMixGamma` and the xorshift shift triple is better documentation than the bare numbers,
   which is presumably why the exemption is written that way.
+
+### Three review fixes
+1. **The acceptance-5 assertion did not guard acceptance 5.** `doctest::Approx(0.1f).epsilon(0.01)`
+   compares against `epsilon * (scale + max(|lhs|,|rhs|))` with `scale` defaulting to `1.0` — so
+   it was a +/-0.011 absolute window on an expected 0.1, an 11% relative tolerance, and would
+   have passed at 0.089. The criterion says "within 1%". Now an explicit `fabs(observed -
+   expected) <= 0.01f`, verified to bite by shifting an expected value to 0.65 (1 failure) and
+   back. This is the same defect class as the vacuous filter above, in the test written to
+   prevent it.
+2. **Decision 5 claimed the zero-weight fallback was "tested over 20,000 draws".** It is not —
+   gcov marks the backwards walk `#####`; the test exercises the main sweep only. Reworded to say
+   the fallback is defensive and unreached.
+3. **The `spec:` anchor was GDScript-era.** `#simrnggd--core-003` (from `sim/rng.gd`) does not
+   exist; the heading is `## Rng.h — CORE-003`, i.e. `#rngh--core-003`. `make check-links` is
+   green because rule 14 checks that the *file* resolves, not the anchor — so my claim that "the
+   spec link was not stale" was true of the file and false of the anchor. 17 task files share
+   the pattern.
 
 ### Follow-ups
 - `tests/unit/test_harness.cpp` says "Delete this file once CORE-003 lands a real module with real
@@ -135,6 +164,28 @@ and there are 50-odd task files. **This is likely not the only one.**
   written before ADR-0004 and never revisited.
 - `Rng` has no benchmark. `performance-budget.md` gives `SteeplejackSim::Step` a 0.5 ms budget and
   the joint grid will draw heavily from this. Not needed yet, but CORE-006 should measure it.
+- **TEST-003 — make `test-unit` use the `gate()` helper, and audit every `FILTER=`.** The highest
+  value item here. ~25 tasks carry a `FILTER=` in their `verify:`, and several name *files* rather
+  than plausible case names — `CORE-004 FILTER=test_types`, `CORE-008 FILTER=test_level`,
+  `CORE-006 FILTER=replayroundtrip`, `METER-004 FILTER=test_recovery`, `VERB-006 FILTER=lashinput`.
+  Each reports SUCCESS against zero cases unless that task happens to name its cases to match.
+  Every one is a task that can be handed off, reviewed and landed with its stated verification
+  never having run.
+- **`Restore()` has no all-zero guard**, while the constructor and `Fork` both do.
+  `Restore({0, 0})` puts the generator in xorshift's absorbing state permanently — 1,000
+  consecutive zeros, confirmed. A live stream cannot reach it, so this only bites on a corrupt or
+  hand-written save, which is exactly CORE-006's input. Left alone deliberately during review
+  rather than changing behaviour under a reviewer; CORE-006 should either validate on load or
+  this should gain a guard.
+- **`RangeInt` is signed-overflow UB for spans above 2^31** (needs `lo < -1` and `hi` near
+  `INT32_MAX`). No sim call will do it, `-Werror` does not catch it, no test covers it.
+- **The "one draw in, one value out" promise has undocumented exceptions.** `RangeInt(5, 5)` and
+  `PickWeighted(nullptr, n)` consume *zero* draws. Replay is unaffected, because the arguments are
+  deterministic functions of sim state — but the header says "always" and a later caller may lean
+  on it.
+- **`Fork` gives pseudo-random offsets into one cycle, not provably disjoint substreams.** There
+  is no jump-ahead. Collision probability is negligible, but the header comment claims slightly
+  more than the algorithm guarantees.
 
 ### Verification
 | # | Criterion | Result |
@@ -143,5 +194,5 @@ and there are 50-odd task files. **This is likely not the only one.**
 | 2 | `Fork(7)` from the same parent state is reproducible | PASS |
 | 3 | Draining a fork does not move the parent | PASS — 5,000 draws, parent's next 500 unchanged |
 | 4 | `State()`/`Restore()` round-trips mid-sequence | PASS — same instance and across instances |
-| 5 | `PickWeighted` within 1% over 100,000 draws | PASS — 0.6/0.3/0.1 within 1% |
+| 5 | `PickWeighted` within 1% over 100,000 draws | PASS — 0.6016 / 0.2973 / 0.1011, all inside an absolute 0.01; assertion verified to bite |
 | — | `make check` | PASS — 0 violations, 23/23 cases, 481,026 assertions |
