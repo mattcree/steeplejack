@@ -200,17 +200,47 @@ make wt-drop ID=CORE-003     # refuses unless merged and pushed
 ## What `make land` actually does
 
 ```
- 1. refuse unless the task is at status: review     (reviewed by a different agent)
+ 1. refuse unless the task is at status: review     (read from the BRANCH, see below)
  2. refuse if the worktree is dirty                 (never lose it here)
  3. acquire a lock                                  (one land at a time, always)
  4. push backup/<task>-<timestamp> to origin        (before anything risky)
- 5. rebase onto origin/main, rerere enabled         (linear history, no merge commits)
-       conflict? abort, branch untouched, diagnose, exit
+ 5. bring the local main up to date, then rebase    (linear history, no merge commits)
+    the branch onto the LOCAL main, rerere enabled
+       conflict in tasks/<ID>.md? take the branch's copy and carry on — see below
+       conflict anywhere else? abort, branch untouched, diagnose, exit
  6. run `make ci` ON THE REBASED RESULT             (not on what the agent tested)
        fail? stop, branch untouched, backup safe, exit
  7. fast-forward main, push                         (trunk only ever advances)
  8. mark the task done
 ```
+
+### Why status is read from the branch, and main from local
+
+`wt-start` commits the claim (`status: in_progress`) to **main**, so two agents cannot claim the
+same task. The worktree branch is cut from `origin/main` *before* that commit. So a handoff
+(`status: review`) can only ever be written on the branch — main never sees it until the task
+lands. `land` therefore reads status from the branch. Reading it from main, which is what the tool
+did originally, meant every task read back as `in_progress` and **nothing could ever merge**.
+
+For the same reason `land` rebases onto the *local* main rather than `origin/main`. Those diverge
+by exactly the claim commits, because agents are blocked from pushing main, so the local trunk is
+ahead as soon as any task is claimed. Rebasing onto `origin/main` and then fast-forwarding the
+local one fails with "Not possible to fast-forward" — after the gate has already passed.
+
+### Why `land` resolves one conflict on its own
+
+`tasks/<ID>.md` conflicts on **every** land, by construction: main carries the claim, the branch
+carries the handoff plus the Plan and the Outcome, and both write the same `status:` line. `land`
+resolves that one path to the branch's copy and continues. Any other conflicted path — including
+that file *plus* another — still aborts with the branch untouched.
+
+This is the only place the merge queue resolves anything on its own authority, and the scope is
+deliberately narrow: the path is computed from the task ID, not matched by pattern, and `make ci`
+still runs on the resolved result before anything merges.
+
+**It discards whatever the trunk's copy had that the branch's does not.** Task files *are*
+sometimes edited on main directly. If you edit `tasks/X.md` on main while X is in flight, `land`
+prints how many lines it dropped — read that line, because the edit is gone.
 
 **Step 6 is the one people skip.** An agent verifies its branch in isolation; by the time it lands,
 the trunk has moved. Verifying the *rebased* result is what makes "main is always green" true rather

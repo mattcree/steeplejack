@@ -305,19 +305,55 @@ def _land(tid: str) -> int:
     # authoritative for its own task file (it holds the handoff), so resolve to the branch
     # and carry on. Anything else conflicting is a real violation and still aborts.
     own = os.path.relpath(task_path(tid), ROOT)
+    stalled = ""
     for _ in range(50):  # bounded: one stop per conflicting commit, never unbounded
         if not r.returncode:
             break
         conflicted = git("diff", "--name-only", "--diff-filter=U", cwd=wt,
                          check=False).splitlines()
+        if not conflicted:
+            # `rebase --continue` failed with nothing conflicted. The usual cause is a
+            # commit that became empty once the conflict was resolved. Say so, rather than
+            # falling through to the ownership lecture with an empty file list.
+            stalled = ("`git rebase --continue` failed with no conflicted paths. A commit "
+                       "probably became empty once its conflict was resolved.")
+            break
         if conflicted != [own]:
             break
-        print(f"{C['dim']}  {own}: taking the branch's copy (it holds the handoff){C['off']}")
-        # mid-rebase, --theirs is the commit being replayed, i.e. the branch
-        git("checkout", "--theirs", own, cwd=wt, check=False)
+
+        # Resolving whole-file loses anything the trunk copy had and the branch's does not.
+        # Task files do get edited on main directly, so count what is being dropped rather
+        # than dropping it silently.
+        base = git("show", f"{TRUNK}:{own}", cwd=wt, check=False, quiet=True)
+        head = git("show", f":3:{own}", cwd=wt, check=False, quiet=True)
+        lost = len([ln for ln in base.splitlines() if ln and ln not in head.splitlines()])
+        note = f", discarding {lost} line(s) that differ on {TRUNK}" if lost else ""
+        print(f"{C['dim']}  {own}: taking the branch's copy (it holds the handoff)"
+              f"{note}{C['off']}")
+
+        # Mid-rebase, --theirs is the commit being replayed, i.e. the branch. If that fails
+        # the index still holds the trunk's side, and staging it would silently apply the
+        # INVERSE resolution — so bail instead of adding.
+        co = subprocess.run(["git", "checkout", "--theirs", "--", own], cwd=wt,
+                            capture_output=True, text=True)
+        if co.returncode:
+            stalled = (f"could not take the branch's copy of {own}: "
+                       f"{co.stderr.strip() or 'unknown error'}")
+            break
         git("add", own, cwd=wt)
         r = subprocess.run(["git", "rebase", "--continue"], cwd=wt, capture_output=True,
                            text=True, env={**os.environ, "GIT_EDITOR": "true"})
+    else:
+        stalled = f"{own} still conflicted after 50 rebase stops."
+
+    if stalled:
+        subprocess.run(["git", "rebase", "--abort"], cwd=wt, capture_output=True)
+        print(f"{C['red']}STOPPED{C['off']} {stalled}")
+        print(f"Rebase aborted; your branch is untouched and safe on origin as {backup}.")
+        print(f"This is NOT an ownership violation — it is {own}, the task's own file, "
+              f"which conflicts on every land by construction.")
+        print(f"Resolve by hand in {wt}, `make wip`, then `make land ID={tid}` again.")
+        return 1
 
     if r.returncode:
         conflicted = git("diff", "--name-only", "--diff-filter=U", cwd=wt, check=False)

@@ -97,6 +97,45 @@ def field_on(tmp: str, branch: str) -> str:
     return out.stdout.strip()
 
 
+def make_repo_with_origin(tmp: str) -> str:
+    """A fixture with a real origin, a real worktree, and a task file that diverges.
+
+    Heavier than make_repo, but defect 4 — land resolving the task's own file — cannot be
+    exercised without an actual rebase, and that needs a remote for the backup ref and a
+    worktree for land to operate on.
+    """
+    origin = os.path.join(tmp, "origin.git")
+    repo = os.path.join(tmp, "repo")
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", origin],
+                   capture_output=True)
+    r = lambda *a: subprocess.run(["git"] + list(a), cwd=repo, capture_output=True, text=True)
+    os.makedirs(repo)
+    r("init", "-q", "-b", "main")
+    r("config", "user.email", "t@example.invalid")
+    r("config", "user.name", "Test")
+    r("remote", "add", "origin", origin)
+    os.makedirs(os.path.join(repo, "tasks"))
+    path = os.path.join(repo, "tasks", "TEST-999.md")
+
+    open(path, "w").write(TASK.format(status="ready"))
+    r("add", "-A"); r("commit", "-qm", "fixture"); r("push", "-q", "origin", "main")
+
+    # the branch: handoff plus an Outcome that must survive the resolution
+    r("worktree", "add", "-q", "-b", "test-999-fixture-task",
+      os.path.join(tmp, "sj-test-999"), "main")
+    wt_path = os.path.join(tmp, "sj-test-999", "tasks", "TEST-999.md")
+    open(wt_path, "w").write(TASK.format(status="review") + "\n## Outcome\nMUST-SURVIVE\n")
+    subprocess.run(["git", "add", "-A"], cwd=os.path.join(tmp, "sj-test-999"),
+                   capture_output=True)
+    subprocess.run(["git", "commit", "-qm", "handoff"], cwd=os.path.join(tmp, "sj-test-999"),
+                   capture_output=True)
+
+    # the trunk: the claim, on the same line — this is what conflicts, every time
+    open(path, "w").write(TASK.format(status="in_progress"))
+    r("add", "-A"); r("commit", "-qm", "claim")
+    return repo
+
+
 def main() -> int:
     print("a missing ID is a message, not a traceback")
     for cmd, target in [("land", "land"), ("start", "wt-start"), ("drop", "wt-drop")]:
@@ -157,6 +196,25 @@ def main() -> int:
         check("land does not traceback", "Traceback" not in out, f"got: {out.strip()[:200]}")
         check("refusal names the branch it read",
               "test-999-fixture-task" in out, f"got: {out.strip()[:300]}")
+
+    print("land resolves the task's own file to the branch")
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = make_repo_with_origin(tmp)
+        p = run(["land", "TEST-999"], cwd=repo)
+        out = p.stdout + p.stderr
+        check("the task file is auto-resolved, not treated as a violation",
+              "taking the branch's copy" in out,
+              f"got: {out.strip()[:300]}")
+        check("it is not misdiagnosed as an ownership violation",
+              "ownership model was violated" not in out,
+              f"got: {out.strip()[:300]}")
+        # land stops later, at the gate (no Makefile in the fixture) — by then the rebase
+        # and the resolution have both happened, so the branch copy must have won.
+        landed = open(os.path.join(tmp, "sj-test-999", "tasks", "TEST-999.md")).read()
+        check("the branch's Outcome survived the resolution", "MUST-SURVIVE" in landed,
+              "the trunk's copy won — --theirs is inverted, and handoffs are being discarded")
+        check("the resolved file carries the branch's status",
+              "status: review" in landed, f"got: {landed[:200]}")
 
     print()
     for f in failures:
