@@ -1,0 +1,68 @@
+{
+  "currency": "GBP",
+  "era": 1979,
+
+  "costs": {
+    "dog": 0.40,
+    "forgedDog": 0.90,
+    "ladderSection": 22.0,
+    "ladderRepair": 4.0,
+    "alloyLadderSection": 48.0,
+    "ropeCoil": 8.0,
+    "goodRopeCoil": 26.0,
+    "goldLeafBook": 14.0,
+    "goldLeafPerLeaf": 1.40,
+    "copperTape50m": 30.0,
+    "toolService": 2.0,
+    "ladPerDay": 8.0,
+    "gloves": 6.0,
+    "goodHammer": 18.0,
+    "bosunsChair": 75.0,
+    "secondFlask": 2.0
+  },
+
+  "upgradeEffects": {
+    "alloyLadders": { "massMultiplier": 0.6, "spanBuckleMetres": 6.5 },
+    "forgedDogs": { "bendRiskMultiplier": 0.4 },
+    "goodRope": { "shockFailChance": 0.0 },
+    "bosunsChair": { "rigSeconds": 12.0 },
+    "gloves": { "gripDrainMultiplier": 0.85, "tapTestTierPenalty": 1 },
+    "goodHammer": { "angleErrorMultiplier": 0.7 }
+  },
+
+  "replayFeeFraction": 0.4,
+
+  "reputation": {
+    "max": 100,
+    "starThresholds": [0, 20, 40, 60, 80],
+    "jobCompleted": 3,
+    "jobPerfect": 6,
+    "damageMinor": -2,
+    "damageMajor": -15,
+    "wildFell": -10,
+    "injured": -4,
+    "abandoned": -5,
+    "catastrophicCollateral": -15
+  },
+
+  "engine": {
+    "totalCost": 8980,
+    "stages": [
+      { "id": "strip",   "name": "Strip and assess",            "parts": 0,  "cost": 0 },
+      { "id": "wheels",  "name": "Wheels and axles",            "parts": 6,  "cost": 480 },
+      { "id": "boiler",  "name": "Boiler: tubes, stays, firebox","parts": 9,  "cost": 2100 },
+      { "id": "motion",  "name": "Motion: crank, gears, valve gear", "parts": 11, "cost": 2400 },
+      { "id": "fittings","name": "Gauges, injector, brasswork",  "parts": 8,  "cost": 1450 },
+      { "id": "finish",  "name": "Canopy, chimney, paint, lining","parts": 6,  "cost": 1900 },
+      { "id": "test",    "name": "Boiler test and certificate",  "parts": 1,  "cost": 650 }
+    ]
+  },
+
+  "toolCondition": {
+    "hammerAngleErrorAtWorn": 1.4,
+    "bolsterSnapChanceAtWorn": 2.0,
+    "ropeShockFailChanceAtFrayed": 0.08,
+    "chairCatastrophicChanceAtWorn": 0.02,
+    "degradePerUse": { "hammer": 0.0008, "bolster": 0.0015, "rope": 0.004, "chair": 0.002 }
+  }
+}

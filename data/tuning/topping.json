@@ -1,0 +1,33 @@
+{
+  "interactiveBricksPerMetre": 20,
+  "prisePerBrickSeconds": 1.8,
+  "giveWindowMs": { "base": 120, "sharpBolster": 160, "bluntBolster": 80 },
+  "seatSeconds": 0.5,
+  "driveSeconds": 0.6,
+  "earlyReleaseWastedSeconds": 2.5,
+  "lateReleaseSnapSeconds": 1.2,
+  "snapChanceOnLateRelease": 1.0,
+  "snapChanceInPerishedBand": 1.0,
+
+  "salvageValuePence": 2,
+  "craftsmanshipGrades": { "A": 0.9, "B": 0.75, "C": 0.55 },
+
+  "courseAutoResolveThreshold": 0.0,
+  "courseStabilityMinFraction": 0.55,
+
+  "stagingBuildSeconds": 180.0,
+  "stagingMoveIntervalMetres": 2.0,
+  "stagingMoveSeconds": 45.0,
+  "stagingWidthMetres": 1.2,
+
+  "jamIntervalBricks": [60, 120],
+  "jamClearSeconds": 25.0,
+  "flueCapacityBricks": 400,
+  "carryDownRateMultiplier": 0.3,
+
+  "complicationIntervalMetres": 4.0,
+  "complicationMinSecondsApart": 90.0,
+
+  "copingInterlockPeelNerve": -30.0,
+  "throwOverSideChance": 0.0
+}

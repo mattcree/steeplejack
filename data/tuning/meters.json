@@ -1,0 +1,70 @@
+{
+  "gripMax": 100.0,
+  "gripRecoverPerSecond": 25.0,
+  "gripDrainPerSecond": {
+    "oneHand": 8.0,
+    "hookedLeg": 4.0,
+    "clipped": 4.0,
+    "belted": 1.0,
+    "chair": 0.0
+  },
+  "stanceWobbleMultiplier": {
+    "oneHand": 1.6,
+    "hookedLeg": 1.3,
+    "clipped": 1.2,
+    "belted": 1.0,
+    "chair": 0.8
+  },
+  "gripTremorThreshold": 20.0,
+  "gripWobbleAtZero": 2.0,
+  "gripModifiers": {
+    "carryingLadder": 1.5,
+    "wet": 1.4,
+    "coldMaxCap": 80.0,
+    "coldWarmupSeconds": 120.0,
+    "crackedRib": 1.25,
+    "gloves": 0.85
+  },
+
+  "nerveStart": 90.0,
+  "nerveMax": 100.0,
+  "nerveBaseDrainPerSecond": 0.15,
+  "nerveHeightRefMetres": 40.0,
+  "nerveHeightFactorMin": 0.25,
+  "nerveHeightFactorMax": 3.0,
+  "nerveWindRefMetresPerSecond": 15.0,
+  "exposureFactor": { "platform": 1.0, "ladder": 1.4, "hanging": 1.8, "overhang": 2.2 },
+  "nerveShock": {
+    "droppedTool": -10.0,
+    "slipSave": -25.0,
+    "anchorFail": -30.0,
+    "startle": -8.0,
+    "haulHit": -20.0,
+    "sawSomethingFall": -15.0,
+    "copingPeel": -30.0,
+    "bellStrike": -35.0,
+    "sitIntoChair": -20.0
+  },
+  "nerveBands": { "calm": 70.0, "uneasy": 40.0, "bad": 20.0 },
+  "nerveWobbleMultiplier": { "calm": 1.0, "uneasy": 2.0, "bad": 3.0 },
+  "nerveHesitationChanceBelow20": 0.12,
+  "nerveHesitationSeconds": 0.3,
+
+  "recover": {
+    "platformStandPerSecond": 2.0,
+    "teaAmount": 40.0, "teaSeconds": 12.0,
+    "cigaretteAmount": 18.0, "cigaretteSeconds": 6.0, "cigaretteMaxNervePenalty": -5.0,
+    "descendBelow20mPerSecond": 1.5,
+    "viewAmount": 12.0, "viewSeconds": 8.0
+  },
+
+  "baseWobbleDegrees": 1.0,
+  "gustWobbleDegrees": 3.5,
+  "gustPreRollSeconds": 1.2,
+
+  "difficulty": {
+    "assisted":  { "nerveDrain": 0.6, "slipSaveWindowMs": 1400, "slipSaveCooldownSeconds": 30.0, "daylight": 1.4, "injuriesPersist": false },
+    "jack":      { "nerveDrain": 1.0, "slipSaveWindowMs": 900,  "slipSaveCooldownSeconds": 60.0, "daylight": 1.0, "injuriesPersist": true },
+    "owd_hand":  { "nerveDrain": 1.4, "slipSaveWindowMs": 650,  "slipSaveCooldownSeconds": 120.0, "daylight": 0.85, "injuriesPersist": true, "laddersLostOnFall": 2 }
+  }
+}

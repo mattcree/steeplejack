@@ -1,0 +1,11 @@
+.godot/
+export_presets.cfg
+*.translation
+build/
+dist/
+*.tmp
+.DS_Store
+
+# Research material must NOT be committed — see docs/05-legal/ip-and-likeness.md
+research/
+reference-footage/

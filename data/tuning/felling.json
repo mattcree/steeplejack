@@ -1,0 +1,40 @@
+{
+  "gobSegmentsDefault": 32,
+  "gobCoursesDefault": 4,
+  "cellCutSeconds": 3.5,
+  "propSetSeconds": 8.0,
+  "propCapacityKN": 40.0,
+  "propSplitLoadKN": 40.0,
+
+  "marginSafeMetres": 0.60,
+  "marginUneasyMetres": 0.30,
+  "marginCriticalMetres": 0.10,
+  "collapseWarningSecondsMin": 6.0,
+  "collapseWarningSecondsMax": 9.0,
+
+  "leanInfluenceDegreesPerDegree": 1.0,
+  "windInfluenceDegreesPerMetrePerSecond": 0.08,
+  "heightReductionAccuracyGainDegreesPer5m": 1.5,
+
+  "debrisFanHalfAngleDegrees": 18.0,
+  "debrisFanHalfAngleDegreesSurveyed": 11.0,
+  "debrisFanLengthHeightMultiplier": 1.15,
+
+  "fractureStressCoefficient": 1.0,
+  "fractureCountTypical": [2, 4],
+  "chunkCountRange": [60, 90],
+  "chunkDynamicLifetimeSeconds": 4.0,
+  "maxConcurrentDynamicChunks": 90,
+
+  "burnSecondsRange": [45, 90],
+  "packingQualityBurnMultiplier": { "good": 1.0, "poor": 0.6 },
+  "poorPackingAccuracyPenaltyDegrees": 6.0,
+  "matchBlowOutWindMetresPerSecond": 9.0,
+
+  "safeLineHeightMultiplier": 1.5,
+  "runSpeedMetresPerSecond": 4.5,
+
+  "accuracyBands": { "perfect": 5.0, "good": 15.0, "acceptable": 30.0 },
+  "dustPlumeSeconds": 40.0,
+  "crowdCheerDelaySeconds": 4.5
+}

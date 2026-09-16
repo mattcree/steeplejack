@@ -1,0 +1,78 @@
+{
+  "$schema": "../schemas/level.schema.json",
+  "id": "01-back-yard",
+  "name": "The Back Yard",
+  "order": 1,
+  "archetype": "SURVEY",
+  "reputationGate": 0,
+  "fee": 0,
+  "shiftMinutes": null,
+  "targetMinutes": 8,
+
+  "structure": {
+    "type": "chimney",
+    "height": 12.0,
+    "baseRadius": 0.85,
+    "topRadius": 0.7,
+    "profile": "square",
+    "batter": [ { "at": 0.0, "step": 0.0 } ],
+    "bands": [],
+    "cap": "plain",
+    "leanDegrees": 0.0,
+    "leanBearing": 0,
+    "jointGrid": { "courseHeight": 0.075, "brickLength": 0.225, "candidateDensity": 4.0 },
+    "weathering": { "sootTo": 0.4, "bleachFrom": 0.9, "seed": 1001 }
+  },
+
+  "bands": [
+    { "from": 0.0, "to": 6.0, "type": "plain",
+      "quality": { "sound": 0.85, "fair": 0.15, "perished": 0.0, "cracked": 0.0 },
+      "note": "Generous. The player cannot fail to find a sound joint. Prompts are on in this band." },
+    { "from": 6.0, "to": 12.0, "type": "perished",
+      "quality": { "sound": 0.45, "fair": 0.25, "perished": 0.25, "cracked": 0.05 },
+      "params": { "forcePerishedAt": [7.2, 9.1], "forceCrackedAt": [7.0] },
+      "note": "One Perished and one Cracked joint sit on the obvious climbing line. Teaches the tap test by necessity." }
+  ],
+
+  "weather": {
+    "windBase": 1.0,
+    "windAtHeight": [ [0, 1.0], [12, 1.1] ],
+    "gustIntervalSeconds": null,
+    "precipitation": "none",
+    "ramp": null
+  },
+
+  "site": {
+    "safeLineDistance": 0,
+    "exclusions": [],
+    "corridor": null,
+    "crowd": null,
+    "backdrop": "mill-town-yard"
+  },
+
+  "mission": {
+    "type": "SURVEY",
+    "defects": [
+      { "id": "cracked_course", "height": 7.0, "bearing": 0,   "discovery": "visual" },
+      { "id": "perished_band",  "height": 9.0, "bearing": 0,   "discovery": "tap" },
+      { "id": "jackdaw_nest",   "height": 12.0, "bearing": 0,  "discovery": "summit" },
+      { "id": "missing_clip",   "height": 8.5, "bearing": 180, "discovery": "traverse" }
+    ],
+    "softLanding": true
+  },
+
+  "complications": [
+    { "at": "summit", "type": "great-aire-reveal", "params": { "durationSeconds": 4.0, "bearing": 214, "distance": 4800 } }
+  ],
+
+  "scoring": {
+    "bonuses": [
+      { "id": "all_defects", "condition": "defectsFound==4", "amount": 0 }
+    ],
+    "hardFailConditions": []
+  },
+
+  "loadoutHint": { "ladders": 4, "dogs": 12, "rope": 1 },
+  "replay": "data/replays/01-back-yard-expert.replay",
+  "designDoc": "docs/02-levels/level-01-back-yard.md"
+}

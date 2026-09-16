@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://steeplejack/schemas/level.schema.json",
+  "title": "Level",
+  "type": "object",
+  "required": ["id", "name", "order", "archetype", "fee", "shiftMinutes", "structure", "bands", "weather", "site", "mission", "scoring"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "id": { "type": "string", "pattern": "^[0-9]{2}-[a-z0-9-]+$" },
+    "name": { "type": "string" },
+    "order": { "type": "integer", "minimum": 1, "maximum": 99 },
+    "archetype": { "enum": ["SURVEY", "CONDUCTOR", "GILD", "BAND", "TOP", "FELL", "MECHANISM", "LATTICE", "EMERGENCY"] },
+    "reputationGate": { "type": "integer", "minimum": 0, "maximum": 5, "default": 0 },
+    "fee": { "type": "integer", "minimum": 0 },
+    "shiftMinutes": { "type": ["integer", "null"], "minimum": 10 },
+    "targetMinutes": { "type": "integer", "minimum": 1 },
+
+    "structure": {
+      "type": "object",
+      "required": ["type", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["chimney", "spire", "tower", "lattice", "concrete"] },
+        "height": { "type": "number", "minimum": 5, "maximum": 200 },
+        "baseRadius": { "type": "number", "minimum": 0.3 },
+        "topRadius": { "type": "number", "minimum": 0.2 },
+        "profile": { "enum": ["round", "octagonal", "square", "square-to-round"] },
+        "batter": {
+          "type": "array",
+          "items": {
+            "type": "object", "required": ["at", "step"], "additionalProperties": false,
+            "properties": { "at": { "type": "number", "minimum": 0, "maximum": 1 }, "step": { "type": "number" } }
+          }
+        },
+        "bands": {
+          "type": "array",
+          "items": {
+            "type": "object", "required": ["at", "type"], "additionalProperties": false,
+            "properties": { "at": { "type": "number" }, "type": { "enum": ["iron", "steel", "none"] } }
+          }
+        },
+        "cap": { "enum": ["corbelled-oversail", "plain", "capped", "flared", "finial", "ball"] },
+        "leanDegrees": { "type": "number", "minimum": 0, "maximum": 5, "default": 0 },
+        "leanBearing": { "type": "number", "minimum": 0, "exclusiveMaximum": 360, "default": 0 },
+        "jointGrid": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "courseHeight": { "type": "number", "default": 0.075 },
+            "brickLength": { "type": "number", "default": 0.225 },
+            "candidateDensity": { "type": "number", "description": "candidate joints per m^2 of face", "default": 4.0 }
+          }
+        },
+        "weathering": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "sootTo": { "type": "number", "minimum": 0, "maximum": 1 },
+            "bleachFrom": { "type": "number", "minimum": 0, "maximum": 1 },
+            "seed": { "type": "integer" }
+          }
+        }
+      }
+    },
+
+    "bands": {
+      "type": "array", "minItems": 1,
+      "description": "Ordered, ground to top. Must be contiguous and cover [0, height]. No 'plain' band may exceed 20m (Ascent Beat Rule).",
+      "items": {
+        "type": "object",
+        "required": ["from", "to", "type", "quality"],
+        "additionalProperties": false,
+        "properties": {
+          "from": { "type": "number", "minimum": 0 },
+          "to": { "type": "number", "minimum": 0 },
+          "type": {
+            "enum": ["plain", "batter-change", "existing-band", "perished", "old-fixtures", "staging",
+                     "nesting-ledge", "corbelled-cap", "lightning-tape", "wind-band", "ivy", "salt-bloom",
+                     "crack", "hot", "internal", "delaminated", "corroded-steel", "lattice-open", "lattice-pinch"]
+          },
+          "quality": {
+            "type": "object",
+            "required": ["sound", "fair", "perished", "cracked"],
+            "additionalProperties": false,
+            "description": "Distribution of joint tiers in this band. Must sum to 1.0 (+/- 0.001).",
+            "properties": {
+              "sound": { "type": "number", "minimum": 0, "maximum": 1 },
+              "fair": { "type": "number", "minimum": 0, "maximum": 1 },
+              "perished": { "type": "number", "minimum": 0, "maximum": 1 },
+              "cracked": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          },
+          "params": { "type": "object" },
+          "note": { "type": "string", "description": "designer note; ignored at runtime" }
+        }
+      }
+    },
+
+    "weather": {
+      "type": "object",
+      "required": ["windBase"],
+      "additionalProperties": false,
+      "properties": {
+        "windBase": { "type": "number", "minimum": 0 },
+        "windAtHeight": { "type": "array", "items": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 } },
+        "gustIntervalSeconds": { "type": ["array", "null"], "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "precipitation": { "enum": ["none", "drizzle", "rain", "sleet"] },
+        "ramp": {
+          "type": ["object", "null"], "additionalProperties": false,
+          "properties": {
+            "startPct": { "type": "number", "minimum": 0, "maximum": 1 },
+            "windTo": { "type": "number" },
+            "precipitationTo": { "enum": ["none", "drizzle", "rain", "sleet"] },
+            "gustIntervalTo": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 }
+          }
+        }
+      }
+    },
+
+    "site": {
+      "type": "object",
+      "required": ["backdrop"],
+      "additionalProperties": false,
+      "properties": {
+        "safeLineDistance": { "type": "number" },
+        "exclusions": {
+          "type": "array",
+          "items": {
+            "type": "object", "required": ["id", "bearing", "distance", "value"], "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "bearing": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
+              "distance": { "type": "number", "minimum": 0 },
+              "value": { "type": "integer", "minimum": 0 },
+              "catastrophic": { "type": "boolean", "default": false }
+            }
+          }
+        },
+        "corridor": {
+          "type": ["object", "null"], "required": ["fromBearing", "toBearing"], "additionalProperties": false,
+          "properties": { "fromBearing": { "type": "number" }, "toBearing": { "type": "number" } }
+        },
+        "crowd": { "type": ["object", "null"] },
+        "backdrop": { "type": "string" }
+      }
+    },
+
+    "mission": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["SURVEY", "CONDUCTOR", "GILD", "BAND", "TOP", "FELL", "MECHANISM", "LATTICE", "EMERGENCY"] }
+      }
+    },
+
+    "complications": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["at", "type"], "additionalProperties": false,
+        "properties": {
+          "at": { "type": "string", "description": "e.g. 'height:52', 'shift:0.75', 'gob:0.6', 'bricks:120'" },
+          "type": { "type": "string" },
+          "params": { "type": "object" }
+        }
+      }
+    },
+
+    "scoring": {
+      "type": "object",
+      "required": ["bonuses"],
+      "additionalProperties": false,
+      "properties": {
+        "bonuses": {
+          "type": "array",
+          "items": {
+            "type": "object", "required": ["id", "condition", "amount"], "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "condition": { "type": "string" },
+              "amount": { "type": "integer" }
+            }
+          }
+        },
+        "hardFailConditions": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "loadoutHint": {
+      "type": "object", "additionalProperties": false,
+      "properties": { "ladders": { "type": "integer" }, "dogs": { "type": "integer" }, "rope": { "type": "integer" } }
+    },
+    "replay": { "type": "string" },
+    "designDoc": { "type": "string" }
+  }
+}
