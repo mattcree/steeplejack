@@ -4,7 +4,7 @@ title: Land must not depend on rerere's memory
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.25
-status: review
+status: done
 assignee: agent
 depends_on: [SETUP-004]
 owns:
