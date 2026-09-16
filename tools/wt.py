@@ -8,6 +8,15 @@ one task at a time, each fully verified before the next starts. That is the 2026
 state of the art for multi-agent development and it is what stops "six green PRs
 that do not work together".
 
+WHERE A TASK'S STATUS LIVES — the trunk carries the claim, the BRANCH carries the
+handoff, and **the branch is authoritative**. `start` commits `status: in_progress`
+to the trunk so two agents cannot claim the same task; the worktree branch is cut
+from origin/TRUNK *before* that commit, so a handoff (`status: review`) can only be
+written on the branch. `land` and `status` therefore read status from the branch via
+`task_field_on`, falling back to the trunk when there is no branch copy. Reading it
+from the trunk instead — which is what this tool did originally — meant `land` never
+saw a handoff and refused every task as 'in_progress'. Nothing could merge at all.
+
 Every command here is built around two failure modes that cost real work:
 
   LOST WORK   `git worktree remove` will take an unmerged branch and uncommitted
@@ -77,6 +86,26 @@ def task_path(tid: str) -> str:
 
 def task_field(tid: str, field: str) -> str:
     for line in open(task_path(tid), encoding="utf-8").read().split("\n---", 1)[0].splitlines():
+        if line.startswith(f"{field}:"):
+            return line.split(":", 1)[1].strip()
+    return ""
+
+
+def task_field_on(tid: str, field: str, branch: str) -> str:
+    """Read a task field from `branch`, falling back to the trunk checkout.
+
+    Status lives on the BRANCH, not on the trunk. `start` writes the claim to the
+    trunk so two agents cannot claim the same task, but the branch is cut from
+    origin/TRUNK *before* that commit — so the handoff (`status: review`) can only
+    ever be written on the branch. Reading status from the trunk means never seeing
+    a handoff, which deadlocked `land` completely: every task read back as
+    'in_progress' and nothing could ever merge.
+    """
+    rel = os.path.relpath(task_path(tid), ROOT)
+    blob = git("show", f"{branch}:{rel}", check=False, quiet=True)
+    if not blob:
+        return task_field(tid, field)
+    for line in blob.split("\n---", 1)[0].splitlines():
         if line.startswith(f"{field}:"):
             return line.split(":", 1)[1].strip()
     return ""
@@ -193,16 +222,25 @@ def cmd_status() -> int:
         print("no task worktrees")
         return 0
     total_problems = 0
-    print(f"{C['bold']}  {'worktree':<20}{'branch':<34}{'task':<13}state{C['off']}")
+    print(f"{C['bold']}  {'worktree':<20}{'branch':<34}{'task':<30}state{C['off']}")
     for w in wts:
         tid = os.path.basename(w["path"]).replace("sj-", "").upper()
-        st = task_field(tid, "status") if os.path.exists(os.path.join(TASKS, f"{tid}.md")) else "?"
+        if os.path.exists(os.path.join(TASKS, f"{tid}.md")):
+            st = task_field_on(tid, "status", w.get("branch", "")) or "?"
+            trunk_st = task_field(tid, "status")
+            if trunk_st != st:
+                # The trunk carries the claim, the branch carries the handoff. Showing
+                # both makes the split visible instead of silently reporting the stale one.
+                st = f"{st} <- {trunk_st} on {TRUNK}"
+        else:
+            st = "?"
         problems = unsafe(w["path"], w.get("branch", ""))
         total_problems += len(problems)
         mark = f"{C['grn']}safe{C['off']}" if not problems else f"{C['red']}AT RISK{C['off']}"
         br = w.get("branch", "?")
         br = br if len(br) <= 32 else br[:29] + "..."
-        print(f"  {os.path.basename(w['path'])[:19]:<20}{br:<34}{st:<13}{mark}")
+        st = st if len(st) <= 28 else st[:25] + "..."
+        print(f"  {os.path.basename(w['path'])[:19]:<20}{br:<34}{st:<30}{mark}")
         for p in problems:
             print(f"    {C['red']}!{C['off']} {p}")
     if total_problems:
@@ -227,12 +265,13 @@ def cmd_land(tid: str) -> int:
 
 
 def _land(tid: str) -> int:
-    st = task_field(tid, "status")
-    if st != "review":
-        die(f"{tid} is '{st}', not 'review'.",
-            "A task lands only after an implementer handed off AND a reviewer passed it.")
-
     wt, br = worktree_for(tid), branch_for(tid)
+    st = task_field_on(tid, "status", br)
+    if st != "review":
+        die(f"{tid} is '{st}' on {br}, not 'review'.",
+            "A task lands only after an implementer handed off AND a reviewer passed it.",
+            f"The handoff is written on the branch — check `git show {br}:tasks/{tid}.md`.")
+
     if not os.path.exists(wt):
         die(f"no worktree at {wt}")
     if git("status", "--porcelain", cwd=wt, check=False):
@@ -380,16 +419,24 @@ def main() -> int:
         print(__doc__)
         return 1
     cmd, args = sys.argv[1], sys.argv[2:]
+
+    def need_id(cmd_name: str, make_target: str) -> str:
+        if not args:
+            die(f"`{cmd_name}` needs a task ID.",
+                f"e.g. make {make_target} ID=CORE-003",
+                "`make ready` lists what you can claim; `make board` shows everything.")
+        return args[0].upper()
+
     if cmd == "start":
-        return cmd_start(args[0].upper())
+        return cmd_start(need_id("start", "wt-start"))
     if cmd == "save":
         return cmd_save(" ".join(args))
     if cmd == "status":
         return cmd_status()
     if cmd == "land":
-        return cmd_land(args[0].upper())
+        return cmd_land(need_id("land", "land"))
     if cmd == "drop":
-        return cmd_drop(args[0].upper(), force=os.environ.get("FORCE") == "1")
+        return cmd_drop(need_id("drop", "wt-drop"), force=os.environ.get("FORCE") == "1")
     if cmd == "doctor":
         return cmd_doctor()
     print(__doc__)

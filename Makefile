@@ -25,9 +25,10 @@ ci: check test-tools check-blueprints test-levels test-replay test-determinism
 check-conventions:
 	@$(PY) tools/check_conventions.py
 
-## test-tools: the convention checkers have their own tests (rule: no untested rules)
+## test-tools: the checkers and the worktree tool have tests (rule: no untested rules)
 test-tools:
 	@$(PY) tools/test_conventions.py
+	@$(PY) tools/test_wt.py
 
 ## check-blueprints: rule 18 — Blueprints are glue only
 check-blueprints:
