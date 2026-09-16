@@ -23,9 +23,9 @@ owns:
   - docs/06-workflow/03-verification.md
   - docs/06-workflow/06-launch.md
   - docs/04-production/work-breakdown.md
+  - Makefile
   - tools/check_conventions.py
 reads:
-  - Makefile
   - Steeplejack.uproject
   - CMakeLists.txt
   - Source/SteeplejackSim/SteeplejackSim.Build.cs
@@ -107,10 +107,10 @@ task's `owns:` because SETUP-004 owns the Makefile (it wires `tools/test_wt.py` 
 `test-tools`), and the task-graph validator rejects two tasks owning one file without a
 dependency between them — `make land` caught exactly that collision on the rebased result.
 
-This task therefore `depends_on: [CORE-001, SETUP-004]`. Once SETUP-004 has landed, add the
-Makefile to this task's `owns:` and fix the string, or hand the one-word change to whoever
-lands SETUP-004. Do not leave it: it is the error message a new contributor sees when their
-`UE_ROOT` is unset, so it is the single highest-traffic stale "5.5" in the repo.
+This task therefore `depends_on: [CORE-001, SETUP-004]`. SETUP-004 landed before this task was
+claimed, so the Makefile **is** owned here and the string **is** fixed. Do not leave it: it is the
+error message a new contributor sees when their `UE_ROOT` is unset, so it is the single
+highest-traffic stale "5.5" in the repo.
 
 ### Two more stale-since-ADR-0004 files
 - `docs/04-production/work-breakdown.md:26` still describes CORE-001 as "Godot project, folder
@@ -125,8 +125,7 @@ lands SETUP-004. Do not leave it: it is the error message a new contributor sees
 No code and no signature changes. Prose, one CI-adjacent comment, and one workflow value.
 
 ## Acceptance
-1. No owned file asserts "5.5" as the engine version or "C++17" as the standard. (The
-   Makefile's "Unreal 5.5" is excluded — SETUP-004 owns that file; see Context.)
+1. No owned file asserts "5.5" as the engine version or "C++17" as the standard.
 2. ADR-0004 carries a dated note giving 5.8.2 as the concrete version and recording that C++20
    was forced by the engine, with its original decision line intact.
 3. ADR-0003's determinism reasoning explicitly states both builds are C++20, rather than just
@@ -195,23 +194,39 @@ library code rather than registered as a loadable UE module. 15 files, `make che
    comment claiming it was a bit-width would have been a lie — 8/16/32/64 are widths, 17 never was.
 
 ### Surprises
-- **The `Makefile`'s stale "5.5" is still there, and deliberately.** It prints `set UE_ROOT to your
-  Unreal 5.5 install` — the highest-traffic stale version string in the repo, since it is the error
-  a new contributor sees. It is **not** in this task's `owns:` because SETUP-004 owns the Makefile,
-  and `make land` caught that collision on the rebased result when both claimed it. This task now
-  `depends_on: [CORE-001, SETUP-004]` and reads the file instead. It needs a one-word fix from
-  whoever next owns that file.
+- **I nearly left the repo's most-read stale string in place, for a constraint that had already
+  dissolved.** The `Makefile` prints `set UE_ROOT to your Unreal 5.5 install` — the first thing a
+  new contributor sees when `UE_ROOT` is unset. I excluded it from `owns:` on the grounds that
+  SETUP-004 owned the file and `make land` had caught that collision. The collision was real
+  history; the constraint was not. `tools/tasks.py` skips an ownership pair when **either task is
+  `done` or the two are related**, and SETUP-004 was both — `done` at this branch's merge-base, and
+  named in this task's `depends_on`. Adding the Makefile was legal the whole time, and this task's
+  own Context had already instructed it: *"Once SETUP-004 has landed, add the Makefile to this
+  task's owns: and fix the string... Do not leave it."*
+
+  Worse, the escape hatch I offered instead — "hand the change to whoever lands SETUP-004" — had no
+  recipient, because SETUP-004 was already landed. The follow-up pointed at a closed task, so the
+  string would have survived with no owner at all, in the Outcome of the task whose entire purpose
+  is that the docs stop lying. Now owned and fixed.
 - **`work-breakdown.md` is worse than one stale row.** Its header already warns that the M0/M1
   tables predate ADR-0004 and name Godot, and the CORE-001 row was the only one with Godot-specific
-  text — but **121 rows are still ⬜**, including every task landed today. The file has never been
-  maintained. Fixing one row does not make the table true.
+  text — but **119 rows are still ⬜** against a single ✅, including every task landed today. The
+  file has never been maintained. Fixing one row does not make the table true.
 - **`make check-links` proves less than it looks.** Rule 14 checks that a linked *file* exists, not
   that its **anchor** does. CORE-003 found its `spec:` pointing at `#simrnggd--core-003`, a
   GDScript-era anchor that resolves to nothing, with the gate green. 17 task files share the
   pattern and this task does not own them.
 
 ### Follow-ups
-- The `Makefile`'s "Unreal 5.5" string, above.
+- **`docs/03-tech/adr/0003-determinism-and-testing.md:112`** still reads "Code review rejects any
+  `sim/` import of a **Godot node type**". Both halves are stale — the path is
+  `Source/SteeplejackSim/` and the forbidden thing is Unreal headers. It is in an owned file, but
+  outside this task's stated scope ("only version and standard statements"), so it is recorded
+  rather than swept in. It is a lie either way and should be fixed.
+- **`tests/unit/test_harness.cpp:22`** — `TEST_CASE("Harness: the toolchain is C++17")`, with a
+  comment asserting structured bindings are C++17. It runs on every `make check` and states the
+  wrong standard. `SETUP-001` owns it. This is the only remaining C++17 assertion in first-party
+  code.
 - `work-breakdown.md`'s ⬜ column, which has never been updated for any task.
 - Anchor checking in rule 14, and the 17 task files with GDScript-era `spec:` anchors.
 - `CORE-003`'s Interface block was GDScript and was fixed in that task. **Nobody has swept
@@ -226,6 +241,6 @@ library code rather than registered as a loadable UE module. 15 files, `make che
 | 4 | ADR-0004 and architecture.md drop "as a UE module", say which side was the bug | PASS — the docs were the bug; ADR-0004's body had contradicted its own section heading |
 | 5 | work-breakdown.md's CORE-001 row is Unreal | PASS |
 | 6 | check_conventions.py's stale C++17 comment | PASS — the allowance itself removed, not just the comment |
-| 7 | `make check` passes | PASS — 0 violations, 60 tasks, 0 broken links |
+| 7 | `make check` passes | PASS — 0 violations, 0 broken links, 59 tasks on this branch (60 after rebase onto main, which adds `TEST-003.md`) |
 | 8 | BLOCKED.md row 3 reflects reality | PASS |
 | 9 | The two unrelated "5.5" matches untouched | PASS — `level-02-sweepers-row.md` (a 5.5 m span) and `02-parallel-execution.md` (5.5 ideal days) |
