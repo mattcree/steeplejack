@@ -274,7 +274,7 @@ private:
             {
                 break;
             }
-            anyDigit = anyDigit || (c >= '0' && c <= '9');
+            anyDigit = anyDigit || (c >= '0' && c <= '9');  // literal: digit range, not a tunable
             ++pos_;
         }
         if (!anyDigit)
@@ -328,7 +328,14 @@ constexpr std::array<uint32_t, 8> kInitialHash = {
     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
 };
 
-constexpr uint32_t kWordBits = 32;
+constexpr uint32_t    kWordBits         = 32;
+constexpr uint32_t    kByteBits         = 8;
+constexpr std::size_t kBlockBytes       = 64;   // SHA-256 operates on 512-bit blocks
+constexpr std::size_t kBytesPerWord     = 4;
+constexpr std::size_t kLengthFieldBytes = 8;    // the 64-bit big-endian message length
+constexpr std::size_t kScheduleWords    = 64;   // w[0..63]
+constexpr std::size_t kSeededWords      = 16;   // w[0..15] come straight from the block
+constexpr uint32_t    kHexDigitBits     = 4;
 constexpr std::array<uint32_t, 3> kSigma0Rotations = {7, 18, 3};    // small sigma 0
 constexpr std::array<uint32_t, 3> kSigma1Rotations = {17, 19, 10};  // small sigma 1
 constexpr std::array<uint32_t, 3> kUpper0Rotations = {2, 13, 22};   // capital sigma 0
@@ -347,43 +354,46 @@ std::string Sha256(const std::string& data)
     std::string msg = data;
     const uint64_t bitLength = static_cast<uint64_t>(data.size()) * 8u;
     msg.push_back(static_cast<char>(0x80));
-    while (msg.size() % 64u != 56u)
+    while (msg.size() % kBlockBytes != kBlockBytes - kLengthFieldBytes)
     {
         msg.push_back('\0');
     }
-    for (int i = 7; i >= 0; --i)
+    for (std::size_t i = kLengthFieldBytes; i-- > 0;)
     {
-        msg.push_back(static_cast<char>((bitLength >> (static_cast<uint32_t>(i) * 8u)) & 0xffu));
+        msg.push_back(static_cast<char>(
+            (bitLength >> (static_cast<uint32_t>(i) * kByteBits)) & 0xffu));
     }
 
-    std::array<uint32_t, 64> w{};
-    for (std::size_t block = 0; block < msg.size(); block += 64u)
+    std::array<uint32_t, kScheduleWords> w{};
+    for (std::size_t block = 0; block < msg.size(); block += kBlockBytes)
     {
-        for (std::size_t t = 0; t < 16u; ++t)
+        for (std::size_t t = 0; t < kSeededWords; ++t)
         {
             w[t] = 0;
-            for (std::size_t b = 0; b < 4u; ++b)
+            for (std::size_t b = 0; b < kBytesPerWord; ++b)
             {
                 const auto byte = static_cast<uint32_t>(
-                    static_cast<unsigned char>(msg[block + t * 4u + b]));
-                w[t] = (w[t] << 8u) | byte;
+                    static_cast<unsigned char>(msg[block + t * kBytesPerWord + b]));
+                w[t] = (w[t] << kByteBits) | byte;
             }
         }
-        for (std::size_t t = 16; t < 64u; ++t)
+        for (std::size_t t = kSeededWords; t < kScheduleWords; ++t)
         {
-            const uint32_t s0 = Rotr(w[t - 15u], kSigma0Rotations[0]) ^
-                                Rotr(w[t - 15u], kSigma0Rotations[1]) ^
-                                (w[t - 15u] >> kSigma0Rotations[2]);
+            // literal: w[t-15], w[t-2], w[t-16], w[t-7] — FIPS 180-4 section 6.2.2. These
+            // offsets are the algorithm, not a tunable; changing one makes it not SHA-256.
+            const uint32_t s0 = Rotr(w[t - 15u], kSigma0Rotations[0]) ^   // literal: as above
+                                Rotr(w[t - 15u], kSigma0Rotations[1]) ^   // literal: as above
+                                (w[t - 15u] >> kSigma0Rotations[2]);      // literal: as above
             const uint32_t s1 = Rotr(w[t - 2u], kSigma1Rotations[0]) ^
                                 Rotr(w[t - 2u], kSigma1Rotations[1]) ^
                                 (w[t - 2u] >> kSigma1Rotations[2]);
-            w[t] = w[t - 16u] + s0 + w[t - 7u] + s1;
+            w[t] = w[t - 16u] + s0 + w[t - 7u] + s1;                      // literal: as above
         }
 
         uint32_t a = h[0], b = h[1], c = h[2], d = h[3];
         uint32_t e = h[4], f = h[5], g = h[6], hh = h[7];
 
-        for (std::size_t t = 0; t < 64u; ++t)
+        for (std::size_t t = 0; t < kScheduleWords; ++t)
         {
             const uint32_t s1 = Rotr(e, kUpper1Rotations[0]) ^ Rotr(e, kUpper1Rotations[1]) ^
                                 Rotr(e, kUpper1Rotations[2]);
@@ -407,9 +417,9 @@ std::string Sha256(const std::string& data)
     out.reserve(64u);
     for (const uint32_t word : h)
     {
-        for (int shift = 28; shift >= 0; shift -= 4)
+        for (uint32_t shift = kWordBits; shift > 0; shift -= kHexDigitBits)
         {
-            out.push_back(kHexDigits[(word >> static_cast<uint32_t>(shift)) & 0xfu]);
+            out.push_back(kHexDigits[(word >> (shift - kHexDigitBits)) & 0xfu]);
         }
     }
     return out;
@@ -661,7 +671,7 @@ std::string Tuning::Hash() const
     // chooses, and two values that differ below that cutoff would hash the same. The digest goes
     // into replay files, so "close enough" is not.
     std::string canonical;
-    canonical.reserve(values_.size() * 48u);
+    canonical.reserve(values_.size() * 48u);  // literal: capacity hint, not a tunable
     for (const auto& [key, value] : values_)
     {
         canonical += key;
