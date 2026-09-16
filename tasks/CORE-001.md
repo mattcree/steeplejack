@@ -4,7 +4,7 @@ title: Unreal project, two modules, and the standalone sim build
 milestone: M0
 discipline: [ENG]
 estimate_days: 1.5
-status: review
+status: done
 assignee: agent
 depends_on: [PROD-001]
 owns:
