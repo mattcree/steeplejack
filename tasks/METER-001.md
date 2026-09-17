@@ -4,7 +4,7 @@ title: Grip meter and the five stances
 milestone: M1
 discipline: [ENG]
 estimate_days: 1.5
-status: review
+status: done
 assignee: agent
 depends_on: [CORE-004, CORE-007, CORE-011]
 owns:
