@@ -16,6 +16,7 @@
 
 #include "CoreMinimal.h"
 #include "HAL/IConsoleManager.h"
+#include "Misc/CoreDelegates.h"
 #include "Misc/Paths.h"
 
 #include "Tuning.h"
@@ -152,6 +153,25 @@ void UnregisterHotReloadKey()
 		GHotReloadInput.Reset();
 	}
 }
+
+/**
+ * Register on post-engine-init, from a file-scope constructor.
+ *
+ * Self-registering because the alternative is a StartupModule override in SteeplejackGame.cpp,
+ * which this task does not own — and because a hot-reload key that only works if someone
+ * remembers to call it is a hot-reload key that quietly stops working. Post-engine-init rather
+ * than static-init because Slate does not exist yet at static-init time.
+ */
+struct FTuningHotReloadBootstrap
+{
+	FTuningHotReloadBootstrap()
+	{
+		FCoreDelegates::GetOnPostEngineInit().AddStatic(&RegisterHotReloadKey);
+		FCoreDelegates::OnEnginePreExit.AddStatic(&UnregisterHotReloadKey);
+	}
+};
+
+static FTuningHotReloadBootstrap GTuningHotReloadBootstrap;
 
 #else
 

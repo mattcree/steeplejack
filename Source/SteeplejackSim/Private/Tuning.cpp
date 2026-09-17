@@ -248,8 +248,11 @@ private:
             case 'u':
                 // No tuning key or value needs one, and decoding UTF-16 surrogate pairs to get
                 // it wrong quietly is worse than saying so.
+                //
+                // No `break` after this or the default: Fail() is [[noreturn]], and UE's clang
+                // builds with -Wunreachable-code-break -Werror, which GCC under CMake does not.
+                // `make check` cannot see this class of error; `make build-game` can.
                 Fail("\\u escapes are not supported in tuning files");
-                break;
             default:
                 Fail(std::string("unknown escape '\\") + e + "'");
             }
@@ -312,6 +315,11 @@ private:
 // FIPS 180-4. Here rather than in a library because SteeplejackSim takes no dependencies, and
 // hand-rolled rather than approximated because the digest is stamped into every replay file and
 // has to mean the same thing in five years. Verified against the published test vectors.
+//
+// Note: Tuning::Hash() feeds this the raw bytes of each double, so the digest is host-endian. All
+// three platform targets are little-endian, and ADR-0003 scopes determinism to within a build
+// rather than across machines, so this is a documented property rather than a bug. If a big-endian
+// target ever appears, byte-swap in the canonical form, not here.
 
 constexpr std::array<uint32_t, 64> kRoundConstants = {
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -626,9 +634,19 @@ int32_t Tuning::GetI(std::string_view key) const
         throw TuningError("tuning key '" + std::string(key) + "' in " + v.origin +
                           " is not a number");
     }
-    const double rounded = (v.number < 0.0) ? -static_cast<double>(static_cast<int64_t>(-v.number))
-                                            : static_cast<double>(static_cast<int64_t>(v.number));
-    if (rounded != v.number)
+    // Out of range before whole-number, because 1e12 is a whole number and still cannot be an
+    // int32. Truncating it would hand back -2147483648, which is the silent-wrong-number failure
+    // this class exists to prevent, just wearing a different hat.
+    constexpr double kInt32Min = -2147483648.0;
+    constexpr double kInt32Max = 2147483647.0;
+    if (!(v.number >= kInt32Min && v.number <= kInt32Max))
+    {
+        throw TuningError("tuning key '" + std::string(key) + "' in " + v.origin + " is " +
+                          std::to_string(v.number) + ", which does not fit in a 32-bit int");
+    }
+
+    const double truncated = static_cast<double>(static_cast<int64_t>(v.number));
+    if (truncated != v.number)
     {
         throw TuningError("tuning key '" + std::string(key) + "' in " + v.origin + " is " +
                           std::to_string(v.number) + ", which is not a whole number — use GetF");
@@ -666,16 +684,23 @@ std::vector<std::string> Tuning::Keys() const
 
 std::string Tuning::Hash() const
 {
-    // Canonical form: normalised key, a type tag, then the value's raw bytes. Raw bytes rather
-    // than a printed number on purpose — a printed double loses precision at whatever the format
-    // chooses, and two values that differ below that cutoff would hash the same. The digest goes
-    // into replay files, so "close enough" is not.
+    // Canonical form, per entry: <keyLength>:<key><kindTag><payload>.
+    //
+    // Raw value bytes rather than a printed number, because any printed float has a cutoff below
+    // which two different values format identically — and they would then hash the same. The
+    // digest guards replay validity, so "close enough" is not.
+    //
+    // Length-prefixed rather than delimited, because a delimiter can appear inside a value. With
+    // a '=' and '\n' layout, {"a": "\nb=<0x02>x"} and {"a": "", "b": "x"} produce identical
+    // canonical bytes and therefore the same digest — two different tunings, one hash. A length
+    // prefix cannot be forged from inside the payload it measures.
     std::string canonical;
     canonical.reserve(values_.size() * 48u);  // literal: capacity hint, not a tunable
     for (const auto& [key, value] : values_)
     {
+        canonical += std::to_string(key.size());
+        canonical.push_back(':');
         canonical += key;
-        canonical.push_back('=');
         canonical.push_back(static_cast<char>(value.kind));
         switch (value.kind)
         {
@@ -690,10 +715,11 @@ std::string Tuning::Hash() const
             canonical.push_back(value.boolean ? '1' : '0');
             break;
         case Kind::String:
+            canonical += std::to_string(value.text.size());
+            canonical.push_back(':');
             canonical += value.text;
             break;
         }
-        canonical.push_back('\n');
     }
     return Sha256(canonical);
 }
