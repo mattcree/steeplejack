@@ -28,7 +28,7 @@ check-conventions:
 ## watch: run the sim and print what it is doing (no engine, no GPU) — TOOL-001
 ##   Not a test and not a gate: it asserts nothing and `make check` must not depend on it.
 watch: build-sim
-	@$(CXX) -std=c++20 -O2 -ISource/SteeplejackSim/Public \
+	@$(CXX) -std=c++20 -O2 -Wall -Wextra -Wconversion -Werror -ISource/SteeplejackSim/Public \
 		tools/sim_watch.cpp -L$(BUILD) -lsteeplejack_sim -o $(BUILD)/sim_watch
 	@$(BUILD)/sim_watch
 
