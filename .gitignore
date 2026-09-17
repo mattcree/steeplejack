@@ -15,6 +15,23 @@ Saved/
 build/
 cmake-build-*/
 
+# Config/ is version-controlled — see tasks/CORE-012.md — with exactly one exception.
+#
+# Config/DefaultInput.ini IS committed. It is byte-identical across machines and across editor
+# launches (verified), and it holds a real project decision: EnhancedInput as the player input
+# class, which ADR-0004's module list depends on.
+#
+# Config/DefaultEngine.ini is NOT, and this is not a preference. The AndroidFileServer engine
+# plugin — which this project does not use and never enabled; it is on by default — rewrites that
+# file on every editor launch with a freshly generated SecurityToken. Committing it means either a
+# permanently dirty working tree or a generated secret in git history, and `make wip` runs
+# `git add -A`, so the second happens by accident. It already did once, in CORE-007.
+#
+# This is an interim answer, not the right one. The right one is to disable AndroidFileServer in
+# Steeplejack.uproject and then commit the file, which CORE-012 does not own. Until then, rendering
+# settings that belong here (the TSR values in performance-budget.md) have nowhere to live.
+Config/DefaultEngine.ini
+
 # Misc
 *.tmp
 .DS_Store
