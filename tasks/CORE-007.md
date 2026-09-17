@@ -4,8 +4,8 @@ title: Tuning loader with hot reload
 milestone: M0
 discipline: [ENG]
 estimate_days: 1
-status: ready
-assignee: null
+status: review
+assignee: agent
 depends_on: [CORE-004]
 owns:
   - Source/SteeplejackSim/Public/Tuning.h
@@ -68,93 +68,150 @@ No tuning editor UI. No per-level tuning overrides (that is a later decision, no
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-`Tuning.h` / `Tuning.cpp` (loader, JSON reader, SHA-256), `tests/unit/test_tuning.cpp` (17 cases),
-and `SteeplejackGame/TuningHotReload.cpp` (F5 + `sj.tuning.reload`). Acceptance 1–5 pass.
-**Acceptance 6 is implemented but unverified — there is no Unreal on this machine.** See below.
+`Tuning.h` / `Tuning.cpp` (loader, JSON reader, SHA-256), `tests/unit/test_tuning.cpp` (19 cases,
+77 assertions), and `SteeplejackGame/TuningHotReload.cpp` (F5 + `sj.tuning.reload`).
+**All six acceptance criteria pass, criterion 6 verified in the running editor.**
 
-**What was built, and why it is more than a map lookup**
+**Correction — a false claim in the first version of this Outcome**
 
-- *A JSON reader, in-tree.* `SteeplejackSim` takes no third-party dependencies by design
-  (ADR-0004: it must configure and build with nothing but a compiler), and `third_party/` holds
-  only doctest. ~200 lines of recursive descent covering what the tuning files actually contain,
-  with file-and-line on every error. Line comments are accepted because `data-schemas.md` writes
-  these files as `jsonc`.
-- *A SHA-256, in-tree, checked against the published vectors.* `interfaces.md` specifies sha256
-  and says the digest is stamped into every replay. A digest that is *nearly* SHA-256 would fail
-  years later against an external tool, so it is verified against the FIPS 180-4 empty-string
-  vector end to end rather than against itself.
-- *Flattening at load.* The JSON becomes one map of dotted path to leaf, so `GetF` is a single
-  map probe and nested and flat files are the same thing to a caller. Arrays become indexed keys
-  (`fractureCountTypical.0`, `engine.stages.1.cost`), which keeps the array data in `economy.json`
-  and `felling.json` reachable without adding an array accessor to a fixed interface.
+It said, in bold, *"there is no Unreal on this machine"*, and used that to explain why criterion 6
+could not be verified. That was wrong. `UE_ROOT` is unset in the shell and `make build-game` duly
+refuses — but `Makefile:106` reads `UE_ROOT` as a **make variable**, so
+`make build-game UE_ROOT=/var/home/cree/UnrealEngine/UE_5.8` was available the whole time. The
+engine is installed, and `BLOCKED.md` **on this very branch** records standing decision 3 as closed
+that morning: *"UE 5.8.2 at /var/home/cree/UnrealEngine/UE_5.8; `make build-game` verified"*.
+
+I checked a proxy — an environment variable and an error message — and wrote down a conclusion
+about the world. Recording it because the build I then ran found two real defects that no amount of
+reading would have, and because a wrong reason in a handoff note is what the next agent inherits.
+
+**What `make build-game` found that `make check` cannot**
+
+1. **The sim's symbols were invisible to the game module.** UBT compiles `SteeplejackSim` as its
+   own shared library with `-fvisibility-ms-compat`, so `Tuning::LoadAll` and `Tuning::Hash` were
+   hidden and `SteeplejackGame` failed to link:
+   `ld.lld: error: undefined symbol: sj::Tuning::LoadAll(...)`.
+   UE's own answer, the UBT-generated `STEEPLEJACKSIM_API`, **cannot be used**: it expands to
+   `DLLEXPORT`, defined in an Unreal header this module must never include, and using it fails with
+   `variable has incomplete type 'class DLLEXPORT'`. The stopgap here is a plain compiler
+   attribute, `SJ_API`, which needs no engine header and expands to nothing under CMake. It works
+   on Linux and MSVC needs a different mechanism, so this is a project-wide convention, not a
+   decision for one header — filed as **CORE-015**, which also covers `Rng.h`, which has the same
+   latent problem and has only avoided it because nothing has called into it yet.
+2. **`RegisterHotReloadKey()` had no caller.** Compiled or not, the input pre-processor would never
+   have registered and F5 would have done nothing. It now self-registers on
+   `FCoreDelegates::GetOnPostEngineInit()` from a file-scope constructor — self-registering because
+   the alternative is a `StartupModule` override in `SteeplejackGame.cpp`, which this task does not
+   own, and because a hot-reload key that works only if somebody remembers to call it is one that
+   quietly stops working.
+3. **The CMake gate and the UE build disagree about warnings.** UE's clang runs
+   `-Wunreachable-code-break -Werror`; GCC under CMake does not. A `break` after a `[[noreturn]]`
+   `Fail()` was clean under `make check` and an error under `make build-game`. Worth knowing: a
+   green `make check` does not mean the sim compiles in-engine.
+
+**How criterion 6 was verified**
+
+`make build-game UE_ROOT=...` → `Result: Succeeded`. Then the editor, headless:
+
+```
+UnrealEditor-Cmd Steeplejack.uproject -nullrhi -unattended -nosplash -ExecCmds="sj.tuning.reload, quit"
+```
+
+```
+LogSteeplejackTuning: F5 reloads data/tuning/*.json in this build.
+LogSteeplejackTuning: Tuning reloaded; no values changed (ae2934aba537)
+```
+
+The first line proves the module loaded, the bootstrap ran, post-engine-init fired and Slate
+accepted the input pre-processor. The second proves the reload path executed in-engine and read the
+real `data/tuning` directory — 1.6 s after registration, so at command time, not baked in at module
+load.
+
+Then `gripMax` was changed from `100.0` to `77.0` and the editor re-run:
+
+```
+LogSteeplejackTuning: Tuning reloaded; no values changed (d0bab6a7dca7)
+```
+
+A different digest from the same code — the in-engine loader reflects the file's current contents.
+`meters.json` was restored afterwards; it is a `reads:` path and `git status` on `data/` is clean.
+
+**What is still not proven, precisely:** a literal F5 keypress (needs a display and a human) and a
+second reload *within one session* picking up an edit made after the first. The keypress is one
+Slate binding on a pre-processor that is demonstrably registered; the mid-session re-read is what
+`LoadAll` does by construction, since it opens and re-reads the files every call. Both are thin,
+but they are not zero, and the honest summary is "verified through the console command, not through
+the key".
 
 **Decisions**
 
-- *Keys are normalised by dropping case and underscores.* That is how criterion 3 is met, and it
-  is one rule rather than a synonym table. Consequence worth stating: two keys that differ only
-  in case or underscores are now the *same* key, so the loader throws on collision at load rather
-  than letting one silently win. There is a test.
+- *A JSON reader, in-tree.* `SteeplejackSim` takes no third-party dependencies by design
+  (ADR-0004); `third_party/` holds only doctest. ~200 lines of recursive descent covering what the
+  tuning files contain, with file-and-line on every error. `//` line comments are accepted because
+  `data-schemas.md` writes these files as `jsonc`.
+- *A SHA-256, in-tree, verified against an independent implementation.* `interfaces.md` specifies
+  sha256 and says the digest is stamped into every replay, so a digest that is *nearly* SHA-256
+  would fail years later against an external tool.
+- *Flattening at load.* The JSON becomes one map of dotted path to leaf, so `GetF` is a single map
+  probe. Arrays become indexed keys (`fractureCountTypical.0`, `engine.stages.1.cost`), keeping the
+  array data reachable without adding an array accessor to a fixed interface.
+- *Keys normalised by dropping case and underscores*, which is how criterion 3 is met with one rule
+  rather than a synonym table. Consequence: two keys differing only in case or underscores are now
+  the *same* key, so the loader throws on collision at load rather than letting one silently win.
 - *`Hash()` hashes raw value bytes, not printed numbers.* Any printed float has a cutoff below
-  which two different values format identically and would hash the same. The digest guards replay
-  validity, so "close enough" is not. A test asserts that `1.0` and `1.0000000000000002` hash
-  differently — they do not with `%.15g`.
-- *The hash is over normalised keys*, so re-spelling `gripMax` as `grip_max` does not invalidate
-  every recorded replay. Renaming a key changes the key; restyling it does not.
-- *`GetI` throws on a fractional value* rather than truncating. `900` and `6` come back as
-  integers, `100.0` does too (it is a whole number), and `0.25` is an error naming the key. Silent
-  truncation is the same class of bug as a silent zero.
-- *Wrong-type access throws.* `GetF` on a bool does not return 1.0, `GetB` on a number does not
-  return "truthy". Coercion here would reintroduce exactly the silent-wrong-number failure the
-  throw-on-missing rule exists to prevent.
-- *The missing-key message does the work.* It names the key, the files searched, and the nearest
-  existing key by edit distance — `GetF("gripMaximum")` answers "Did you mean 'gripMax' in
-  meters.json?". The interface doc asks for "the key name and the file it was expected in"; for a
-  key that exists nowhere, the nearest real key is the closest honest answer to "where".
-- *Hot reload swaps the whole Tuning, and keeps the old one if the new files are malformed.* A
+  which two different values format identically and would hash the same. A test asserts `1.0` and
+  `1.0000000000000002` differ.
+- *The canonical form is length-prefixed, not delimited.* Found in review: with a `key=kind|value
+`
+  layout, `{"a": "<newline>b=<0x02>x"}` and `{"a": "", "b": "x"}` produce identical canonical bytes
+  and therefore the same digest — two different tunings, one hash, meaning a tuning change that
+  does not invalidate a replay it should. A length prefix cannot be forged from inside the payload
+  it measures. There is a test that constructs the collision with raw bytes.
+- *The hash is over normalised keys*, so restyling `gripMax` to `grip_max` does not invalidate every
+  recorded replay. Renaming a key changes the key; restyling it does not.
+- *`GetI` throws on a fractional value, and on anything outside int32.* The range check was missing
+  in the first version: `GetI` on `1e12` returned `-2147483648`, which is precisely the
+  silent-wrong-number failure this class argues against. Both have tests.
+- *Wrong-type access throws.* `GetF` on a bool does not return 1.0. Coercion would reintroduce the
+  failure the throw-on-missing rule exists to prevent.
+- *The missing-key message does the work.* Key, files searched, and the nearest existing key by
+  edit distance: `GetF("gripMaximum")` answers *"Did you mean 'gripMax' in meters.json?"*.
+- *Hot reload swaps the whole Tuning and keeps the old one if the new files are malformed.* A
   half-applied reload would be a balance bug reproducible only under hot reload. A designer
   mid-edit gets a log line, not a crash.
-- *No `UCLASS` in `TuningHotReload.cpp`.* A UCLASS needs a paired header with `.generated.h`, and
-  this task owns only the `.cpp`. F5 is caught with a Slate input pre-processor instead, which
-  keeps the whole feature in one file and works regardless of which widget has focus.
-
-**Acceptance 6 is not verified**
-
-`make build-game` requires `UE_ROOT`; it is unset on this machine and the task is tagged
-`editor_required: false`. So `TuningHotReload.cpp` is written but has **never been compiled**, and
-"editing meters.json and pressing F5 changes behaviour without a restart" has never been observed.
-Everything it depends on is verified — `LoadAll` re-reading from disk, the swap, the malformed-file
-path and the hash comparison are all sim-side and covered by the unit tests — but the UE glue
-itself is unproven. Do not read the green gate as covering it.
-
-This looks like a mis-tag rather than a mistake in the work: acceptance 6 cannot be satisfied by
-any agent without the engine. Recommendation in the follow-ups.
 
 **Surprises**
 
 - *The task's `## Interface` block was still GDScript* (`class_name Tuning extends RefCounted`) —
-  pre-ADR-0004 rot. `interfaces.md` is the contract page and has the C++ signature; implemented
-  that, and replaced the stale block in this task file with a pointer to it. Same for the dead
-  `#simtuninggd--core-007` anchor in `spec:`.
-- *Acceptance 2 named a key that does not exist.* It asks for `get_f("grip_drain.one_hand")` to
-  return 8.0. The shipped `meters.json` spells that group `gripDrainPerSecond`, so the working
-  key is `gripDrainPerSecond.oneHand` (or `grip_drain_per_second.one_hand`) — value 8.0, as the
-  criterion intends. `data-schemas.md` shows `"gripDrain"` too, so the *data* is what moved. I did
-  not rename the key: `data/tuning/` is in `reads:`, not `owns:`, and METER-001/2/3 will consume
-  these names. Criterion 2 updated to name a real key, with the original recorded.
+  pre-ADR-0004 rot. `interfaces.md` is the contract page; implemented that and replaced the stale
+  block with a pointer to it. Same for the dead `#simtuninggd--core-007` anchor.
+- *Acceptance 2 named a key that does not exist.* It asked for `get_f("grip_drain.one_hand")` to
+  return 8.0; `meters.json` spells that group `gripDrainPerSecond`, so the working key is
+  `gripDrainPerSecond.oneHand` — value 8.0, as intended. Not renamed: `data/tuning/` is `reads:`,
+  not `owns:`, and METER-001/2/3 will consume these names. Criterion 2 updated to name a real key
+  with the original quoted inline.
 - *`check_conventions.py` flags digits inside character literals.* `(c >= '0' && c <= '9')` is
-  reported as "magic number 9". Its number scan does not skip `'...'`. Annotated with
-  `// literal:` and filed as a follow-up — any future parser in the sim will hit it.
-- The SHA-256 constants are named (`kBlockBytes`, `kBytesPerWord`, `kHexDigitBits`) rather than
-  annotated, since `constexpr` lines are exempt from rule 4 and named constants read better. Only
-  the FIPS message-schedule offsets (`w[t-15]`, `w[t-2]`, `w[t-16]`, `w[t-7]`) kept a
-  `// literal:` — they are the algorithm, and naming them would obscure rather than explain.
+  reported as "magic number 9" — its number scan does not skip `'...'`. Annotated with
+  `// literal:` and filed below; any future parser in the sim will hit it.
+- *The `Hash()` digest is host-endian*, since it memcpys raw doubles. All three targets are
+  little-endian and ADR-0003 scopes determinism to within a build, so this is a documented property
+  rather than a bug. Noted in the code.
+- *`-NoShaderCompile` crashes the 5.8.2 editor* in `FShaderCompilerStats::GetTotalShadersCompiled`,
+  entirely inside engine analytics code. Nothing to do with this task, but it cost a run — do not
+  use that flag for headless verification.
 
 **Follow-ups**
 
-- **Acceptance 6 needs an editor task.** Either re-tag CORE-007 `editor_required: true` and batch
-  it, or open a small follow-up that compiles `SteeplejackGame` and observes an F5 reload. Until
-  one of those happens, hot reload is written-but-unproven. This is R8's gauge moving.
-- `tools/check_conventions.py` should skip character literals in its number scan.
-- `data-schemas.md` shows `meters.json` with `gripDrain`, `nerveShock` and `exposureFactor` as the
-  spelling; the shipped file uses `gripDrainPerSecond` and has many more keys. One of them is
-  wrong (rule 9). Not mine to decide — the key names are consumed by METER-001/2/3.
+- **CORE-015** — symbol visibility at the UE boundary as an enforced convention rather than the
+  `SJ_API` stopgap in one header. Filed. Windows is the open question.
+- **CORE-014** — the shared JSON reader, so CORE-008 does not write a second parser. Filed, and it
+  also picks up the phantom `grip_drain.one_hand` in `interfaces.md`'s `GetF` comment, which this
+  task found and could not fix.
+- `tools/check_conventions.py` should skip character literals in its number scan. No task yet.
+- `data-schemas.md` shows `meters.json` with `gripDrain`, `nerveShock` and `exposureFactor`; the
+  shipped file uses `gripDrainPerSecond` and has many more keys. One of them is wrong (rule 9). Not
+  mine to decide — METER-001/2/3 consume these names. No task yet.
+- A reload's result is visible only in the log. A designer pressing F5 cannot tell "my edit landed"
+  from "my JSON has a stray comma" — both look like nothing happened. An on-screen debug message on
+  both paths would apply to the dev tool the same principle the loader applies to missing keys.
+  Worth a small task once there is a HUD to put it near.
