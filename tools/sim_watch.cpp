@@ -2,8 +2,8 @@
 //
 // This is not a test and it asserts nothing. It exists so that a human can read a tuning change as
 // *behaviour*. meters.json says one-handed grip drain is 8/s; what that means is "about twelve
-// seconds of work before you must stop and hold on", and that a belt round the stack buys
-// sixty-seven. A table cannot show you that. This can, in a second, with no engine and no GPU.
+// seconds of work before you must stop and hold on", against a hundred seconds for a belt round
+// the stack. A table cannot show you that. This can, in a second, with no engine and no GPU.
 //
 // It also exists so that "verified by running it" in a task's Outcome is a claim a reviewer can
 // check. Twice this was written citing a harness in a scratch directory, which is worth less than
@@ -17,6 +17,8 @@
 #include "Meters.h"
 #include "Tuning.h"
 
+#include <cinttypes>
+#include <cstdint>
 #include <cstdio>
 #include <filesystem>
 #include <string>
@@ -47,7 +49,9 @@ const char* StanceName(sj::Stance s)
 
 std::string Bar(float value, float max, int width)
 {
-    const int filled = (max <= 0.0f) ? 0 : static_cast<int>((value / max) * width + 0.5f);
+    const int filled = (max <= 0.0f)
+                           ? 0
+                           : static_cast<int>((value / max) * static_cast<float>(width) + 0.5f);
     std::string out;
     for (int i = 0; i < width; ++i)
     {
@@ -167,13 +171,29 @@ int main(int argc, char** argv)
                 }
                 ++totalSteps;
 
-                if (tremorStep < 0 && sj::grip::Tremor(m, tuning))
+                // The telegraph interval is from the tremor that *preceded this slip*, not from
+                // the first tremor of the session. Grip recovers, so the shake can clear and come
+                // back; latching the first one and subtracting reports an interval that never
+                // happened. Caught in review by raising gripTremorThreshold, which made the tool
+                // claim 28.62s of warning where the real figure was a few seconds.
+                if (slipStep < 0)
                 {
-                    tremorStep = totalSteps;
-                }
-                if (slipStep < 0 && sj::grip::Slipping(m))
-                {
-                    slipStep = totalSteps;
+                    if (sj::grip::Tremor(m, tuning))
+                    {
+                        if (tremorStep < 0)
+                        {
+                            tremorStep = totalSteps;
+                        }
+                    }
+                    else
+                    {
+                        tremorStep = -1;   // recovered; the next shake starts a new warning
+                    }
+
+                    if (sj::grip::Slipping(m))
+                    {
+                        slipStep = totalSteps;
+                    }
                 }
             }
 
@@ -204,8 +224,9 @@ int main(int argc, char** argv)
                     SecondsFor(slipStep - tremorStep));
     }
 
-    std::printf("\n  %lld steps = %.2fs simulated, %lld dropped, alpha %.3f\n",
-                totalSteps, SecondsFor(totalSteps), clock.DroppedSteps(),
+    std::printf("\n  %" PRId64 " steps = %.2fs simulated, %" PRId64 " dropped, alpha %.3f\n",
+                static_cast<int64_t>(totalSteps), SecondsFor(totalSteps),
+                static_cast<int64_t>(clock.DroppedSteps()),
                 static_cast<double>(clock.Alpha()));
     return 0;
 }

@@ -121,6 +121,29 @@ CORE-005's case not arithmetically self-consistent — an unreproducible "verifi
 than no claim. Rather than delete those sentences and move on, the harness is now a committed tool,
 so the next such claim is checkable by running one command.
 
+**Caught in review: the tool printed a number that never happened**
+
+The telegraph interval latched the *first tremor of the session* rather than the tremor that
+preceded the slip. Grip recovers, so the shake clears and comes back — and with
+`gripTremorThreshold` raised from 20 to 45, the tool confidently reported **28.62 s of warning**
+when the real figure was 5.62 s. Its own trace above showed the tremor clearing and grip returning
+to full in between.
+
+That is the worst possible bug for this tool specifically. Its entire purpose is that a designer
+edits `meters.json` and reads the behaviour, and the telegraph interval is the single number a
+reader would quote — into a task file, most likely, where it would then be inherited. It now clears
+the latch when the tremor clears, and reports 5.62 s for that mutation, which is exactly
+`45 / 8` = threshold over drain rate.
+
+Found by a reviewer mutating the tuning rather than reading the code. Worth noting that the tool
+passed all six acceptance criteria while carrying it: nothing in the criteria asked what happens
+when a telegraph is interrupted.
+
+**Also from review:** the `watch` recipe compiled with no warning flags at all, which is why a
+`-Wconversion` warning and a `%lld`-against-`int64_t` format mismatch went unseen in a repo whose
+library builds at `-Werror`. It now compiles at `-Wall -Wextra -Wconversion -Werror` like
+everything else.
+
 **Surprises**
 
 - *Clipped and hooked-leg have identical drain rates* (4.0/s), so the table shows both buying 25 s.
@@ -129,10 +152,25 @@ so the next such claim is checkable by running one command.
   set-up timings land, and someone reading this output today could reasonably ask why you would
   ever clip in. Worth knowing before it is shown to a playtester.
 - `ctx.workedSeconds` is advanced *by this tool*, because nothing in the sim does — see METER-001.
-  This tool is currently the only thing in the repo that feeds the cold cap.
+  An earlier draft of this Outcome said that made it "the only thing in the repo that feeds the
+  cold cap". It does not: `ctx.cold` is left false, so `MaxGrip` returns `gripMax` and the cap
+  never engages in this run. The cold cap remains entirely inert everywhere. Corrected after
+  review; the distinction matters because the first version made a known hole sound half-closed.
 - The worktree for this task was cut from `origin/main`, which did not yet carry this task's own
   file: `make land` pushes the trunk, but a task file committed directly to local `main` is not
-  pushed until the next land. Copied in. Worth knowing before it looks like a missing file.
+  pushed until the next land.
+
+**Two task files in this branch that are not this task's**
+
+Declared rather than left for review to find, since rule 3 is about declaring and not about intent:
+
+- `tasks/TOOL-001.md` — this task's own file, copied in for the reason above.
+- `tasks/CORE-016.md` — copied in because `BLOCKED.md` on this branch links to it and
+  `make check-links` fails without it. Byte-identical to main's copy, so it lands as a no-op. I
+  removed it first and put it back when the link check caught me; the link check is doing exactly
+  its job.
+
+`make land` resolves `tasks/TOOL-001.md` to the branch by design; the other is net-zero.
 
 **Follow-ups**
 
