@@ -151,8 +151,13 @@ key exists in any tuning file; `meters.json` spells that group `gripDrainPerSeco
 `gripDrainPerSecond.oneHand`.
 
 Per rule 9: **the doc was the wrong one.** The data has been `gripDrainPerSecond` since it was
-written, METER-001 now reads it under that name, and `data-schemas.md`'s example uses a third
-spelling again (`gripDrain`). CORE-007 found this and could not fix it — it does not own
+written, and `data-schemas.md`'s example uses a third spelling again (`gripDrain`) at line 132.
+
+An earlier draft of this paragraph also said "METER-001 now reads it under that name". On this
+branch METER-001 is `status: ready` with no code at all, so that was false when written — a claim
+about another work item's state, asserted without opening it, which is the fourth time this session
+and the place a wrong claim costs most. The only code reading that key on this branch is CORE-007's
+own `test_tuning.cpp`. CORE-007 found this and could not fix it — it does not own
 `interfaces.md` — and the first draft of this Outcome fixed the comment without saying which side
 was wrong, which is the half of rule 9 that actually matters.
 

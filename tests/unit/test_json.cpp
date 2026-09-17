@@ -214,11 +214,16 @@ TEST_CASE("Json: the errors that matter are rejections, not guesses")
               .find("unknown escape") != std::string::npos);
 }
 
-TEST_CASE("Json: the rejection paths the tuning reader had, which nothing else covers")
+TEST_CASE("Json: the rejection paths CORE-007's reader had, which nothing else covers")
 {
     // These three were reachable in CORE-007's reader and had no test on either side of the
     // extraction — found by a reviewer running a 50-input differential probe against main. The
     // behaviour is unchanged; what was missing was anything that would notice if it changed.
+    //
+    // Named "CORE-007's reader" and not "the tuning reader" on purpose: doctest's --test-case
+    // filter is a case-insensitive substring, so the word "tuning" in a Json case name pulls it
+    // into `make test-unit FILTER=tuning` and quietly changes the count that CORE-007's verify
+    // command reports. Which is the same mechanism this task's own Outcome spends a paragraph on.
 
     // An escape at the very end of the input, so there is no character after the backslash.
     const std::string backslash(1, char(92));
