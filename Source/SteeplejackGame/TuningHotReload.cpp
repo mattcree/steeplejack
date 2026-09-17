@@ -19,6 +19,7 @@
 #include "Misc/CoreDelegates.h"
 #include "Misc/Paths.h"
 
+#include "TuningAccess.h"
 #include "Tuning.h"
 
 #include <string>

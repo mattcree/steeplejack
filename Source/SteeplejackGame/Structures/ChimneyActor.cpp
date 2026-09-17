@@ -117,6 +117,9 @@ void AChimneyActor::Rebuild()
 		UE_LOG(LogSteeplejackStructure, Warning, TEXT("SJCHIMNEY: %s"), UTF8_TO_TCHAR(Problem.c_str()));
 	}
 
+	Loaded = Level;
+	bLoaded = true;
+
 	const sj::StructureSpec& S = Level.Structure();
 	const float HeightM = S.height;
 	if (HeightM <= 0.0f)
@@ -260,4 +263,27 @@ void AChimneyActor::Rebuild()
 		UE_LOG(LogSteeplejackStructure, Display, TEXT("SJCHIMNEY:   band %.0f-%.0fm %s"),
 			Band.from, Band.to, UTF8_TO_TCHAR(Band.type.c_str()));
 	}
+}
+
+float AChimneyActor::RadiusAtHeightMetres(float HeightMetres) const
+{
+	if (!bLoaded || BuiltHeightMetres <= 0.0f)
+	{
+		return 0.0f;
+	}
+	const sj::StructureSpec& S = Loaded.Structure();
+	const float T = FMath::Clamp(HeightMetres / BuiltHeightMetres, 0.0f, 1.0f);
+	return FMath::Lerp(S.baseRadius, S.topRadius, T);
+}
+
+FString AChimneyActor::BandTypeAtHeight(float HeightMetres) const
+{
+	if (!bLoaded)
+	{
+		return FString();
+	}
+	// BandAt throws above the structure — a height outside the stack is a caller bug there, but
+	// here it is just a climber who has run out of chimney, so clamp rather than propagate.
+	const float H = FMath::Clamp(HeightMetres, 0.0f, BuiltHeightMetres - 0.01f);
+	return FString(UTF8_TO_TCHAR(Loaded.BandAt(H).type.c_str()));
 }

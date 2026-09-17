@@ -2,6 +2,9 @@
 
 #include "SteeplejackGameMode.h"
 
+#include "Player/SteeplejackHUD.h"
+#include "Player/SteeplejackPawn.h"
+
 #include "HAL/PlatformTime.h"
 #include "Stats/Stats.h"
 
@@ -25,6 +28,9 @@ namespace
 ASteeplejackGameMode::ASteeplejackGameMode()
 {
 	PrimaryActorTick.bCanEverTick = true;
+
+	DefaultPawnClass = ASteeplejackPawn::StaticClass();
+	HUDClass = ASteeplejackHUD::StaticClass();
 	// TG_PrePhysics is the *earliest* tick group. The sim must advance before anything reads it:
 	// before physics, before actor ticks, before render. Everything downstream this frame then
 	// sees a state the sim has actually computed, rather than one a tick stale.

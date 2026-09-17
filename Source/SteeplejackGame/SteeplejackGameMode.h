@@ -22,6 +22,7 @@ class ASteeplejackGameMode : public AGameModeBase
 public:
 	ASteeplejackGameMode();
 
+
 	virtual void Tick(float DeltaSeconds) override;
 
 	/** Render interpolation factor for the current frame, in [0, 1). Presentation lerps with this. */

@@ -50,6 +50,14 @@ public:
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Steeplejack")
 	void Rebuild();
 
+	/** Outer radius of the stack at a given height, in metres. The batter. */
+	UFUNCTION(BlueprintPure, Category = "Steeplejack")
+	float RadiusAtHeightMetres(float HeightMetres) const;
+
+	/** The band type at a height, e.g. "ivy". Empty above the structure. */
+	UFUNCTION(BlueprintPure, Category = "Steeplejack")
+	FString BandTypeAtHeight(float HeightMetres) const;
+
 	/** Height of the structure last built, in metres. 0 if nothing loaded. */
 	UFUNCTION(BlueprintPure, Category = "Steeplejack")
 	float GetBuiltHeightMetres() const { return BuiltHeightMetres; }
@@ -62,6 +70,8 @@ public:
 	virtual void BeginPlay() override;
 
 private:
+	sj::LevelData Loaded;
+	bool bLoaded = false;
 	float BuiltHeightMetres = 0.0f;
 	int32 BuiltCourses = 0;
 };
