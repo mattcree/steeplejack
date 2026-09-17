@@ -180,7 +180,10 @@ is a function-local static initialised on first use, and `Reload()` calls it onl
 succeeds — so the first reload of any session builds the live Tuning from the already-current files
 and necessarily logs "no values changed". That is why both runs took that branch, and it means the
 `"Tuning reloaded: X -> Y"` branch has never executed in-engine. The behaviour is correct; the gap
-is slightly more load-bearing than it reads, and it is the reviewer's observation, not mine. The keypress is one
+is slightly more load-bearing than it reads. This surfaced during review rather than from the
+implementation, and it is the sharpest thing said about the task — both editor runs logged "no
+values changed", including the one where the file genuinely had changed, and that is the predicted
+signature rather than a coincidence. The keypress is one
 Slate binding on a pre-processor that is demonstrably registered; the mid-session re-read is what
 `LoadAll` does by construction, since it opens and re-reads the files every call. Both are thin,
 but they are not zero, and the honest summary is "verified through the console command, not through
