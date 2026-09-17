@@ -33,7 +33,11 @@
       "Bash(git merge --ff-only:*)",
       "Bash(git worktree add:*)",
       "Bash(git worktree list:*)",
-      "Bash(git ls-remote:*)"
+      "Bash(git ls-remote:*)",
+      "Bash(ss:*)",
+      "Bash(curl:*)",
+      "Bash(pgrep:*)",
+      "Bash(pkill:*)"
     ],
     "ask": [
       "Bash(gh pr:*)"
@@ -56,6 +60,16 @@
           {
             "type": "command",
             "command": "python3 .claude/hooks/git_guard.py"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/start_mcp.sh"
           }
         ]
       }
