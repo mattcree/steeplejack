@@ -60,6 +60,10 @@ float WindFactor(const MeterContext& ctx, const Tuning& t) noexcept
         return 1.0f;
     }
     // 1 + wind/ref, so still air costs nothing extra rather than costing nothing at all.
+    //
+    // Negative wind speeds clamp to zero rather than reducing the factor below 1. A wind blowing
+    // the other way is still wind; a negative here would be a bug upstream, and letting it make
+    // the climber calmer is the wrong way to surface one.
     return 1.0f + (std::max(ctx.windSpeed, 0.0f) / reference);
 }
 
@@ -134,12 +138,12 @@ bool Frozen(const Meters& m) noexcept
     return m.nerve <= 0.0f;
 }
 
-void ReduceMax(Meters& m, float amount, const Tuning& t) noexcept
+void ReduceMax(Meters& m, float delta, const Tuning& t) noexcept
 {
     (void)t;
-    // The ceiling only ever comes down within a shift, so a negative amount is ignored rather than
-    // handed back as free headroom.
-    m.nerveMax = std::max(m.nerveMax - std::max(amount, 0.0f), 0.0f);
+    // delta is signed, and the tuned penalties are negative. A positive delta is ignored: the
+    // ceiling only ever falls within a shift, so a sign error upstream cannot become free headroom.
+    m.nerveMax = std::max(m.nerveMax + std::min(delta, 0.0f), 0.0f);
     m.nerve = std::min(m.nerve, m.nerveMax);
 }
 

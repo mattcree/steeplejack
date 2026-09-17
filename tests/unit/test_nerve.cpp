@@ -248,19 +248,23 @@ TEST_CASE("Nerve: Acceptance 6: the cigarette lowers the ceiling for the rest of
     Meters m = sj::nerve::FreshShift(Tune());
     m.nerve = m.nerveMax;   // topped right up, so the clamp is observable
 
-    const float penalty = 5.0f;   // GDD: cigarette costs 5 max nerve. METER-004 applies it.
+    // Read the tuned value and pass it straight in — which is what METER-004 will do. It is
+    // stored negative (-5.0), and this asserts the obvious call is the correct one. An earlier
+    // version of ReduceMax took a positive magnitude, so this exact line was a silent no-op.
+    const float penalty = Tune().GetF("recover.cigaretteMaxNervePenalty");
+    REQUIRE(penalty < 0.0f);
     sj::nerve::ReduceMax(m, penalty, Tune());
 
-    CHECK(m.nerveMax == doctest::Approx(Tune().GetF("nerveMax") - penalty));
+    CHECK(m.nerveMax == doctest::Approx(Tune().GetF("nerveMax") + penalty));
     CHECK(m.nerve == doctest::Approx(m.nerveMax));   // current nerve comes down with the ceiling
 
     // And it stays down: stepping does not let nerve drift back above the new ceiling.
     m = Simulate(m, At(5.0f), 1.0f);
     CHECK(m.nerve <= m.nerveMax);
 
-    // The ceiling only ever falls within a shift. A negative penalty is not free headroom.
+    // The ceiling only ever falls within a shift. A positive delta is not free headroom.
     const float ceiling = m.nerveMax;
-    sj::nerve::ReduceMax(m, -50.0f, Tune());
+    sj::nerve::ReduceMax(m, 50.0f, Tune());
     CHECK(m.nerveMax == doctest::Approx(ceiling));
 }
 
@@ -312,11 +316,13 @@ TEST_CASE("Nerve: it never leaves [0, nerveMax], whatever it is fed")
     }
 }
 
-TEST_CASE("Nerve: nerve is slow and grip is fast — they are not the same meter twice")
+TEST_CASE("Nerve: at a typical exposed working point, grip is the faster meter")
 {
-    // The two-meter design only works if the timescales differ by an order of magnitude. Grip is
-    // seconds-to-minutes; nerve is minutes-to-hours. If a change ever makes nerve comparable to
-    // grip, the game has two stamina bars and an anti-pillar.
+    // The two-meter design needs the timescales to differ, and at a realistic operating point they
+    // do — about six to one. Note the wording: "six to one at this point", not "an order of
+    // magnitude always". A reviewer measured 5.99 here and 2.69 at the caps, and at a belted stance
+    // nerve drains three times FASTER than grip. See the task Outcome; the separation is a property
+    // of where you are standing, not a law.
     Meters m = sj::nerve::FreshShift(Tune());
     m.exposure = Exposure::Hanging;
 
@@ -329,4 +335,56 @@ TEST_CASE("Nerve: nerve is slow and grip is fast — they are not the same meter
 
     CHECK(nerveDrain > 0.0f);
     CHECK(gripDrain > nerveDrain * 5.0f);
+}
+
+TEST_CASE("Nerve: the result does not depend on how the caller sliced time")
+{
+    // The DoD box METER-001 ticked and this task had missed: a meter whose outcome depends on the
+    // frame rate makes a recorded replay unreproducible on another machine (ADR-0003).
+    Meters start = sj::nerve::FreshShift(Tune());
+    start.exposure = Exposure::Hanging;
+    const MeterContext ctx = At(80.0f, 10.0f);
+
+    const auto run = [&](float dt, int steps)
+    {
+        Meters m = start;
+        for (int i = 0; i < steps; ++i)
+        {
+            sj::nerve::Step(m, dt, ctx, Tune());
+        }
+        return m.nerve;
+    };
+
+    // Sixty seconds, delivered three ways.
+    CHECK(run(1.0f / 30.0f, 30 * 60) == doctest::Approx(run(1.0f / 144.0f, 144 * 60)).epsilon(0.01));
+    CHECK(run(sj::kTick, 3600) == doctest::Approx(run(1.0f / 30.0f, 30 * 60)).epsilon(0.01));
+
+    // And two steps of dt equal one step of 2*dt.
+    Meters a = start;
+    sj::nerve::Step(a, 0.1f, ctx, Tune());
+    sj::nerve::Step(a, 0.1f, ctx, Tune());
+    Meters b = start;
+    sj::nerve::Step(b, 0.2f, ctx, Tune());
+    CHECK(a.nerve == doctest::Approx(b.nerve));
+}
+
+TEST_CASE("Nerve: the same inputs always give the same result")
+{
+    Meters start = sj::nerve::FreshShift(Tune());
+    start.exposure = Exposure::Overhang;
+    const MeterContext ctx = At(75.0f, 7.0f);
+
+    CHECK(Simulate(start, ctx, 20.0f).nerve == Simulate(start, ctx, 20.0f).nerve);
+
+    Meters a = start;
+    Meters b = start;
+    for (int i = 0; i < 600; ++i)
+    {
+        sj::nerve::Step(a, sj::kTick, ctx, Tune());
+        sj::nerve::Step(b, sj::kTick, ctx, Tune());
+        REQUIRE(a.nerve == b.nerve);
+    }
+    sj::nerve::Shock(a, "startle", Tune());
+    sj::nerve::Shock(b, "startle", Tune());
+    CHECK(a.nerve == b.nerve);
 }
