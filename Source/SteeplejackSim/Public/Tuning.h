@@ -44,10 +44,12 @@
 // per translation unit and cannot come from one macro defined here. The project builds on Linux
 // today. See this task's Outcome; this needs to become a project-wide convention rather than a
 // decision made in one header.
+#ifndef SJ_API
 #if defined(__GNUC__) || defined(__clang__)
 #define SJ_API __attribute__((visibility("default")))
 #else
 #define SJ_API
+#endif
 #endif
 
 namespace sj {

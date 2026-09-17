@@ -106,8 +106,13 @@ reading would have, and because a wrong reason in a handoff note is what the nex
    quietly stops working.
 3. **The CMake gate and the UE build disagree about warnings.** UE's clang runs
    `-Wunreachable-code-break -Werror`; GCC under CMake does not. A `break` after a `[[noreturn]]`
-   `Fail()` was clean under `make check` and an error under `make build-game`. Worth knowing: a
-   green `make check` does not mean the sim compiles in-engine.
+   `Fail()` was clean under `make check` and an error under `make build-game`.
+4. **The packaged game target does not compile at all**, and this branch does not fix it — see
+   below. `make build-game` builds `SteeplejackEditor`; nothing builds `Steeplejack`.
+
+   So the lesson from 3 is bigger than it first looked. A green `make check` does not mean the sim
+   compiles in-engine, **and** a green `make build-game` does not mean it compiles for shipping.
+   There are three build configurations and two gates.
 
 **How criterion 6 was verified**
 
@@ -149,11 +154,66 @@ change makes these two diverge, replay validation is broken and `make check` wil
 that comparison belongs in CI, and there is no task for it yet.
 
 **What is still not proven, precisely:** a literal F5 keypress (needs a display and a human) and a
-second reload *within one session* picking up an edit made after the first. The keypress is one
+second reload *within one session* picking up an edit made after the first. On the second: `Live()`
+is a function-local static initialised on first use, and `Reload()` calls it only after `LoadAll`
+succeeds — so the first reload of any session builds the live Tuning from the already-current files
+and necessarily logs "no values changed". That is why both runs took that branch, and it means the
+`"Tuning reloaded: X -> Y"` branch has never executed in-engine. The behaviour is correct; the gap
+is slightly more load-bearing than it reads, and it is the reviewer's observation, not mine. The keypress is one
 Slate binding on a pre-processor that is demonstrably registered; the mid-session re-read is what
 `LoadAll` does by construction, since it opens and re-reads the files every call. Both are thin,
 but they are not zero, and the honest summary is "verified through the console command, not through
 the key".
+
+**Exceptions: correcting the record a second time**
+
+In sending this back for re-review I told the reviewer their `bEnableExceptions` finding "did not
+reproduce", on the evidence that UBT's response file for this module contains `-fexceptions`. That
+was true and the conclusion drawn from it was too narrow, in the same shape as the Unreal mistake
+above: I checked one target and reported a fact about the project.
+
+UBT forces exceptions on for **editor** targets only:
+
+```csharp
+GlobalCompileEnvironment.bEnableExceptions = Rules.bForceEnableExceptions
+    || (Rules.bCompileAgainstEditor && !Rules.bUseAutoRTFMCompiler);
+```
+
+`make build-game` builds `SteeplejackEditor`, so it passes. `Steeplejack.Target.cs` is
+`TargetType.Game`, gets `-fno-exceptions`, and fails — verified:
+
+```
+$ Build.sh Steeplejack Linux Development -project=Steeplejack.uproject
+Tuning.cpp:73:9: error: cannot use 'throw' with exceptions disabled
+  ... 17 errors generated
+Result: Failed (OtherCompilationError)
+```
+
+The project cannot currently be packaged. That is **not** this task's bug — it is `interfaces.md`'s
+throw-on-missing contract meeting UE's non-editor build configuration, and the same page contradicts
+itself about it (its `Tuning.h` section mandates throwing; its Conventions section says failures
+return a result struct). CORE-007 is simply the first task to write a `throw` that UBT ever
+compiles. Both `Steeplejack.Target.cs` and `interfaces.md` are outside this task's `owns:`, and
+changing the contract page is a breaking change by that page's own rule, so it is not an
+implementer's call. Raised as **CORE-016**, `status: blocked`, with a row in `BLOCKED.md`, three
+options and a recommendation.
+
+**Config/ — two files that should never have been in this branch**
+
+Running the editor to verify criterion 6 made it write `Config/DefaultEngine.ini` and
+`Config/DefaultInput.ini`, and `make wip` (`git add -A`) swept them into commit `b54019d`, which
+was about SHA-256 vectors. Undeclared, outside `owns:`, and content nobody chose: a generated
+`SecurityToken`, Android FileServer settings for a project with no Android target, and 91 lines of
+the engine's default input map including `DefaultPlayerInputClass`. A future input task would have
+found project input defaults already committed by a tuning loader.
+
+Removed from the branch and from disk. Caught by review, not by a gate — this is rule 3, the one
+CLAUDE.md says nothing catches but review, and it caught it.
+
+Worth passing to **CORE-012**, which exists to decide this and could not previously see the files
+because `Config/` did not exist in a fresh clone: they are pure engine boilerplate, they regenerate
+on every editor launch, and any agent verifying an editor-required task will re-trigger this. The
+generated contents are quoted above so CORE-012 no longer needs an editor to see them.
 
 **Decisions**
 
@@ -214,6 +274,8 @@ the key".
 
 **Follow-ups**
 
+- **CORE-016** — the packaged game target does not compile. Blocked on a decision; see above.
+- **CORE-012** — the `Config/` droppings, now quoted above so it does not need an editor to see them.
 - **CORE-015** — symbol visibility at the UE boundary as an enforced convention rather than the
   `SJ_API` stopgap in one header. Filed. Windows is the open question.
 - **CORE-014** — the shared JSON reader, so CORE-008 does not write a second parser. Filed, and it
