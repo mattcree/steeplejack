@@ -1,25 +1,58 @@
 {
-	"FileVersion": 3,
-	"EngineAssociation": "5.8",
-	"Category": "",
-	"Description": "A game about climbing tall things and taking them down.",
-	"Modules": [
-		{
-			"Name": "SteeplejackGame",
-			"Type": "Runtime",
-			"LoadingPhase": "Default",
-			"AdditionalDependencies": [ "Engine" ]
-		}
-	],
-	"Plugins": [
-		{ "Name": "ChaosCloth", "Enabled": true },
-		{ "Name": "GeometryCollectionPlugin", "Enabled": true },
-		{ "Name": "ControlRig", "Enabled": true },
-		{ "Name": "FullBodyIK", "Enabled": true },
-		{ "Name": "MetaSound", "Enabled": true },
-		{ "Name": "Niagara", "Enabled": true },
-		{ "Name": "EnhancedInput", "Enabled": true },
-		{ "Name": "GeometryScripting", "Enabled": true },
-		{ "Name": "ModelingToolsEditorMode", "Enabled": true }
-	]
+  "FileVersion": 3,
+  "EngineAssociation": "5.8",
+  "Category": "",
+  "Description": "A game about climbing tall things and taking them down.",
+  "Modules": [
+    {
+      "Name": "SteeplejackGame",
+      "Type": "Runtime",
+      "LoadingPhase": "Default",
+      "AdditionalDependencies": [
+        "Engine"
+      ]
+    }
+  ],
+  "Plugins": [
+    {
+      "Name": "ChaosCloth",
+      "Enabled": true
+    },
+    {
+      "Name": "GeometryCollectionPlugin",
+      "Enabled": true
+    },
+    {
+      "Name": "ControlRig",
+      "Enabled": true
+    },
+    {
+      "Name": "FullBodyIK",
+      "Enabled": true
+    },
+    {
+      "Name": "MetaSound",
+      "Enabled": true
+    },
+    {
+      "Name": "Niagara",
+      "Enabled": true
+    },
+    {
+      "Name": "EnhancedInput",
+      "Enabled": true
+    },
+    {
+      "Name": "GeometryScripting",
+      "Enabled": true
+    },
+    {
+      "Name": "ModelingToolsEditorMode",
+      "Enabled": true
+    },
+    {
+      "Name": "AndroidFileServer",
+      "Enabled": false
+    }
+  ]
 }
