@@ -64,9 +64,10 @@ Do not add the intent recorder — CORE-006 — or any gameplay.
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-`Clock.h`, `Clock.cpp`, `tests/unit/test_clock.cpp` (12 cases). Acceptance 1–3 pass. Acceptance 4
-is the UE-side `SteeplejackGameMode`, still outstanding — see below. Acceptance 5 was Godot rot and
-is struck.
+`Clock.h`, `Clock.cpp`, `tests/unit/test_clock.cpp` (13 cases), and `SteeplejackGameMode.{h,cpp}`,
+which drives the sim from Unreal's `Tick` and instruments it. **Acceptance 1–4 pass**; 4 was
+handed off unfinished at first and finished after review. Acceptance 5 was Godot rot and is struck.
+`make build-game` succeeds and the editor loads the module.
 
 **The bug this found — corrected after review, twice**
 
@@ -172,8 +173,23 @@ METER-001 branch, not this one — and internally inconsistent, since 2703 steps
 not 45.0. Both true. The claim is withdrawn rather than patched: an unreproducible "verified by
 running it" is worth less than no claim. Committing that harness is a follow-up.
 
+**`Config/` got swept in again, for the second time in one session**
+
+Launching the editor to check the module loads makes Unreal write `Config/DefaultEngine.ini` and
+`Config/DefaultInput.ini`, and `make wip` runs `git add -A`. The same thing happened in CORE-007,
+was caught in review there, and happened again here — including another freshly generated
+`SecurityToken`. Removed from the branch and from disk.
+
+Worth stating plainly: I did not learn from the first occurrence, and a second reviewer had to
+catch the identical defect. The durable fix is CORE-012's `.gitignore` rule, which exists only on
+CORE-012's branch and therefore did not protect this one. **Every editor-touching task will keep
+reproducing this until CORE-012 lands**, and there is no gate for it — this is rule 3, the one
+CLAUDE.md says only review catches. That is an argument for landing CORE-012 ahead of anything else
+that runs the editor.
+
 **Follow-ups**
 
+- **CORE-012 should land before any further editor-touching task**, for the reason above.
 - **CORE-015** is now twice-evidenced rather than once — see above.
 - A committed demo/harness tool, so "verified by running it" is reproducible by a reviewer. No task
   yet; METER-001 raises the same follow-up.

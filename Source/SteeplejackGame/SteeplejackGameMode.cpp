@@ -7,8 +7,8 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogSteeplejackSim, Log, All);
 
-// Shows up in `stat Steeplejack` alongside the engine's own counters, so the sim's cost is visible
-// next to everything it competes with rather than only in a log line.
+// Declared in STATGROUP_Game, so it appears under `stat Game` alongside the engine's own counters
+// — the sim's cost visible next to everything it competes with, rather than only in a log line.
 DECLARE_CYCLE_STAT(TEXT("Steeplejack Sim Step"), STAT_SteeplejackSimStep, STATGROUP_Game);
 
 namespace
@@ -25,8 +25,12 @@ namespace
 ASteeplejackGameMode::ASteeplejackGameMode()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	// The sim must advance before anything reads it. Tick as late as possible in the frame so
-	// input collected this frame is consumed this frame.
+	// TG_PrePhysics is the *earliest* tick group. The sim must advance before anything reads it:
+	// before physics, before actor ticks, before render. Everything downstream this frame then
+	// sees a state the sim has actually computed, rather than one a tick stale.
+	//
+	// CORE-006 will read this when deciding where intent collection goes: input must be collected
+	// before this runs, which means the input component, not a later tick group.
 	PrimaryActorTick.TickGroup = TG_PrePhysics;
 }
 
