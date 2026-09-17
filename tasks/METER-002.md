@@ -4,7 +4,7 @@ title: Nerve meter: height, wind, exposure and shocks
 milestone: M1
 discipline: [ENG]
 estimate_days: 1.5
-status: review
+status: done
 assignee: agent
 depends_on: [METER-001]
 owns:
