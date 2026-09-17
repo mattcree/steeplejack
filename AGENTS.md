@@ -49,6 +49,32 @@ most work does not need it.
 **Review is on request, not by default.** Ask for one when the thing is subtle, risky, or you are
 unsure. A second pair of eyes on a hand-rolled SHA-256 is worth it; on a terminal demo it is not.
 
+## Driving the editor: `make mcp`
+
+UE 5.8 ships Epic's experimental Model Context Protocol plugin — an MCP server running **inside the
+editor process**. `make mcp` starts a long-lived editor with it up on `http://127.0.0.1:8000/mcp`,
+and `.mcp.json` points Claude Code at it (restart Claude Code once to pick it up).
+
+This matters more than it sounds. Without it, every question about the running game costs a cold
+editor start plus a shader compile — three or four minutes — and the answer arrives as a PNG you
+have to interpret. With it, you ask:
+
+```bash
+python3 tools/mcp_call.py DescribeStack
+python3 tools/mcp_call.py SimulateGrip stance=belted bWet=true bCarryingLadder=true
+python3 tools/mcp_call.py SetBandColour BandType=ivy R=0.07 G=0.14 B=0.05
+python3 tools/mcp_call.py ReadTuning KeySubstring=gripdrain
+```
+
+`Source/SteeplejackGame/Tools/SteeplejackToolset.cpp` is where the tools live. Adding one is a
+static `UFUNCTION(meta = (AICallable))` on `USteeplejackToolset` — the registry does **not** scan
+for subclasses, so it also needs a line in `FSteeplejackGameModule::StartupModule`.
+
+Add a tool whenever you find yourself rebuilding the project to answer a question. `DescribeStack`
+exists because a colour bug cost four rebuild-and-squint cycles that one query would have settled:
+it reports which material is actually on each band, which is the thing that could not be seen from
+a screenshot.
+
 ## Verifying that it actually works
 
 Unit tests are not enough for a game. Three levels, cheapest first:

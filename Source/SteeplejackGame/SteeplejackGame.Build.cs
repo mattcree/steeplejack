@@ -25,6 +25,8 @@ public class SteeplejackGame : ModuleRules
 			"Niagara", "MetasoundEngine", "AudioMixer",
 			"UMG", "Slate", "SlateCore",
 			"ProceduralMeshComponent", "GeometryScriptingCore",
+			// Epic's experimental in-editor MCP server, so an agent can drive a running editor.
+			"ToolsetRegistry",
 		});
 	}
 }

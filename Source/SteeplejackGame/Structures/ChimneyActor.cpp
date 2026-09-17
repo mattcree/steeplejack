@@ -17,7 +17,28 @@ namespace
 	// The engine cylinder is a 100cm-diameter, 100cm-tall unit, so a scale of 1 is one metre.
 	const TCHAR* kCylinder = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
 	const TCHAR* kCube = TEXT("/Engine/BasicShapes/Cube.Cube");
+	const TCHAR* kBandMaterial = TEXT("/Game/Materials/M_Band.M_Band");
 	const TCHAR* kBasicMaterial = TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial");
+
+	// Material instance assets, built by tools/editor/make_materials.py. Loaded by name rather
+	// than tinted at runtime: a dynamic instance created in Rebuild() does not survive the actor
+	// being saved into a map and loaded back, and the symptom is a stack that logs "material=set"
+	// for every band while rendering the colours from a previous build.
+	UMaterialInterface* BandMaterial(const FString& Type)
+	{
+		FString Name = TEXT("Default");
+		if (Type == TEXT("plain"))              { Name = TEXT("Plain"); }
+		else if (Type == TEXT("ivy"))           { Name = TEXT("Ivy"); }
+		else if (Type == TEXT("existing-band")) { Name = TEXT("ExistingBand"); }
+		else if (Type == TEXT("wind-band"))     { Name = TEXT("WindBand"); }
+		else if (Type == TEXT("internal"))      { Name = TEXT("Internal"); }
+		else if (Type == TEXT("__timber"))      { Name = TEXT("Timber"); }
+		else if (Type == TEXT("__plank"))       { Name = TEXT("Plank"); }
+
+		const FString Path = FString::Printf(TEXT("/Game/Materials/MI_%s.MI_%s"), *Name, *Name);
+		return Cast<UMaterialInterface>(
+			StaticLoadObject(UMaterialInterface::StaticClass(), nullptr, *Path));
+	}
 
 	// Band colours. Not art direction — a legend. The level file says a band is ivy or a wind band
 	// and until ART-010 there is no material that shows it, so the stack is striped by band type
@@ -25,10 +46,10 @@ namespace
 	// thing and seeing grey.
 	FLinearColor ColourForBand(const FString& Type)
 	{
-		if (Type == TEXT("plain"))         { return FLinearColor(0.16f, 0.12f, 0.10f); }  // soot-dulled brick
-		if (Type == TEXT("ivy"))           { return FLinearColor(0.06f, 0.13f, 0.05f); }
-		if (Type == TEXT("existing-band")) { return FLinearColor(0.20f, 0.10f, 0.06f); }  // iron banding
-		if (Type == TEXT("wind-band"))     { return FLinearColor(0.34f, 0.32f, 0.30f); }  // bleached, up top
+		if (Type == TEXT("plain"))         { return FLinearColor(1.0f, 0.0f, 1.0f); }  // TEMP magenta probe
+		if (Type == TEXT("ivy"))           { return FLinearColor(0.07f, 0.14f, 0.05f); }  // ivy
+		if (Type == TEXT("existing-band")) { return FLinearColor(0.13f, 0.09f, 0.08f); }  // iron banding, near black
+		if (Type == TEXT("wind-band"))     { return FLinearColor(0.42f, 0.33f, 0.26f); }  // bleached by weather up top
 		if (Type == TEXT("internal"))      { return FLinearColor(0.20f, 0.20f, 0.22f); }
 		return FLinearColor(0.50f, 0.45f, 0.42f);
 	}
@@ -51,10 +72,24 @@ AChimneyActor::AChimneyActor()
 	Staging->SetupAttachment(Courses);
 	Staging->SetMobility(EComponentMobility::Movable);
 
+	for (int32 i = 0; i < kMaxBands; ++i)
+	{
+		UInstancedStaticMeshComponent* Band = CreateDefaultSubobject<UInstancedStaticMeshComponent>(
+			*FString::Printf(TEXT("Band%d"), i));
+		Band->SetupAttachment(Courses);
+		Band->SetMobility(EComponentMobility::Movable);
+		Band->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		BandCourses.Add(Band);
+	}
+
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Mesh(kCylinder);
 	if (Mesh.Succeeded())
 	{
 		Courses->SetStaticMesh(Mesh.Object);
+		for (UInstancedStaticMeshComponent* Band : BandCourses)
+		{
+			Band->SetStaticMesh(Mesh.Object);
+		}
 	}
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(kCube);
 	if (CubeMesh.Succeeded())
@@ -133,35 +168,36 @@ void AChimneyActor::Rebuild()
 
 	// A component per band, so each can carry its own colour. Made here rather than in the
 	// constructor because the number of bands is a property of the level file.
+	// tools/editor/make_materials.py builds M_Band: a VectorParameter wired to Base Color. The
+	// engine's BasicShapeMaterial does not expose base colour, which is why the first coloured
+	// render came out pastel however dark the values were set.
 	UMaterialInterface* Base = Cast<UMaterialInterface>(
-		StaticLoadObject(UMaterialInterface::StaticClass(), nullptr, kBasicMaterial));
-
-	for (UInstancedStaticMeshComponent* Old : BandCourses)
+		StaticLoadObject(UMaterialInterface::StaticClass(), nullptr, kBandMaterial));
+	if (!Base)
 	{
-		if (Old)
-		{
-			Old->DestroyComponent();
-		}
+		UE_LOG(LogSteeplejackStructure, Warning,
+			TEXT("SJCHIMNEY: %s missing — run `make materials`. Falling back to flat grey."),
+			kBandMaterial);
+		Base = Cast<UMaterialInterface>(
+			StaticLoadObject(UMaterialInterface::StaticClass(), nullptr, kBasicMaterial));
 	}
-	BandCourses.Reset();
 
 	const std::vector<sj::BandSpec>& Bands = Level.Bands();
-	for (int32 b = 0; b < static_cast<int32>(Bands.size()); ++b)
+	for (int32 b = 0; b < BandCourses.Num(); ++b)
 	{
-		UInstancedStaticMeshComponent* Comp = NewObject<UInstancedStaticMeshComponent>(this);
-		Comp->SetStaticMesh(Courses->GetStaticMesh());
-		Comp->SetMobility(EComponentMobility::Movable);
-		Comp->SetupAttachment(Courses);
-		Comp->RegisterComponent();
-
-		if (Base)
+		UInstancedStaticMeshComponent* Comp = BandCourses[b];
+		if (!Comp)
 		{
-			UMaterialInstanceDynamic* Mat = UMaterialInstanceDynamic::Create(Base, this);
-			Mat->SetVectorParameterValue(TEXT("Color"),
-				ColourForBand(UTF8_TO_TCHAR(Bands[b].type.c_str())));
-			Comp->SetMaterial(0, Mat);
+			continue;
 		}
-		BandCourses.Add(Comp);
+		Comp->ClearInstances();
+		if (b < static_cast<int32>(Bands.size()))
+		{
+			if (UMaterialInterface* M = BandMaterial(UTF8_TO_TCHAR(Bands[b].type.c_str())))
+			{
+				Comp->SetMaterial(0, M);
+			}
+		}
 	}
 
 	for (int32 i = 0; i < CourseCount; ++i)
@@ -197,6 +233,9 @@ void AChimneyActor::Rebuild()
 			Courses->AddInstance(X);
 		}
 	}
+
+	if (Ladders) { if (UMaterialInterface* M = BandMaterial(TEXT("__timber"))) { Ladders->SetMaterial(0, M); } }
+	if (Staging) { if (UMaterialInterface* M = BandMaterial(TEXT("__plank"))) { Staging->SetMaterial(0, M); } }
 
 	// Ladders lashed up the north face, in 5 m sections with a 1 m overlap — the numbers in
 	// climbing.json. This is the silhouette that says steeplejack rather than smokestack, and it

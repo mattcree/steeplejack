@@ -35,7 +35,16 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Steeplejack")
 	TObjectPtr<UInstancedStaticMeshComponent> Courses;
 
-	/** One instanced component per band, so each band can carry its own colour. */
+	/** One instanced component per band, so each band can carry its own colour.
+	 *
+	 *  A fixed set, created in the constructor. An earlier version made these with NewObject at
+	 *  runtime — which works, until the actor is saved into a map: the saved components come back
+	 *  on load carrying their old materials, and the freshly made ones render on top of them. The
+	 *  result was a stack that reported "material=set" for every band and rendered in the previous
+	 *  build's colours. Default subobjects serialise predictably and cannot double up.
+	 */
+	static constexpr int32 kMaxBands = 8;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Steeplejack")
 	TArray<TObjectPtr<UInstancedStaticMeshComponent>> BandCourses;
 

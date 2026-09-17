@@ -53,6 +53,18 @@
     {
       "Name": "AndroidFileServer",
       "Enabled": false
+    },
+    {
+      "Name": "ModelContextProtocol",
+      "Enabled": true
+    },
+    {
+      "Name": "PythonScriptPlugin",
+      "Enabled": true
+    },
+    {
+      "Name": "RemoteControl",
+      "Enabled": true
     }
   ]
 }

@@ -174,6 +174,45 @@ ue-py: ue-kill
 	@grep -E "^\[.*LogPython: (Error: )?SJ" Saved/Logs/Steeplejack.log | sed 's/.*LogPython: //' || \
 	  echo "  no SJ* output — see Saved/Logs/Steeplejack.log"
 
+## mcp: start a long-lived editor with the MCP server, in the background
+##   This is the one that changes how the project is worked on. UE 5.8 ships Epic's experimental
+##   Model Context Protocol plugin: an MCP server inside the editor process. With it up, an agent
+##   queries and drives a RUNNING editor over http://127.0.0.1:$(MCP_PORT)$(MCP_PATH) instead of
+##   cold-starting one per change -- which costs a shader compile every time and was most of the
+##   friction in this project's first night.
+##
+##   .mcp.json points Claude Code at it. Restart Claude Code once after `make mcp` to pick it up.
+MCP_PORT ?= 8000
+MCP_PATH ?= /mcp
+
+mcp: build-game ue-kill
+	@mkdir -p Saved/Logs
+	@nohup $(UE_EDITOR) $(PWD)/Steeplejack.uproject $(MAP) \
+		-RenderOffscreen -nosplash -NoSound > Saved/Logs/mcp-editor.log 2>&1 &
+	@printf "  starting editor"
+	@for i in $$(seq 1 60); do \
+		if ss -ltn 2>/dev/null | grep -q ":$(MCP_PORT)"; then echo; \
+		  echo "  MCP up on http://127.0.0.1:$(MCP_PORT)$(MCP_PATH)"; \
+		  grep -E "SJTOOLS" Saved/Logs/Steeplejack.log 2>/dev/null | tail -1; exit 0; fi; \
+		printf "."; sleep 2; \
+	done; \
+	echo; echo "  MCP did not come up — see Saved/Logs/mcp-editor.log"; exit 1
+
+## mcp-status: is the editor up and serving tools?
+mcp-status:
+	@ss -ltn 2>/dev/null | grep -q ":$(MCP_PORT)" \
+		&& echo "  MCP listening on 127.0.0.1:$(MCP_PORT)$(MCP_PATH)" \
+		|| (echo "  not running — \`make mcp\`"; exit 1)
+	@$(PY) tools/mcp_call.py list_toolsets 2>/dev/null || true
+
+## mcp-stop: shut the editor down
+mcp-stop: ue-kill
+	@echo "  editor stopped"
+
+## materials: build the band material (run once; build-map needs it)
+materials:
+	@$(MAKE) --no-print-directory ue-py SCRIPT=tools/editor/make_materials.py
+
 ## build-map: (re)generate the test map from tools/editor/build_test_map.py
 ##   Removes the .umap first: LevelEditorSubsystem.new_level() returns False if the asset exists,
 ##   and the save that follows then reports success while writing nothing.
@@ -314,5 +353,5 @@ help:
         test-coverage build-game test-automation perf-capture editor \
         board ready waves critical editor-queue human-queue stale graph new-task \
         test-tools check-verify check-blueprints install-hooks help watch ue-root \
-        play run build-map ue-py ue-kill \
+        play run build-map materials ue-py ue-kill mcp mcp-status mcp-stop \
         wt-start wip wt-status land wt-drop doctor

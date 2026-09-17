@@ -95,8 +95,18 @@ try:
     pitch = math.degrees(math.atan2(d.z, math.sqrt(d.x * d.x + d.y * d.y)))
     rot = unreal.Rotator(0.0, pitch, yaw)
 
-    start = eas.spawn_actor_from_class(unreal.PlayerStart, eye, rot)
-    start.set_actor_label("ViewPoint")
+    # The player starts on the ground at the foot of the stack, looking up at it — not floating
+    # where the establishing camera happens to be. The camera actor below keeps that framing for
+    # screenshots; the PlayerStart is where a jack actually begins a shift.
+    foot = unreal.Vector(-14 * M, -10 * M, 1.0 * M)
+    foot_d = unreal.Vector(-foot.x, -foot.y, HEIGHT_M * 0.30 * M - foot.z)
+    foot_yaw = math.degrees(math.atan2(foot_d.y, foot_d.x))
+    foot_pitch = math.degrees(math.atan2(foot_d.z, math.sqrt(foot_d.x ** 2 + foot_d.y ** 2)))
+    start = eas.spawn_actor_from_class(unreal.PlayerStart, foot,
+                                       unreal.Rotator(0.0, foot_pitch, foot_yaw))
+    start.set_actor_label("ShiftStart")
+    LOG("SJMAP: player starts at the foot, %.0fm out, looking up %.0f deg"
+        % (math.sqrt(foot.x ** 2 + foot.y ** 2) / M, foot_pitch))
 
     cam = eas.spawn_actor_from_class(unreal.CameraActor, eye, rot)
     cam.set_actor_label("ShotCamera")

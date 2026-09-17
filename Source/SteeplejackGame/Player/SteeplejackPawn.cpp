@@ -17,8 +17,10 @@ namespace
 	// Movement is deliberately crude. CLIMB-004 and PLAYER-001 own the real controller; this is
 	// enough to stand at the foot of a stack, walk to the ladder and go up it, which is what makes
 	// the meters mean anything.
-	constexpr float kWalkMetresPerSecond = 4.0f;
-	constexpr float kClimbGraceMetres = 3.5f;   // how far off the face you can be and still be on
+	// Walking is not the game, so it should not be slow: you cross the yard and start climbing.
+	// Climbing IS the game, and its rate is tuned (climbing.json), not invented here.
+	constexpr float kWalkMetresPerSecond = 9.0f;
+	constexpr float kClimbGraceMetres = 4.5f;   // how far off the face you can be and still be on
 }
 
 ASteeplejackPawn::ASteeplejackPawn()
@@ -34,6 +36,7 @@ ASteeplejackPawn::ASteeplejackPawn()
 	Camera->SetupAttachment(Capsule);
 	Camera->SetRelativeLocation(FVector(0.0f, 0.0f, 70.0f));   // eye height
 	Camera->bUsePawnControlRotation = true;
+	Camera->SetFieldOfView(70.0f);   // 90 makes everything look far away and small
 
 	bUseControllerRotationYaw = true;
 	AutoPossessPlayer = EAutoReceiveInput::Player0;
@@ -84,16 +87,20 @@ void ASteeplejackPawn::Tick(float DeltaSeconds)
 			FVector::Dist2D(Location, Axis) / kUUPerMetre;
 		bOnLadder = FlatDistM < RadiusM + kClimbGraceMetres &&
 		            HeightM < Chimney->GetBuiltHeightMetres();
-		BandName = Chimney->BandTypeAtHeight(HeightM);
+		BandName = bOnLadder ? Chimney->BandTypeAtHeight(HeightM) : FString();
 	}
 
 	// Move. On the ladder, forward climbs; on the ground, forward walks.
 	FVector Delta = FVector::ZeroVector;
 	if (bOnLadder)
 	{
-		Delta.Z = InputForward * kWalkMetresPerSecond * kUUPerMetre * DeltaSeconds;
+		// Up at the tuned climb rate; down faster, because sliding a ladder is how it is done.
+		const float Up = T.GetF("climbSpeedMetresPerSecond");
+		const float Down = T.GetF("slideSpeedMetresPerSecond");
+		const float Rate = InputForward >= 0.0f ? Up : Down;
+		Delta.Z = InputForward * Rate * kUUPerMetre * DeltaSeconds;
 		const FVector Right = FRotationMatrix(GetControlRotation()).GetScaledAxis(EAxis::Y);
-		Delta += Right * InputRight * kWalkMetresPerSecond * 0.4f * kUUPerMetre * DeltaSeconds;
+		Delta += Right * InputRight * Up * kUUPerMetre * DeltaSeconds;
 	}
 	else
 	{
