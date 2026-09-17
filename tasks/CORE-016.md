@@ -6,7 +6,7 @@ discipline: [ENG]
 estimate_days: 0.25
 status: blocked
 assignee: null
-depends_on: [CORE-007, CORE-014, CORE-015]
+depends_on: [CORE-007, CORE-014, CORE-015, TOOL-001]
 owns:
   - Source/Steeplejack.Target.cs
   - docs/03-tech/interfaces.md
