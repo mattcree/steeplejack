@@ -35,11 +35,15 @@ int StepsOverOneSecond(int fps, float seconds = 1.0f)
 
 }  // namespace
 
-TEST_CASE("Clock: Acceptance 1: one second is 60 steps at any frame rate")
+TEST_CASE("Clock: Acceptance 1: one second is 60 steps at these frame rates")
 {
     // The property that matters. A player on a 144 Hz monitor and a player on a 30 Hz one must
     // run the same number of sim steps per second of wall time, or they are playing different
     // games and neither one's replay reproduces on the other's machine.
+    //
+    // "At these frame rates", not "at any": `1.0f/fps` is not exact, so for some rates the deltas
+    // delivered in a nominal second genuinely add up to marginally under 60 ticks of real time and
+    // 59 is the correct answer. The named rates below are the ones that matter and they are exact.
     CHECK(StepsOverOneSecond(30) == 60);
     CHECK(StepsOverOneSecond(144) == 60);
     CHECK(StepsOverOneSecond(60) == 60);
@@ -57,8 +61,9 @@ TEST_CASE("Clock: a frame rate that does not divide the tick still averages out"
 
 TEST_CASE("Clock: step counts stay exact over ten seconds, not just one")
 {
-    // Float accumulation is where a fixed-step clock usually rots: each Advance subtracts a value
-    // that is not exactly representable, and the error compounds. Ten seconds is 600 steps.
+    // Not because error compounds — it does not; the float version's deficit is a fixed one-step
+    // boundary offset, not a rate. This guards the opposite risk: that the integer conversion in
+    // Advance() acquires a per-frame rounding bias, which WOULD compound. Ten seconds is 600 steps.
     CHECK(StepsOverOneSecond(60, 10.0f) == 600);
     CHECK(StepsOverOneSecond(144, 10.0f) == 600);
 }
@@ -163,6 +168,21 @@ TEST_CASE("Clock: the same delta sequence always produces the same step sequence
         }
     }
     CHECK(a.DroppedSteps() == b.DroppedSteps());
+}
+
+TEST_CASE("Clock: an absurd delta is clamped rather than overflowing the accumulator")
+{
+    // The clamp in Advance() needs a delta of ~16666 s to engage, so nothing else in this file
+    // reaches it. An uncovered branch in the one class every other test depends on is not a branch
+    // worth leaving to chance.
+    SimClock clock;
+    const int steps = clock.Advance(1e30f);
+    CHECK(steps == kMaxCatchUpSteps);
+    CHECK(clock.Alpha() >= 0.0f);
+    CHECK(clock.Alpha() < 1.0f);
+
+    // And the clock still works afterwards: the accumulator was not left holding garbage.
+    CHECK(clock.Advance(kTick) == 1);
 }
 
 TEST_CASE("Clock: Reset clears the accumulator and the dropped count")
