@@ -4,8 +4,8 @@ title: Fixed-step simulation driver with render interpolation
 milestone: M0
 discipline: [ENG]
 estimate_days: 1.5
-status: ready
-assignee: null
+status: in_progress
+assignee: agent
 depends_on: [CORE-004, CORE-007]
 owns:
   - Source/SteeplejackSim/Public/Clock.h
