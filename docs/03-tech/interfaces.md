@@ -96,13 +96,60 @@ Aggregate initialisation only. No constructors, no virtuals, no inheritance — 
 
 ---
 
+## `Json.h` — CORE-014
+
+```cpp
+class JsonError : public std::runtime_error { ... };   // carries origin and line
+
+class JsonValue {
+public:
+    enum class Kind : uint8_t { Object, Array, Number, String, Bool, Null };
+
+    static JsonValue Parse(const std::string& text, const std::string& origin);
+
+    Kind               Type() const noexcept;
+    const std::string& Origin() const noexcept;
+    std::size_t        Line() const noexcept;          // where this value started
+
+    bool             Has(std::string_view key) const noexcept;
+    const JsonValue& At(std::string_view key) const;   // object member; throws if absent
+    const JsonValue& At(std::size_t index) const;      // array element; throws if absent
+    std::size_t      Size() const noexcept;            // members or elements
+
+    double             AsNumber() const;               // throws unless Kind::Number
+    const std::string& AsString() const;               // throws unless Kind::String
+    bool               AsBool() const;                 // throws unless Kind::Bool
+
+    // Object members and array elements, in FILE order. Order is part of the contract:
+    // level bands are contiguous ranges and CORE-008 validates neighbours.
+    const std::vector<std::pair<std::string, JsonValue>>& Members() const;
+    const std::vector<JsonValue>&                         Elements() const;
+
+    // Every leaf as (dotted.path, value) — the flat view Tuning is built on.
+    void ForEachLeaf(const std::function<void(const std::string&, const JsonValue&)>&) const;
+};
+```
+
+The one JSON reader in `SteeplejackSim`. `Tuning` (CORE-007) and `LevelData` (CORE-008) both read
+through it; a second parser is how two parsers start disagreeing about what a number is.
+
+Accepts the subset the data actually uses — objects, arrays, numbers, strings, booleans, and `//`
+line comments, since `data-schemas.md` writes these files as `jsonc`. Rejects `\uXXXX` escapes
+rather than decoding UTF-16 surrogate pairs wrongly in silence. `null` **parses** to `Kind::Null`;
+whether a null is acceptable is the caller's policy, not the reader's — `Tuning` rejects one.
+
+No third-party JSON library: `SteeplejackSim` must configure and build with nothing but a compiler
+(ADR-0004).
+
+---
+
 ## `Tuning.h` — CORE-007
 
 ```cpp
 class Tuning {
 public:
     static Tuning LoadAll(const std::string& dir);     // reads data/tuning/*.json
-    float       GetF(std::string_view key) const;      // dotted: "grip_drain.one_hand"
+    float       GetF(std::string_view key) const;      // dotted: "gripDrainPerSecond.oneHand"
     int32_t     GetI(std::string_view key) const;
     bool        GetB(std::string_view key) const;
     bool        Has(std::string_view key) const noexcept;
