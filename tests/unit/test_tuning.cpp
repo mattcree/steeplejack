@@ -233,14 +233,72 @@ TEST_CASE("Tuning: a missing directory is an error, not an empty Tuning")
 
 // ---------------------------------------------------------------- Hash
 
-TEST_CASE("Tuning: the digest is a real SHA-256 (FIPS 180-4 published vectors)")
+TEST_CASE("Tuning: the digest is a real SHA-256, not something that merely looks like one")
 {
-    // Hash() is not directly fed arbitrary strings, so these go through Parse: a string value is
-    // hashed as its own bytes, which lets the published vectors be checked end to end. If this
-    // ever fails, the digest stamped into every replay file is not what it claims to be.
+    // An empty Tuning hashes an empty canonical string, so this is the FIPS 180-4 empty-message
+    // vector, checkable against `printf '' | sha256sum`. It exercises padding, and nothing else:
+    // one block, zero length field.
     const auto digestOfEmpty = Tuning::Parse("{}", "t.json").Hash();
     CHECK(digestOfEmpty == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
     CHECK(digestOfEmpty.size() == 64);
+
+    // The cases below are known answers computed by an independent SHA-256 over this class's
+    // canonical form (see Tuning::Hash). Their job is to exercise what the empty vector cannot:
+    // a non-zero length field, and block chaining across more than one 64-byte block.
+    //
+    // If you deliberately change the canonical form, these digests change and these three lines
+    // must be recomputed — that is the cost of pinning the format, and it is the point. If you
+    // did NOT change the canonical form and these fail, the SHA-256 itself is broken.
+
+    // 18 canonical bytes: one block, non-zero length field.
+    CHECK(Tuning::Parse(R"({"gripMax": 100.0})", "t.json").Hash() ==
+          "e69c435899cc88c6e10748adfdc783a2e7e5d35337e54e21eeb3b646145049a7");
+
+    // 53 canonical bytes, spanning all three value kinds, just under the 55-byte boundary where
+    // padding stops fitting in the same block.
+    CHECK(Tuning::Parse(R"({"alpha": 1.5, "beta": true, "gamma": "GBP", "delta": -30.0})",
+                        "t.json").Hash() ==
+          "45b6d8dc01e725d1e75627aff5bcce138ad27daec1686e1947383eeb139f7838");
+
+    // 192 canonical bytes: four blocks. This is the one that would catch a broken chaining loop,
+    // which the empty-string vector cannot see at all.
+    CHECK(Tuning::Parse(R"({"key00": 0.0, "key01": 1.5, "key02": 3.0, "key03": 4.5,
+                            "key04": 6.0, "key05": 7.5, "key06": 9.0, "key07": 10.5,
+                            "key08": 12.0, "key09": 13.5, "key10": 15.0, "key11": 16.5})",
+                        "t.json").Hash() ==
+          "6dbf4eec7bd9652817d594846793150a68aaf2c9dcde962e664cc78ef209fa07");
+}
+
+TEST_CASE("Tuning: a string value cannot forge an entry boundary in the canonical form")
+{
+    // Entries are length-prefixed rather than delimited. With a delimiter-based form these two
+    // different tunings produce identical canonical bytes and therefore the same digest — which
+    // would mean a tuning change that does not change the hash, and a replay that silently no
+    // longer reproduces. Length prefixes cannot be forged from inside the payload they measure.
+    // The bytes have to be raw, not escaped: the reader rejects \u escapes outright, which is
+    // what makes this hard to do by accident and easy to do on purpose.
+    const std::string kindTagForString(1, static_cast<char>(2));
+    const std::string smuggledJson = "{\"a\": \"\\n1:b" + kindTagForString + "1:x\"}";
+
+    const Tuning smuggled = Tuning::Parse(smuggledJson, "t.json");
+    const Tuning honest   = Tuning::Parse(R"({"a": "", "b": "x"})", "t.json");
+    CHECK(smuggled.Hash() != honest.Hash());
+}
+
+TEST_CASE("Tuning: GetI refuses a value that does not fit in an int32")
+{
+    const Tuning t = Tuning::Parse(R"({"huge": 1e12, "verySmall": -3e9, "fine": 900})", "t.json");
+
+    CHECK(t.GetI("fine") == 900);
+
+    // Truncating 1e12 yields -2147483648 — a plausible-looking wrong number, which is the exact
+    // failure this class exists to prevent.
+    CHECK_THROWS_AS(t.GetI("huge"), TuningError);
+    CHECK_THROWS_AS(t.GetI("verySmall"), TuningError);
+    CHECK(MessageOf([&] { (void)t.GetI("huge"); }).find("32-bit") != std::string::npos);
+
+    // Still readable as a float — the value is fine, it is just not an int32.
+    CHECK(t.GetF("huge") == doctest::Approx(1e12f));
 }
 
 TEST_CASE("Tuning: Acceptance 5: the hash is stable across loads and across key spellings")
