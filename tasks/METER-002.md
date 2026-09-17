@@ -52,14 +52,40 @@ added to `Meters.h`. All six acceptance criteria pass. 88 test cases green overa
 **The design claim, made testable**
 
 "Without nerve, a 110 m chimney plays exactly like a 12 m one." That is now a test: a minute at
-110 m costs **eleven times** the nerve a minute at 10 m does — exactly the ratio of the two height
-factors (2.75 against the 0.25 floor), because nothing else differs between the runs. If someone
-flattens the height curve, that test says so in the terms the GDD uses.
+110 m costs **eleven times** the nerve a minute at 10 m does — the ratio of the two height factors
+(2.75 against the 0.25 floor), because nothing else differs between the runs. If someone flattens
+the height curve, that test says so in the terms the GDD uses.
 
-The other structural test asserts the two meters are not the same meter twice: one-handed grip
-drain is more than five times the nerve drain of a fully exposed climber. Grip is
-seconds-to-minutes, nerve is minutes-to-hours, and if a tuning change ever collapses that gap the
-game has two stamina bars and an anti-pillar.
+Measured ratio is 10.97, 0.25% under the analytic 11.0, and a reviewer confirmed the error lives
+entirely in the low-magnitude run — subtracting 0.000875 per step from a float near 90 is about 115
+ulps and biased. The 1% epsilon leaves 4× headroom over that and would not hide a wrong factor,
+which would move it by 10% or more. (The helper runs 3599 steps rather than 3600, since
+`60.0f / kTick` truncates; both runs use the same count so the ratio is unaffected, but an earlier
+draft of this Outcome said 3600.)
+
+**The timescale separation is narrower than the GDD implies, and I overstated it.** The first draft
+of this Outcome said the two meters differ "by an order of magnitude" and repeated the GDD's
+"minutes-to-hours". Measured:
+
+| operating point | grip | nerve | ratio |
+|---|---|---|---|
+| hanging at 110 m, 12 m/s wind, one-handed | 8.0/s | 1.34/s | 6.0× |
+| at the height and wind caps, overhang | 8.0/s | 2.97/s | 2.7× |
+| at the caps, **belted** | 1.0/s | 2.97/s | **nerve is 3× faster** |
+
+Time from a fresh 90 to frozen: 600 s at 40 m on a platform in still air; 156 s at 110 m on a
+ladder; **67 s** hanging at 110 m in a 12 m/s wind; **30 s** at the caps. "Minutes-to-hours" is true
+of the bottom of the range only.
+
+This is the GDD's formula and the GDD's data transcribed faithfully, so it is not a defect in this
+task and I have not changed a tuned value. But the sentence would have been inherited and built on,
+and at a belted stance high on a stack nerve is genuinely the meter that runs out first — which may
+be the intent (the chair is safe for your hands and terrifying) or may be a number nobody checked.
+It belongs with the `bellStrike` question in **GDD-001**.
+
+The structural test remains, with its claim narrowed to what it measures: at a realistic exposed
+working point grip is about six times faster, and the comment now says that separation is a property
+of where you are standing rather than a law.
 
 **Decisions**
 
@@ -75,8 +101,13 @@ game has two stamina bars and an anti-pillar.
 - *`Step` clamps to `m.nerveMax`, not to the tuned `nerveMax`.* The cigarette lowers the ceiling
   for the rest of the shift, and nerve must not drift back above it. Tested by stepping after the
   reduction.
-- *`ReduceMax` only ever lowers.* A negative penalty is ignored rather than handed back as free
-  headroom, so a sign error upstream cannot become an exploit.
+- *`ReduceMax` takes the tuned sign.* `meters.json` stores `recover.cigaretteMaxNervePenalty` as
+  **−5.0**, so `ReduceMax(m, t.GetF("recover.cigaretteMaxNervePenalty"), t)` — the obvious call,
+  and the one METER-004 will write — does the obvious thing. An earlier version took a positive
+  magnitude and clamped negatives to zero, which made that exact line a **silent no-op**: a sign
+  error converted into no effect, in the module that spends a page explaining why silent failures
+  are unacceptable. Caught in review. The test now reads the key rather than hardcoding `5.0f`,
+  which is what would have caught it.
 - *`Frozen()` reports and does not enforce.* Nerve never kills the player; it makes them worse at
   the job, which kills them. Stepping ten more seconds at zero does nothing further — there is a
   test for that, the same shape as METER-001's `Slipping()` test, because the temptation to let a
@@ -96,10 +127,16 @@ I did not change the signature: `interfaces.md` is owned by four tasks, one of t
 changing a fixed signature mid-flight is forbidden outright. Instead the silence is bounded:
 
 - `IsKnownShock()` and `ShockAmount()` let any caller or test check, without throwing.
-- **The test reads the shock names out of the tuning data** rather than listing them, asserts all
-  nine are known to the code, and asserts each costs nerve rather than granting it. That catches
-  the realistic version of the bug — a tenth shock added to `meters.json` that nothing ever fires —
-  at test time rather than in play.
+- **The test reads the shock names out of the tuning data** rather than listing them, and asserts
+  each costs nerve rather than granting it.
+
+  A reviewer was right that I oversold what this proves. `IsKnownShock(e)` *is*
+  `Tuning::Has("nerveShock." + e)`, and the names come from `Tuning::Keys()`, so that half of the
+  loop cannot fail for any key in the data — it is close to a tautology. What it genuinely proves
+  is that key construction round-trips and that every shock is negative; the "a tenth shock nobody
+  fires" case is caught only by `REQUIRE(found.size() == 9)`. And the failure that will actually
+  cost someone — a typo'd event name at a call site — is not catchable here at all, because no
+  caller exists yet. Worth knowing before writing the first one.
 
 If the contract is ever reopened, an enum would remove the class of error entirely. Worth doing;
 not worth blocking a meter on.
@@ -122,8 +159,15 @@ not worth blocking a meter on.
 
 **Follow-ups**
 
-- The GDD's shock table needs the three missing rows, and someone should confirm `bellStrike` is
-  meant to be the worst event in the game. No task owns `03-meters-grip-nerve.md`.
+- **GDD-001** — filed, `status: blocked`, with a row in `BLOCKED.md`: the three undocumented shocks,
+  whether `bellStrike` should outrank `anchorFail`, and now also the timescale question above. A
+  reviewer was right that this belonged in a task rather than a bullet in a task about to be marked
+  done.
+- `tools/check_conventions.py` rule 10 only matches literal `.GetF("...")`, so the four
+  `exposureFactor.*` keys reached through `ExposureKeyFor()` are invisible to it. A rename in
+  `meters.json` would be `std::terminate` inside a `noexcept` function at runtime rather than a
+  check failure. Covered in practice only because the tests assert all four against literal keys —
+  coverage by luck of test shape, not by the gate. Raised in review; no task yet.
 - `nerve::Shock` should take an enum rather than a string if `interfaces.md` is reopened — see
   above. Natural fit for whoever resolves the `interfaces.md` ownership contention flagged in
   CORE-015.

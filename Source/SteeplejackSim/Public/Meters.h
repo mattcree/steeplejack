@@ -121,10 +121,21 @@ int32_t Band(float nerve, const Tuning& t) noexcept;
 // enforced — PLAYER-001 owns what "cannot climb" does.
 bool Frozen(const Meters& m) noexcept;
 
-// Permanently lower the ceiling for the rest of the shift, and bring current nerve down with it.
-// This is the cigarette: fast, works anywhere, and costs you the top of your range. The bad option
-// that is always tempting.
-void ReduceMax(Meters& m, float amount, const Tuning& t) noexcept;
+// Change the nerve ceiling for the rest of the shift, and bring current nerve down with it.
+//
+// `delta` is the **signed change**, matching how the penalty is stored: `meters.json` holds
+// `recover.cigaretteMaxNervePenalty` as `-5.0`, so the obvious call does the obvious thing:
+//
+//     nerve::ReduceMax(m, t.GetF("recover.cigaretteMaxNervePenalty"), t);
+//
+// A positive delta is ignored — the ceiling only ever falls within a shift. An earlier version took
+// a positive magnitude, which meant passing the tuned value straight in was a silent no-op: a sign
+// error converted into no effect, in the module that spends a page explaining why silent failures
+// are unacceptable. Caught in review.
+//
+// This is the cigarette: fast, works anywhere, costs you the top of your range. The bad option that
+// is always tempting.
+void ReduceMax(Meters& m, float delta, const Tuning& t) noexcept;
 
 // A fresh climber at the start of a shift: nerve at nerveStart, which is 90 and not 100, because
 // you are always slightly on edge.
