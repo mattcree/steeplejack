@@ -4,8 +4,8 @@ title: Shared JSON reader for SteeplejackSim
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.5
-status: ready
-assignee: null
+status: in_progress
+assignee: agent
 depends_on: [CORE-007, CORE-011]
 owns:
   - Source/SteeplejackSim/Public/Json.h
