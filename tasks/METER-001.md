@@ -102,13 +102,31 @@ ready. Until that lands, `interfaces.md`'s `Types.h` and `Meters.h` blocks are s
   seconds at zero and checks nothing else happens, so the meter cannot quietly grow a second
   responsibility.
 
-**The fairness contract**
+**The fairness contract — and the number METER-005 depends on**
 
-Rule 7 says every failure has a telegraph shipped in the same task. Grip's failure is the slip, and
-its telegraph is the tremor. A test asserts the tremor is set *before* the slip, that they are not
-simultaneous, and that there is real time between them — at one-handed drain, the warning arrives
-about 2.5 s before grip reaches zero. Verified in a run of the whole meter:
-`hands start to shake at t=36.0s`, `GRIP GONE at t=38.5s`.
+Rule 7 says every failure has a telegraph shipped in the same task. Grip's failure is the slip; its
+telegraph is the tremor. The tremor strictly precedes the slip in every reachable combination of
+stance and modifiers — never simultaneously.
+
+But the margin is a **range, not a number**, because modifiers multiply the drain rate. Swept over
+every stance × all 32 modifier combinations:
+
+| case | drain | tremor → slip |
+|---|---|---|
+| one hand, no modifiers | 8.0/s | **2.50 s** |
+| one hand + ladder + wet + cracked rib | 21.0/s | **0.95 s** |
+| belted, no modifiers | 1.0/s | 20.0 s |
+| bosun's chair | 0/s | never drains, so never fails |
+
+**0.95 s is the worst case, and `slipSaveWindowMs` in climbing.json is 900 ms.** The telegraph
+outlasts the slip-save window by 52 milliseconds. METER-005 must size its window against 0.95 s,
+not against the 2.5 s an unmodified one-handed climber sees. An earlier draft of this Outcome
+quoted only the 2.5 s figure, which is the most generous of 128 cases; caught in review, and it is
+the one number another task builds on.
+
+There is now a test that sweeps all of them and asserts the worst case stays above the slip-save
+window, so a tuning bump to `wet` or `crackedRib` that shrinks the warning below a reactable margin
+fails the suite instead of shipping.
 
 **Verified by running it, not only by testing it**
 
@@ -124,9 +142,26 @@ the GDD describes. The harness is scratchpad-only; making it a committed tool is
 - The cold cap is the one modifier that changes the *ceiling* rather than the rate, so recovery
   stops short of full rather than slowing. That reads exactly like cold hands and is worth keeping.
 
+**A silent hole with no owner: nothing advances `workedSeconds`**
+
+`Step` takes `const MeterContext&`, deliberately — whoever assembles the context each tick owns the
+accumulators in it. Nothing does. No task in `tasks/` owns a `Sim::Step` or the code that builds a
+`MeterContext`; I grepped for it. So `workedSeconds` is always 0, and the cold cap holds max grip at
+80 **forever** on a winter level rather than for the first two minutes.
+
+The code is right and the data is right; the integration does not exist yet. This is exactly the
+kind of failure that passes every gate — the unit tests set `workedSeconds` by hand, so they prove
+the cap works and cannot notice that nothing feeds it. Flagged loudly here and in `Meters.h` beside
+`MaxGrip`, because the winter-level design silently depends on it. It needs a task; whoever builds
+the sim's per-tick context assembly should own it.
+
 **Follow-ups**
 
 - **CORE-015** must add the two `MeterContext` fields and the five `grip::` helpers to
   `interfaces.md`. Added to its acceptance. Until then the contract page is stale.
 - METER-002 (nerve) and METER-003 (wobble) share `Meters.h`; both are unblocked by this.
 - A committed demo tool, so the sim can be watched without a scratch build. No task yet.
+- **Nothing advances `workedSeconds`** (above). The cold cap is inert until per-tick context
+  assembly exists. No task owns that. This is the most consequential follow-up here.
+- `Slipping(Meters{})` is `true`, because `Meters::grip` defaults to 0 (CORE-004's default, not
+  this task's). Noted in `Meters.h` for METER-005, which consumes `Slipping()`.
