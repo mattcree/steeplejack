@@ -158,7 +158,9 @@ int main(int argc, char** argv)
         while (totalSteps < phaseEnd)
         {
             // A real frame, as the engine hands one over. The clock decides how many sim steps
-            // that is owed — this loop never assumes.
+            // that is owed — this loop never assumes 1. It does truncate an owed batch when a
+            // phase boundary falls mid-frame, which is unreachable at 60 fps and would not be at
+            // 144; both are one follow-up. See the task file.
             const int steps = clock.Advance(1.0f / 60.0f);
             for (int i = 0; i < steps && totalSteps < phaseEnd; ++i)
             {
