@@ -4,10 +4,27 @@
 
 PY      ?= python3
 CMAKE   ?= cmake
+# Where Unreal 5.8 lives. You should not have to set this.
+#
+# Order: whatever is already in your environment or on the command line, then Makefile.local
+# (gitignored — put `UE_ROOT = /path/to/UE_5.8` there if yours is somewhere unusual), then the
+# places it is normally installed. `make ue-root` prints what was found.
+-include Makefile.local
+UE_ROOT ?= $(firstword $(wildcard \
+             $(HOME)/UnrealEngine/UE_5.8 \
+             $(HOME)/UnrealEngine/UE_5.8.2 \
+             /opt/UnrealEngine/UE_5.8 \
+             /usr/local/UnrealEngine/UE_5.8))
 UE      ?= $(UE_ROOT)/Engine/Binaries/Linux/UnrealEditor-Cmd
+UE_EDITOR ?= $(UE_ROOT)/Engine/Binaries/Linux/UnrealEditor
 BUILD   ?= build
 FILTER  ?=
 comma   := ,
+
+# `make play` knobs. MAP is what to open; PLAY_CMDS is what to do once it is open.
+MAP       ?= /Game/Maps/ShotTest
+PLAY_CMDS ?= DisableAllScreenMessages; shot showui
+PLAY_SECS ?= 90
 
 .DEFAULT_GOAL := help
 
@@ -135,9 +152,51 @@ test-coverage:
 
 # ---------------------------------------------------------------- engine (needs UE_ROOT)
 
+## ue-root: print the Unreal install this Makefile will use
+ue-root:
+	@if [ -n "$(UE_ROOT)" ]; then echo "UE_ROOT = $(UE_ROOT)"; \
+	else echo "no Unreal found. Put 'UE_ROOT = /path/to/UE_5.8' in Makefile.local, or pass UE_ROOT=..."; exit 1; fi
+
+# Unreal holds an exclusive lock on the project. A previous editor still running makes the next
+# run exit silently having done nothing, which looks exactly like a script that did not work.
+# Every editor target kills stragglers first. Learned the hard way.
+ue-kill:
+	@pkill -x UnrealEditor 2>/dev/null || true
+	@pkill -x UnrealEditor-Cmd 2>/dev/null || true
+	@for i in 1 2 3 4 5 6 7 8 9 10; do pgrep -f "Binaries/Linux/UnrealEditor" >/dev/null 2>&1 || break; sleep 1; done
+
+## ue-py: run a python script in the editor, headless.  make ue-py SCRIPT=tools/editor/foo.py
+ue-py: ue-kill
+	@test -n "$(UE_ROOT)" || (echo "no Unreal found — see \`make ue-root\`" && exit 1)
+	@test -n "$(SCRIPT)" || (echo "usage: make ue-py SCRIPT=tools/editor/foo.py" && exit 1)
+	@timeout 900 $(UE) $(PWD)/Steeplejack.uproject -run=pythonscript \
+	  -script=$(PWD)/$(SCRIPT) -unattended -nosplash -NoSound >/dev/null 2>&1 || true
+	@grep -E "^\[.*LogPython: (Error: )?SJ" Saved/Logs/Steeplejack.log | sed 's/.*LogPython: //' || \
+	  echo "  no SJ* output — see Saved/Logs/Steeplejack.log"
+
+## build-map: (re)generate the test map from tools/editor/build_test_map.py
+##   Removes the .umap first: LevelEditorSubsystem.new_level() returns False if the asset exists,
+##   and the save that follows then reports success while writing nothing.
+build-map:
+	@rm -f Content/Maps/ShotTest.umap
+	@$(MAKE) --no-print-directory ue-py SCRIPT=tools/editor/build_test_map.py
+
+## play: build, run the game headless, and write a screenshot you can actually look at
+##   The one that matters. If you changed something visual and have not looked at a frame,
+##   you have not finished. Writes Saved/Screenshots/LinuxEditor/*.png.
+play: build-game ue-kill
+	@rm -f Saved/Screenshots/LinuxEditor/*.png
+	@timeout $(PLAY_SECS) $(UE_EDITOR) $(PWD)/Steeplejack.uproject $(MAP) -game -RenderOffscreen \
+	  -unattended -nosplash -NoSound -windowed -ResX=1280 -ResY=720 \
+	  -ExecCmds="$(PLAY_CMDS)" >/dev/null 2>&1 || true
+	@$(MAKE) --no-print-directory ue-kill
+	@ls -1 Saved/Screenshots/LinuxEditor/*.png 2>/dev/null \
+	  && echo "  ^ open these" \
+	  || (echo "  no screenshot — see Saved/Logs/Steeplejack.log"; exit 1)
+
 ## build-game: compile the UE game module
 build-game:
-	@test -n "$(UE_ROOT)" || (echo "set UE_ROOT to your Unreal 5.8 install" && exit 1)
+	@test -n "$(UE_ROOT)" || (echo "no Unreal 5.8 found. Put 'UE_ROOT = /path/to/UE_5.8' in Makefile.local (gitignored), or pass UE_ROOT=... — \`make ue-root\` shows what was detected" && exit 1)
 	@$(UE_ROOT)/Engine/Build/BatchFiles/Linux/Build.sh SteeplejackEditor Linux Development \
 		-project=$(PWD)/Steeplejack.uproject
 
@@ -236,5 +295,6 @@ help:
         configure build-sim test-unit test-levels test-replay test-determinism test-perf \
         test-coverage build-game test-automation perf-capture editor \
         board ready waves critical editor-queue human-queue stale graph new-task \
-        test-tools check-verify check-blueprints install-hooks help watch \
+        test-tools check-verify check-blueprints install-hooks help watch ue-root \
+        play build-map ue-py ue-kill \
         wt-start wip wt-status land wt-drop doctor

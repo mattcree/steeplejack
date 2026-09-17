@@ -6,41 +6,67 @@ The long form is [`docs/06-workflow/`](docs/06-workflow/00-agent-workflow.md).
 ## Start here
 
 ```bash
-make ready                   # tasks you can claim right now
-make wt-start ID=CORE-003    # isolated worktree + branch, pushed immediately
-cd ../sj-core-003
-make wip                     # commit + push. Run this constantly. It is the panic button.
-make check                   # the gate (no Unreal needed). Green before handoff.
+make watch        # run the sim and watch it. One second, no engine.
+make check        # the gate: conventions, data, tests. ~1s. No engine needed.
+make play         # build the game and screenshot it. Needs Unreal; finds it itself.
+make build-game   # compile the UE modules
 ```
 
-You need `cmake`, `ninja` and a C++20 compiler for `make check`. You need **Unreal 5.8 and
-`UE_ROOT` set** only for tasks that touch `SteeplejackGame` or `Content/` — most tasks don't.
+Work on `main`. Commit often. Push when you have something that passes `make check`.
 
-Then open `tasks/<ID>.md` for the task you claimed. **It is self-contained.** Read it, read the
-`spec:` sections it names, and nothing else. If it doesn't give you what you need, that's a bug in
-the task — fix the task file and say so in the PR.
+## The workflow
 
-## The loop
+There isn't one. There is a gate.
 
 ```
-CLAIM → CONTEXT → PLAN → BUILD → VERIFY → HANDOFF → REVIEW → MERGE
+pick something -> build it -> make check -> commit -> push
 ```
 
-1. **Claim** — edit your own task file: `status: in_progress`, set `assignee`. Commit that alone.
-   One file per task, so claiming never conflicts with anyone.
-2. **Context** — the task file and its `spec:` refs. Not the whole repo.
-3. **Plan** — if `estimate_days > 1`, write 3–8 bullets into `## Plan` and commit before coding.
-4. **Build** — **only in your task's `owns:` paths**, in the worktree `wt-start` made for you.
-   Run `make wip` constantly: it commits and pushes in one command, so your work exists off this
-   disk from the first minute. See [integration](docs/06-workflow/07-integration.md).
-5. **Verify** — your task's `verify:` command, then `make check`, then the applicable sections of
-   [`definition-of-done.md`](docs/04-production/definition-of-done.md).
-6. **Handoff** — fill in `## Outcome`: what changed, decisions you made, what surprised you,
-   follow-up task IDs. Set `status: review`.
-7. **Review** — a *different* agent, against the acceptance criteria. Not against taste.
-8. **Merge** — **you do not merge.** The integrator runs `make land ID=<your-task>`, which backs up
-   your branch, rebases it onto main, re-runs the full gate on the *rebased* result, and
-   fast-forwards. One task at a time. If it conflicts, your branch is left untouched.
+That is the whole process. If `make check` is green and the thing you built does what you
+said it does, you are done.
+
+**This replaced a heavier process** — per-task git worktrees, a claim commit on the trunk, a
+mandatory review by a separate agent, a long handoff note per task, and a serialised merge queue.
+It caught real bugs. It also spent the clear majority of the effort on process, produced a
+repository with a hundred passing tests and no game in it, and generated conflicts on every single
+merge by construction. The bugs it caught were worth less than the game it did not build.
+
+What is kept, because it earns its place:
+
+- **`make check` must be green before you commit.** It is about a second. There is no excuse.
+- **The conventions in the next section are enforced by a script.** They are not style; each one
+  exists because breaking it costs a day later.
+- **Tests, for anything with a rule in it.** Not for plumbing, not for demos, not for a struct with
+  no behaviour. A test that cannot fail is worse than no test — see `make check-verify`.
+- **Write down what surprised you**, in the code, next to the thing that surprised you. Not in a
+  task file nobody opens.
+
+What is gone: worktrees, claim commits, `status:` fields, the merge queue, mandatory review,
+handoff notes. `tasks/*.md` are now **notes about intent** — read them for context, ignore the
+frontmatter. `make wt-start` and `make land` still work if you want isolation for something big;
+most work does not need it.
+
+**Review is on request, not by default.** Ask for one when the thing is subtle, risky, or you are
+unsure. A second pair of eyes on a hand-rolled SHA-256 is worth it; on a terminal demo it is not.
+
+## Verifying that it actually works
+
+Unit tests are not enough for a game. Three levels, cheapest first:
+
+```bash
+make check     # the sim's rules, headless, ~1s
+make watch     # the sim's behaviour, as text you can read
+make play      # the game, rendered to a PNG you can look at
+```
+
+`make play` is the one that matters and the one that was missing for too long. It builds the
+modules, opens a map headlessly with `-RenderOffscreen`, and writes a screenshot. If you changed
+something visual and have not looked at a frame of it, you have not finished.
+
+Levels and test maps are **generated by script** (`tools/editor/*.py`, run through
+`UnrealEditor-Cmd -run=pythonscript`), never hand-built in the editor. That is what keeps the
+project agent-executable on an engine whose asset format is binary — and it is the same reason
+`data/levels/*.json` exists.
 
 ## Orientation (first time only)
 

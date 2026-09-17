@@ -181,8 +181,29 @@ def cmd_start(tid: str) -> int:
         die(f"{wt} already exists.", f"Resume it, or `make wt-drop ID={tid}` first.")
 
     git("fetch", "origin", TRUNK, quiet=True)
+
+    # Branch from the local trunk, not origin/TRUNK.
+    #
+    # `new-task` writes the task file into the local working tree and the claim commit also goes to
+    # the local trunk, which agents cannot push (the git guard forbids it, deliberately). The trunk
+    # only reaches origin when some *other* task lands. So cutting from origin/TRUNK hands the agent
+    # a worktree in which its own task file — the one thing it is told to read first — does not
+    # exist, silently, until an unrelated merge happens to flush the trunk.
+    #
+    # `land` already rebases onto the local trunk for the same underlying reason (SETUP-005), so
+    # this makes start and land agree about what the trunk is. Branching from local also means the
+    # worktree carries every landed task, which is what `make validate` and `make check-links`
+    # expect.
+    base = TRUNK
+    if not git("rev-parse", "--verify", "--quiet", TRUNK, check=False, quiet=True):
+        base = f"origin/{TRUNK}"   # fresh clone with no local trunk ref yet
+
+    ahead = git("rev-list", "--count", f"origin/{TRUNK}..{base}", check=False, quiet=True)
     print(f"creating worktree {C['dim']}{wt}{C['off']} on branch {C['bold']}{br}{C['off']}")
-    git("worktree", "add", "-b", br, wt, f"origin/{TRUNK}")
+    if ahead and ahead != "0":
+        print(f"       {C['dim']}from local {TRUNK}, {ahead} commit(s) ahead of origin "
+              f"— they land with the next `make land`{C['off']}")
+    git("worktree", "add", "-b", br, wt, base)
 
     # rerere remembers conflict resolutions, so the same conflict is only solved once.
     git("config", "rerere.enabled", "true", cwd=wt)

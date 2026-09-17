@@ -15,6 +15,9 @@ Saved/
 build/
 cmake-build-*/
 
+# Per-machine Makefile overrides (UE_ROOT and the like). See the Makefile header.
+Makefile.local
+
 # Misc
 *.tmp
 .DS_Store
