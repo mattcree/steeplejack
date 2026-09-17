@@ -4,7 +4,7 @@ title: A terminal harness for watching the sim run
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.25
-status: review
+status: done
 assignee: agent
 depends_on: [CORE-005, CORE-007, CORE-011, METER-001, TEST-003]
 owns:
