@@ -4,13 +4,14 @@ title: Grip meter and the five stances
 milestone: M1
 discipline: [ENG]
 estimate_days: 1.5
-status: in_progress
-assignee: agent
-depends_on: [CORE-007]
+status: ready
+assignee: null
+depends_on: [CORE-004, CORE-007, CORE-011]
 owns:
   - Source/SteeplejackSim/Public/Meters.h
   - Source/SteeplejackSim/Private/MetersGrip.cpp
   - tests/unit/test_grip.cpp
+  - Source/SteeplejackSim/Public/Types.h
 spec:
   - docs/03-tech/interfaces.md#simmeters_gripgd-simmeters_nervegd-simwobblegd--meter-0123
   - docs/01-gdd/03-meters-grip-nerve.md#grip--the-short-meter

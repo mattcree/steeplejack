@@ -98,6 +98,19 @@ struct MeterContext
     float       height{}, windSpeed{};
     bool        carryingLadder{}, wet{}, cold{}, gloves{};
     const char* injury{""};   // "" | "cracked_rib" | "bad_ankle"
+
+    // True while a hand is off the ladder — that is, while the player is *working*. Grip drains
+    // only then, and recovers only when it is false; see 03-meters-grip-nerve.md. It defaults to
+    // false so a zero-initialised context describes someone holding on with both hands, which is
+    // the safe reading: a default that meant "working" would drain a climber nobody is moving.
+    //
+    // Added by METER-001. The interfaces doc fixed MeterContext before any meter existed and had
+    // no way to express this, so grip could only ever drain and never recover.
+    bool        working{};
+
+    // Seconds of work done this shift. Only the cold cap reads it: max grip is held at
+    // gripModifiers.coldMaxCap until coldWarmupSeconds of work have been done.
+    float       workedSeconds{};
 };
 
 // One hammer blow's effect on a joint. `seated` is the terminal success; `bent` is the
