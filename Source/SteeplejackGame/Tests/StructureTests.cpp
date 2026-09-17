@@ -138,17 +138,36 @@ bool FSJChimneyBuildsFromLevel::RunTest(const FString&)
 	TestEqual(TEXT("built height matches the level file"),
 		Chimney->GetBuiltHeightMetres(), Level.TotalHeight());
 	TestTrue(TEXT("built some courses"), Chimney->GetCourseCount() > 0);
-	TestEqual(TEXT("instance count matches course count"),
-		Chimney->Courses->GetInstanceCount(), Chimney->GetCourseCount());
+	// Courses live in per-band components now, so count across all of them.
+	int32 Instances = Chimney->Courses->GetInstanceCount();
+	for (UInstancedStaticMeshComponent* Comp : Chimney->BandCourses)
+	{
+		Instances += Comp ? Comp->GetInstanceCount() : 0;
+	}
+	TestEqual(TEXT("instance count matches course count"), Instances, Chimney->GetCourseCount());
+	TestEqual(TEXT("one component per band"),
+		Chimney->BandCourses.Num(), static_cast<int32>(Level.Bands().size()));
+	TestTrue(TEXT("ladders were placed"), Chimney->Ladders->GetInstanceCount() > 0);
 
 	// The stack must actually occupy the height it claims: bottom instance near the ground, top
 	// instance near the top. A chimney of the right course count in the wrong place renders as a
 	// perfectly plausible screenshot.
-	FTransform First, Last;
-	Chimney->Courses->GetInstanceTransform(0, First);
-	Chimney->Courses->GetInstanceTransform(Chimney->GetCourseCount() - 1, Last);
-	const float TopZMetres = Last.GetLocation().Z / 100.0f;
-	TestTrue(TEXT("bottom course is near the ground"), First.GetLocation().Z < 500.0f);
+	// The stack must occupy the height it claims. A chimney of the right course count in the wrong
+	// place renders as a perfectly plausible screenshot.
+	float LowestZ = TNumericLimits<float>::Max();
+	float HighestZ = TNumericLimits<float>::Lowest();
+	for (UInstancedStaticMeshComponent* Comp : Chimney->BandCourses)
+	{
+		for (int32 i = 0; Comp && i < Comp->GetInstanceCount(); ++i)
+		{
+			FTransform X;
+			Comp->GetInstanceTransform(i, X);
+			LowestZ = FMath::Min(LowestZ, static_cast<float>(X.GetLocation().Z));
+			HighestZ = FMath::Max(HighestZ, static_cast<float>(X.GetLocation().Z));
+		}
+	}
+	TestTrue(TEXT("bottom course is near the ground"), LowestZ < 500.0f);
+	const float TopZMetres = HighestZ / 100.0f;
 	TestTrue(TEXT("top course reaches the stated height"),
 		TopZMetres > Level.TotalHeight() * 0.9f && TopZMetres <= Level.TotalHeight());
 

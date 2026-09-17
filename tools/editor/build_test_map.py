@@ -49,6 +49,14 @@ try:
     if HEIGHT_M <= 0.0:
         raise RuntimeError("ChimneyActor built nothing — is data/levels/06-waterside.json readable?")
 
+    # A person, 1.8 m, at the foot of the stack. Seventy metres means nothing without one.
+    capsule = unreal.load_asset("/Engine/BasicShapes/Cylinder.Cylinder")
+    jack = movable(eas.spawn_actor_from_class(
+        unreal.StaticMeshActor, unreal.Vector(6 * M, -2 * M, 0.9 * M), unreal.Rotator(0, 0, 0)))
+    jack.set_actor_label("JackForScale")
+    jack.static_mesh_component.set_static_mesh(capsule)
+    jack.set_actor_scale3d(unreal.Vector(0.45, 0.45, 1.8))
+
     plane = unreal.load_asset("/Engine/BasicShapes/Plane.Plane")
     g = movable(eas.spawn_actor_from_class(unreal.StaticMeshActor, unreal.Vector(0, 0, 0),
                                            unreal.Rotator(0, 0, 0)))
@@ -80,8 +88,8 @@ try:
 
     # Where the camera stands. A PlayerStart, because `-game` ignores the editor viewport camera
     # and drops the default pawn at the origin — inside the chimney, looking at black.
-    eye = unreal.Vector(-52 * M, -34 * M, 26 * M)
-    look = unreal.Vector(0, 0, HEIGHT_M * 0.45 * M)
+    eye = unreal.Vector(-58 * M, -44 * M, 20 * M)
+    look = unreal.Vector(0, 0, HEIGHT_M * 0.50 * M)
     d = unreal.Vector(look.x - eye.x, look.y - eye.y, look.z - eye.z)
     yaw = math.degrees(math.atan2(d.y, d.x))
     pitch = math.degrees(math.atan2(d.z, math.sqrt(d.x * d.x + d.y * d.y)))

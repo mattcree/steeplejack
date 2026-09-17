@@ -35,6 +35,17 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Steeplejack")
 	TObjectPtr<UInstancedStaticMeshComponent> Courses;
 
+	/** One instanced component per band, so each band can carry its own colour. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Steeplejack")
+	TArray<TObjectPtr<UInstancedStaticMeshComponent>> BandCourses;
+
+	/** Ladder sections lashed up the side, and the staging they land on. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Steeplejack")
+	TObjectPtr<UInstancedStaticMeshComponent> Ladders;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Steeplejack")
+	TObjectPtr<UInstancedStaticMeshComponent> Staging;
+
 	/** Rebuild from the level file. Safe to call again; clears first. */
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Steeplejack")
 	void Rebuild();

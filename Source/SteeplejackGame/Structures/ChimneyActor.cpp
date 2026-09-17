@@ -1,6 +1,8 @@
 #include "Structures/ChimneyActor.h"
 
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "Misc/Paths.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -14,6 +16,22 @@ namespace
 
 	// The engine cylinder is a 100cm-diameter, 100cm-tall unit, so a scale of 1 is one metre.
 	const TCHAR* kCylinder = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
+	const TCHAR* kCube = TEXT("/Engine/BasicShapes/Cube.Cube");
+	const TCHAR* kBasicMaterial = TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial");
+
+	// Band colours. Not art direction — a legend. The level file says a band is ivy or a wind band
+	// and until ART-010 there is no material that shows it, so the stack is striped by band type
+	// instead. Looking at the thing and seeing the data is worth more right now than looking at the
+	// thing and seeing grey.
+	FLinearColor ColourForBand(const FString& Type)
+	{
+		if (Type == TEXT("plain"))         { return FLinearColor(0.16f, 0.12f, 0.10f); }  // soot-dulled brick
+		if (Type == TEXT("ivy"))           { return FLinearColor(0.06f, 0.13f, 0.05f); }
+		if (Type == TEXT("existing-band")) { return FLinearColor(0.20f, 0.10f, 0.06f); }  // iron banding
+		if (Type == TEXT("wind-band"))     { return FLinearColor(0.34f, 0.32f, 0.30f); }  // bleached, up top
+		if (Type == TEXT("internal"))      { return FLinearColor(0.20f, 0.20f, 0.22f); }
+		return FLinearColor(0.50f, 0.45f, 0.42f);
+	}
 }
 
 AChimneyActor::AChimneyActor()
@@ -25,10 +43,24 @@ AChimneyActor::AChimneyActor()
 	Courses->SetMobility(EComponentMobility::Movable);   // no lightmap build in a headless pass
 	Courses->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 
+	Ladders = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Ladders"));
+	Ladders->SetupAttachment(Courses);
+	Ladders->SetMobility(EComponentMobility::Movable);
+
+	Staging = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Staging"));
+	Staging->SetupAttachment(Courses);
+	Staging->SetMobility(EComponentMobility::Movable);
+
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Mesh(kCylinder);
 	if (Mesh.Succeeded())
 	{
 		Courses->SetStaticMesh(Mesh.Object);
+	}
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(kCube);
+	if (CubeMesh.Succeeded())
+	{
+		Ladders->SetStaticMesh(CubeMesh.Object);
+		Staging->SetStaticMesh(CubeMesh.Object);
 	}
 }
 
@@ -54,6 +86,13 @@ void AChimneyActor::Rebuild()
 		return;
 	}
 	Courses->ClearInstances();
+	for (UInstancedStaticMeshComponent* Comp : BandCourses)
+	{
+		if (Comp)
+		{
+			Comp->ClearInstances();
+		}
+	}
 	BuiltHeightMetres = 0.0f;
 	BuiltCourses = 0;
 
@@ -89,6 +128,39 @@ void AChimneyActor::Rebuild()
 	const int32 CourseCount = FMath::Max(1, FMath::RoundToInt(HeightM * CoursesPerMetre));
 	const float CourseH = HeightM / static_cast<float>(CourseCount);
 
+	// A component per band, so each can carry its own colour. Made here rather than in the
+	// constructor because the number of bands is a property of the level file.
+	UMaterialInterface* Base = Cast<UMaterialInterface>(
+		StaticLoadObject(UMaterialInterface::StaticClass(), nullptr, kBasicMaterial));
+
+	for (UInstancedStaticMeshComponent* Old : BandCourses)
+	{
+		if (Old)
+		{
+			Old->DestroyComponent();
+		}
+	}
+	BandCourses.Reset();
+
+	const std::vector<sj::BandSpec>& Bands = Level.Bands();
+	for (int32 b = 0; b < static_cast<int32>(Bands.size()); ++b)
+	{
+		UInstancedStaticMeshComponent* Comp = NewObject<UInstancedStaticMeshComponent>(this);
+		Comp->SetStaticMesh(Courses->GetStaticMesh());
+		Comp->SetMobility(EComponentMobility::Movable);
+		Comp->SetupAttachment(Courses);
+		Comp->RegisterComponent();
+
+		if (Base)
+		{
+			UMaterialInstanceDynamic* Mat = UMaterialInstanceDynamic::Create(Base, this);
+			Mat->SetVectorParameterValue(TEXT("Color"),
+				ColourForBand(UTF8_TO_TCHAR(Bands[b].type.c_str())));
+			Comp->SetMaterial(0, Mat);
+		}
+		BandCourses.Add(Comp);
+	}
+
 	for (int32 i = 0; i < CourseCount; ++i)
 	{
 		// Radius interpolates base to top across the whole stack — the batter. Sampled at the
@@ -96,12 +168,66 @@ void AChimneyActor::Rebuild()
 		// consistently fat or thin.
 		const float T = (static_cast<float>(i) + 0.5f) / static_cast<float>(CourseCount);
 		const float Radius = FMath::Lerp(S.baseRadius, S.topRadius, T);
-		const float CentreZ = (static_cast<float>(i) * CourseH + CourseH * 0.5f) * kUUPerMetre;
+		const float MidM = static_cast<float>(i) * CourseH + CourseH * 0.5f;
 
 		FTransform X;
-		X.SetLocation(FVector(0.0f, 0.0f, CentreZ));
+		X.SetLocation(FVector(0.0f, 0.0f, MidM * kUUPerMetre));
 		X.SetScale3D(FVector(Radius * 2.0f, Radius * 2.0f, CourseH));
-		Courses->AddInstance(X);
+
+		// Put the course in its band's component. BandAt throws above the structure; the middle of
+		// a course is always inside it, so this cannot.
+		int32 BandIndex = 0;
+		for (int32 b = 0; b < static_cast<int32>(Bands.size()); ++b)
+		{
+			if (MidM >= Bands[b].from && MidM < Bands[b].to)
+			{
+				BandIndex = b;
+				break;
+			}
+		}
+		if (BandCourses.IsValidIndex(BandIndex) && BandCourses[BandIndex])
+		{
+			BandCourses[BandIndex]->AddInstance(X);
+		}
+		else
+		{
+			Courses->AddInstance(X);
+		}
+	}
+
+	// Ladders lashed up the north face, in 5 m sections with a 1 m overlap — the numbers in
+	// climbing.json. This is the silhouette that says steeplejack rather than smokestack, and it
+	// is what the player will actually be standing on.
+	if (Ladders)
+	{
+		Ladders->ClearInstances();
+		constexpr float kSectionM = 5.0f;
+		constexpr float kOverlapM = 1.0f;
+		constexpr float kRise = kSectionM - kOverlapM;
+		const int32 Sections = FMath::CeilToInt(HeightM / kRise);
+		for (int32 i = 0; i < Sections; ++i)
+		{
+			const float FootM = static_cast<float>(i) * kRise;
+			const float MidM = FMath::Min(FootM + kSectionM * 0.5f, HeightM);
+			const float T = FMath::Clamp(MidM / HeightM, 0.0f, 1.0f);
+			const float Radius = FMath::Lerp(S.baseRadius, S.topRadius, T);
+
+			FTransform X;
+			X.SetLocation(FVector(-(Radius + 0.25f) * kUUPerMetre, 0.0f, MidM * kUUPerMetre));
+			X.SetScale3D(FVector(0.12f, 0.45f, kSectionM));   // metres: a plank-width ladder
+			Ladders->AddInstance(X);
+		}
+	}
+
+	// Staging at the top: the platform a jack actually works from.
+	if (Staging)
+	{
+		Staging->ClearInstances();
+		const float TopRadius = S.topRadius;
+		FTransform X;
+		X.SetLocation(FVector(0.0f, 0.0f, (HeightM + 0.15f) * kUUPerMetre));
+		X.SetScale3D(FVector((TopRadius + 1.2f) * 2.0f, (TopRadius + 1.2f) * 2.0f, 0.3f));
+		Staging->AddInstance(X);
 	}
 
 	BuiltHeightMetres = HeightM;
@@ -112,6 +238,22 @@ void AChimneyActor::Rebuild()
 		UTF8_TO_TCHAR(Level.Id().c_str()), UTF8_TO_TCHAR(Level.Archetype().c_str()),
 		HeightM, CourseCount, S.baseRadius, S.topRadius,
 		static_cast<int32>(Level.Bands().size()), static_cast<int32>(Problems.size()));
+
+	int32 Total = Courses->GetInstanceCount();
+	for (int32 b = 0; b < BandCourses.Num(); ++b)
+	{
+		const int32 N = BandCourses[b] ? BandCourses[b]->GetInstanceCount() : -1;
+		Total += FMath::Max(0, N);
+		UE_LOG(LogSteeplejackStructure, Display,
+			TEXT("SJCHIMNEY:   bandcomp %d instances=%d material=%s"), b, N,
+			(BandCourses[b] && BandCourses[b]->GetMaterial(0)) ? TEXT("set") : TEXT("NONE"));
+	}
+	UE_LOG(LogSteeplejackStructure, Display,
+		TEXT("SJCHIMNEY:   totals: banded=%d loose=%d ladders=%d staging=%d basemat=%s"),
+		Total, Courses->GetInstanceCount(),
+		Ladders ? Ladders->GetInstanceCount() : -1,
+		Staging ? Staging->GetInstanceCount() : -1,
+		Base ? TEXT("loaded") : TEXT("NULL"));
 
 	for (const sj::BandSpec& Band : Level.Bands())
 	{

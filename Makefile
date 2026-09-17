@@ -219,9 +219,17 @@ test-automation: build-game ue-kill
 perf-capture:
 	@$(PY) tools/perf_capture.py
 
-## editor: open the Unreal editor
-editor:
-	@$(UE_ROOT)/Engine/Binaries/Linux/UnrealEditor $(PWD)/Steeplejack.uproject
+## run: play the game in a window, on your screen, with a keyboard
+##   This is the one you want. `make play` is the headless one: it renders a frame to a PNG and
+##   exits, which is what CI and an agent need and is no use to a human.
+run: build-game ue-kill
+	@echo "  opening $(MAP) — close the window or press Esc to quit"
+	@$(UE_EDITOR) $(PWD)/Steeplejack.uproject $(MAP) -game \
+		-windowed -ResX=1600 -ResY=900 -NoSound
+
+## editor: open the Unreal editor on the test map
+editor: build-game ue-kill
+	@$(UE_EDITOR) $(PWD)/Steeplejack.uproject $(MAP)
 
 # ---------------------------------------------------------------- parallel work
 # Parallel generation, sequential merging. See docs/06-workflow/07-integration.md
@@ -306,5 +314,5 @@ help:
         test-coverage build-game test-automation perf-capture editor \
         board ready waves critical editor-queue human-queue stale graph new-task \
         test-tools check-verify check-blueprints install-hooks help watch ue-root \
-        play build-map ue-py ue-kill \
+        play run build-map ue-py ue-kill \
         wt-start wip wt-status land wt-drop doctor
