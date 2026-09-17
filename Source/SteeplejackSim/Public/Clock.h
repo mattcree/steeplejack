@@ -63,7 +63,7 @@ private:
     // One tick is exactly this many accumulator units. Large enough that converting a frame delta
     // to units rounds to well under a microsecond of error, small enough that an int64 cannot
     // overflow in any session length that matters.
-    static constexpr int64_t kUnitsPerTick = 1000000;
+    static constexpr int64_t kUnitsPerTick = 1000000;  // literal: the unit scale itself, not a tunable
 
     float   tick_;
     int64_t accumulator_{};
