@@ -25,6 +25,13 @@ ci: check check-verify test-tools check-blueprints test-levels test-replay test-
 check-conventions:
 	@$(PY) tools/check_conventions.py
 
+## watch: run the sim and print what it is doing (no engine, no GPU) — TOOL-001
+##   Not a test and not a gate: it asserts nothing and `make check` must not depend on it.
+watch: build-sim
+	@$(CXX) -std=c++20 -O2 -ISource/SteeplejackSim/Public \
+		tools/sim_watch.cpp -L$(BUILD) -lsteeplejack_sim -o $(BUILD)/sim_watch
+	@$(BUILD)/sim_watch
+
 ## test-tools: the checkers and the worktree tool have tests (rule: no untested rules)
 test-tools:
 	@$(PY) tools/test_conventions.py
@@ -229,5 +236,5 @@ help:
         configure build-sim test-unit test-levels test-replay test-determinism test-perf \
         test-coverage build-game test-automation perf-capture editor \
         board ready waves critical editor-queue human-queue stale graph new-task \
-        test-tools check-verify check-blueprints install-hooks help \
+        test-tools check-verify check-blueprints install-hooks help watch \
         wt-start wip wt-status land wt-drop doctor
