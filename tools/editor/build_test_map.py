@@ -34,21 +34,20 @@ try:
     LOG("SJMAP: new level %s" % MAP)
 
     M = 100.0                      # unreal units per metre
-    HEIGHT_M, BASE_R, TOP_R = 70.0, 3.2, 1.9      # 06-waterside.json
-    COURSES = 28
-    course_h = HEIGHT_M / COURSES
 
-    cyl = unreal.load_asset("/Engine/BasicShapes/Cylinder.Cylinder")
-    for i in range(COURSES):
-        t = (i + 0.5) / COURSES
-        r = BASE_R * (1.0 - t) + TOP_R * t
-        a = movable(eas.spawn_actor_from_class(
-            unreal.StaticMeshActor, unreal.Vector(0, 0, (i * course_h + course_h * 0.5) * M),
-            unreal.Rotator(0, 0, 0)))
-        a.set_actor_label("Course_%02d" % i)
-        a.static_mesh_component.set_static_mesh(cyl)
-        a.set_actor_scale3d(unreal.Vector(r * 2.0, r * 2.0, course_h))
-    LOG("SJMAP: %d courses, %.0fm" % (COURSES, HEIGHT_M))
+    # The stack itself is NOT built here. AChimneyActor reads data/levels/*.json through
+    # sj::LevelData and generates the courses at runtime — rule 3, and it means the thing you look
+    # at is the thing the sim thinks the level is, rather than a second copy of it baked into a
+    # .umap. This script only places the actor and everything around it.
+    chimney = eas.spawn_actor_from_class(
+        unreal.load_class(None, "/Script/SteeplejackGame.ChimneyActor"),
+        unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0))
+    chimney.set_actor_label("Chimney")
+    HEIGHT_M = chimney.get_built_height_metres()
+    LOG("SJMAP: chimney actor -> %.1fm in %d courses"
+        % (HEIGHT_M, chimney.get_course_count()))
+    if HEIGHT_M <= 0.0:
+        raise RuntimeError("ChimneyActor built nothing — is data/levels/06-waterside.json readable?")
 
     plane = unreal.load_asset("/Engine/BasicShapes/Plane.Plane")
     g = movable(eas.spawn_actor_from_class(unreal.StaticMeshActor, unreal.Vector(0, 0, 0),
@@ -81,7 +80,7 @@ try:
 
     # Where the camera stands. A PlayerStart, because `-game` ignores the editor viewport camera
     # and drops the default pawn at the origin — inside the chimney, looking at black.
-    eye = unreal.Vector(-95 * M, -60 * M, 22 * M)
+    eye = unreal.Vector(-52 * M, -34 * M, 26 * M)
     look = unreal.Vector(0, 0, HEIGHT_M * 0.45 * M)
     d = unreal.Vector(look.x - eye.x, look.y - eye.y, look.z - eye.z)
     yaw = math.degrees(math.atan2(d.y, d.x))
