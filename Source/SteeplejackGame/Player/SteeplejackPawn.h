@@ -20,6 +20,7 @@ class UCameraComponent;
 class UCapsuleComponent;
 class USpringArmComponent;
 class UStaticMeshComponent;
+class UPoseableMeshComponent;
 
 UCLASS()
 class ASteeplejackPawn : public APawn
@@ -49,12 +50,14 @@ public:
 	// A blockout of primitives, not a character. There is no rig and no animator, and a placeholder
 	// that pretended to be a person would be harder to replace than one that plainly is not.
 	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<USceneComponent> Body;
-	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<UStaticMeshComponent> Torso;
-	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<UStaticMeshComponent> Head;
-	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<UStaticMeshComponent> ArmL;
-	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<UStaticMeshComponent> ArmR;
-	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<UStaticMeshComponent> LegL;
-	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<UStaticMeshComponent> LegR;
+
+	/**
+	 * A poseable skeletal mesh rather than an animated one. There is no animation anywhere for a
+	 * man going up a ladder with another ladder on his shoulder, and an animation blueprint would
+	 * only be a graph with nothing in it — so the bones are set from code, from the same state the
+	 * sim already tracks. CHAR-001 replaces the placeholder body; the posing survives it.
+	 */
+	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<UPoseableMeshComponent> Jack;
 	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<UStaticMeshComponent> CarriedLadder;
 
 	// --- what the HUD reads -------------------------------------------------------------------
@@ -131,6 +134,12 @@ public:
 	UFUNCTION(Exec) void SJStrain(float GripValue, float NerveValue);
 	/** Toggle between watching the climber and looking through their eyes. */
 	UFUNCTION(Exec) void SJCam();
+	/** Log where the skeleton's bones actually are, rather than guessing at the axis convention. */
+	UFUNCTION(Exec) void SJBones();
+	/** Swing the camera round to a yaw, to read a pose from a side the climb never shows. */
+	UFUNCTION(Exec) void SJView(float Yaw, float Pitch);
+	/** Turn procedural posing off, to see the rest pose underneath it. */
+	UFUNCTION(Exec) void SJPose();
 	/** Put a ladder on your shoulder and dogs in the bag without the trip down. */
 	UFUNCTION(Exec) void SJCarry();
 	/**
@@ -202,7 +211,8 @@ private:
 
 	bool    bThirdPerson = true;
 	float   TapReach = 0.0f;      // 0-1, the working arm going out to the brick and back
-	float   StridePhase = 0.0f;   // drives the climb, so the legs move when you do
+	float   StridePhase = 0.0f;
+	bool    bPoseEnabled = true;   // drives the climb, so the legs move when you do
 	FString TapReading;
 	int32   TapPipShape = -1;
 	float   TappedAtM = -100.0f;
