@@ -14,7 +14,7 @@ move the row to Resolved with the date.
 
 | Task | Raised | The question, in one line | Recommendation |
 |---|---|---|---|
-| [GDD-001](tasks/GDD-001.md) | 2026-09-17 | Is `bellStrike` at -35 meant to be the worst shock in the game, worse than an anchor failing under you? And what are `copingPeel` and `sitIntoChair` modelling? Three shocks are in the data, implemented, and in no design doc. | Keep the data, add the three rows to the GDD table with a line of rationale each |
+| [GDD-001](tasks/GDD-001.md) | 2026-09-17 | Two nerve questions the data answers and no document does: (a) is `bellStrike` at -35 meant to be the worst shock in the game, worse than an anchor failing under you; (b) at a belted stance at the height and wind caps, nerve drains 3x faster than grip and freezes in 30 s — is nerve still the slow meter? | (a) keep the data, document the three missing shocks; (b) needs a designer — the formula and data are the GDD's own and faithfully implemented |
 | [CORE-016](tasks/CORE-016.md) | 2026-09-17 | Should `SteeplejackSim` use C++ exceptions? The packaged game target does not compile without them, and `interfaces.md` mandates them in one section and forbids them in another. | Set `bForceEnableExceptions = true` on the game target and keep the throw-on-missing contract |
 
 ## Standing decisions the lead owes the project
