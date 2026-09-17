@@ -1,15 +1,16 @@
 // Tuning loader — CORE-007.
 //
-// A self-contained JSON reader and a SHA-256, because SteeplejackSim has no third-party
-// dependencies by design: it must configure and build under CMake with nothing but a compiler
-// (ADR-0004). Both are small, and both are fully covered by tests/unit/test_tuning.cpp — the
-// SHA-256 against the FIPS 180-4 published vectors.
+// Reads through sj::JsonValue (CORE-014) and carries its own SHA-256, because SteeplejackSim has
+// no third-party dependencies by design: it must configure and build under CMake with nothing but
+// a compiler (ADR-0004).
 //
-// The JSON is flattened at load into one map of dotted path -> value, so lookup is a single
-// map probe with no tree walk per call, and so a nested file and a flat file are the same
-// thing to a caller.
+// The JSON tree is flattened at load into one map of dotted path -> value, so a lookup is a single
+// map probe with no tree walk per call, and a nested file and a flat file are the same thing to a
+// caller.
 
 #include "Tuning.h"
+
+#include "Json.h"
 
 #include <algorithm>
 #include <array>
@@ -41,274 +42,6 @@ std::string Normalise(std::string_view key)
     }
     return out;
 }
-
-// ---------------------------------------------------------------- JSON
-
-// A recursive-descent reader for the JSON subset the tuning files use: objects, arrays, numbers,
-// strings, booleans. It flattens as it goes rather than building a tree, because nothing needs
-// the tree. Arrays become indexed keys ("reputation.starThresholds.0"), which keeps them
-// reachable without adding an array accessor to the interface.
-class JsonReader
-{
-public:
-    JsonReader(const std::string& text, std::string origin)
-        : text_(text), origin_(std::move(origin)) {}
-
-    // Emits (path, value) for every leaf.
-    template <typename Emit>
-    void ReadDocument(const Emit& emit)
-    {
-        SkipSpace();
-        ReadValue("", emit);
-        SkipSpace();
-        if (pos_ < text_.size())
-        {
-            Fail("trailing content after the top-level value");
-        }
-    }
-
-private:
-    [[noreturn]] void Fail(const std::string& why) const
-    {
-        throw TuningError(origin_ + ":" + std::to_string(Line()) + ": " + why);
-    }
-
-    std::size_t Line() const
-    {
-        return static_cast<std::size_t>(
-                   std::count(text_.begin(),
-                              text_.begin() + static_cast<std::ptrdiff_t>(
-                                                  std::min(pos_, text_.size())),
-                              '\n')) + 1u;
-    }
-
-    void SkipSpace()
-    {
-        while (pos_ < text_.size())
-        {
-            const char c = text_[pos_];
-            if (c == ' ' || c == '\t' || c == '\n' || c == '\r')
-            {
-                ++pos_;
-            }
-            else if (c == '/' && pos_ + 1 < text_.size() && text_[pos_ + 1] == '/')
-            {
-                // The data-schemas doc writes these files as jsonc, with line comments.
-                while (pos_ < text_.size() && text_[pos_] != '\n')
-                {
-                    ++pos_;
-                }
-            }
-            else
-            {
-                break;
-            }
-        }
-    }
-
-    char Peek() const
-    {
-        if (pos_ >= text_.size())
-        {
-            Fail("unexpected end of file");
-        }
-        return text_[pos_];
-    }
-
-    void Expect(char c)
-    {
-        if (Peek() != c)
-        {
-            Fail(std::string("expected '") + c + "' but found '" + text_[pos_] + "'");
-        }
-        ++pos_;
-    }
-
-    static std::string Join(const std::string& prefix, const std::string& leaf)
-    {
-        return prefix.empty() ? leaf : prefix + "." + leaf;
-    }
-
-    template <typename Emit>
-    void ReadValue(const std::string& path, const Emit& emit)
-    {
-        SkipSpace();
-        switch (Peek())
-        {
-        case '{': ReadObject(path, emit); return;
-        case '[': ReadArray(path, emit); return;
-        case '"': emit(path, ReadString()); return;
-        case 't': ReadLiteral("true");  emit(path, true);  return;
-        case 'f': ReadLiteral("false"); emit(path, false); return;
-        case 'n': ReadLiteral("null");
-            // Deliberately fatal. A null tuning value would reach a getter as either a missing
-            // key or a zero, and both of those are the failure this loader exists to prevent.
-            Fail("null is not a tuning value — remove the key or give it a value");
-        default:  emit(path, ReadNumber()); return;
-        }
-    }
-
-    template <typename Emit>
-    void ReadObject(const std::string& path, const Emit& emit)
-    {
-        Expect('{');
-        SkipSpace();
-        if (Peek() == '}')
-        {
-            ++pos_;
-            return;
-        }
-        for (;;)
-        {
-            SkipSpace();
-            const std::string key = ReadString();
-            SkipSpace();
-            Expect(':');
-            ReadValue(Join(path, key), emit);
-            SkipSpace();
-            if (Peek() == ',')
-            {
-                ++pos_;
-                continue;
-            }
-            Expect('}');
-            return;
-        }
-    }
-
-    template <typename Emit>
-    void ReadArray(const std::string& path, const Emit& emit)
-    {
-        Expect('[');
-        SkipSpace();
-        if (Peek() == ']')
-        {
-            ++pos_;
-            return;
-        }
-        for (std::size_t i = 0;; ++i)
-        {
-            ReadValue(Join(path, std::to_string(i)), emit);
-            SkipSpace();
-            if (Peek() == ',')
-            {
-                ++pos_;
-                continue;
-            }
-            Expect(']');
-            return;
-        }
-    }
-
-    void ReadLiteral(const char* word)
-    {
-        const std::size_t n = std::strlen(word);
-        if (text_.compare(pos_, n, word) != 0)
-        {
-            Fail(std::string("expected '") + word + "'");
-        }
-        pos_ += n;
-    }
-
-    std::string ReadString()
-    {
-        Expect('"');
-        std::string out;
-        while (true)
-        {
-            if (pos_ >= text_.size())
-            {
-                Fail("unterminated string");
-            }
-            const char c = text_[pos_++];
-            if (c == '"')
-            {
-                return out;
-            }
-            if (c != '\\')
-            {
-                out.push_back(c);
-                continue;
-            }
-            if (pos_ >= text_.size())
-            {
-                Fail("unterminated escape");
-            }
-            const char e = text_[pos_++];
-            switch (e)
-            {
-            case '"':  out.push_back('"');  break;
-            case '\\': out.push_back('\\'); break;
-            case '/':  out.push_back('/');  break;
-            case 'b':  out.push_back('\b'); break;
-            case 'f':  out.push_back('\f'); break;
-            case 'n':  out.push_back('\n'); break;
-            case 'r':  out.push_back('\r'); break;
-            case 't':  out.push_back('\t'); break;
-            case 'u':
-                // No tuning key or value needs one, and decoding UTF-16 surrogate pairs to get
-                // it wrong quietly is worse than saying so.
-                //
-                // No `break` after this or the default: Fail() is [[noreturn]], and UE's clang
-                // builds with -Wunreachable-code-break -Werror, which GCC under CMake does not.
-                // `make check` cannot see this class of error; `make build-game` can.
-                Fail("\\u escapes are not supported in tuning files");
-            default:
-                Fail(std::string("unknown escape '\\") + e + "'");
-            }
-        }
-    }
-
-    double ReadNumber()
-    {
-        const std::size_t start = pos_;
-        if (pos_ < text_.size() && (text_[pos_] == '-' || text_[pos_] == '+'))
-        {
-            ++pos_;
-        }
-        bool anyDigit = false;
-        while (pos_ < text_.size())
-        {
-            const char c = text_[pos_];
-            const bool part = (c >= '0' && c <= '9') || c == '.' || c == 'e' || c == 'E' ||
-                              ((c == '-' || c == '+') && (text_[pos_ - 1] == 'e' ||
-                                                          text_[pos_ - 1] == 'E'));
-            if (!part)
-            {
-                break;
-            }
-            anyDigit = anyDigit || (c >= '0' && c <= '9');  // literal: digit range, not a tunable
-            ++pos_;
-        }
-        if (!anyDigit)
-        {
-            Fail("expected a value");
-        }
-        const std::string token = text_.substr(start, pos_ - start);
-        try
-        {
-            std::size_t used = 0;
-            const double v = std::stod(token, &used);
-            if (used != token.size())
-            {
-                Fail("malformed number '" + token + "'");
-            }
-            return v;
-        }
-        catch (const TuningError&)
-        {
-            throw;
-        }
-        catch (const std::exception&)
-        {
-            Fail("malformed number '" + token + "'");
-        }
-    }
-
-    const std::string& text_;
-    std::string        origin_;
-    std::size_t        pos_{0};
-};
 
 // ---------------------------------------------------------------- SHA-256
 //
@@ -464,27 +197,49 @@ Tuning Tuning::Parse(const std::string& json, const std::string& origin)
     Tuning t;
     t.sources_.push_back(origin);
 
-    JsonReader reader(json, origin);
-    const auto emit = [&t, &origin](const std::string& path, auto&& raw)
+    // JsonError becomes TuningError at this boundary. Callers of Tuning should not have to know
+    // that JSON is how tuning happens to be stored, and the contract in interfaces.md is that
+    // Tuning's failures are TuningError. The message, with its origin and line, passes through.
+    JsonValue doc = [&]
+    {
+        try
+        {
+            return JsonValue::Parse(json, origin);
+        }
+        catch (const JsonError& e)
+        {
+            throw TuningError(e.what());
+        }
+    }();
+
+    doc.ForEachLeaf([&t, &origin](const std::string& path, const JsonValue& leaf)
     {
         Value v;
         v.origin = origin;
         v.spelling = path;
-        using Raw = std::decay_t<decltype(raw)>;
-        if constexpr (std::is_same_v<Raw, bool>)
+        switch (leaf.Type())
         {
-            v.kind = Kind::Bool;
-            v.boolean = raw;
-        }
-        else if constexpr (std::is_same_v<Raw, double>)
-        {
+        case JsonValue::Kind::Number:
             v.kind = Kind::Number;
-            v.number = raw;
-        }
-        else
-        {
+            v.number = leaf.AsNumber();
+            break;
+        case JsonValue::Kind::Bool:
+            v.kind = Kind::Bool;
+            v.boolean = leaf.AsBool();
+            break;
+        case JsonValue::Kind::String:
             v.kind = Kind::String;
-            v.text = raw;
+            v.text = leaf.AsString();
+            break;
+        case JsonValue::Kind::Null:
+            // The reader parses null; refusing it is this loader's policy, not JSON's. A null
+            // tuning value would reach a getter as either a missing key or a zero, and both are
+            // the failure this class exists to prevent.
+            throw TuningError(origin + ":" + std::to_string(leaf.Line()) +
+                              ": null is not a tuning value — remove the key or give it a value");
+        case JsonValue::Kind::Object:
+        case JsonValue::Kind::Array:
+            return;   // ForEachLeaf only yields leaves; an empty one contributes nothing
         }
 
         std::string norm;
@@ -511,8 +266,7 @@ Tuning Tuning::Parse(const std::string& json, const std::string& origin)
                               "' — two spellings of one key is ambiguous, rename one");
         }
         t.values_.emplace(norm, std::move(v));
-    };
-    reader.ReadDocument(emit);
+    });
     return t;
 }
 
