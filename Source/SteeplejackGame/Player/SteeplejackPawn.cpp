@@ -7,6 +7,9 @@
 #include "Components/CapsuleComponent.h"
 #include "EngineUtils.h"
 #include "Meters.h"
+#include "Verbs/Hammer.h"
+#include "Wobble.h"
+#include "Rng.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSteeplejackPawn, Log, All);
 
@@ -21,6 +24,15 @@ namespace
 	// Climbing IS the game, and its rate is tuned (climbing.json), not invented here.
 	constexpr float kWalkMetresPerSecond = 9.0f;
 	constexpr float kClimbGraceMetres = 4.5f;   // how far off the face you can be and still be on
+
+	// Work mode. The mouse drives the hammer rather than the head, so it needs its own sensitivity
+	// and its own limit: you can only reach so far without letting go of the ladder.
+	constexpr float kAimDegreesPerMouseUnit = 2.2f;
+	constexpr float kAimLimitDeg = 18.0f;
+	constexpr float kLeanRate = 1.8f;       // per second, -1..1
+	constexpr float kLeanReturn = 2.5f;     // springs back when you stop pushing
+	constexpr float kLeanWobbleScale = 0.6f;  // leaning out costs steadiness
+	constexpr float kDrawRate = 1.6f;       // how fast the hammer arc builds, per second
 }
 
 ASteeplejackPawn::ASteeplejackPawn()
@@ -92,7 +104,11 @@ void ASteeplejackPawn::Tick(float DeltaSeconds)
 
 	// Move. On the ladder, forward climbs; on the ground, forward walks.
 	FVector Delta = FVector::ZeroVector;
-	if (bOnLadder)
+	if (bWorkMode)
+	{
+		// You are hooked into the ladder with both hands committed. You are not going anywhere.
+	}
+	else if (bOnLadder)
 	{
 		// Up at the tuned climb rate; down faster, because sliding a ladder is how it is done.
 		const float Up = T.GetF("climbSpeedMetresPerSecond");
@@ -126,6 +142,47 @@ void ASteeplejackPawn::Tick(float DeltaSeconds)
 	if (bWorking)
 	{
 		Context.workedSeconds += DeltaSeconds;
+	}
+
+	// --- work mode: the hand, not the head ----------------------------------------------------
+	StrikeCooldown = FMath::Max(0.0f, StrikeCooldown - DeltaSeconds);
+
+	if (bWorkMode)
+	{
+		// Lean. Holding A/D shifts your weight to reach across the face; let go and you come back.
+		// It buys reach and costs steadiness, which is the trade the whole posture is about.
+		if (FMath::Abs(InputRight) > 0.01f)
+		{
+			Lean = FMath::Clamp(Lean + InputRight * kLeanRate * DeltaSeconds, -1.0f, 1.0f);
+		}
+		else
+		{
+			Lean = FMath::FInterpTo(Lean, 0.0f, DeltaSeconds, kLeanReturn);
+		}
+
+		// Wobble. METER-003 owns the amplitude; this only turns it into motion. Two sine terms at
+		// unrelated rates so it never settles into a rhythm the player can simply wait out.
+		const float Amplitude =
+			sj::WobbleAmplitudeDeg(Meters, Context, 0.0f, T) *
+			(1.0f + FMath::Abs(Lean) * kLeanWobbleScale);
+		DriftPhase += DeltaSeconds;
+		Drift.X = Amplitude * 0.6f * FMath::Sin(DriftPhase * 2.3f) +
+		          Amplitude * 0.4f * FMath::Sin(DriftPhase * 5.7f + 1.1f);
+		Drift.Y = Amplitude * 0.6f * FMath::Sin(DriftPhase * 1.9f + 0.7f) +
+		          Amplitude * 0.4f * FMath::Sin(DriftPhase * 4.3f + 2.2f);
+
+		// Drawing the hammer back. Both hands are committed while you hold, so grip drains.
+		if (bDrawing)
+		{
+			SwingPower = FMath::Min(1.0f, SwingPower + kDrawRate * DeltaSeconds);
+		}
+		Context.working = true;
+	}
+	else
+	{
+		Lean = FMath::FInterpTo(Lean, 0.0f, DeltaSeconds, kLeanReturn);
+		Drift = FVector2D::ZeroVector;
+		Context.working = bWorking;
 	}
 
 	sj::grip::Step(Meters, DeltaSeconds, Context, T);
@@ -177,12 +234,140 @@ FString ASteeplejackPawn::GetStanceName() const
 	return TEXT("?");
 }
 
+float ASteeplejackPawn::GetAngleErrorDeg() const
+{
+	return FVector2D(Aim + Drift).Size();
+}
+
+float ASteeplejackPawn::GetWobbleDeg() const
+{
+	return sj::WobbleAmplitudeDeg(Meters, Context, 0.0f, SteeplejackTuning::Get()) *
+	       (1.0f + FMath::Abs(Lean) * kLeanWobbleScale);
+}
+
+void ASteeplejackPawn::EnterWorkMode()
+{
+	if (!bOnLadder)
+	{
+		LastStrike = TEXT("you need to be on the brickwork to work");
+		return;
+	}
+	bWorkMode = true;
+	Aim = FVector2D::ZeroVector;
+	SwingPower = 0.0f;
+
+	// The joint you are working. STRUCT-002 generates the real grid; until then the band's quality
+	// distribution stands in, so the brickwork you hit still varies the way the level file says.
+	if (Chimney)
+	{
+		const FString Band = Chimney->BandTypeAtHeight(GetHeightMetres());
+		WorkJoint = sj::Joint{};
+		// Quality from the band, deterministically per height, so the same joint is the same joint.
+		sj::Rng Rng(static_cast<uint64_t>(GetHeightMetres() * 100.0f) ^ 0x5D3Bu);
+		WorkJoint.quality = Rng.RangeFloat(0.2f, 0.95f);
+		WorkJoint.height = GetHeightMetres();
+	}
+	DogDepth = 0.0f;
+	LastStrike = TEXT("hammer up. mouse aims, A/D leans, hold LMB to draw");
+}
+
+void ASteeplejackPawn::LeaveWorkMode()
+{
+	bWorkMode = false;
+	bDrawing = false;
+	SwingPower = 0.0f;
+	Aim = FVector2D::ZeroVector;
+	Drift = FVector2D::ZeroVector;
+}
+
+void ASteeplejackPawn::ResolveStrike()
+{
+	const sj::Tuning& T = SteeplejackTuning::Get();
+	if (StrikeCooldown > 0.0f)
+	{
+		return;
+	}
+	StrikeCooldown = T.GetF("hammerStrikeCooldownSeconds");
+
+	const float Power = SwingPower;
+	const float AngleErr = GetAngleErrorDeg();
+	SwingPower = 0.0f;
+
+	const sj::StrikeResult R =
+		sj::hammer::Strike(WorkJoint, DogDepth, Power, AngleErr, 1.0f, T);
+
+	if (R.bent)
+	{
+		LastStrike = FString::Printf(
+			TEXT("bent the dog — %.0f%% power at %.1f deg off. that one is scrap"),
+			Power * 100.0f, AngleErr);
+		sj::nerve::Shock(Meters, "droppedTool", T);
+		DogDepth = 0.0f;
+		return;
+	}
+
+	DogDepth = FMath::Clamp(DogDepth + R.depthGain, 0.0f, 1.0f);
+
+	if (R.seated)
+	{
+		LastStrike = FString::Printf(TEXT("dog seated at %.0f%% — %s joint"),
+			DogDepth * 100.0f,
+			WorkJoint.quality > 0.7f ? TEXT("sound") :
+			WorkJoint.quality > 0.4f ? TEXT("fair") : TEXT("perished"));
+	}
+	else
+	{
+		LastStrike = FString::Printf(TEXT("%.0f%% power, %.1f deg off — dog at %.0f%%%s"),
+			Power * 100.0f, AngleErr, DogDepth * 100.0f,
+			R.spalled > 0.15f ? TEXT(", brick spalling") : TEXT(""));
+	}
+}
+
 void ASteeplejackPawn::MoveForward(float Value) { InputForward = Value; }
 void ASteeplejackPawn::MoveRight(float Value) { InputRight = Value; }
-void ASteeplejackPawn::Turn(float Value) { AddControllerYawInput(Value); }
-void ASteeplejackPawn::LookUp(float Value) { AddControllerPitchInput(Value); }
-void ASteeplejackPawn::StartWorking() { bWorking = true; }
-void ASteeplejackPawn::StopWorking() { bWorking = false; }
+void ASteeplejackPawn::Turn(float Value)
+{
+	// In work mode the mouse is your hand, not your head. This is the whole point: your eyes stay
+	// on the joint while the hammer moves, which is what it is like to work at arm's length on a
+	// ladder you are hooked into.
+	if (bWorkMode)
+	{
+		Aim.X = FMath::Clamp(Aim.X + Value * kAimDegreesPerMouseUnit, -kAimLimitDeg, kAimLimitDeg);
+		return;
+	}
+	AddControllerYawInput(Value);
+}
+
+void ASteeplejackPawn::LookUp(float Value)
+{
+	if (bWorkMode)
+	{
+		Aim.Y = FMath::Clamp(Aim.Y + Value * kAimDegreesPerMouseUnit, -kAimLimitDeg, kAimLimitDeg);
+		return;
+	}
+	AddControllerPitchInput(Value);
+}
+
+void ASteeplejackPawn::StartWorking()
+{
+	if (bWorkMode)
+	{
+		bDrawing = true;      // draw the hammer back
+		return;
+	}
+	bWorking = true;
+}
+
+void ASteeplejackPawn::StopWorking()
+{
+	if (bWorkMode && bDrawing)
+	{
+		bDrawing = false;
+		ResolveStrike();      // release is the strike
+		return;
+	}
+	bWorking = false;
+}
 
 void ASteeplejackPawn::CycleStance()
 {
@@ -209,4 +394,6 @@ void ASteeplejackPawn::SetupPlayerInputComponent(UInputComponent* Input)
 	Input->BindAction(TEXT("Work"), IE_Pressed, this, &ASteeplejackPawn::StartWorking);
 	Input->BindAction(TEXT("Work"), IE_Released, this, &ASteeplejackPawn::StopWorking);
 	Input->BindAction(TEXT("Stance"), IE_Pressed, this, &ASteeplejackPawn::CycleStance);
+	Input->BindAction(TEXT("WorkMode"), IE_Pressed, this, &ASteeplejackPawn::EnterWorkMode);
+	Input->BindAction(TEXT("WorkMode"), IE_Released, this, &ASteeplejackPawn::LeaveWorkMode);
 }

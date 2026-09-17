@@ -73,7 +73,47 @@ void ASteeplejackHUD::DrawHUD()
 		Canvas->DrawText(Font, FString::Printf(TEXT("band: %s"), *Jack->GetBandName()), X, Y);
 	}
 
+	// --- work mode -----------------------------------------------------------------------------
+	if (Jack->IsInWorkMode())
+	{
+		const float CX = Canvas->SizeX * 0.5f;
+		const float CY = Canvas->SizeY * 0.42f;
+
+		// The tolerance ring: inside it a strike is clean, outside it bends dogs. Drawn so the
+		// player can see the wobble eating their margin rather than being told about it.
+		const float PixelsPerDeg = 9.0f;
+		const float Tolerance = 12.0f * PixelsPerDeg;   // hammerMaxAngleErrorDegrees
+		Canvas->SetDrawColor(120, 120, 130, 120);
+		Canvas->DrawTile(Canvas->DefaultTexture, CX - Tolerance, CY - 1, Tolerance * 2, 2, 0, 0, 1, 1);
+		Canvas->DrawTile(Canvas->DefaultTexture, CX - 1, CY - Tolerance, 2, Tolerance * 2, 0, 0, 1, 1);
+
+		// Where the hammer actually is: aim plus wobble.
+		const float Err = Jack->GetAngleErrorDeg();
+		const float R = Err * PixelsPerDeg;
+		const bool bClean = Err < 12.0f * 0.35f;
+		Canvas->SetDrawColor(bClean ? 120 : 220, bClean ? 220 : 110, 110, 255);
+		Canvas->DrawTile(Canvas->DefaultTexture, CX + R - 5, CY - 5, 10, 10, 0, 0, 1, 1);
+
+		// Draw strength. Release near the top for power, but only if the angle is clean.
+		const float BarW = 220.0f;
+		Bar(Canvas, CX - BarW * 0.5f, CY + Tolerance + 30.0f, BarW, 12.0f,
+			Jack->GetSwingPower(), FLinearColor(0.85f, 0.70f, 0.30f));
+
+		Canvas->SetDrawColor(235, 235, 235, 255);
+		Canvas->DrawText(Font, FString::Printf(TEXT("dog %.0f%%   %.1f deg off   wobble %.1f deg%s"),
+			Jack->GetDogDepth() * 100.0f, Err, Jack->GetWobbleDeg(),
+			FMath::Abs(Jack->GetLean()) > 0.05f
+				? *FString::Printf(TEXT("   leaning %.0f%%"), Jack->GetLean() * 100.0f)
+				: TEXT("")),
+			CX - BarW * 0.5f, CY + Tolerance + 50.0f);
+
+		Canvas->SetDrawColor(200, 200, 205, 255);
+		Canvas->DrawText(Font, *Jack->GetLastStrikeResult(), CX - BarW * 0.5f, CY + Tolerance + 70.0f);
+	}
+
 	Canvas->SetDrawColor(150, 150, 155, 255);
-	Canvas->DrawText(Font, TEXT("WASD move / climb   mouse look   LMB work   Q stance"),
+	Canvas->DrawText(Font, Jack->IsInWorkMode()
+		? TEXT("mouse aims the hammer   A/D lean   hold LMB draw, release to strike   let go of RMB to stop")
+		: TEXT("WASD move / climb   mouse look   RMB or F work the brickwork   LMB work   Q stance"),
 		X, Canvas->SizeY - 28.0f);
 }

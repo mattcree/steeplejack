@@ -29,6 +29,14 @@ try:
     rough.set_editor_property("default_value", 0.92)      # brickwork, not porcelain
     MEL.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
 
+    # Usage flags. Without bUsedWithInstancedStaticMeshes, UE silently substitutes the default
+    # grey material when the thing is drawn on an InstancedStaticMeshComponent — while
+    # GetMaterial(0) keeps reporting yours. That is the whole reason the bands rendered pale no
+    # matter what colour they were given; the log said so once, quietly:
+    #   "Material /Game/Materials/MI_Plain needed to set usage flag InstancedStaticMeshes"
+    mat.set_editor_property("used_with_instanced_static_meshes", True)
+    mat.set_editor_property("used_with_static_lighting", True)
+
     MEL.recompile_material(mat)
     unreal.EditorAssetLibrary.save_asset(path)
     LOG("SJMAT: built %s" % path)

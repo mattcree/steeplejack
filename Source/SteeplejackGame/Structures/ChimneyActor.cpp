@@ -46,7 +46,7 @@ namespace
 	// thing and seeing grey.
 	FLinearColor ColourForBand(const FString& Type)
 	{
-		if (Type == TEXT("plain"))         { return FLinearColor(1.0f, 0.0f, 1.0f); }  // TEMP magenta probe
+		if (Type == TEXT("plain"))         { return FLinearColor(0.23f, 0.11f, 0.07f); }  // soot-dulled red brick
 		if (Type == TEXT("ivy"))           { return FLinearColor(0.07f, 0.14f, 0.05f); }  // ivy
 		if (Type == TEXT("existing-band")) { return FLinearColor(0.13f, 0.09f, 0.08f); }  // iron banding, near black
 		if (Type == TEXT("wind-band"))     { return FLinearColor(0.42f, 0.33f, 0.26f); }  // bleached by weather up top
