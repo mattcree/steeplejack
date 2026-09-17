@@ -11,11 +11,12 @@ owns:
   - Source/SteeplejackSim/Public/Level.h
   - Source/SteeplejackSim/Private/Level.cpp
   - tests/unit/test_level.cpp
+  - tests/fixtures/levels
+  - tools/validate_data.py
 reads:
   - data/levels/01-back-yard.json
   - data/levels/06-waterside.json
   - data/schemas/level.schema.json
-  - tools/validate_data.py
 spec:
   - docs/03-tech/interfaces.md#levelh--core-008
   - docs/03-tech/data-schemas.md#level-file

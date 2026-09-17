@@ -175,7 +175,52 @@ def check_tuning():
         walk(doc)
 
 
+def check_one(path, name):
+    """Every design rule, for a single already-parsed file. Shared by main() and --level."""
+    doc = json.load(open(path, encoding="utf-8"))
+    schema_validate(doc, name)
+    try:
+        check_bands(doc, name)
+        check_reachability(doc, name)
+        check_felling(doc, name)
+        check_scoring(doc, name)
+        check_docs_link(doc, name)
+    except KeyError as e:
+        err(name, f"missing key {e} — fix schema errors first")
+
+
+def main_one(path):
+    """Validate one file and print only the error count.
+
+    Exists so that LevelData::Validate() (CORE-008) can be compared against this implementation on
+    identical fixtures. The two enforce the same rules for different moments — this one in a
+    pre-commit hook with no compiler, the C++ one in the game — and a divergence is a bug in
+    whichever is newer. A parity test that cannot feed both the same file cannot catch that.
+
+        python3 tools/validate_data.py --level path/to/fixture.json
+        -> "3 error(s)" on stdout, exit 1 if any
+
+    Deliberately prints a machine-readable count and nothing else: the caller is a test.
+    """
+    name = os.path.basename(path)
+    try:
+        check_one(path, name)
+    except json.JSONDecodeError as e:
+        err(name, f"invalid JSON: {e}")
+    except FileNotFoundError:
+        print(f"no such level: {path}")
+        return 2
+
+    for e in errors:
+        print(f"\033[31merror\033[0m {e}", file=sys.stderr)
+    print(f"{len(errors)} error(s)")
+    return 1 if errors else 0
+
+
 def main():
+    if len(sys.argv) > 2 and sys.argv[1] == "--level":
+        return main_one(sys.argv[2])
+
     if not os.path.exists(SCHEMA):
         print(f"missing schema: {SCHEMA}")
         return 1
@@ -187,19 +232,10 @@ def main():
         n += 1
         p = os.path.join(LEVELS, fn)
         try:
-            doc = json.load(open(p, encoding="utf-8"))
+            check_one(p, fn)
         except json.JSONDecodeError as e:
             err(fn, f"invalid JSON: {e}")
             continue
-        schema_validate(doc, fn)
-        try:
-            check_bands(doc, fn)
-            check_reachability(doc, fn)
-            check_felling(doc, fn)
-            check_scoring(doc, fn)
-            check_docs_link(doc, fn)
-        except KeyError as e:
-            err(fn, f"missing key {e} — fix schema errors first")
 
     check_tuning()
 
