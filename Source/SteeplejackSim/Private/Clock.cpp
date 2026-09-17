@@ -44,7 +44,7 @@ int SimClock::Advance(float realDelta) noexcept
     if (accumulator_ >= kUnitsPerTick)
     {
         const int64_t owed = accumulator_ / kUnitsPerTick;
-        dropped_ += static_cast<int>(owed);
+        dropped_ += owed;
         accumulator_ -= owed * kUnitsPerTick;
     }
 
@@ -59,7 +59,7 @@ float SimClock::Alpha() const noexcept
                               static_cast<double>(kUnitsPerTick));
 }
 
-int SimClock::DroppedSteps() const noexcept
+int64_t SimClock::DroppedSteps() const noexcept
 {
     return dropped_;
 }

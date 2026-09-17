@@ -68,11 +68,10 @@ Do not add the intent recorder — CORE-006 — or any gameplay.
 is the UE-side `SteeplejackGameMode`, still outstanding — see below. Acceptance 5 was Godot rot and
 is struck.
 
-**The bug this found, which is the reason the task exists**
+**The bug this found — corrected after review, twice**
 
 The obvious implementation — a float accumulator and `acc -= tick` in a loop — is wrong, and wrong
-in a way that no reading would catch. It runs **59 steps per second at 75, 90, 100 and 144 fps**,
-and 60 at 30, 60 and 120. Measured, before fixing:
+in a way no reading would catch. Measured, before fixing:
 
 ```
 fps= 30  sum_of_deltas=1.0000000522  steps=60
@@ -86,9 +85,26 @@ It is that `kTick` as a `float` is `0.016666668`, very slightly **larger** than 
 them sum to more than one second and the sixtieth step never arrives. No epsilon fixes that
 honestly; it just moves the boundary.
 
-The consequence would have been a game that runs ~1.7% slow on exactly the monitors most players
-own, by an amount far too small to see, and a replay recorded at 60 fps that fails to reproduce at
-144. That is the highest-leverage test in the project (TEST-002) broken before it is written.
+**The magnitude, corrected.** The first version of this Outcome said the naive clock "runs 59 steps
+per second" and the game would be "~1.7% slow on exactly the monitors most players own". That is
+wrong by about three orders of magnitude, and a reviewer caught it by running the harness for
+longer than one second — which I had not. The deficit is **one step, once**, and then never again:
+
+```
+fps=144    1 s: 59      ideal 60      shortfall 1
+fps=144   10 s: 599     ideal 600     shortfall 1
+fps=144   60 s: 3599    ideal 3600    shortfall 1
+fps=144 3600 s: 215999  ideal 216000  shortfall 1
+```
+
+A fixed boundary offset, not a rate. One step in 216000 over an hour is 0.0005%, and nobody would
+ever feel it. Affected rates measured: 75, 90, 100, 144, 165 short by one; 30, 60, 120 exact.
+
+**The fix is still right, for the other reason.** One step in 216000 is nothing as a *rate* and
+fatal for *replay*: a run recorded at 60 fps and played back at 144 is offset by a whole tick from
+the first second onward, and replay regression compares state byte for byte (ADR-0003). A constant
+offset is exactly as fatal there as a growing one. That is the argument that holds, and it is the
+one the first draft should have made instead of reaching for a number it had not measured.
 
 **So the accumulator is an integer**, counting exact sub-tick units (one tick = 1,000,000 units).
 The frame delta is converted once, in double, and the accumulator never sees a float again. No
@@ -119,23 +135,50 @@ task file rather than reinterpreted, and the `## Interface` block — which was 
 (`class_name SimClock extends RefCounted`) — now points at `interfaces.md`, which has the C++
 signature the implementation matches. The `spec:` anchor `#simclockgd--core-005` was dead too.
 
-**Acceptance 4 is not done**
+**Acceptance 4 — finished, after a first attempt to hand it off unfinished**
 
-`SteeplejackGameMode.h/.cpp` are in this task's `owns:` and are not written. The sim half is
-complete and tested; the UE half — the `Tick` that drives `Advance()`, and the `Sim::Step` timing
-instrumentation — is not. Unreal is available (`make build-game UE_ROOT=...` works), so this is not
-blocked, only unfinished. Flagged rather than quietly dropped: do not read the green gate as
-covering it.
+`ASteeplejackGameMode` drives `SimClock::Advance()` from Unreal's `Tick`, runs the owed steps, and
+instruments them: `SCOPE_CYCLE_COUNTER` so the cost shows in `stat Game` next to everything it
+competes with, plus a rate-limited log when a step exceeds the 0.5 ms budget from
+`architecture.md`. The budget is measured **per step, not per frame** — a frame that ran five
+catch-up steps costs five times as much and flagging that as a breach would cry wolf exactly when
+the game is already struggling. `GetSimAlpha`, `GetSimTick`, `GetDroppedSteps` and
+`GetLastStepMilliseconds` are `BlueprintPure`, so a dev HUD can show all of it without a Blueprint
+containing a gameplay decision (rule 4).
+
+`StepSim()` is deliberately empty and says so: intent collection is CORE-006 and the job state is
+CLIMB-001 onward. What this task owns is that whatever goes there is called exactly 60 times per
+second of wall time and never at any other rate.
+
+I first submitted this task with acceptance 4 unmet and a flag saying so. A reviewer pointed at the
+Definition of Done — *"A task is done when every applicable box is ticked. Not 'mostly'. Partial
+work goes back to 🟡"* — and was right. It was not blocked and not infeasible; Unreal is installed
+and `make build-game` is a real target. Flagging beats hiding, but neither beats finishing.
+
+**And it immediately hit the symbol-visibility bug again.** `SteeplejackGame` would not link:
+`undefined symbol: sj::SimClock::SimClock(float)`. Same cause as CORE-007, second task to cross the
+boundary, exactly as **CORE-015** predicted when it was filed. `Clock.h` carries the same guarded
+`SJ_API` stopgap; CORE-015 replaces both copies with one `Export.h`. Two occurrences in two
+crossings is the whole argument for that task, and it is now evidence rather than a prediction.
 
 **Verified by running it**
 
-A terminal harness steps this clock at 60 Hz through a 45-second shift driving the grip meter
-(METER-001): 2703 steps, 45.0 s simulated, 0 dropped, final alpha 0.000. The fixed step and the
-meter behave together as the GDD describes.
+`make build-game UE_ROOT=/var/home/cree/UnrealEngine/UE_5.8` → `Result: Succeeded`, and the editor
+boots with the module loaded.
+
+An earlier draft cited a terminal harness "2703 steps, 45.0 s simulated". A reviewer noted it was
+unreproducible — the harness is not committed, and it depends on `Meters.h`, which is on the
+METER-001 branch, not this one — and internally inconsistent, since 2703 steps at 60 Hz is 45.05 s,
+not 45.0. Both true. The claim is withdrawn rather than patched: an unreproducible "verified by
+running it" is worth less than no claim. Committing that harness is a follow-up.
 
 **Follow-ups**
 
-- Acceptance 4: `SteeplejackGameMode` and the `Sim::Step` timing. Same task; unfinished.
+- **CORE-015** is now twice-evidenced rather than once — see above.
+- A committed demo/harness tool, so "verified by running it" is reproducible by a reviewer. No task
+  yet; METER-001 raises the same follow-up.
+- `dropped_` widened to `int64_t` after review showed 5000 consecutive garbage deltas overflow an
+  `int`. Unreachable in play; free to fix.
 - `tools/check_conventions.py` skips lines starting `constexpr` but not `static constexpr`, so a
   named constant inside a class is reported as a magic number. Annotated with `// literal:` here.
   Same checker family as the character-literal gap CORE-007 found. No task yet.

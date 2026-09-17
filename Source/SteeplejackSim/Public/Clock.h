@@ -22,24 +22,45 @@
 //   reached 1 there was a step left unspent.
 //
 // **The accumulator is an integer, and that is not an optimisation.** The obvious version — a
-// float accumulator and `acc -= tick` in a loop — loses a step per second at 75, 90, 100 and 144
-// fps. Not through drift: `kTick` as a float is very slightly *larger* than 1/60, so sixty of them
-// add up to more than one second and the sixtieth step never comes. The game would simply run slow
-// on those monitors, by an amount too small to see and large enough to make every replay recorded
-// at one frame rate fail at another. Counting in exact integer sub-tick units removes the entire
-// class of problem: no drift, no epsilon, and the same answer on every compiler.
+// float accumulator and `acc -= tick` in a loop — is permanently **one step short** at 75, 90,
+// 100, 144 and 165 fps, and exact at 30, 60 and 120. Not drift, and not per second: the deficit
+// appears in the first second and stays at exactly 1 forever (measured to one hour: 215999 steps
+// against 216000). `kTick` as a float is `0.016666668`, very slightly *larger* than 1/60, so sixty
+// of them exceed a second and the sixtieth step never arrives; after that the boundary never bites
+// again.
+//
+// One step in 216000 is nothing as a rate. It is not nothing for **replay**: a run recorded at 60
+// fps and played back at 144 is offset by a whole tick from the first second onward, and replay
+// regression compares state byte for byte (ADR-0003). A constant offset is exactly as fatal there
+// as a growing one. Counting in exact integer sub-tick units removes the class of problem — no
+// boundary, no epsilon, the same answer on every compiler.
 
 #include "Types.h"
 
 #include <cstdint>
 
+// Symbol visibility at the UE boundary — the same stopgap Tuning.h carries, and the second time
+// this has been needed. UBT builds SteeplejackSim with -fvisibility-ms-compat, so a class's
+// out-of-line members are hidden and SteeplejackGame will not link against them. UE's own
+// STEEPLEJACKSIM_API macro cannot be used: it expands to DLLEXPORT, which lives in an Unreal
+// header this module must never include (ADR-0004). CORE-015 replaces both copies with one
+// Export.h; the guard means having both is harmless until it lands.
+#ifndef SJ_API
+#if defined(__GNUC__) || defined(__clang__)
+#define SJ_API __attribute__((visibility("default")))
+#else
+#define SJ_API
+#endif
+#endif
+
 namespace sj {
 
-class SimClock
+class SJ_API SimClock
 {
 public:
-    // Non-explicit default so `SimClock clock;` works; the tick is a parameter only so tests can
-    // drive it at a rate they can do exact arithmetic in.
+    // The tick is a parameter only so tests can drive it at a rate they can do exact arithmetic
+    // in; production always uses kTick. `SimClock clock;` works despite `explicit`, which applies
+    // to conversions rather than to default construction.
     explicit SimClock(float tick = kTick) noexcept;
 
     // Accumulate `realDelta` and return how many whole sim steps the caller owes. Negative or
@@ -53,7 +74,7 @@ public:
     // Sim steps dropped to avoid a spiral of death, since construction. Nonzero means the frame
     // rate could not keep up and simulated time was lost — worth surfacing in a dev HUD rather
     // than leaving invisible.
-    int DroppedSteps() const noexcept;
+    int64_t DroppedSteps() const noexcept;
 
     float Tick() const noexcept;
 
@@ -67,7 +88,7 @@ private:
 
     float   tick_;
     int64_t accumulator_{};
-    int     dropped_{};
+    int64_t dropped_{};
 };
 
 }  // namespace sj
