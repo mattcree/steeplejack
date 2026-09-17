@@ -4,8 +4,8 @@ title: wt-start must not make a branch without its own task file
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.25
-status: ready
-assignee: null
+status: in_progress
+assignee: agent
 depends_on: [SETUP-005]
 owns:
   - tools/wt.py
