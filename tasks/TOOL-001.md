@@ -4,7 +4,7 @@ title: A terminal harness for watching the sim run
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.25
-status: in_progress
+status: review
 assignee: agent
 depends_on: [CORE-005, CORE-007, CORE-011, METER-001, TEST-003]
 owns:
@@ -69,4 +69,74 @@ not depend on it. Do not add it to `make ci`.
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+`tools/sim_watch.cpp` and a `make watch` target. All six acceptance criteria pass.
+
+**What it shows, and why that is more than a demo**
+
+It opens with the stance table *computed* — drain rate and seconds-of-work for all five stances,
+derived from `meters.json` through `grip::DrainRate` and `grip::SecondsOfWorkLeft`:
+
+```
+  one hand on rung         8.0 grip/s   12s of work
+  hooked leg               4.0 grip/s   25s of work
+  belt round the stack     1.0 grip/s   100s of work
+  bosun's chair            0.0 grip/s   works indefinitely
+```
+
+That is the game's answer, not the design document's. `02-climbing-system.md` states the same table
+by hand; if the two ever disagree, this is the one that is true, and now anyone can see it in a
+second without an engine. It is the difficulty dial made legible.
+
+Then a six-phase shift, and the fairness contract as a timestamp rather than an assertion:
+
+```
+  telegraph: hands began to shake at t=36.00s; grip gone at t=38.50s.
+             2.50s of warning
+
+  2700 steps = 45.00s simulated, 0 dropped, alpha 0.000
+```
+
+**Decisions**
+
+- *It drives the real classes.* `sj::SimClock::Advance` decides how many steps a frame owes; the
+  loop never assumes 1. `sj::grip::Step` does the work. Nothing here reimplements a rule, because a
+  demonstration that shows a different game from the one that ships has exactly one failure mode
+  and that is it.
+- *Elapsed time is derived from the step count, never accumulated.* `SecondsFor(steps)`, once. The
+  first draft added `kTick` in a loop and reported "45.0 s" after 2703 steps — which is 45.05 s.
+  That is the float-accumulation mistake CORE-005 exists to remove, reproduced inside the tool that
+  demonstrates CORE-005. It now prints `2700 steps = 45.00s`, and acceptance 4 exists specifically
+  so nobody reintroduces it.
+- *It lives in `tools/`, not in the sim.* Rule 1 forbids stdout in `SteeplejackSim`, and that rule
+  is the reason this is a separate tool rather than an obstacle to it.
+- *It is not wired into `make check` or `make ci`.* It asserts nothing and gates nothing. A demo in
+  the gate would be a gate that cannot fail — the decoration TEST-003 spent a task removing.
+- *It prints the tuning digest*, so what you watched is identifiable against a `Tuning::Hash()`.
+
+**Why this task exists at all**
+
+CORE-005 and METER-001 both wrote "verified by running it" into an Outcome citing a harness in a
+scratch directory. A reviewer called it correctly: not committed, not reproducible, and in
+CORE-005's case not arithmetically self-consistent — an unreproducible "verified" is worth less
+than no claim. Rather than delete those sentences and move on, the harness is now a committed tool,
+so the next such claim is checkable by running one command.
+
+**Surprises**
+
+- *Clipped and hooked-leg have identical drain rates* (4.0/s), so the table shows both buying 25 s.
+  The GDD distinguishes them by set-up time (1.5 s vs 3 s) and wobble (×1.3 vs ×1.2), neither of
+  which grip models. Not a bug — but the stance trade is only half visible until METER-003 and the
+  set-up timings land, and someone reading this output today could reasonably ask why you would
+  ever clip in. Worth knowing before it is shown to a playtester.
+- `ctx.workedSeconds` is advanced *by this tool*, because nothing in the sim does — see METER-001.
+  This tool is currently the only thing in the repo that feeds the cold cap.
+- The worktree for this task was cut from `origin/main`, which did not yet carry this task's own
+  file: `make land` pushes the trunk, but a task file committed directly to local `main` is not
+  pushed until the next land. Copied in. Worth knowing before it looks like a missing file.
+
+**Follow-ups**
+
+- Extend it once METER-002 (nerve) and METER-003 (wobble) land; this shift is grip-only, and nerve
+  is what makes height mechanically frightening.
+- The set-up cost of a stance is modelled nowhere yet, so the table shows what a stance buys and
+  not what it costs. That is the other half of the trade.
