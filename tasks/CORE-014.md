@@ -4,7 +4,7 @@ title: Shared JSON reader for SteeplejackSim
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.5
-status: review
+status: done
 assignee: agent
 depends_on: [CORE-007, CORE-011]
 owns:
