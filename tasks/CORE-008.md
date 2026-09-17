@@ -4,8 +4,8 @@ title: Level data loader
 milestone: M0
 discipline: [ENG]
 estimate_days: 1.5
-status: ready
-assignee: null
+status: in_progress
+assignee: agent
 depends_on: [CORE-004, CORE-014]
 owns:
   - Source/SteeplejackSim/Public/Level.h
