@@ -99,7 +99,10 @@ Then a six-phase shift, and the fairness contract as a timestamp rather than an 
 **Decisions**
 
 - *It drives the real classes.* `sj::SimClock::Advance` decides how many steps a frame owes; the
-  loop never assumes 1. `sj::grip::Step` does the work. Nothing here reimplements a rule, because a
+  loop never assumes 1 — though it does truncate an owed batch at a phase boundary, which is
+  unreachable at 60 fps and would not be at 144. See the follow-ups; the claim is true today and
+  stops being true the moment someone takes that work, which is not a distinction to leave implicit
+  in a file whose whole argument is that it does not print things that never happened. `sj::grip::Step` does the work. Nothing here reimplements a rule, because a
   demonstration that shows a different game from the one that ships has exactly one failure mode
   and that is it.
 - *Elapsed time is derived from the step count, never accumulated.* `SecondsFor(steps)`, once. The
@@ -166,9 +169,18 @@ Declared rather than left for review to find, since rule 3 is about declaring an
 
 - `tasks/TOOL-001.md` — this task's own file, copied in for the reason above.
 - `tasks/CORE-016.md` — copied in because `BLOCKED.md` on this branch links to it and
-  `make check-links` fails without it. Byte-identical to main's copy, so it lands as a no-op. I
-  removed it first and put it back when the link check caught me; the link check is doing exactly
-  its job.
+  `make check-links` fails without it. Matches main's copy, so it lands as a no-op. I removed it
+  first and put it back when the link check caught me.
+
+And one that was nearly a real loss: I also removed `tasks/CORE-018.md`, an unclaimed `ready` M0
+task, and did **not** put it back — because nothing links to it, so `check-links` stayed green,
+`validate-tasks` counted 67 tasks and 0 errors without noticing one had gone, and landing this
+branch would have silently deleted a task from the trunk. A second reviewer caught it by diffing
+`tasks/` against main. Restored with `git checkout main -- tasks/CORE-018.md`.
+
+That is the sharpest illustration this session of why rule 3 says *declare* rather than *be
+careful*: the link checker caught the file something pointed at, and nothing at all caught the file
+nothing pointed at.
 
 `make land` resolves `tasks/TOOL-001.md` to the branch by design; the other is net-zero.
 
@@ -178,3 +190,9 @@ Declared rather than left for review to find, since rule 3 is about declaring an
   is what makes height mechanically frightening.
 - The set-up cost of a stance is modelled nowhere yet, so the table shows what a stance buys and
   not what it costs. That is the other half of the trade.
+- **Drive one phase at 144 fps, and fix the phase-boundary truncation at the same time.** They are
+  one piece of work. Today every frame is exactly `1/60`, so `Advance` returns 1 every time and the
+  run always reports `0 dropped, alpha 0.000` — `SimClock` is present but doing nothing observable,
+  which is a poor advertisement for the task that found the 59-steps-per-second bug. Driving a
+  phase at 144 fps would make it visible, and would also make `totalSteps < phaseEnd` start
+  dropping steps the clock owed. Raised by a reviewer; deferred deliberately rather than bolted on.
