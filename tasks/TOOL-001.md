@@ -98,13 +98,14 @@ Then a six-phase shift, and the fairness contract as a timestamp rather than an 
 
 **Decisions**
 
-- *It drives the real classes.* `sj::SimClock::Advance` decides how many steps a frame owes; the
-  loop never assumes 1 — though it does truncate an owed batch at a phase boundary, which is
-  unreachable at 60 fps and would not be at 144. See the follow-ups; the claim is true today and
-  stops being true the moment someone takes that work, which is not a distinction to leave implicit
-  in a file whose whole argument is that it does not print things that never happened. `sj::grip::Step` does the work. Nothing here reimplements a rule, because a
-  demonstration that shows a different game from the one that ships has exactly one failure mode
-  and that is it.
+- *It drives the real classes.* `sj::SimClock::Advance` decides how many steps a frame owes and
+  `sj::grip::Step` does the work. Nothing here reimplements a rule, because a demonstration that
+  shows a different game from the one that ships has exactly one failure mode and that is it.
+
+  The loop never assumes 1 — though it does truncate an owed batch at a phase boundary, which is
+  unreachable at 60 fps and would not be at 144. See the follow-ups. The claim is true today and
+  stops being true the moment someone takes that work, which is not a distinction to leave
+  implicit in a file whose whole argument is that it does not print things that never happened.
 - *Elapsed time is derived from the step count, never accumulated.* `SecondsFor(steps)`, once. The
   first draft added `kTick` in a loop and reported "45.0 s" after 2703 steps — which is 45.05 s.
   That is the float-accumulation mistake CORE-005 exists to remove, reproduced inside the tool that
