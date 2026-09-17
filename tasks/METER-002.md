@@ -4,8 +4,8 @@ title: Nerve meter: height, wind, exposure and shocks
 milestone: M1
 discipline: [ENG]
 estimate_days: 1.5
-status: ready
-assignee: null
+status: in_progress
+assignee: agent
 depends_on: [METER-001]
 owns:
   - Source/SteeplejackSim/Private/MetersNerve.cpp
