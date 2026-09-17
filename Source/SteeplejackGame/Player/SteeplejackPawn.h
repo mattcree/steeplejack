@@ -8,7 +8,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Pawn.h"
+#include "GameFramework/Character.h"
 
 #include "Anchor.h"
 #include "Types.h"
@@ -18,12 +18,21 @@
 class AChimneyActor;
 class UCameraComponent;
 class UCapsuleComponent;
+class UAnimSequence;
 class USpringArmComponent;
 class UStaticMeshComponent;
-class UPoseableMeshComponent;
 
+/**
+ * ACharacter, not APawn.
+ *
+ * Hand-rolled movement gave a man who floated: no gravity, no ground contact, and a capsule whose
+ * feet were wherever the last SetActorLocation put them. CharacterMovementComponent does all of
+ * that properly and is what every walking character in the engine is built on, so the ground half
+ * of this game is now entirely boilerplate. Climbing switches it to flying, which is the honest
+ * description of a man held on by his hands.
+ */
 UCLASS()
-class ASteeplejackPawn : public APawn
+class ASteeplejackPawn : public ACharacter
 {
 	GENERATED_BODY()
 
@@ -33,9 +42,6 @@ public:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* Input) override;
-
-	UPROPERTY(VisibleAnywhere, Category = "Steeplejack")
-	TObjectPtr<UCapsuleComponent> Capsule;
 
 	UPROPERTY(VisibleAnywhere, Category = "Steeplejack")
 	TObjectPtr<USpringArmComponent> Boom;
@@ -49,22 +55,17 @@ public:
 	//
 	// A blockout of primitives, not a character. There is no rig and no animator, and a placeholder
 	// that pretended to be a person would be harder to replace than one that plainly is not.
-	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<USceneComponent> Body;
 
-	/**
-	 * A poseable skeletal mesh rather than an animated one. There is no animation anywhere for a
-	 * man going up a ladder with another ladder on his shoulder, and an animation blueprint would
-	 * only be a graph with nothing in it — so the bones are set from code, from the same state the
-	 * sim already tracks. CHAR-001 replaces the placeholder body; the posing survives it.
-	 */
-	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<UPoseableMeshComponent> Jack;
 	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<UStaticMeshComponent> CarriedLadder;
 
 	// --- what the HUD reads -------------------------------------------------------------------
 	UFUNCTION(BlueprintPure, Category = "Steeplejack") float GetGrip() const { return Meters.grip; }
 	UFUNCTION(BlueprintPure, Category = "Steeplejack") float GetNerve() const { return Meters.nerve; }
 	UFUNCTION(BlueprintPure, Category = "Steeplejack") float GetNerveMax() const { return Meters.nerveMax; }
+	/** Height of his feet above the ground, in metres. The capsule's origin is at his middle. */
 	UFUNCTION(BlueprintPure, Category = "Steeplejack") float GetHeightMetres() const;
+	/** Put his feet at a height. */
+	void SetHeightMetres(float Metres);
 	UFUNCTION(BlueprintPure, Category = "Steeplejack") bool IsOnLadder() const { return bOnLadder; }
 	UFUNCTION(BlueprintPure, Category = "Steeplejack") bool IsWorking() const { return bWorking; }
 	UFUNCTION(BlueprintPure, Category = "Steeplejack") bool IsTremoring() const;
@@ -134,12 +135,10 @@ public:
 	UFUNCTION(Exec) void SJStrain(float GripValue, float NerveValue);
 	/** Toggle between watching the climber and looking through their eyes. */
 	UFUNCTION(Exec) void SJCam();
-	/** Log where the skeleton's bones actually are, rather than guessing at the axis convention. */
-	UFUNCTION(Exec) void SJBones();
+
 	/** Swing the camera round to a yaw, to read a pose from a side the climb never shows. */
 	UFUNCTION(Exec) void SJView(float Yaw, float Pitch);
-	/** Turn procedural posing off, to see the rest pose underneath it. */
-	UFUNCTION(Exec) void SJPose();
+
 	/** Put a ladder on your shoulder and dogs in the bag without the trip down. */
 	UFUNCTION(Exec) void SJCarry();
 	/**
@@ -174,7 +173,7 @@ private:
 	void TapJoint();
 	void LashLadder();
 	void PickUpMaterials();
-	void PoseBody(float DeltaSeconds);
+	void UpdateBodyAndCamera(float DeltaSeconds);
 	void SeatAnchor();
 
 	AChimneyActor* FindChimney() const;
@@ -210,9 +209,10 @@ private:
 	int32   DogsAtBase = 14;
 
 	bool    bThirdPerson = true;
-	float   TapReach = 0.0f;      // 0-1, the working arm going out to the brick and back
 	float   StridePhase = 0.0f;
-	bool    bPoseEnabled = true;   // drives the climb, so the legs move when you do
+	UPROPERTY() TObjectPtr<UAnimSequence> Idle;
+	UPROPERTY() TObjectPtr<UAnimSequence> Walk;
+	UPROPERTY() TObjectPtr<UAnimSequence> Playing;   // drives the climb, so the legs move when you do
 	FString TapReading;
 	int32   TapPipShape = -1;
 	float   TappedAtM = -100.0f;
