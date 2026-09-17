@@ -15,6 +15,7 @@
 // no clock, no randomness: the same Meters and MeterContext always produce the same result, which
 // is what lets a recorded shift replay (ADR-0003).
 
+#include "Export.h"
 #include "Types.h"
 
 #include <cstdint>
@@ -29,15 +30,15 @@ namespace grip {
 // One fixed step. Drains at the stance rate while `ctx.working`, recovers otherwise, and clamps to
 // [0, MaxGrip]. Writes only to `m`; the context is read-only, including `workedSeconds`, which the
 // caller must advance itself — see the note on MaxGrip.
-void Step(Meters& m, float dt, const MeterContext& ctx, const Tuning& t) noexcept;
+SJ_API void Step(Meters& m, float dt, const MeterContext& ctx, const Tuning& t) noexcept;
 
 // Grip lost per second while working in this stance, with every modifier applied. Exposed
 // separately because the HUD wants to show the cost of a stance *before* the player commits to
 // rigging it — a decision the player cannot make well if the number is invisible.
-float DrainRate(Stance stance, const MeterContext& ctx, const Tuning& t) noexcept;
+SJ_API float DrainRate(Stance stance, const MeterContext& ctx, const Tuning& t) noexcept;
 
 // Grip recovered per second while holding on with both hands.
-float RecoverRate(const Tuning& t) noexcept;
+SJ_API float RecoverRate(const Tuning& t) noexcept;
 
 // The ceiling. Normally gripMax; capped lower while cold, until enough work has been done to warm
 // up. This is why a winter level feels different without changing any other rule.
@@ -45,12 +46,12 @@ float RecoverRate(const Tuning& t) noexcept;
 // Reads `ctx.workedSeconds`, which nothing in the sim advances yet — `Step` takes the context by
 // const reference on purpose, so whoever assembles a MeterContext each tick owns that accumulator.
 // Until that exists the cold cap is correct and permanently inert. See METER-001's Outcome.
-float MaxGrip(const MeterContext& ctx, const Tuning& t) noexcept;
+SJ_API float MaxGrip(const MeterContext& ctx, const Tuning& t) noexcept;
 
 // Below the tremor threshold the hands visibly shake and the aim reticle wobbles harder. The
 // telegraph for running out, and it must be visible before the failure, not with it — the fairness
 // contract requires the warning to precede the consequence.
-bool Tremor(const Meters& m, const Tuning& t) noexcept;
+SJ_API bool Tremor(const Meters& m, const Tuning& t) noexcept;
 
 // Grip is gone and the hand is coming off. This *reports* the condition; it does not resolve it.
 //
@@ -59,12 +60,12 @@ bool Tremor(const Meters& m, const Tuning& t) noexcept;
 // avoids by defaulting `working` to false. Start a climber at MaxGrip, not at {}.
 // The slip window, the grab input and the fall are METER-005's, deliberately, so that the meter
 // cannot quietly acquire a second responsibility.
-bool Slipping(const Meters& m) noexcept;
+SJ_API bool Slipping(const Meters& m) noexcept;
 
 // Seconds of work left in this stance before a slip, at the current drain rate. What the twelve
 // seconds in the design doc actually is, and what a HUD would show. Negative means never (a stance
 // that does not drain).
-float SecondsOfWorkLeft(const Meters& m, const MeterContext& ctx, const Tuning& t) noexcept;
+SJ_API float SecondsOfWorkLeft(const Meters& m, const MeterContext& ctx, const Tuning& t) noexcept;
 
 }  // namespace grip
 
@@ -94,7 +95,7 @@ namespace nerve {
 //
 // Every term is tuned, and the height factor is clamped, so a chimney twice as tall is not twice
 // as frightening forever — the fear saturates, as it does in people.
-void Step(Meters& m, float dt, const MeterContext& ctx, const Tuning& t) noexcept;
+SJ_API void Step(Meters& m, float dt, const MeterContext& ctx, const Tuning& t) noexcept;
 
 // An instant loss from something that happened: a dropped tool, an anchor letting go, a jackdaw.
 // Named rather than numbered so the caller reads as the event and not as a magic value.
@@ -105,21 +106,21 @@ void Step(Meters& m, float dt, const MeterContext& ctx, const Tuning& t) noexcep
 // check, and test_nerve.cpp asserts that every `nerveShock.*` key in the tuning data is known —
 // which catches the realistic version of this, a shock added to the JSON that the code never
 // learned about.
-void Shock(Meters& m, std::string_view event, const Tuning& t) noexcept;
+SJ_API void Shock(Meters& m, std::string_view event, const Tuning& t) noexcept;
 
 // Whether `event` names a shock this build knows. See Shock().
-bool IsKnownShock(std::string_view event, const Tuning& t) noexcept;
+SJ_API bool IsKnownShock(std::string_view event, const Tuning& t) noexcept;
 
 // How much nerve `event` costs, as a negative number. 0 if unknown.
-float ShockAmount(std::string_view event, const Tuning& t) noexcept;
+SJ_API float ShockAmount(std::string_view event, const Tuning& t) noexcept;
 
 // 0 calm, 1 uneasy, 2 bad, 3 worst. The presentation layer maps these to effects; the sim only
 // says which one you are in.
-int32_t Band(float nerve, const Tuning& t) noexcept;
+SJ_API int32_t Band(float nerve, const Tuning& t) noexcept;
 
 // Nerve is gone: the player can descend or recover in place, but cannot climb. Reported, not
 // enforced — PLAYER-001 owns what "cannot climb" does.
-bool Frozen(const Meters& m) noexcept;
+SJ_API bool Frozen(const Meters& m) noexcept;
 
 // Change the nerve ceiling for the rest of the shift, and bring current nerve down with it.
 //
@@ -135,18 +136,18 @@ bool Frozen(const Meters& m) noexcept;
 //
 // This is the cigarette: fast, works anywhere, costs you the top of your range. The bad option that
 // is always tempting.
-void ReduceMax(Meters& m, float delta, const Tuning& t) noexcept;
+SJ_API void ReduceMax(Meters& m, float delta, const Tuning& t) noexcept;
 
 // A fresh climber at the start of a shift: nerve at nerveStart, which is 90 and not 100, because
 // you are always slightly on edge.
-Meters FreshShift(const Tuning& t) noexcept;
+SJ_API Meters FreshShift(const Tuning& t) noexcept;
 
 // The terms of the drain, exposed for a HUD and for tests that assert the formula rather than its
 // result.
-float HeightFactor(const MeterContext& ctx, const Tuning& t) noexcept;
-float WindFactor(const MeterContext& ctx, const Tuning& t) noexcept;
-float ExposureFactor(Exposure exposure, const Tuning& t) noexcept;
-float DrainRate(const Meters& m, const MeterContext& ctx, const Tuning& t) noexcept;
+SJ_API float HeightFactor(const MeterContext& ctx, const Tuning& t) noexcept;
+SJ_API float WindFactor(const MeterContext& ctx, const Tuning& t) noexcept;
+SJ_API float ExposureFactor(Exposure exposure, const Tuning& t) noexcept;
+SJ_API float DrainRate(const Meters& m, const MeterContext& ctx, const Tuning& t) noexcept;
 
 }  // namespace nerve
 }  // namespace sj

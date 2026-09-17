@@ -200,10 +200,20 @@ build-game:
 	@$(UE_ROOT)/Engine/Build/BatchFiles/Linux/Build.sh SteeplejackEditor Linux Development \
 		-project=$(PWD)/Steeplejack.uproject
 
-## test-automation: UE automation tests (presentation layer only)
-test-automation:
-	@$(UE) $(PWD)/Steeplejack.uproject -ExecCmds="Automation RunTests Steeplejack; Quit" \
-		-unattended -nullrhi -nosplash
+## test-automation: in-engine tests — the sim running inside Unreal, and the actors built from data
+##   These are NOT a second copy of `make check`. They test what only the engine can tell you:
+##   that the sim links and behaves inside UE, and that an actor built from a level file contains
+##   the geometry that file describes.
+test-automation: build-game ue-kill
+	@timeout 600 $(UE) $(PWD)/Steeplejack.uproject \
+		-ExecCmds="Automation RunTests Steeplejack; Quit" \
+		-unattended -nullrhi -nosplash -NoSound >/dev/null 2>&1 || true
+	@$(MAKE) --no-print-directory ue-kill
+	@grep -E "LogAutomationController.*(Test Completed|Success|Fail)" Saved/Logs/Steeplejack.log \
+		| sed 's/.*LogAutomationController: //' | tail -20 || true
+	@if grep -qE "LogAutomationController.*Fail" Saved/Logs/Steeplejack.log; then \
+		echo "  FAILED — see Saved/Logs/Steeplejack.log"; exit 1; \
+	fi
 
 ## perf-capture: frame-time capture on the three reference scenes (nightly)
 perf-capture:

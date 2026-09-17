@@ -21,6 +21,8 @@
 // Keys are dotted paths into the JSON — "gripDrainPerSecond.oneHand" — and are matched ignoring
 // case and underscores, so snake_case and camelCase spellings of the same key are the same key.
 
+#include "Export.h"
+
 #include <cstdint>
 #include <map>
 #include <stdexcept>
@@ -28,29 +30,6 @@
 #include <string_view>
 #include <vector>
 
-// Symbol visibility at the UE boundary.
-//
-// UBT compiles SteeplejackSim as its own shared library with `-fvisibility-ms-compat`, which
-// hides a class's out-of-line member functions unless they are explicitly exported — so
-// SteeplejackGame fails to link against Tuning::LoadAll and Tuning::Hash with no warning until
-// the link step.
-//
-// UE's own answer is the UBT-generated STEEPLEJACKSIM_API macro, but that expands to DLLEXPORT,
-// which is defined in an Unreal header this module must never include (ADR-0004). So: the plain
-// compiler attribute, which needs no engine header and expands to nothing when the compiler does
-// not support it. The standalone CMake build is unaffected either way.
-//
-// Known gap: MSVC has no visibility attribute — Windows needs dllexport/dllimport, which differs
-// per translation unit and cannot come from one macro defined here. The project builds on Linux
-// today. See this task's Outcome; this needs to become a project-wide convention rather than a
-// decision made in one header.
-#ifndef SJ_API
-#if defined(__GNUC__) || defined(__clang__)
-#define SJ_API __attribute__((visibility("default")))
-#else
-#define SJ_API
-#endif
-#endif
 
 namespace sj {
 

@@ -20,6 +20,8 @@
 // guessed at: a level or tuning file that this reader silently misreads is worse than one it
 // refuses, because the game still starts.
 
+#include "Export.h"
+
 #include <cstdint>
 #include <functional>
 #include <stdexcept>
@@ -31,7 +33,7 @@
 namespace sj {
 
 // Always carries the origin file and the line, because a JSON error with neither is a hunt.
-class JsonError : public std::runtime_error
+class SJ_API JsonError : public std::runtime_error
 {
 public:
     JsonError(const std::string& origin, std::size_t line, const std::string& what)
@@ -46,7 +48,7 @@ private:
     std::size_t line_;
 };
 
-class JsonValue
+class SJ_API JsonValue
 {
 public:
     enum class Kind : uint8_t { Object, Array, Number, String, Bool, Null };

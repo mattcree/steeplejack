@@ -7,12 +7,14 @@
 // what makes a recorded replay reproducible, and replay regression is the highest-leverage
 // test in the project.
 
+#include "Export.h"
+
 #include <array>
 #include <cstdint>
 
 namespace sj {
 
-class Rng
+class SJ_API Rng
 {
 public:
     explicit Rng(uint64_t seed) noexcept;

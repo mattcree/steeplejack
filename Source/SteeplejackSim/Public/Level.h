@@ -13,6 +13,7 @@
 // this one runs in the game. A divergence between them is a bug in whichever is newer, and there is
 // a test that runs both over the same fixtures and compares.
 
+#include "Export.h"
 #include "Types.h"
 
 #include <cstdint>
@@ -23,13 +24,6 @@ namespace sj {
 
 class JsonValue;
 
-#ifndef SJ_API
-#if defined(__GNUC__) || defined(__clang__)
-#define SJ_API __attribute__((visibility("default")))
-#else
-#define SJ_API
-#endif
-#endif
 
 // How the joints in a height range behave. `type` is open — a band type is added by writing a
 // generator, not by extending an enum here — but `from`/`to`/`quality` are universal.

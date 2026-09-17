@@ -35,6 +35,7 @@
 // as a growing one. Counting in exact integer sub-tick units removes the class of problem — no
 // boundary, no epsilon, the same answer on every compiler.
 
+#include "Export.h"
 #include "Types.h"
 
 #include <cstdint>
@@ -45,13 +46,6 @@
 // STEEPLEJACKSIM_API macro cannot be used: it expands to DLLEXPORT, which lives in an Unreal
 // header this module must never include (ADR-0004). CORE-015 replaces both copies with one
 // Export.h; the guard means having both is harmless until it lands.
-#ifndef SJ_API
-#if defined(__GNUC__) || defined(__clang__)
-#define SJ_API __attribute__((visibility("default")))
-#else
-#define SJ_API
-#endif
-#endif
 
 namespace sj {
 
