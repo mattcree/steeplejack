@@ -14,7 +14,7 @@ move the row to Resolved with the date.
 
 | Task | Raised | The question, in one line | Recommendation |
 |---|---|---|---|
-| — | — | *(nothing blocked)* | — |
+| [CORE-016](tasks/CORE-016.md) | 2026-09-17 | Should `SteeplejackSim` use C++ exceptions? The packaged game target does not compile without them, and `interfaces.md` mandates them in one section and forbids them in another. | Set `bForceEnableExceptions = true` on the game target and keep the throw-on-missing contract |
 
 ## Standing decisions the lead owes the project
 
