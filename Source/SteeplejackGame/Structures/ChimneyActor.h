@@ -55,6 +55,29 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Steeplejack")
 	TObjectPtr<UInstancedStaticMeshComponent> Staging;
 
+	/** Dogs driven into the brickwork, one instance each. What you have spent, made visible. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Steeplejack")
+	TObjectPtr<UInstancedStaticMeshComponent> DrivenDogs;
+
+	/**
+	 * Lay ladder up the climbing face as far as TopM, and no further.
+	 *
+	 * The ladders used to be generated for the full height of the stack at load, which quietly
+	 * contradicted the one rule the game is built on: you climb only as high as you have built.
+	 * It also left nothing for lashing a section to *do*. Now the player's LadderTopM drives this,
+	 * so the silhouette of the stack is a running record of the ascent.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Steeplejack")
+	void BuildLaddersTo(float TopM);
+
+	/** Show a dog where one was driven. */
+	UFUNCTION(BlueprintCallable, Category = "Steeplejack")
+	void AddDogMarker(float HeightMetres);
+
+	/** Which face the ladders run up, in actor space. Everything that climbs must agree on this. */
+	UFUNCTION(BlueprintPure, Category = "Steeplejack")
+	FVector ClimbFaceOffset(float HeightMetres) const;
+
 	/** Rebuild from the level file. Safe to call again; clears first. */
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Steeplejack")
 	void Rebuild();

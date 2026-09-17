@@ -68,6 +68,10 @@ AChimneyActor::AChimneyActor()
 	Ladders->SetupAttachment(Courses);
 	Ladders->SetMobility(EComponentMobility::Movable);
 
+	DrivenDogs = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("DrivenDogs"));
+	DrivenDogs->SetupAttachment(Courses);
+	DrivenDogs->SetMobility(EComponentMobility::Movable);
+
 	Staging = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Staging"));
 	Staging->SetupAttachment(Courses);
 	Staging->SetMobility(EComponentMobility::Movable);
@@ -95,6 +99,7 @@ AChimneyActor::AChimneyActor()
 	if (CubeMesh.Succeeded())
 	{
 		Ladders->SetStaticMesh(CubeMesh.Object);
+		DrivenDogs->SetStaticMesh(CubeMesh.Object);
 		Staging->SetStaticMesh(CubeMesh.Object);
 	}
 }
@@ -236,30 +241,13 @@ void AChimneyActor::Rebuild()
 
 	if (Ladders) { if (UMaterialInterface* M = BandMaterial(TEXT("__timber"))) { Ladders->SetMaterial(0, M); } }
 	if (Staging) { if (UMaterialInterface* M = BandMaterial(TEXT("__plank"))) { Staging->SetMaterial(0, M); } }
+	if (DrivenDogs) { if (UMaterialInterface* M = BandMaterial(TEXT("__timber"))) { DrivenDogs->SetMaterial(0, M); } }
 
-	// Ladders lashed up the north face, in 5 m sections with a 1 m overlap — the numbers in
-	// climbing.json. This is the silhouette that says steeplejack rather than smokestack, and it
-	// is what the player will actually be standing on.
-	if (Ladders)
-	{
-		Ladders->ClearInstances();
-		constexpr float kSectionM = 5.0f;
-		constexpr float kOverlapM = 1.0f;
-		constexpr float kRise = kSectionM - kOverlapM;
-		const int32 Sections = FMath::CeilToInt(HeightM / kRise);
-		for (int32 i = 0; i < Sections; ++i)
-		{
-			const float FootM = static_cast<float>(i) * kRise;
-			const float MidM = FMath::Min(FootM + kSectionM * 0.5f, HeightM);
-			const float T = FMath::Clamp(MidM / HeightM, 0.0f, 1.0f);
-			const float Radius = FMath::Lerp(S.baseRadius, S.topRadius, T);
-
-			FTransform X;
-			X.SetLocation(FVector(-(Radius + 0.25f) * kUUPerMetre, 0.0f, MidM * kUUPerMetre));
-			X.SetScale3D(FVector(0.12f, 0.45f, kSectionM));   // metres: a plank-width ladder
-			Ladders->AddInstance(X);
-		}
-	}
+	// Only the section already standing when the jack arrives. Everything above it is the
+	// player's to lash, one ladder at a time, and BuildLaddersTo is what puts it there.
+	if (DrivenDogs) { DrivenDogs->ClearInstances(); }
+	BuiltHeightMetres = HeightM;   // BuildLaddersTo needs the radius, which needs this set
+	BuildLaddersTo(5.0f);
 
 	// Staging at the top: the platform a jack actually works from.
 	if (Staging)
@@ -302,6 +290,64 @@ void AChimneyActor::Rebuild()
 		UE_LOG(LogSteeplejackStructure, Display, TEXT("SJCHIMNEY:   band %.0f-%.0fm %s"),
 			Band.from, Band.to, UTF8_TO_TCHAR(Band.type.c_str()));
 	}
+}
+
+
+FVector AChimneyActor::ClimbFaceOffset(float HeightMetres) const
+{
+	// One face, agreed on by everything that touches it: the ladders, the dogs, and the code that
+	// puts the climber against the brickwork. If these ever disagree the jack climbs thin air.
+	return FVector(-(RadiusAtHeightMetres(HeightMetres) + 0.25f) * kUUPerMetre, 0.0f, 0.0f);
+}
+
+void AChimneyActor::BuildLaddersTo(float TopM)
+{
+	if (!Ladders) { return; }
+	Ladders->ClearInstances();
+
+	TopM = FMath::Clamp(TopM, 0.0f, FMath::Max(BuiltHeightMetres, 1.0f));
+
+	// Rails and rungs, both cubes, both instances. A single long box read as a plank rather than a
+	// ladder, and in third person the difference is the whole silhouette.
+	constexpr float kRailGapM  = 0.44f;   // outside to outside
+	constexpr float kRungGapM  = 0.28f;
+	constexpr float kRailThick = 0.07f;
+
+	auto Box = [&](const FVector& CentreM, const FVector& SizeM)
+	{
+		FTransform X;
+		X.SetLocation(CentreM * kUUPerMetre);
+		X.SetScale3D(SizeM);
+		Ladders->AddInstance(X);
+	};
+
+	const float Face = ClimbFaceOffset(TopM * 0.5f).X / kUUPerMetre;
+
+	// Two rails running the whole lashed height. Sections overlap in the fiction; drawing them as
+	// one continuous pair avoids a seam every five metres that would read as a break in the ladder.
+	for (const float Side : { -kRailGapM * 0.5f, kRailGapM * 0.5f })
+	{
+		Box(FVector(Face, Side, TopM * 0.5f), FVector(kRailThick, kRailThick, TopM));
+	}
+
+	const int32 Rungs = FMath::Max(1, FMath::FloorToInt(TopM / kRungGapM));
+	for (int32 i = 1; i <= Rungs; ++i)
+	{
+		Box(FVector(Face + 0.01f, 0.0f, i * kRungGapM),
+		    FVector(kRailThick * 0.8f, kRailGapM, kRailThick * 0.8f));
+	}
+}
+
+void AChimneyActor::AddDogMarker(float HeightMetres)
+{
+	if (!DrivenDogs) { return; }
+	// A stub of iron standing proud of the face, on the side the ladder runs up. Small, because a
+	// dog is small, and the point is that you can count them on the way down.
+	FTransform X;
+	X.SetLocation(ClimbFaceOffset(HeightMetres)
+		+ FVector(0.18f * kUUPerMetre, 0.30f * kUUPerMetre, HeightMetres * kUUPerMetre));
+	X.SetScale3D(FVector(0.34f, 0.07f, 0.07f));
+	DrivenDogs->AddInstance(X);
 }
 
 float AChimneyActor::RadiusAtHeightMetres(float HeightMetres) const

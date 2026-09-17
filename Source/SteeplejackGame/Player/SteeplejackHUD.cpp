@@ -203,13 +203,14 @@ void ASteeplejackHUD::DrawHUD()
 
 	// --- material counts: "fade in when relevant" ----------------------------------------------
 	// Relevant means you are working, or you are running out. Otherwise they are not on screen.
-	const bool bLowStock = Jack->GetLaddersLeft() <= 3 || Jack->GetDogsLeft() <= 3;
+	const bool bLowStock = !Jack->IsCarryingLadder() || Jack->GetDogsLeft() <= 2;
 	const float StockAlpha = (bBusy || bLowStock) ? (bLowStock ? 0.95f : 0.65f) : 0.0f;
 	if (StockAlpha > 0.01f)
 	{
 		Label(Canvas, Small,
-			FString::Printf(TEXT("%d ladders   %d dogs   top %.0fm"),
-				Jack->GetLaddersLeft(), Jack->GetDogsLeft(), Jack->GetLadderTopMetres()),
+			FString::Printf(TEXT("%s   %d dogs in the bag   top %.0fm"),
+				Jack->IsCarryingLadder() ? TEXT("ladder on your shoulder") : TEXT("no ladder"),
+				Jack->GetDogsLeft(), Jack->GetLadderTopMetres()),
 			InfoX, Canvas->SizeY - kHandYFromBottom + 22.0f,
 			bLowStock ? FLinearColor(0.92f, 0.62f, 0.32f, StockAlpha)
 			          : FLinearColor(0.78f, 0.76f, 0.72f, StockAlpha));
@@ -328,18 +329,29 @@ void ASteeplejackHUD::DrawHUD()
 	const bool bLadder  = Jack->IsOnLadder();
 	const bool bTapped  = Jack->HasTappedHere();
 	const bool bDogs    = Jack->GetDogsLeft() > 0;
-	const bool bLadders = Jack->GetLaddersLeft() > 0;
 	const bool bLashable = Jack->HasLashableAnchor();
+	const bool bCarrying = Jack->IsCarryingLadder();
+	const bool bCradle   = Jack->IsAtCradle();
 
 	// The single next move. A list tells you what exists; this tells you what to do, which is the
 	// thing a player standing in a field thirty metres from a chimney actually needs.
 	FString NextStep;
-	if (Jack->IsInWorkMode())       NextStep = TEXT("Line the dog up, then hold LMB to draw — release to strike.");
-	else if (!bLadder)              NextStep = TEXT("Walk to the foot of the stack and climb on.");
-	else if (bLashable && bLadders) NextStep = TEXT("Lash the next ladder to that dog, then climb it.  [R]");
-	else if (!bTapped)              NextStep = TEXT("Tap the brickwork to hear what the joint is worth.  [E]");
-	else if (bDogs)                 NextStep = TEXT("Drive a dog into that joint.  [RMB]");
-	else                            NextStep = TEXT("Out of dogs. Climb down to the cradle for more.");
+	if (Jack->IsInWorkMode())
+		NextStep = TEXT("Line the dog up, then hold LMB to draw — release to strike.");
+	else if (bCradle && (!bCarrying || !bDogs))
+		NextStep = TEXT("Take a ladder and fill the dog bag.  [F]");
+	else if (!bLadder)
+		NextStep = TEXT("Walk to the foot of the stack and climb on.");
+	else if (bLashable && bCarrying)
+		NextStep = TEXT("Lash the ladder to that dog, then climb it.  [R]");
+	else if (bLashable && !bCarrying)
+		NextStep = TEXT("Nothing to lash — climb down to the cradle for a ladder.");
+	else if (!bDogs)
+		NextStep = TEXT("Bag is empty. Climb down to the cradle for more dogs.");
+	else if (!bTapped)
+		NextStep = TEXT("Tap the brickwork to hear what the joint is worth.  [E]");
+	else
+		NextStep = TEXT("Drive a dog into that joint.  [RMB]");
 
 	{
 		float W = 0.0f, H = 0.0f;
@@ -361,8 +373,10 @@ void ASteeplejackHUD::DrawHUD()
 		{
 			Rows.Add({ TEXT("WASD"), TEXT("walk"), true, {} });
 			Rows.Add({ TEXT("mouse"), TEXT("look"), true, {} });
+			Rows.Add({ TEXT("F"), TEXT("take a ladder and dogs"), bCradle,
+			           TEXT("only at the cradle, at the foot of the stack") });
 			Rows.Add({ TEXT("Q"), TEXT("change stance"), true, {} });
-			Rows.Add({ TEXT("—"), TEXT("tapping, dogs and ladders open up on the stack"), false, {} });
+			Rows.Add({ TEXT("—"), TEXT("tapping and dogs open up on the stack"), false, {} });
 		}
 		else
 		{
@@ -371,9 +385,9 @@ void ASteeplejackHUD::DrawHUD()
 			Rows.Add({ TEXT("RMB"), TEXT("dog in"), bTapped && bDogs,
 			           !bTapped ? FString(TEXT("tap the joint first"))
 			                    : FString(TEXT("no dogs left")) });
-			Rows.Add({ TEXT("R"),   TEXT("lash the next ladder"), bLashable && bLadders,
-			           !bLashable ? FString(TEXT("needs a dog seated above you"))
-			                      : FString(TEXT("no ladders left")) });
+			Rows.Add({ TEXT("R"),   TEXT("lash the next ladder"), bLashable && bCarrying,
+			           !bCarrying ? FString(TEXT("you are not carrying one"))
+			                      : FString(TEXT("needs a dog seated above you")) });
 			Rows.Add({ TEXT("Q"),   TEXT("change stance"), true, {} });
 		}
 

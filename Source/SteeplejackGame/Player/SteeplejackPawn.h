@@ -18,6 +18,8 @@
 class AChimneyActor;
 class UCameraComponent;
 class UCapsuleComponent;
+class USpringArmComponent;
+class UStaticMeshComponent;
 
 UCLASS()
 class ASteeplejackPawn : public APawn
@@ -35,7 +37,25 @@ public:
 	TObjectPtr<UCapsuleComponent> Capsule;
 
 	UPROPERTY(VisibleAnywhere, Category = "Steeplejack")
+	TObjectPtr<USpringArmComponent> Boom;
+
+	UPROPERTY(VisibleAnywhere, Category = "Steeplejack")
 	TObjectPtr<UCameraComponent> Camera;
+
+	// The climber's body. Third person, because the things this game is about are things a body
+	// does: which hand is on the rung, how far you have leaned out, a ladder over one shoulder,
+	// the arm coming back for a strike. In first person all of that was text on a HUD.
+	//
+	// A blockout of primitives, not a character. There is no rig and no animator, and a placeholder
+	// that pretended to be a person would be harder to replace than one that plainly is not.
+	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<USceneComponent> Body;
+	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<UStaticMeshComponent> Torso;
+	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<UStaticMeshComponent> Head;
+	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<UStaticMeshComponent> ArmL;
+	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<UStaticMeshComponent> ArmR;
+	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<UStaticMeshComponent> LegL;
+	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<UStaticMeshComponent> LegR;
+	UPROPERTY(VisibleAnywhere, Category = "Steeplejack") TObjectPtr<UStaticMeshComponent> CarriedLadder;
 
 	// --- what the HUD reads -------------------------------------------------------------------
 	UFUNCTION(BlueprintPure, Category = "Steeplejack") float GetGrip() const { return Meters.grip; }
@@ -81,8 +101,18 @@ public:
 	// has to be earned: tap a joint, drive a dog, lash the next section. That is the loop, and the
 	// resources are finite so it is also the decision.
 	UFUNCTION(BlueprintPure, Category = "Steeplejack") float GetLadderTopMetres() const { return LadderTopM; }
-	UFUNCTION(BlueprintPure, Category = "Steeplejack") int32 GetLaddersLeft() const { return LaddersLeft; }
-	UFUNCTION(BlueprintPure, Category = "Steeplejack") int32 GetDogsLeft() const { return DogsLeft; }
+	// Ladders and dogs are objects, not a score. A ladder is one man's awkward load — you carry one
+	// at a time, and it costs you grip the whole way up. The stock sits in the cradle at the foot
+	// of the stack, so running out forty metres up means going down for another. That trip is the
+	// price of the ascent and it is meant to be felt, not abstracted into a counter.
+	UFUNCTION(BlueprintPure, Category = "Steeplejack") bool  IsCarryingLadder() const { return bCarryingLadder; }
+	UFUNCTION(BlueprintPure, Category = "Steeplejack") int32 GetLaddersLeft() const { return bCarryingLadder ? 1 : 0; }
+	UFUNCTION(BlueprintPure, Category = "Steeplejack") int32 GetDogsLeft() const { return DogsCarried; }
+	UFUNCTION(BlueprintPure, Category = "Steeplejack") int32 GetLaddersAtBase() const { return LaddersAtBase; }
+	UFUNCTION(BlueprintPure, Category = "Steeplejack") int32 GetDogsAtBase() const { return DogsAtBase; }
+
+	/** Within reach of the cradle at the foot of the stack, where the materials are. */
+	UFUNCTION(BlueprintPure, Category = "Steeplejack") bool IsAtCradle() const;
 	UFUNCTION(BlueprintPure, Category = "Steeplejack") int32 GetAnchorCount() const { return Anchors.Num(); }
 	UFUNCTION(BlueprintPure, Category = "Steeplejack") FString GetTapReading() const { return TapReading; }
 	UFUNCTION(BlueprintPure, Category = "Steeplejack") int32 GetTapPipShape() const { return TapPipShape; }
@@ -99,6 +129,18 @@ public:
 	UFUNCTION(Exec) void SJDog(float Metres);
 	/** Drain grip and nerve to a value, to see the meters and their telegraphs. */
 	UFUNCTION(Exec) void SJStrain(float GripValue, float NerveValue);
+	/** Toggle between watching the climber and looking through their eyes. */
+	UFUNCTION(Exec) void SJCam();
+	/** Put a ladder on your shoulder and dogs in the bag without the trip down. */
+	UFUNCTION(Exec) void SJCarry();
+	/**
+	 * Screenshot after a settle. `shot` fires the instant the map opens, which catches the camera
+	 * lag mid-interpolation and smears the frame — every automated capture was coming out blurred
+	 * and none of them were showing what the game looks like.
+	 */
+	UFUNCTION(Exec) void SJShot(float AfterSeconds);
+	/** Sound the brickwork after a delay, so a capture can catch the arm mid-reach. */
+	UFUNCTION(Exec) void SJTap(float AfterSeconds);
 
 	/** Is there a dog in at or above head height that a ladder could be lashed to? */
 	UFUNCTION(BlueprintPure, Category = "Steeplejack") bool HasLashableAnchor() const;
@@ -122,6 +164,8 @@ private:
 	void ResolveStrike();
 	void TapJoint();
 	void LashLadder();
+	void PickUpMaterials();
+	void PoseBody(float DeltaSeconds);
 	void SeatAnchor();
 
 	AChimneyActor* FindChimney() const;
@@ -151,8 +195,14 @@ private:
 	// topmost lashed section reaches, and therefore how high you may climb.
 	TArray<sj::Anchor> Anchors;
 	float   LadderTopM = 5.0f;    // the first section stands off the ground
-	int32   LaddersLeft = 12;
-	int32   DogsLeft = 14;
+	bool    bCarryingLadder = false;
+	int32   DogsCarried = 0;
+	int32   LaddersAtBase = 12;
+	int32   DogsAtBase = 14;
+
+	bool    bThirdPerson = true;
+	float   TapReach = 0.0f;      // 0-1, the working arm going out to the brick and back
+	float   StridePhase = 0.0f;   // drives the climb, so the legs move when you do
 	FString TapReading;
 	int32   TapPipShape = -1;
 	float   TappedAtM = -100.0f;

@@ -4,6 +4,11 @@
 #include "TuningAccess.h"
 
 #include "Camera/CameraComponent.h"
+#include "GameFramework/SpringArmComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "UObject/ConstructorHelpers.h"
+#include "UnrealClient.h"
+#include "TimerManager.h"
 #include "Components/CapsuleComponent.h"
 #include "EngineUtils.h"
 #include "Meters.h"
@@ -46,11 +51,87 @@ ASteeplejackPawn::ASteeplejackPawn()
 	Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SetRootComponent(Capsule);
 
+	// The camera hangs off a boom so it can sit behind and to one side of the climber, which is the
+	// shot that sells this game: a small figure on a very large chimney with a long way to fall.
+	// The boom collides with the stack, so swinging round the face pulls the camera in rather than
+	// putting it inside the brickwork.
+	Boom = CreateDefaultSubobject<USpringArmComponent>(TEXT("Boom"));
+	Boom->SetupAttachment(Capsule);
+	Boom->SetRelativeLocation(FVector(0.0f, 0.0f, 55.0f));
+	Boom->TargetArmLength = 280.0f;
+	Boom->SocketOffset = FVector(0.0f, 55.0f, 35.0f);   // off one shoulder, a little above
+	Boom->bUsePawnControlRotation = true;
+	Boom->bEnableCameraLag = true;
+	Boom->CameraLagSpeed = 9.0f;
+	Boom->bEnableCameraRotationLag = true;
+	Boom->CameraRotationLagSpeed = 14.0f;
+	Boom->ProbeSize = 10.0f;
+
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
-	Camera->SetupAttachment(Capsule);
-	Camera->SetRelativeLocation(FVector(0.0f, 0.0f, 70.0f));   // eye height
-	Camera->bUsePawnControlRotation = true;
+	Camera->SetupAttachment(Boom, USpringArmComponent::SocketName);
 	Camera->SetFieldOfView(70.0f);   // 90 makes everything look far away and small
+
+	// --- the blockout body ----------------------------------------------------------------------
+	// Built from engine primitives and posed in code. Sized off a 1.8m man: the capsule's origin is
+	// at his middle, so Body sits at his feet and everything below is measured up from there in
+	// metres, which is the only way this stays readable.
+	Body = CreateDefaultSubobject<USceneComponent>(TEXT("Body"));
+	Body->SetupAttachment(Capsule);
+	Body->SetRelativeLocation(FVector(0.0f, 0.0f, -90.0f));
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(
+		TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(
+		TEXT("/Engine/BasicShapes/Cube.Cube"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(
+		TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+
+	auto Part = [&](const TCHAR* Name, UStaticMesh* Mesh) -> UStaticMeshComponent*
+	{
+		UStaticMeshComponent* C = CreateDefaultSubobject<UStaticMeshComponent>(Name);
+		C->SetupAttachment(Body);
+		if (Mesh) { C->SetStaticMesh(Mesh); }
+		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		C->SetCastShadow(true);
+		return C;
+	};
+
+	// The engine's basic-shape material is a checkerboard, which turns the jack into a test pattern.
+	// Reuse the stack's own material instances: dark for the man so he reads as a silhouette
+	// against brick and sky, timber for the ladder on his shoulder.
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> DarkMat(
+		TEXT("/Game/Materials/MI_Internal.MI_Internal"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TimberMat(
+		TEXT("/Game/Materials/MI_Timber.MI_Timber"));
+
+	UStaticMesh* Cyl = CylinderMesh.Succeeded() ? CylinderMesh.Object : nullptr;
+	Torso = Part(TEXT("Torso"), Cyl);
+	Head  = Part(TEXT("Head"),  SphereMesh.Succeeded() ? SphereMesh.Object : nullptr);
+	ArmL  = Part(TEXT("ArmL"),  Cyl);
+	ArmR  = Part(TEXT("ArmR"),  Cyl);
+	LegL  = Part(TEXT("LegL"),  Cyl);
+	LegR  = Part(TEXT("LegR"),  Cyl);
+	CarriedLadder = Part(TEXT("CarriedLadder"), CubeMesh.Succeeded() ? CubeMesh.Object : nullptr);
+	CarriedLadder->SetVisibility(false);
+
+	if (DarkMat.Succeeded())
+	{
+		for (UStaticMeshComponent* C : { Torso.Get(), Head.Get(), ArmL.Get(), ArmR.Get(),
+		                                 LegL.Get(), LegR.Get() })
+		{
+			if (C) { C->SetMaterial(0, DarkMat.Object); }
+		}
+	}
+	if (TimberMat.Succeeded() && CarriedLadder) { CarriedLadder->SetMaterial(0, TimberMat.Object); }
+
+	// Engine primitives are 100uu across and 100uu tall, so a scale is just the size in metres.
+	Torso->SetRelativeScale3D(FVector(0.34f, 0.24f, 0.62f));
+	Head->SetRelativeScale3D(FVector(0.21f));
+	ArmL->SetRelativeScale3D(FVector(0.11f, 0.11f, 0.62f));
+	ArmR->SetRelativeScale3D(FVector(0.11f, 0.11f, 0.62f));
+	LegL->SetRelativeScale3D(FVector(0.15f, 0.15f, 0.85f));
+	LegR->SetRelativeScale3D(FVector(0.15f, 0.15f, 0.85f));
+	CarriedLadder->SetRelativeScale3D(FVector(0.09f, 0.42f, 3.6f));
 
 	bUseControllerRotationYaw = true;
 	AutoPossessPlayer = EAutoReceiveInput::Player0;
@@ -66,6 +147,7 @@ void ASteeplejackPawn::BeginPlay()
 {
 	Super::BeginPlay();
 	Chimney = FindChimney();
+	if (Chimney) { Chimney->BuildLaddersTo(LadderTopM); }
 
 	const sj::Tuning& T = SteeplejackTuning::Get();
 	Meters = sj::nerve::FreshShift(T);
@@ -170,6 +252,7 @@ void ASteeplejackPawn::Tick(float DeltaSeconds)
 
 	// Feed the sim. Exposure and height are what nerve reads; `working` is what grip reads.
 	Context.height = FMath::Max(0.0f, NewHeightM);
+	Context.carryingLadder = bCarryingLadder;
 	Context.windSpeed = 9.0f;          // ENV-003 owns real weather; a steady breeze until then
 	Context.working = bWorking;
 	Meters.exposure = bOnLadder ? sj::Exposure::Ladder : sj::Exposure::Platform;
@@ -247,6 +330,9 @@ void ASteeplejackPawn::Tick(float DeltaSeconds)
 			TEXT("SJPAWN: grip gone at %.1fm — down you come. nerve now %.0f"),
 			NewHeightM, Meters.nerve);
 	}
+
+	// Last, so the body reflects the state this frame ended in rather than the one it began in.
+	PoseBody(DeltaSeconds);
 }
 
 bool ASteeplejackPawn::IsTremoring() const
@@ -300,7 +386,7 @@ void ASteeplejackPawn::EnterWorkMode()
 		LastStrike = TEXT("you need to be on the brickwork to work");
 		return;
 	}
-	if (DogsLeft <= 0)
+	if (DogsCarried <= 0)
 	{
 		LastStrike = TEXT("out of dogs");
 		return;
@@ -384,15 +470,15 @@ void ASteeplejackPawn::SJClimb(float Metres)
 		UE_LOG(LogTemp, Warning, TEXT("SJClimb: no chimney in the level"));
 		return;
 	}
-	const float RadiusM = Chimney->RadiusAtHeightMetres(Metres);
-	FVector P = Chimney->GetActorLocation();
-	P.X -= (RadiusM + 1.0f) * kUUPerMetre;
+	FVector P = Chimney->GetActorLocation() + Chimney->ClimbFaceOffset(Metres);
+	P.X -= 0.55f * kUUPerMetre;   // a body's depth off the rungs
 	P.Z  = Metres * kUUPerMetre;
 	SetActorLocation(P, false, nullptr, ETeleportType::TeleportPhysics);
 	if (AController* C = GetController())
 	{
 		C->SetControlRotation(FRotator(-8.0f, 0.0f, 0.0f));   // facing the brickwork
 	}
+	Chimney->BuildLaddersTo(LadderTopM);   // a dev jump still has to leave a world that makes sense
 	UE_LOG(LogTemp, Display, TEXT("SJClimb: at the face at %.1f m, top %.1f m, built %.1f m"),
 		Metres, LadderTopM, Chimney->GetBuiltHeightMetres());
 }
@@ -412,6 +498,219 @@ void ASteeplejackPawn::SJStrain(float GripValue, float NerveValue)
 	Meters.grip = FMath::Clamp(GripValue, 0.0f, 100.0f);
 	Meters.nerve = FMath::Clamp(NerveValue, 0.0f, GetNerveMax());
 	UE_LOG(LogTemp, Display, TEXT("SJStrain: grip %.0f nerve %.0f"), Meters.grip, Meters.nerve);
+}
+
+
+// --- the body ------------------------------------------------------------------------------------
+// Posed in code every frame from state that already exists. Nothing here decides anything: it reads
+// stance, lean, swing power and whether a hand is off the ladder, and puts the limbs where those
+// values say they are. If the pose and the sim ever disagree, the pose is wrong.
+
+namespace
+{
+	/** Lay a primitive along a line, because a limb is a line with a thickness. */
+	void SetLimb(UStaticMeshComponent* C, const FVector& From, const FVector& To, float Thickness)
+	{
+		if (!C) { return; }
+		const FVector Dir = To - From;
+		const float Len = FMath::Max(Dir.Size(), 1.0f);
+		C->SetRelativeLocation((From + To) * 0.5f);
+		C->SetRelativeRotation(FRotationMatrix::MakeFromZ(Dir).Rotator());
+		C->SetRelativeScale3D(FVector(Thickness, Thickness, Len / 100.0f));
+	}
+}
+
+void ASteeplejackPawn::PoseBody(float DeltaSeconds)
+{
+	if (!Body) { return; }
+
+	// The camera first, because where it sits decides what the pose is for. Climbing wants the
+	// figure against the drop; work mode wants to be close enough to see a hand on a dog.
+	if (Boom)
+	{
+		// Far enough back to hold a 1.8 m man and the 3.4 m ladder on his shoulder in the same
+		// frame, and off to one side so the brickwork he is working on is not behind his head.
+		const float WantLength = !bThirdPerson ? 0.0f : (bWorkMode ? 260.0f : 430.0f);
+		const FVector WantOffset = !bThirdPerson ? FVector(0.0f, 0.0f, 35.0f)
+		                         : bWorkMode     ? FVector(0.0f, -125.0f, 30.0f)
+		                                         : FVector(0.0f, -95.0f, 45.0f);
+		Boom->TargetArmLength = FMath::FInterpTo(Boom->TargetArmLength, WantLength, DeltaSeconds, 6.0f);
+		Boom->SocketOffset = FMath::VInterpTo(Boom->SocketOffset, WantOffset, DeltaSeconds, 6.0f);
+	}
+	// In first person you are inside the head, so the head has to go.
+	Body->SetVisibility(bThirdPerson, true);
+	if (CarriedLadder) { CarriedLadder->SetVisibility(bThirdPerson && bCarryingLadder, false); }
+	if (!bThirdPerson) { return; }
+
+	// The climb drives the stride, so the legs only move when you do. On the ground it is a walk;
+	// on the ladder it is hand over hand and the same phase serves both.
+	const float Speed = FMath::Abs(InputForward) + FMath::Abs(InputRight);
+	StridePhase += DeltaSeconds * Speed * (bOnLadder ? 3.4f : 6.0f);
+	const float Stride = FMath::Sin(StridePhase) * (bOnLadder ? 20.0f : 26.0f) * FMath::Min(Speed, 1.0f);
+
+	// The tap reach decays on its own, so the arm comes back without anyone telling it to.
+	TapReach = FMath::Max(0.0f, TapReach - DeltaSeconds * 2.4f);
+
+	// Lean is a weight shift: the whole body goes with it, and it is the thing that costs you
+	// steadiness, so it should be the thing you can see.
+	Body->SetRelativeLocation(FVector(0.0f, Lean * 16.0f, -90.0f));
+	Body->SetRelativeRotation(FRotator(0.0f, 0.0f, Lean * 9.0f));
+
+	// Landmarks, in centimetres up from the feet. +X is the way he faces — into the brickwork when
+	// he is on the ladder.
+	const FVector ShoulderL(0.0f, -16.0f, 142.0f), ShoulderR(0.0f, 16.0f, 142.0f);
+	const FVector HipL(0.0f, -10.0f, 88.0f),       HipR(0.0f, 10.0f, 88.0f);
+
+	FVector HandL, HandR, FootL, FootR;
+	float   TorsoLeanX = 0.0f;
+
+	if (bOnLadder)
+	{
+		// Hanging on. Hands above the head on the rungs, feet close in under him, body tucked
+		// toward the ladder — which is how you stay on one when your arms are tired.
+		TorsoLeanX = 6.0f;
+		HandL = FVector(26.0f, -18.0f, 186.0f + Stride);
+		HandR = FVector(26.0f,  18.0f, 186.0f - Stride);
+		FootL = FVector(22.0f, -11.0f,  12.0f - FMath::Min(Stride, 0.0f) * 0.9f);
+		FootR = FVector(22.0f,  11.0f,  12.0f + FMath::Max(Stride, 0.0f) * 0.9f);
+
+		if (bWorkMode)
+		{
+			// One hand holds, one works. That is the whole reason work mode is a commitment, and
+			// the pose is where the player should be able to read it.
+			HandL = FVector(24.0f, -18.0f, 190.0f);
+			const float Draw = SwingPower;
+			HandR = FVector(46.0f - Draw * 40.0f, 14.0f + Aim.X * 0.8f,
+			                150.0f + Draw * 26.0f - Aim.Y * 0.8f);
+		}
+		else if (TapReach > 0.0f)
+		{
+			// Reaching out to sound the brickwork. A short jab and back.
+			const float R = FMath::Sin(TapReach * PI);
+			HandR = FVector(24.0f + R * 26.0f, 16.0f, 150.0f + R * 8.0f);
+		}
+	}
+	else
+	{
+		// On the ground. Arms swing opposite the legs.
+		HandL = FVector(Stride * 0.5f,  -20.0f, 100.0f);
+		HandR = FVector(-Stride * 0.5f,  20.0f, 100.0f);
+		FootL = FVector(Stride,  -10.0f, 8.0f);
+		FootR = FVector(-Stride,  10.0f, 8.0f);
+	}
+
+	if (bCarryingLadder)
+	{
+		// A ladder is carried on one shoulder with one hand steadying it, which is exactly why it
+		// costs grip: that hand is not available for anything else.
+		HandR = FVector(-8.0f, 34.0f, 168.0f);
+	}
+
+	if (Torso)
+	{
+		Torso->SetRelativeLocation(FVector(TorsoLeanX * 0.5f, 0.0f, 115.0f));
+		Torso->SetRelativeRotation(FRotator(-TorsoLeanX, 0.0f, 0.0f));
+		Torso->SetRelativeScale3D(FVector(0.34f, 0.24f, 0.62f));
+	}
+	if (Head)
+	{
+		// Looking where the camera looks, within reason — a head that follows the mouse exactly
+		// looks like it is on a stick.
+		const float Pitch = GetControlRotation().Pitch;
+		Head->SetRelativeLocation(FVector(TorsoLeanX + 2.0f, 0.0f, 158.0f));
+		Head->SetRelativeRotation(FRotator(FMath::ClampAngle(Pitch, -35.0f, 35.0f) * 0.5f, 0.0f, 0.0f));
+		Head->SetRelativeScale3D(FVector(0.21f));
+	}
+
+	SetLimb(ArmL, ShoulderL, HandL, 0.10f);
+	SetLimb(ArmR, ShoulderR, HandR, 0.10f);
+	SetLimb(LegL, HipL, FootL, 0.14f);
+	SetLimb(LegR, HipR, FootR, 0.14f);
+
+	if (CarriedLadder && bCarryingLadder)
+	{
+		// Upright and tight to his right side, which is the far side from the camera. A five-metre
+		// section carried at any angle sweeps straight through the shot, and a ladder that hides
+		// the man defeats the point of being able to see him.
+		CarriedLadder->SetRelativeLocation(FVector(-14.0f, 34.0f, 150.0f));
+		CarriedLadder->SetRelativeRotation(FRotator(8.0f, 0.0f, 0.0f));
+		CarriedLadder->SetRelativeScale3D(FVector(0.05f, 0.32f, 3.0f));
+	}
+}
+
+bool ASteeplejackPawn::IsAtCradle() const
+{
+	if (!Chimney) { return false; }
+	const float FlatM = FVector::Dist2D(GetActorLocation(), Chimney->GetActorLocation()) / kUUPerMetre;
+	return GetHeightMetres() < 2.0f
+	    && FlatM < Chimney->RadiusAtHeightMetres(0.0f) + 8.0f;
+}
+
+void ASteeplejackPawn::PickUpMaterials()
+{
+	if (!IsAtCradle())
+	{
+		LastStrike = TEXT("the materials are in the cradle at the foot of the stack");
+		return;
+	}
+
+	constexpr int32 kDogBag = 6;   // what fits in the bag on your hip
+	int32 TookDogs = 0;
+	while (DogsCarried < kDogBag && DogsAtBase > 0) { ++DogsCarried; --DogsAtBase; ++TookDogs; }
+
+	bool bTookLadder = false;
+	if (!bCarryingLadder && LaddersAtBase > 0)
+	{
+		bCarryingLadder = true;
+		--LaddersAtBase;
+		bTookLadder = true;
+	}
+
+	if (!bTookLadder && TookDogs == 0)
+	{
+		LastStrike = bCarryingLadder
+			? TEXT("you already have a ladder on your shoulder and a full bag")
+			: TEXT("the cradle is empty");
+		return;
+	}
+	LastStrike = FString::Printf(TEXT("%s%s%d dogs in the bag, %d ladders left in the cradle"),
+		bTookLadder ? TEXT("ladder on your shoulder — ") : TEXT(""),
+		(bTookLadder || TookDogs) ? TEXT("") : TEXT(""),
+		DogsCarried, LaddersAtBase);
+}
+
+void ASteeplejackPawn::SJShot(float AfterSeconds)
+{
+	const float Wait = AfterSeconds > 0.0f ? AfterSeconds : 1.5f;
+	FTimerHandle H;
+	GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this]()
+	{
+		FScreenshotRequest::RequestScreenshot(false);
+		UE_LOG(LogTemp, Display, TEXT("SJShot: taken at %.1f m"), GetHeightMetres());
+	}), Wait, false);
+}
+
+void ASteeplejackPawn::SJTap(float AfterSeconds)
+{
+	FTimerHandle H;
+	GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this]()
+	{
+		TapJoint();
+	}), FMath::Max(AfterSeconds, 0.01f), false);
+}
+
+void ASteeplejackPawn::SJCam()
+{
+	bThirdPerson = !bThirdPerson;
+	UE_LOG(LogTemp, Display, TEXT("SJCam: %s"), bThirdPerson ? TEXT("third person") : TEXT("first person"));
+}
+
+void ASteeplejackPawn::SJCarry()
+{
+	bCarryingLadder = LaddersAtBase > 0;
+	if (bCarryingLadder) { --LaddersAtBase; }
+	while (DogsCarried < 6 && DogsAtBase > 0) { ++DogsCarried; --DogsAtBase; }
+	UE_LOG(LogTemp, Display, TEXT("SJCarry: ladder %d, dogs %d"), bCarryingLadder ? 1 : 0, DogsCarried);
 }
 
 bool ASteeplejackPawn::HasLashableAnchor() const
@@ -459,6 +758,7 @@ void ASteeplejackPawn::TapJoint()
 	static const TCHAR* Words[] = { TEXT("cracked — it rattles"), TEXT("perished — dull thud"),
 	                                TEXT("fair — firm"), TEXT("sound — it rings") };
 	TappedAtM = GetHeightMetres();
+	TapReach = 1.0f;
 	TapReading = FString::Printf(TEXT("%s%s"),
 		Words[FMath::Clamp(static_cast<int32>(R.tier), 0, 3)],
 		R.confidence < 1.0f ? TEXT("  (gloves — hard to tell)") : TEXT(""));
@@ -472,20 +772,23 @@ void ASteeplejackPawn::SeatAnchor()
 	const sj::Tuning& T = SteeplejackTuning::Get();
 	const sj::Anchor A = sj::anchor::Make(WorkJoint, DogDepth, 0.0f, T);
 	Anchors.Add(A);
-	--DogsLeft;
+	--DogsCarried;
+	if (Chimney) { Chimney->AddDogMarker(A.height); }
 
 	static const TCHAR* Rated[] = { TEXT("FAILED"), TEXT("poor"), TEXT("fair"), TEXT("sound") };
 	LastStrike = FString::Printf(TEXT("dog in at %.0fm — %s anchor, %.1f kN. %d dogs left"),
-		A.height, Rated[FMath::Clamp(static_cast<int32>(A.rate), 0, 3)], A.capacityKN, DogsLeft);
+		A.height, Rated[FMath::Clamp(static_cast<int32>(A.rate), 0, 3)], A.capacityKN, DogsCarried);
 }
 
 void ASteeplejackPawn::LashLadder()
 {
 	const sj::Tuning& T = SteeplejackTuning::Get();
 
-	if (LaddersLeft <= 0)
+	if (!bCarryingLadder)
 	{
-		LastStrike = TEXT("no ladder sections left — that is as high as this goes");
+		LastStrike = LaddersAtBase > 0
+			? TEXT("you are not carrying a ladder — go down to the cradle for one")
+			: TEXT("no ladder sections left — that is as high as this goes");
 		return;
 	}
 	// You lash to an anchor, so there has to be one at or above where you are standing.
@@ -506,9 +809,11 @@ void ASteeplejackPawn::LashLadder()
 	const float Rise = T.GetF("ladderLengthMetres") - T.GetF("ladderMinOverlapMetres");
 	LadderTopM = FMath::Min(Best + Rise,
 		Chimney ? Chimney->GetBuiltHeightMetres() : LadderTopM + Rise);
-	--LaddersLeft;
-	LastStrike = FString::Printf(TEXT("lashed to the dog at %.0fm — ladder tops out at %.0fm. %d left"),
-		Best, LadderTopM, LaddersLeft);
+	bCarryingLadder = false;
+	if (Chimney) { Chimney->BuildLaddersTo(LadderTopM); }
+	LastStrike = FString::Printf(
+		TEXT("lashed to the dog at %.0fm — ladder tops out at %.0fm. %d left in the cradle"),
+		Best, LadderTopM, LaddersAtBase);
 }
 
 void ASteeplejackPawn::MoveForward(float Value) { InputForward = Value; }
