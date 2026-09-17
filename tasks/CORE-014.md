@@ -97,6 +97,11 @@ immediately followed by a parenthesis out of code samples in any `.md` file.
 5. `06-waterside.json` parses into a tree whose `bands` array has 4 elements in file order, proving
    the tree API is adequate for CORE-008 before CORE-008 is written against it.
 6. The signature is in `interfaces.md` under its own heading before the implementation.
+7. While in `interfaces.md`: the `Tuning.h` block's comment on `GetF` still reads
+   `// dotted: "grip_drain.one_hand"`. No such key exists in `data/tuning/meters.json`, which
+   spells the group `gripDrainPerSecond` — CORE-007 found this and could not fix it, since it does
+   not own the file. Correct the comment to a key that exists. Rule 9: say which of the two was
+   wrong, and it is the doc.
 
 ## Out of scope
 Do not add a JSON *writer*. Do not add a schema validator — `tools/validate_data.py` and
