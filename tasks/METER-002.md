@@ -46,8 +46,8 @@ Recovery actions are METER-004. Visual and audio effects are UI-001 and AUD-003.
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-`MetersNerve.cpp`, `tests/unit/test_nerve.cpp` (13 cases, 72k assertions), and the `nerve::` block
-added to `Meters.h`. All six acceptance criteria pass. 88 test cases green overall.
+`MetersNerve.cpp`, `tests/unit/test_nerve.cpp` (15 cases, 72,956 assertions), and the `nerve::`
+block added to `Meters.h`. All six acceptance criteria pass. 90 test cases green overall.
 
 **The design claim, made testable**
 
@@ -150,7 +150,7 @@ not worth blocking a meter on.
   shock in the game, larger than an anchor failure, and nothing in the design docs explains it —
   worth a designer's eye before M1.
 - *A near-miss test was over-specified and I loosened it rather than chase it.* Comparing two sums
-  of 3600 float subtractions taken at very different magnitudes to doctest's default relative
+  of 3599 float subtractions taken at very different magnitudes to doctest's default relative
   epsilon fails at 0.25%. That is float accumulation, not a logic error, and asserting it to the
   last bit would have been a test being precious. Now checked to 1% with the reason written down.
 - *`check_conventions.py` flagged `return 3;`* — the band index, which `interfaces.md` fixes as
@@ -159,10 +159,16 @@ not worth blocking a meter on.
 
 **Follow-ups**
 
-- **GDD-001** — filed, `status: blocked`, with a row in `BLOCKED.md`: the three undocumented shocks,
-  whether `bellStrike` should outrank `anchorFail`, and now also the timescale question above. A
-  reviewer was right that this belonged in a task rather than a bullet in a task about to be marked
-  done.
+- **GDD-001** — filed, `status: blocked`, with a row in `BLOCKED.md`. It carries two questions: the
+  three undocumented shocks and whether `bellStrike` should outrank `anchorFail`; and the timescale
+  finding above, as question 2 with the measurements and its own acceptance criterion.
+
+  Worth recording how close that came to being a lie. An earlier draft of this Outcome said GDD-001
+  covered the timescale question when it did not — I filed the task before making that correction,
+  then asserted the cross-reference here *and* in a message to the reviewer without reopening the
+  file. A reviewer grepped it and found nothing. Same habit as the test-count and the "no Unreal"
+  claims, one level up: not a wrong measurement this time, but a wrong claim about the state of a
+  document I had written myself.
 - `tools/check_conventions.py` rule 10 only matches literal `.GetF("...")`, so the four
   `exposureFactor.*` keys reached through `ExposureKeyFor()` are invisible to it. A rename in
   `meters.json` would be `std::terminate` inside a `noexcept` function at runtime rather than a
