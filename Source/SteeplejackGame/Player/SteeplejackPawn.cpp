@@ -374,6 +374,70 @@ void ASteeplejackPawn::ResolveStrike()
 	}
 }
 
+void ASteeplejackPawn::SJClimb(float Metres)
+{
+	// bOnLadder is recomputed from position every tick, so setting the flag is not enough — the
+	// climber has to actually be at the face, and there has to be stack built up to here.
+	LadderTopM = FMath::Max(LadderTopM, Metres + 0.5f);
+	if (!Chimney)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("SJClimb: no chimney in the level"));
+		return;
+	}
+	const float RadiusM = Chimney->RadiusAtHeightMetres(Metres);
+	FVector P = Chimney->GetActorLocation();
+	P.X -= (RadiusM + 1.0f) * kUUPerMetre;
+	P.Z  = Metres * kUUPerMetre;
+	SetActorLocation(P, false, nullptr, ETeleportType::TeleportPhysics);
+	if (AController* C = GetController())
+	{
+		C->SetControlRotation(FRotator(-8.0f, 0.0f, 0.0f));   // facing the brickwork
+	}
+	UE_LOG(LogTemp, Display, TEXT("SJClimb: at the face at %.1f m, top %.1f m, built %.1f m"),
+		Metres, LadderTopM, Chimney->GetBuiltHeightMetres());
+}
+
+void ASteeplejackPawn::SJDog(float Metres)
+{
+	sj::Joint J{};
+	J.height  = Metres;
+	J.quality = 0.85f;
+	J.tier    = sj::JointTier::Sound;
+	Anchors.Add(sj::anchor::Make(J, 1.0f, 0.0f, SteeplejackTuning::Get()));
+	UE_LOG(LogTemp, Display, TEXT("SJDog: dog seated at %.1f m (%d total)"), Metres, Anchors.Num());
+}
+
+void ASteeplejackPawn::SJStrain(float GripValue, float NerveValue)
+{
+	Meters.grip = FMath::Clamp(GripValue, 0.0f, 100.0f);
+	Meters.nerve = FMath::Clamp(NerveValue, 0.0f, GetNerveMax());
+	UE_LOG(LogTemp, Display, TEXT("SJStrain: grip %.0f nerve %.0f"), Meters.grip, Meters.nerve);
+}
+
+bool ASteeplejackPawn::HasLashableAnchor() const
+{
+	for (const sj::Anchor& A : Anchors)
+	{
+		if (A.rate != sj::AnchorRate::Failed && A.height >= GetHeightMetres() - 1.0f &&
+		    A.height + 0.1f > LadderTopM - (SteeplejackTuning::Get().GetF("ladderLengthMetres") -
+		                                    SteeplejackTuning::Get().GetF("ladderMinOverlapMetres")))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool ASteeplejackPawn::IsAtLadderTop() const
+{
+	return bOnLadder && GetHeightMetres() >= LadderTopM - 0.6f;
+}
+
+bool ASteeplejackPawn::HasTappedHere() const
+{
+	return TapPipShape >= 0 && FMath::Abs(TappedAtM - GetHeightMetres()) < 1.5f;
+}
+
 void ASteeplejackPawn::TapJoint()
 {
 	if (!bOnLadder)
@@ -394,6 +458,7 @@ void ASteeplejackPawn::TapJoint()
 
 	static const TCHAR* Words[] = { TEXT("cracked — it rattles"), TEXT("perished — dull thud"),
 	                                TEXT("fair — firm"), TEXT("sound — it rings") };
+	TappedAtM = GetHeightMetres();
 	TapReading = FString::Printf(TEXT("%s%s"),
 		Words[FMath::Clamp(static_cast<int32>(R.tier), 0, 3)],
 		R.confidence < 1.0f ? TEXT("  (gloves — hard to tell)") : TEXT(""));

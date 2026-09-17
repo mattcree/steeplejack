@@ -81,6 +81,19 @@ namespace
 		C->DrawText(Font, Text, X, Y);
 	}
 
+	/**
+	 * One thing you could do, or could not do and why. The "why" is the whole point: an action
+	 * that is greyed out with no reason teaches you nothing, and this game's actions are gated on
+	 * state a new player cannot see (whether a dog is seated, whether you are on the ladder).
+	 */
+	struct Affordance
+	{
+		const TCHAR* Key;
+		const TCHAR* Verb;
+		bool         bAvailable;
+		FString      Why;     // shown only when unavailable
+	};
+
 	/** Smooth 0→1 with a soft shoulder, for fades that do not pop. */
 	float Ease(float T)
 	{
@@ -112,10 +125,15 @@ void ASteeplejackHUD::DrawHUD()
 	// --- the two arcs --------------------------------------------------------------------------
 	// Faded out when you are safe and idle, so a calm climb has almost no interface on it. This is
 	// the spec's rule and it is also the reason the arcs mean something when they do appear.
-	const float GripAlpha = FMath::Max(
-		bBusy ? 1.0f : 0.0f, Ease((kFadeAboveValue - Grip) / 25.0f));
-	const float NerveAlpha = FMath::Max(
-		bBusy ? 0.85f : 0.0f, Ease((kFadeAboveValue - (Nerve / NerveMax) * 100.0f) / 25.0f));
+	// kRestAlpha is a deliberate departure from "fade out": a meter faded to nothing is a meter the
+	// player never learns they have. They fade to a ghost instead — present enough to be noticed
+	// once, faint enough that a calm climb still reads as a chimney rather than a dashboard.
+	constexpr float kRestAlpha = 0.22f;
+	const float GripAlpha = FMath::Max3(
+		bBusy ? 1.0f : kRestAlpha, kRestAlpha, Ease((kFadeAboveValue - Grip) / 25.0f));
+	const float NerveAlpha = FMath::Max3(
+		bBusy ? 0.85f : kRestAlpha, kRestAlpha,
+		Ease((kFadeAboveValue - (Nerve / NerveMax) * 100.0f) / 25.0f));
 
 	// Grip is the fast one. Below the tremor threshold it flashes — the telegraph, on screen.
 	float GripPulse = 1.0f;
@@ -150,6 +168,17 @@ void ASteeplejackHUD::DrawHUD()
 			FLinearColor(0.85f, 0.80f, 0.72f, HandAlpha));
 		Canvas->K2_DrawLine(Hand + FVector2D(-5, 6), Hand + FVector2D(5, 6), 2.5f,
 			FLinearColor(0.85f, 0.80f, 0.72f, HandAlpha));
+	}
+
+	// Named for the first half-minute only. After that the shape, the colour and the flash carry
+	// it, and a label on a diegetic meter starts to look like a spreadsheet.
+	if (Now < 30.0f)
+	{
+		const float NameA = Ease((30.0f - Now) / 5.0f) * 0.55f;
+		Label(Canvas, Small, TEXT("grip"),  kHandX - 20.0f, Hand.Y + kGripRadius + 2.0f,
+			FLinearColor(0.86f, 0.74f, 0.42f, NameA));
+		Label(Canvas, Small, TEXT("nerve"), kHandX + 30.0f, Hand.Y + kNerveRadius + 2.0f,
+			FLinearColor(0.42f, 0.58f, 0.78f, NameA));
 	}
 
 	// --- where you are -------------------------------------------------------------------------
@@ -289,16 +318,95 @@ void ASteeplejackHUD::DrawHUD()
 		}
 	}
 
-	// --- controls -------------------------------------------------------------------------------
-	// Bottom-right, dim, and only a prototype affordance: a shipping build teaches these in the
-	// first level rather than printing them.
+	// --- what you can do, and what is stopping you -----------------------------------------------
+	// The spec's minimalism is about *meters* — it says no minimap and no objective marker, not
+	// that the verbs should be a secret. Every action here is gated on state the player cannot see
+	// (is a dog seated? have I read this joint?), so a list that only greys things out would be
+	// worse than nothing: each row carries its own reason. And because four rows all reading
+	// "not on the ladder" is noise rather than instruction, the off-ladder case collapses to the
+	// one move that matters and a note about what it opens up.
+	const bool bLadder  = Jack->IsOnLadder();
+	const bool bTapped  = Jack->HasTappedHere();
+	const bool bDogs    = Jack->GetDogsLeft() > 0;
+	const bool bLadders = Jack->GetLaddersLeft() > 0;
+	const bool bLashable = Jack->HasLashableAnchor();
+
+	// The single next move. A list tells you what exists; this tells you what to do, which is the
+	// thing a player standing in a field thirty metres from a chimney actually needs.
+	FString NextStep;
+	if (Jack->IsInWorkMode())       NextStep = TEXT("Line the dog up, then hold LMB to draw — release to strike.");
+	else if (!bLadder)              NextStep = TEXT("Walk to the foot of the stack and climb on.");
+	else if (bLashable && bLadders) NextStep = TEXT("Lash the next ladder to that dog, then climb it.  [R]");
+	else if (!bTapped)              NextStep = TEXT("Tap the brickwork to hear what the joint is worth.  [E]");
+	else if (bDogs)                 NextStep = TEXT("Drive a dog into that joint.  [RMB]");
+	else                            NextStep = TEXT("Out of dogs. Climb down to the cradle for more.");
+
 	{
-		const FString Keys = Jack->IsInWorkMode()
-			? TEXT("mouse aims  ·  A/D lean  ·  hold LMB draw, release to strike")
-			: TEXT("WASD climb  ·  E tap  ·  RMB dog in  ·  R lash  ·  Q stance");
 		float W = 0.0f, H = 0.0f;
-		Canvas->TextSize(Small, Keys, W, H);
-		Label(Canvas, Small, Keys, Canvas->SizeX - W - 28.0f, Canvas->SizeY - 30.0f,
-			FLinearColor(0.72f, 0.70f, 0.68f, 0.45f));
+		Canvas->TextSize(Font, NextStep, W, H);
+		Label(Canvas, Font, NextStep, (Canvas->SizeX - W) * 0.5f, Canvas->SizeY - 96.0f,
+			FLinearColor(0.95f, 0.93f, 0.88f, 0.90f));
+	}
+
+	{
+		TArray<Affordance> Rows;
+		if (Jack->IsInWorkMode())
+		{
+			Rows.Add({ TEXT("mouse"), TEXT("place the dog"), true, {} });
+			Rows.Add({ TEXT("A/D"),   TEXT("lean for the angle"), true, {} });
+			Rows.Add({ TEXT("LMB"),   TEXT("hold to draw, release to strike"), true, {} });
+			Rows.Add({ TEXT("RMB"),   TEXT("back out"), true, {} });
+		}
+		else if (!bLadder)
+		{
+			Rows.Add({ TEXT("WASD"), TEXT("walk"), true, {} });
+			Rows.Add({ TEXT("mouse"), TEXT("look"), true, {} });
+			Rows.Add({ TEXT("Q"), TEXT("change stance"), true, {} });
+			Rows.Add({ TEXT("—"), TEXT("tapping, dogs and ladders open up on the stack"), false, {} });
+		}
+		else
+		{
+			Rows.Add({ TEXT("W/S"), TEXT("climb"), true, {} });
+			Rows.Add({ TEXT("E"),   TEXT("tap the brickwork"), true, {} });
+			Rows.Add({ TEXT("RMB"), TEXT("dog in"), bTapped && bDogs,
+			           !bTapped ? FString(TEXT("tap the joint first"))
+			                    : FString(TEXT("no dogs left")) });
+			Rows.Add({ TEXT("R"),   TEXT("lash the next ladder"), bLashable && bLadders,
+			           !bLashable ? FString(TEXT("needs a dog seated above you"))
+			                      : FString(TEXT("no ladders left")) });
+			Rows.Add({ TEXT("Q"),   TEXT("change stance"), true, {} });
+		}
+
+		// Stacked upward from the bottom-right, clear of the screen edge so the last row is not
+		// half a row of pixels.
+		const float RowH = 17.0f;
+		float RowY = Canvas->SizeY - 44.0f - RowH * (Rows.Num() - 1);
+		for (const Affordance& A : Rows)
+		{
+			const FString Line = (A.bAvailable || A.Why.IsEmpty())
+				? FString::Printf(TEXT("[%s]  %s"), A.Key, A.Verb)
+				: FString::Printf(TEXT("[%s]  %s — %s"), A.Key, A.Verb, *A.Why);
+
+			float W = 0.0f, H = 0.0f;
+			Canvas->TextSize(Small, Line, W, H);
+			Label(Canvas, Small, Line, Canvas->SizeX - W - 28.0f, RowY,
+				A.bAvailable ? FLinearColor(0.93f, 0.90f, 0.84f, 0.88f)
+				             : FLinearColor(0.64f, 0.62f, 0.60f, 0.48f));
+			RowY += RowH;
+		}
+	}
+
+	// --- what the game is ------------------------------------------------------------------------
+	// There is no objective marker because the objective is the top of the chimney and you can see
+	// it. But you cannot see the *rule* — that the stack is the only thing you may stand on — so it
+	// is said once, at the start, and then never again.
+	if (Now < 14.0f)
+	{
+		const float A = Ease(FMath::Min(Now, 1.0f)) * Ease((14.0f - Now) / 3.0f);
+		const FString Line(TEXT("Climb the stack. You can only go as high as you have built."));
+		float W = 0.0f, H = 0.0f;
+		Canvas->TextSize(Font, Line, W, H);
+		Label(Canvas, Font, Line, (Canvas->SizeX - W) * 0.5f, Canvas->SizeY * 0.14f,
+			FLinearColor(0.92f, 0.90f, 0.86f, 0.85f * A));
 	}
 }

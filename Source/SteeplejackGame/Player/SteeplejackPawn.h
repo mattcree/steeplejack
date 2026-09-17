@@ -88,6 +88,27 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Steeplejack") int32 GetTapPipShape() const { return TapPipShape; }
 	UFUNCTION(BlueprintPure, Category = "Steeplejack") FString GetSpanWarning() const { return SpanWarning; }
 
+	// Dev commands, typed at the console. Not guarded by a #if because UHT rejects a UFUNCTION
+	// inside a preprocessor block; they are cheap and harmless, and the day this ships is the day
+	// to strip them. Nothing above the ground floor can be tested — not the HUD's gating, not wobble,
+	// not the span economy — without a way to put the climber where the test needs them, and
+	// climbing there by hand is not something an automated run can do.
+	/** Put the climber on the ladder at a height, building enough stack under them to stand on. */
+	UFUNCTION(Exec) void SJClimb(float Metres);
+	/** Seat a dog of a given rating at a height, as though it had been driven cleanly. */
+	UFUNCTION(Exec) void SJDog(float Metres);
+	/** Drain grip and nerve to a value, to see the meters and their telegraphs. */
+	UFUNCTION(Exec) void SJStrain(float GripValue, float NerveValue);
+
+	/** Is there a dog in at or above head height that a ladder could be lashed to? */
+	UFUNCTION(BlueprintPure, Category = "Steeplejack") bool HasLashableAnchor() const;
+
+	/** Are you standing at the top of what you have built, with nowhere further up? */
+	UFUNCTION(BlueprintPure, Category = "Steeplejack") bool IsAtLadderTop() const;
+
+	/** Have you read the joint at this height yet? */
+	UFUNCTION(BlueprintPure, Category = "Steeplejack") bool HasTappedHere() const;
+
 private:
 	void MoveForward(float Value);
 	void MoveRight(float Value);
@@ -134,6 +155,7 @@ private:
 	int32   DogsLeft = 14;
 	FString TapReading;
 	int32   TapPipShape = -1;
+	float   TappedAtM = -100.0f;
 	FString SpanWarning;
 
 	UPROPERTY() TObjectPtr<AChimneyActor> Chimney;

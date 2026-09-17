@@ -223,7 +223,7 @@ build-map:
 ## play: build, run the game headless, and write a screenshot you can actually look at
 ##   The one that matters. If you changed something visual and have not looked at a frame,
 ##   you have not finished. Writes Saved/Screenshots/LinuxEditor/*.png.
-play: build-game ue-kill
+play: build-game
 	@rm -f Saved/Screenshots/LinuxEditor/*.png
 	@timeout $(PLAY_SECS) $(UE_EDITOR) $(PWD)/Steeplejack.uproject $(MAP) -game -RenderOffscreen \
 	  -unattended -nosplash -NoSound -windowed -ResX=1280 -ResY=720 \
@@ -234,7 +234,14 @@ play: build-game ue-kill
 	  || (echo "  no screenshot — see Saved/Logs/Steeplejack.log"; exit 1)
 
 ## build-game: compile the UE game module
-build-game:
+# A build must always produce the binary that the next run loads. If an editor is live — and the
+# session-start MCP hook keeps one live — UBT quietly falls back to a *hot-reload* build: it writes
+# libUnrealEditor-SteeplejackGame-0001.so and leaves the base .so untouched, so `make play` then
+# launches yesterday's code and reports success. Kill the editor first and sweep the numbered
+# leftovers, so "it built" and "it ran" cannot disagree. Restart the live editor with `make mcp`.
+build-game: ue-kill
+	@rm -f Binaries/Linux/libUnrealEditor-SteeplejackGame-[0-9][0-9][0-9][0-9].so \
+	       Binaries/Linux/libUnrealEditor-SteeplejackSim-[0-9][0-9][0-9][0-9].so
 	@test -n "$(UE_ROOT)" || (echo "no Unreal 5.8 found. Put 'UE_ROOT = /path/to/UE_5.8' in Makefile.local (gitignored), or pass UE_ROOT=... — \`make ue-root\` shows what was detected" && exit 1)
 	@$(UE_ROOT)/Engine/Build/BatchFiles/Linux/Build.sh SteeplejackEditor Linux Development \
 		-project=$(PWD)/Steeplejack.uproject
