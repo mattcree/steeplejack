@@ -141,17 +141,38 @@ LogSteeplejackTuning: Tuning reloaded; no values changed (d0bab6a7dca7)
 A different digest from the same code — the in-engine loader reflects the file's current contents.
 `meters.json` was restored afterwards; it is a `reads:` path and `git status` on `data/` is clean.
 
-**And the two builds agree exactly.** Linking the *standalone CMake* `libsteeplejack_sim.a` into a
-throwaway program and hashing the same two directory states gives `ae2934aba537` and
-`d0bab6a7dca7` — the same twelve hex digits the engine printed, for both states. So the CMake build
-and UBT's build of `SteeplejackSim` produce byte-identical digests over identical data.
+**And the two builds agree.** Linking the *standalone CMake* `libsteeplejack_sim.a` into a throwaway
+program and hashing the same two directory states gives `ae2934aba537` and `d0bab6a7dca7` — the same
+digits the engine printed, for both states. The CMake build and UBT's build of `SteeplejackSim`
+produce identical digests over identical data.
 
-That is worth more than this task. It is the first direct evidence for ADR-0004's central claim —
-that the standalone gate proves what the engine will do — and for ADR-0003's, that a digest stamped
-into a replay means the same thing wherever it was produced. Both were, until now, arguments.
-Neither had been measured, because nothing had ever been built both ways and compared. If a future
-change makes these two diverge, replay validation is broken and `make check` will still be green;
-that comparison belongs in CI, and there is no task for it yet.
+**What that does and does not establish.** I first wrote that this was the first direct evidence for
+ADR-0004's claim that the standalone gate proves what the engine will do, and for ADR-0003's that a
+replay digest means the same thing wherever produced. The reviewer pushed back and was right; the
+evidence is thinner than the sentence.
+
+`LoadAll(...).Hash()` contains no floating-point *arithmetic*. It is `std::stod`, a `memcpy` of the
+resulting bits, then SHA-256, which is pure 32-bit integer work — nothing ever multiplies or adds a
+double. So the digest cannot detect the divergence ADR-0003's rule 4 exists to prevent. Compiling
+the same source six ways:
+
+| flags | digest |
+|---|---|
+| `-ffp-contract=off` (what CMake uses) | `ae2934aba537…` |
+| `-ffp-contract=fast` | `ae2934aba537…` |
+| `-ffast-math` | `ae2934aba537…` |
+| `-O0` / `-O3` | `ae2934aba537…` |
+| `clang++` instead of `g++` | `ae2934aba537…` |
+
+Identical under `-ffast-math`. The two builds would have agreed on this number even if they
+disagreed completely about float semantics — which is exactly what `SteeplejackSim.Build.cs`'s
+`FPSemantics = Precise` and CMake's `-ffp-contract=off` exist to keep aligned.
+
+So the honest claim is narrower, and still worth having: both builds parse the same JSON to the same
+double bit patterns, SHA-256 is deterministic across them, and the ABI lines up well enough to call
+across the module boundary. It is the first cross-build comparison of any sim output. **Rule 4
+remains unmeasured**, and a CI gate modelled on this test would be green for the same reason this
+test is.
 
 **What is still not proven, precisely:** a literal F5 keypress (needs a display and a human) and a
 second reload *within one session* picking up an edit made after the first. On the second: `Live()`
@@ -285,10 +306,15 @@ generated contents are quoted above so CORE-012 no longer needs an editor to see
 - `data-schemas.md` shows `meters.json` with `gripDrain`, `nerveShock` and `exposureFactor`; the
   shipped file uses `gripDrainPerSecond` and has many more keys. One of them is wrong (rule 9). Not
   mine to decide — METER-001/2/3 consume these names. No task yet.
-- **CI should compare the two builds' digests.** Nothing currently notices if the CMake and UE
-  builds of `SteeplejackSim` start disagreeing, and replay validity rests on them agreeing. A gate
-  that hashes `data/tuning` under both and diffs them would be cheap and would fail loudly. Needs a
-  task; it depends on CORE-002 (the self-hosted Unreal runner), since CI has no engine today.
+- **CI should compare the two builds — on stepped sim state, not on a tuning digest.** Nothing
+  notices today if the CMake and UE builds of `SteeplejackSim` start disagreeing, and replay
+  validity rests on them agreeing. But per the table above, a gate that compares `Tuning::Hash()`
+  would prove almost nothing: that path has no float arithmetic in it and matches even under
+  `-ffast-math`. The gate has to run N fixed steps of the sim from a fixed seed under both builds
+  and compare the resulting state, which is the thing rule 4 is about. That cannot be written until
+  there is a sim to step (CORE-005), and cannot run in CI until there is an engine there
+  (CORE-002). Needs a task once both exist — worth writing down now because the cheap version of
+  this gate is tempting and would be decoration.
 - A reload's result is visible only in the log. A designer pressing F5 cannot tell "my edit landed"
   from "my JSON has a stray comma" — both look like nothing happened. An on-screen debug message on
   both paths would apply to the dev tool the same principle the loader applies to missing keys.
