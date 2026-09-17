@@ -115,8 +115,13 @@ Do not add a JSON *writer*. Do not add a schema validator — `tools/validate_da
 
 ## Outcome
 `Json.h` / `Json.cpp` (one reader: a tree, with the flat view built on it), `tests/unit/test_json.cpp`
-(13 cases, 62 assertions), `Tuning.cpp` reading through it, and the `Json.h` contract written into
-`interfaces.md` before the implementation. 61 test cases green.
+(**13 cases**), `Tuning.cpp` reading through it, and the `Json.h` contract written into
+`interfaces.md` before the implementation.
+
+A first draft of this line said "13 cases, 62 assertions" when the file held 11. `make test-unit
+FILTER=json` reports 13 because doctest's filter is case-insensitive and also matches two cases in
+`test_tuning.cpp`. I read a number off a tool and attributed it to the file. It is 13 now because a
+reviewer's coverage finding added two more — but it was 11 when I wrote 13.
 
 **The headline: `tests/unit/test_tuning.cpp` passes unchanged** — `git diff` against main shows no
 edit to it. That is acceptance 3, and it is the whole safety argument for the extraction. It matters
@@ -124,6 +129,32 @@ more than it sounds: that file pins three SHA-256 digests over the flattened tun
 single dotted path, value kind or map ordering had shifted, the digests would move and the tests
 would fail. They do not. The flattening is behaviourally identical, proved by a hash rather than by
 reading the diff.
+
+**Two behaviour deltas, both deliberate, neither previously written down**
+
+A reviewer ran a 50-input differential probe against main — every key list and every hash identical,
+and exactly two outputs differ:
+
+1. `{"a":null, "b": }` reported the null on main and now reports the syntax error. The reader parses
+   the whole document before `Tuning` inspects any leaf, so a later syntax error wins. A direct
+   consequence of the null-policy decision below, but a consequence I had not stated.
+2. The `\u` rejection message lost the words "in tuning files", because this reader now serves level
+   files too.
+
+Both are defensible; neither was in the first draft of this Outcome, and `Json.cpp`'s own header
+comment claimed "same rejections" without qualification. The header now names both.
+
+**Acceptance 7 — and which document was wrong**
+
+`interfaces.md`'s `Tuning.h` block documented `GetF` as `// dotted: "grip_drain.one_hand"`. No such
+key exists in any tuning file; `meters.json` spells that group `gripDrainPerSecond`. Corrected to
+`gripDrainPerSecond.oneHand`.
+
+Per rule 9: **the doc was the wrong one.** The data has been `gripDrainPerSecond` since it was
+written, METER-001 now reads it under that name, and `data-schemas.md`'s example uses a third
+spelling again (`gripDrain`). CORE-007 found this and could not fix it — it does not own
+`interfaces.md` — and the first draft of this Outcome fixed the comment without saying which side
+was wrong, which is the half of rule 9 that actually matters.
 
 **Decisions**
 
@@ -170,3 +201,8 @@ that turns out not to fit is worse than two readers, because the second caller b
 - **CORE-008** is unblocked and should use `JsonValue`; its `## Interface` and `depends_on` already say so.
 - **CORE-015** should add `Json.h` to the export rule; it already owns the file.
 - `tools/check_links.py` should skip fenced code blocks. No task yet.
+- `data-schemas.md` still shows `meters.json` with `gripDrain`, a third spelling of the key that
+  `interfaces.md` and the data now agree on. Same rule-9 divergence, one document further along; no
+  task owns that file.
+- `JsonValue` will need `SJ_API` the moment CORE-008 puts one in a public header. CORE-015 owns
+  `Json.h` and its acceptance already covers it.
