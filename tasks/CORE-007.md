@@ -136,6 +136,18 @@ LogSteeplejackTuning: Tuning reloaded; no values changed (d0bab6a7dca7)
 A different digest from the same code — the in-engine loader reflects the file's current contents.
 `meters.json` was restored afterwards; it is a `reads:` path and `git status` on `data/` is clean.
 
+**And the two builds agree exactly.** Linking the *standalone CMake* `libsteeplejack_sim.a` into a
+throwaway program and hashing the same two directory states gives `ae2934aba537` and
+`d0bab6a7dca7` — the same twelve hex digits the engine printed, for both states. So the CMake build
+and UBT's build of `SteeplejackSim` produce byte-identical digests over identical data.
+
+That is worth more than this task. It is the first direct evidence for ADR-0004's central claim —
+that the standalone gate proves what the engine will do — and for ADR-0003's, that a digest stamped
+into a replay means the same thing wherever it was produced. Both were, until now, arguments.
+Neither had been measured, because nothing had ever been built both ways and compared. If a future
+change makes these two diverge, replay validation is broken and `make check` will still be green;
+that comparison belongs in CI, and there is no task for it yet.
+
 **What is still not proven, precisely:** a literal F5 keypress (needs a display and a human) and a
 second reload *within one session* picking up an edit made after the first. The keypress is one
 Slate binding on a pre-processor that is demonstrably registered; the mid-session re-read is what
@@ -211,6 +223,10 @@ the key".
 - `data-schemas.md` shows `meters.json` with `gripDrain`, `nerveShock` and `exposureFactor`; the
   shipped file uses `gripDrainPerSecond` and has many more keys. One of them is wrong (rule 9). Not
   mine to decide — METER-001/2/3 consume these names. No task yet.
+- **CI should compare the two builds' digests.** Nothing currently notices if the CMake and UE
+  builds of `SteeplejackSim` start disagreeing, and replay validity rests on them agreeing. A gate
+  that hashes `data/tuning` under both and diffs them would be cheap and would fail loudly. Needs a
+  task; it depends on CORE-002 (the self-hosted Unreal runner), since CI has no engine today.
 - A reload's result is visible only in the log. A designer pressing F5 cannot tell "my edit landed"
   from "my JSON has a stray comma" — both look like nothing happened. An on-screen debug message on
   both paths would apply to the dev tool the same principle the loader applies to missing keys.
