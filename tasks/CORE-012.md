@@ -4,8 +4,8 @@ title: Decide whether Config/ is version-controlled
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.25
-status: ready
-assignee: null
+status: in_progress
+assignee: agent
 depends_on: [CORE-001]
 owns:
   - Config/DefaultEngine.ini
