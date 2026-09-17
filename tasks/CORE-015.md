@@ -90,6 +90,22 @@ aggregates like those in `Types.h` do not need it and should not have it.
    rule.
 6. `make check` stays green and `SteeplejackSim` still builds standalone under CMake with no
    Unreal present.
+7. **`interfaces.md` is brought back in step with `Types.h` and `Meters.h`.** METER-001 added two
+   fields to `MeterContext` (`bool working`, `float workedSeconds`) and five free functions to
+   `namespace grip` (`MaxGrip`, `RecoverRate`, `Tremor`, `Slipping`, `SecondsOfWorkLeft`), and
+   could not update the contract page itself: four tasks own `interfaces.md` and one of them
+   (CORE-016) is `status: blocked`, so declaring it would have blocked METER-001 behind a question
+   about exception handling. Write them in, and say in the Outcome that the doc was the stale one
+   (rule 9). The `working` field is the load-bearing one — without it grip can only drain and never
+   recover, which is why METER-001 could not wait.
+
+## Note on `interfaces.md` contention
+
+Four tasks now own this file (CORE-014, CORE-015, CORE-016, and CORE-011 which is done), and
+METER-001 needed to edit it and could not. That is a process smell worth raising with the lead
+rather than routing around a fifth time: a contract page that every task must touch and only one
+task may own will keep going stale, and each staleness is a rule-9 divergence. Not this task's to
+fix; worth a line in its Outcome.
 
 ## Out of scope
 Do not add an Unreal include, macro or type to `SteeplejackSim` to solve this — that is the
