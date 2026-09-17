@@ -11,6 +11,7 @@
 #include "Meters.h"
 #include "Tuning.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <string>
 
@@ -230,6 +231,47 @@ TEST_CASE("Grip: Acceptance 4: the tremor warning arrives before the failure, no
     Meters warned = Working(Stance::OneHand);
     warned.grip = threshold;
     CHECK(sj::grip::SecondsOfWorkLeft(warned, Busy(), Tune()) > 2.0f);
+}
+
+TEST_CASE("Grip: the fairness margin survives the worst modifier stack, not just the easy case")
+{
+    // Rule 7 requires a telegraph before every failure. The margin is not one number: it shrinks
+    // as modifiers multiply the drain rate. METER-005 has to build a slip-save window against the
+    // WORST case, so the worst case is what gets asserted here — otherwise a tuning bump to
+    // crackedRib or wet could shrink the warning below a reactable window with the suite green.
+    const Stance stances[] = {Stance::OneHand, Stance::HookedLeg, Stance::Clipped, Stance::Belted};
+    const float threshold = Tune().GetF("gripTremorThreshold");
+    const float slipWindowSeconds =
+        static_cast<float>(Tune().GetI("slipSaveWindowMs")) / 1000.0f;
+
+    float worst = 1e9f;
+    for (const Stance s : stances)
+    {
+        for (int bits = 0; bits < 32; ++bits)
+        {
+            MeterContext c{};
+            c.working = true;
+            c.carryingLadder = (bits & 1) != 0;
+            c.wet            = (bits & 2) != 0;
+            c.gloves         = (bits & 4) != 0;
+            c.injury         = (bits & 8) != 0 ? "cracked_rib" : "";
+            c.cold           = (bits & 16) != 0;
+
+            const float rate = sj::grip::DrainRate(s, c, Tune());
+            if (rate <= 0.0f)
+            {
+                continue;   // a stance that never drains never fails, so it needs no telegraph
+            }
+            worst = std::min(worst, threshold / rate);
+        }
+    }
+
+    // The telegraph must outlast the slip-save window, or the player is told they are in trouble
+    // at the same moment they must already have reacted to it.
+    CHECK(worst > slipWindowSeconds);
+
+    // And it must be reactable at all. Roughly: under a second is tight, under the window is unfair.
+    CHECK(worst > 0.9f);
 }
 
 TEST_CASE("Grip: Acceptance 5: at zero it reports a slip and does not resolve one")
