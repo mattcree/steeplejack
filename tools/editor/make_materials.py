@@ -45,15 +45,22 @@ try:
     # runtime: a MID made in Rebuild() has to survive the actor being saved into a map and loaded
     # again, and it did not — every band reported "material=set" while rendering the previous
     # build's colour. An asset is just an asset.
+    # Weathered brick is not colourful. Everything here sits in a narrow, desaturated range with
+    # the bands separated by VALUE more than hue — which is how a real stack reads, and which also
+    # keeps them legible to a colour-blind player without relying on the hue at all.
+    #
+    # These are a legend, not art direction. The real look is ART-010's brick master material, and
+    # a placeholder that pretended to be art would be harder to replace than one that clearly is
+    # not.
     BANDS = {
-        "Plain":        (0.23, 0.11, 0.07),   # soot-dulled red brick
-        "Ivy":          (0.07, 0.14, 0.05),
-        "ExistingBand": (0.13, 0.09, 0.08),   # iron banding, near black
-        "WindBand":     (0.42, 0.33, 0.26),   # weather-bleached up top
-        "Internal":     (0.10, 0.10, 0.12),
-        "Timber":       (0.20, 0.13, 0.07),   # ladders
-        "Plank":        (0.26, 0.18, 0.10),   # staging
-        "Default":      (0.35, 0.30, 0.27),
+        "Plain":        (0.20, 0.13, 0.10),   # soot-dulled red brick
+        "Ivy":          (0.11, 0.14, 0.08),   # dark growth, barely green
+        "ExistingBand": (0.09, 0.08, 0.08),   # iron banding, near black
+        "WindBand":     (0.34, 0.30, 0.26),   # weather-bleached up top
+        "Internal":     (0.10, 0.10, 0.11),
+        "Timber":       (0.17, 0.13, 0.09),   # ladders
+        "Plank":        (0.22, 0.18, 0.13),   # staging
+        "Default":      (0.24, 0.21, 0.19),
     }
     factory = unreal.MaterialInstanceConstantFactoryNew()
     for name, (r, g, b) in BANDS.items():

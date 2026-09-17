@@ -34,6 +34,8 @@ try:
     LOG("SJMAP: new level %s" % MAP)
 
     M = 100.0                      # unreal units per metre
+    EXPOSURE = 2.0                 # fixed scene exposure; lower targets a dimmer average, so the
+                                   # image comes out brighter. See the PostProcessVolume below.
 
     # The stack itself is NOT built here. AChimneyActor reads data/levels/*.json through
     # sj::LevelData and generates the courses at runtime — rule 3, and it means the thing you look
@@ -69,14 +71,44 @@ try:
     sun.set_actor_label("Sun")
     sc = sun.get_component_by_class(unreal.DirectionalLightComponent)
     if sc:
-        sc.set_intensity(6.0)
+        sc.set_intensity(9.0)
 
     sky = movable(eas.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(0, 0, 30 * M),
                                              unreal.Rotator(0, 0, 0)))
     sky.set_actor_label("Sky")
     kc = sky.get_component_by_class(unreal.SkyLightComponent)
     if kc:
-        kc.set_intensity(1.5)
+        kc.set_intensity(0.7)
+
+    # Pin the exposure.
+    #
+    # Auto-exposure is why the brickwork kept rendering as pastel however dark the albedo was set:
+    # the surfaces ARE dark (0.07-0.23), so the histogram lifts the whole frame until the average
+    # reads mid-grey, and a 0.23 brick arrives on screen as pale pink. Clamping min and max to the
+    # same value turns adaptation off without going near manual EV, which needs camera ISO and
+    # shutter to mean anything.
+    #
+    # It also makes screenshots comparable between runs, which matters when the frames are how
+    # changes get reviewed.
+    try:
+        ppv = eas.spawn_actor_from_class(unreal.PostProcessVolume, unreal.Vector(0, 0, 0),
+                                         unreal.Rotator(0, 0, 0))
+        ppv.set_actor_label("Exposure")
+        ppv.set_editor_property("unbound", True)
+        st = ppv.get_editor_property("settings")
+        for prop, value in (("override_auto_exposure_min_brightness", True),
+                            ("auto_exposure_min_brightness", EXPOSURE),
+                            ("override_auto_exposure_max_brightness", True),
+                            ("auto_exposure_max_brightness", EXPOSURE),
+                            ("override_auto_exposure_bias", True),
+                            ("auto_exposure_bias", 1.0)):
+            st.set_editor_property(prop, value)
+        ppv.set_editor_property("settings", st)
+        LOG("SJMAP: exposure pinned at %.2f" % EXPOSURE)
+    except Exception as e:
+        # Never fatal: a map without a post-process volume still renders, and a script that dies
+        # here leaves no map at all, which reads as a black frame and wastes an hour.
+        LOG("SJMAP: could not pin exposure (%s)" % e)
 
     for cls, label in ((unreal.SkyAtmosphere, "Atmosphere"), (unreal.ExponentialHeightFog, "Fog")):
         try:
@@ -98,8 +130,8 @@ try:
     # The player starts on the ground at the foot of the stack, looking up at it — not floating
     # where the establishing camera happens to be. The camera actor below keeps that framing for
     # screenshots; the PlayerStart is where a jack actually begins a shift.
-    foot = unreal.Vector(-14 * M, -10 * M, 1.0 * M)
-    foot_d = unreal.Vector(-foot.x, -foot.y, HEIGHT_M * 0.30 * M - foot.z)
+    foot = unreal.Vector(-30 * M, -22 * M, 1.7 * M)
+    foot_d = unreal.Vector(-foot.x, -foot.y, HEIGHT_M * 0.55 * M - foot.z)
     foot_yaw = math.degrees(math.atan2(foot_d.y, foot_d.x))
     foot_pitch = math.degrees(math.atan2(foot_d.z, math.sqrt(foot_d.x ** 2 + foot_d.y ** 2)))
     start = eas.spawn_actor_from_class(unreal.PlayerStart, foot,

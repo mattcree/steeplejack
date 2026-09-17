@@ -3,19 +3,89 @@
 #include "Player/SteeplejackPawn.h"
 
 #include "Engine/Canvas.h"
+#include "Engine/Engine.h"
 #include "Engine/Font.h"
+
+// The HUD, to the spec in docs/01-gdd/03-meters-grip-nerve.md#hud:
+//
+//   "Minimal and diegetic-ish. Bottom-left, two thin arcs around the hand icon. Grip: a fast,
+//    responsive arc. Flashes at 20. Nerve: a slow arc that visibly breathes. Neither is shown at
+//    full value with no threat — they fade out above 85 and when idle. The rest of the HUD is
+//    only: anchor rating pips, material counts (fade in when relevant), daylight bar. No minimap.
+//    No objective marker. The objective is at the top; you can see it."
+//
+// Everything here follows from that. Nothing is permanent except the arcs, and even they leave
+// when you are safe and idle — the screen is meant to be a chimney, not a dashboard. Anything that
+// must be read against a bright sky gets a shadow rather than a panel, because a panel is a box
+// between the player and the thing they climbed to see.
 
 namespace
 {
-	// Grip is red as it goes; nerve blues out. Placeholder until UI-001 — but the *thresholds*
-	// are the sim's, not invented here, so what you see is what the rules say.
-	void Bar(UCanvas* C, float X, float Y, float W, float H, float Fraction, FLinearColor Colour)
+	// Bottom-left, per the spec. Everything else is positioned relative to this.
+	constexpr float kHandX = 96.0f;
+	constexpr float kHandYFromBottom = 104.0f;
+	constexpr float kGripRadius = 44.0f;
+	constexpr float kNerveRadius = 56.0f;
+	constexpr float kArcThickness = 4.0f;
+
+	// The arcs sweep the left side, opening away from the centre of the screen so they frame the
+	// hand rather than pointing at the action.
+	constexpr float kArcStartDeg = 128.0f;
+	constexpr float kArcSweepDeg = 244.0f;
+	constexpr int32 kArcSegments = 48;
+
+	constexpr float kFadeAboveValue = 85.0f;   // the spec's "fade out above 85"
+	constexpr float kTremorValue = 20.0f;      // "flashes at 20"
+
+	FVector2D OnArc(const FVector2D& Centre, float Radius, float Degrees)
 	{
-		C->SetDrawColor(20, 20, 22, 180);
-		C->DrawTile(C->DefaultTexture, X - 2, Y - 2, W + 4, H + 4, 0, 0, 1, 1);
+		const float R = FMath::DegreesToRadians(Degrees);
+		return Centre + FVector2D(FMath::Cos(R) * Radius, -FMath::Sin(R) * Radius);
+	}
+
+	void Arc(UCanvas* C, const FVector2D& Centre, float Radius, float Fraction, float Thickness,
+	         const FLinearColor& Colour)
+	{
+		if (Fraction <= 0.0f || Colour.A <= 0.01f)
+		{
+			return;
+		}
+		const int32 Steps = FMath::Max(2, FMath::RoundToInt(kArcSegments * Fraction));
+		const float Span = kArcSweepDeg * FMath::Clamp(Fraction, 0.0f, 1.0f);
+		for (int32 i = 0; i < Steps; ++i)
+		{
+			const float A = kArcStartDeg - Span * (static_cast<float>(i) / Steps);
+			const float B = kArcStartDeg - Span * (static_cast<float>(i + 1) / Steps);
+			C->K2_DrawLine(OnArc(Centre, Radius, A), OnArc(Centre, Radius, B), Thickness, Colour);
+		}
+	}
+
+	/** The unfilled remainder, so the arc reads as a gauge rather than a floating stroke. */
+	void ArcTrack(UCanvas* C, const FVector2D& Centre, float Radius, float Alpha)
+	{
+		Arc(C, Centre, Radius, 1.0f, 1.5f, FLinearColor(0.0f, 0.0f, 0.0f, 0.35f * Alpha));
+	}
+
+	/** Text with a shadow rather than a panel: legible on sky without boxing the view in. */
+	void Label(UCanvas* C, UFont* Font, const FString& Text, float X, float Y,
+	           const FLinearColor& Colour)
+	{
+		if (Colour.A <= 0.01f)
+		{
+			return;
+		}
+		C->SetDrawColor(0, 0, 0, static_cast<uint8>(150 * Colour.A));
+		C->DrawText(Font, Text, X + 1.0f, Y + 1.0f);
 		C->SetDrawColor(static_cast<uint8>(Colour.R * 255), static_cast<uint8>(Colour.G * 255),
-		                static_cast<uint8>(Colour.B * 255), 235);
-		C->DrawTile(C->DefaultTexture, X, Y, W * FMath::Clamp(Fraction, 0.0f, 1.0f), H, 0, 0, 1, 1);
+		                static_cast<uint8>(Colour.B * 255), static_cast<uint8>(Colour.A * 255));
+		C->DrawText(Font, Text, X, Y);
+	}
+
+	/** Smooth 0→1 with a soft shoulder, for fades that do not pop. */
+	float Ease(float T)
+	{
+		T = FMath::Clamp(T, 0.0f, 1.0f);
+		return T * T * (3.0f - 2.0f * T);
 	}
 }
 
@@ -29,127 +99,206 @@ void ASteeplejackHUD::DrawHUD()
 		return;
 	}
 
+	UFont* Small = GEngine->GetSmallFont();
 	UFont* Font = GEngine->GetMediumFont();
-	const float X = 40.0f;
-	float Y = Canvas->SizeY - 150.0f;
+	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	const FVector2D Hand(kHandX, Canvas->SizeY - kHandYFromBottom);
 
-	// Grip: reddens as it drops, so the tremor threshold is visible before it bites.
-	const float GripFrac = Jack->GetGrip() / 100.0f;
+	const float Grip = Jack->GetGrip();
+	const float Nerve = Jack->GetNerve();
+	const float NerveMax = FMath::Max(1.0f, Jack->GetNerveMax());
+	const bool bBusy = Jack->IsWorking() || Jack->IsInWorkMode();
+
+	// --- the two arcs --------------------------------------------------------------------------
+	// Faded out when you are safe and idle, so a calm climb has almost no interface on it. This is
+	// the spec's rule and it is also the reason the arcs mean something when they do appear.
+	const float GripAlpha = FMath::Max(
+		bBusy ? 1.0f : 0.0f, Ease((kFadeAboveValue - Grip) / 25.0f));
+	const float NerveAlpha = FMath::Max(
+		bBusy ? 0.85f : 0.0f, Ease((kFadeAboveValue - (Nerve / NerveMax) * 100.0f) / 25.0f));
+
+	// Grip is the fast one. Below the tremor threshold it flashes — the telegraph, on screen.
+	float GripPulse = 1.0f;
+	if (Jack->IsTremoring())
+	{
+		GripPulse = 0.55f + 0.45f * FMath::Sin(Now * 9.0f);
+	}
 	const FLinearColor GripColour = Jack->IsTremoring()
-		? FLinearColor(0.85f, 0.20f, 0.15f)
-		: FLinearColor::LerpUsingHSV(FLinearColor(0.85f, 0.35f, 0.15f),
-		                             FLinearColor(0.55f, 0.75f, 0.35f), GripFrac);
-	Bar(Canvas, X, Y, 320.0f, 16.0f, GripFrac, GripColour);
-	Canvas->SetDrawColor(235, 235, 235, 255);
-	Canvas->DrawText(Font, FString::Printf(TEXT("GRIP  %.0f    %s"), Jack->GetGrip(),
-		Jack->IsTremoring() ? TEXT("— hands shaking") : TEXT("")), X + 330.0f, Y - 2.0f);
+		? FLinearColor(0.92f, 0.28f, 0.20f, GripAlpha * GripPulse)
+		: FLinearColor(0.86f, 0.74f, 0.42f, GripAlpha);
 
-	Y += 26.0f;
-	const float NerveFrac = Jack->GetNerveMax() > 0.0f ? Jack->GetNerve() / Jack->GetNerveMax() : 0.0f;
-	static const TCHAR* BandWords[] = { TEXT("calm"), TEXT("uneasy"), TEXT("bad"), TEXT("gripped") };
-	const int32 Band = FMath::Clamp(Jack->GetNerveBand(), 0, 3);
-	Bar(Canvas, X, Y, 320.0f, 16.0f, NerveFrac, FLinearColor(0.35f, 0.55f, 0.80f));
-	Canvas->SetDrawColor(235, 235, 235, 255);
-	Canvas->DrawText(Font, FString::Printf(TEXT("NERVE %.0f    %s"), Jack->GetNerve(),
-		BandWords[Band]), X + 330.0f, Y - 2.0f);
+	// Nerve is the slow one, and it breathes: a real, visible in-and-out at rest-breathing rate,
+	// faster as the bands get worse. It is the character's chest, not a progress bar.
+	const float BreathRate = 0.55f + 0.30f * Jack->GetNerveBand();
+	const float Breath = 1.0f + 0.035f * FMath::Sin(Now * BreathRate * PI);
+	const FLinearColor NerveColour(0.42f, 0.58f, 0.78f, NerveAlpha);
 
-	// The state line: where you are, what you are stood on, what it is costing.
-	Y += 34.0f;
-	const float Left = Jack->GetSecondsOfWorkLeft();
-	Canvas->SetDrawColor(205, 205, 210, 255);
-	Canvas->DrawText(Font, FString::Printf(
-		TEXT("%.0f m   %s   %s%s   %s"),
-		Jack->GetHeightMetres(),
-		Jack->IsOnLadder() ? TEXT("on the ladder") : TEXT("on the ground"),
-		*Jack->GetStanceName(),
-		Jack->IsWorking() ? TEXT(" — working") : TEXT(""),
-		Left < 0.0f ? TEXT("") : *FString::Printf(TEXT("~%.0fs of work left"), Left)),
-		X, Y);
+	ArcTrack(Canvas, Hand, kGripRadius, GripAlpha);
+	ArcTrack(Canvas, Hand, kNerveRadius, NerveAlpha);
+	Arc(Canvas, Hand, kGripRadius, Grip / 100.0f, kArcThickness, GripColour);
+	Arc(Canvas, Hand, kNerveRadius * Breath, Nerve / NerveMax, kArcThickness - 1.0f, NerveColour);
 
-	// The ascent: what you have built, and what it cost you. Materials are the decision -- bring
-	// too few and you do not reach the top.
-	Y += 22.0f;
-	Canvas->SetDrawColor(215, 205, 180, 255);
-	Canvas->DrawText(Font, FString::Printf(
-		TEXT("ladder tops out at %.0fm   %d ladders   %d dogs   %d anchors"),
-		Jack->GetLadderTopMetres(), Jack->GetLaddersLeft(), Jack->GetDogsLeft(),
-		Jack->GetAnchorCount()), X, Y);
+	// The hand: a small mark the arcs wrap, so they read as belonging to a body. Abstract on
+	// purpose — a proper glyph is UI-001's, and a placeholder that pretends otherwise would be
+	// harder to replace than one that clearly does not.
+	const float HandAlpha = FMath::Max(GripAlpha, NerveAlpha);
+	if (HandAlpha > 0.01f)
+	{
+		Canvas->K2_DrawLine(Hand + FVector2D(-7, 4), Hand + FVector2D(0, -8), 2.5f,
+			FLinearColor(0.85f, 0.80f, 0.72f, HandAlpha));
+		Canvas->K2_DrawLine(Hand + FVector2D(0, -8), Hand + FVector2D(7, 4), 2.5f,
+			FLinearColor(0.85f, 0.80f, 0.72f, HandAlpha));
+		Canvas->K2_DrawLine(Hand + FVector2D(-5, 6), Hand + FVector2D(5, 6), 2.5f,
+			FLinearColor(0.85f, 0.80f, 0.72f, HandAlpha));
+	}
 
+	// --- where you are -------------------------------------------------------------------------
+	// One quiet line. Height is the only number that is always worth knowing, because it is the
+	// thing the whole game is about.
+	const float InfoX = kHandX + kNerveRadius + 26.0f;
+	float Y = Canvas->SizeY - kHandYFromBottom - 26.0f;
+
+	Label(Canvas, Font, FString::Printf(TEXT("%.0f m"), Jack->GetHeightMetres()), InfoX, Y,
+		FLinearColor(0.94f, 0.92f, 0.88f, 0.92f));
+
+	if (Jack->IsOnLadder())
+	{
+		Y += 20.0f;
+		FString Where = Jack->GetStanceName();
+		if (!Jack->GetBandName().IsEmpty())
+		{
+			Where += TEXT("  ·  ") + Jack->GetBandName();
+		}
+		Label(Canvas, Small, Where, InfoX, Y, FLinearColor(0.80f, 0.78f, 0.74f, 0.70f));
+	}
+
+	// --- material counts: "fade in when relevant" ----------------------------------------------
+	// Relevant means you are working, or you are running out. Otherwise they are not on screen.
+	const bool bLowStock = Jack->GetLaddersLeft() <= 3 || Jack->GetDogsLeft() <= 3;
+	const float StockAlpha = (bBusy || bLowStock) ? (bLowStock ? 0.95f : 0.65f) : 0.0f;
+	if (StockAlpha > 0.01f)
+	{
+		Label(Canvas, Small,
+			FString::Printf(TEXT("%d ladders   %d dogs   top %.0fm"),
+				Jack->GetLaddersLeft(), Jack->GetDogsLeft(), Jack->GetLadderTopMetres()),
+			InfoX, Canvas->SizeY - kHandYFromBottom + 22.0f,
+			bLowStock ? FLinearColor(0.92f, 0.62f, 0.32f, StockAlpha)
+			          : FLinearColor(0.78f, 0.76f, 0.72f, StockAlpha));
+	}
+
+	// --- the span you are stood on --------------------------------------------------------------
+	// Only when it is a problem. A rigid span says nothing, which is what makes a warning mean
+	// something when it appears.
 	if (!Jack->GetSpanWarning().IsEmpty())
 	{
-		Y += 20.0f;
 		const bool bBuckle = Jack->GetSpanWarning().Contains(TEXT("BUCKLE"));
-		Canvas->SetDrawColor(bBuckle ? 235 : 225, bBuckle ? 70 : 170, 60, 255);
-		Canvas->DrawText(Font, *Jack->GetSpanWarning(), X, Y);
+		const float Pulse = bBuckle ? 0.6f + 0.4f * FMath::Sin(Now * 7.0f) : 1.0f;
+		Label(Canvas, Font, Jack->GetSpanWarning(), InfoX, Canvas->SizeY - kHandYFromBottom + 44.0f,
+			bBuckle ? FLinearColor(0.95f, 0.30f, 0.22f, Pulse)
+			        : FLinearColor(0.92f, 0.70f, 0.35f, 0.90f));
 	}
 
-	if (!Jack->GetTapReading().IsEmpty())
+	// --- what the last thing you did told you ---------------------------------------------------
+	// Centre-low, where the eye already is after a strike. One line, no history.
+	const FString Message = Jack->IsInWorkMode() ? FString() : Jack->GetLastStrikeResult();
+	if (!Message.IsEmpty())
 	{
-		Y += 20.0f;
-		Canvas->SetDrawColor(200, 210, 220, 255);
-		// The pip is a shape, never a colour (rule 8): a player who cannot hear the ring and a
-		// player who cannot tell red from green must both be able to read the joint.
-		static const TCHAR* Pips[] = { TEXT("(O)"), TEXT("[#]"), TEXT("/_\\"), TEXT(">|<") };
+		float W = 0.0f, H = 0.0f;
+		Canvas->TextSize(Font, Message, W, H);
+		Label(Canvas, Font, Message, (Canvas->SizeX - W) * 0.5f, Canvas->SizeY * 0.70f,
+			FLinearColor(0.90f, 0.88f, 0.84f, 0.88f));
+	}
+
+	// The tap reading sits with its shape pip, because rule 8 says the sound must have a visual
+	// fallback and the fallback must not be a colour.
+	if (!Jack->GetTapReading().IsEmpty() && !Jack->IsInWorkMode())
+	{
+		static const TCHAR* Pips[] = { TEXT("●"), TEXT("■"), TEXT("▲"), TEXT("✖") };
 		const int32 Pip = Jack->GetTapPipShape();
-		Canvas->DrawText(Font, FString::Printf(TEXT("%s  %s"),
-			(Pip >= 0 && Pip < 4) ? Pips[Pip] : TEXT("   "), *Jack->GetTapReading()), X, Y);
+		const FString Line = FString::Printf(TEXT("%s  %s"),
+			(Pip >= 0 && Pip < 4) ? Pips[Pip] : TEXT(" "), *Jack->GetTapReading());
+		float W = 0.0f, H = 0.0f;
+		Canvas->TextSize(Font, Line, W, H);
+		Label(Canvas, Font, Line, (Canvas->SizeX - W) * 0.5f, Canvas->SizeY * 0.70f - 24.0f,
+			FLinearColor(0.86f, 0.90f, 0.94f, 0.92f));
 	}
 
-	if (!Jack->GetLastStrikeResult().IsEmpty() && !Jack->IsInWorkMode())
-	{
-		Y += 20.0f;
-		Canvas->SetDrawColor(180, 180, 185, 255);
-		Canvas->DrawText(Font, *Jack->GetLastStrikeResult(), X, Y);
-	}
-
-	Y += 22.0f;
-	if (!Jack->GetBandName().IsEmpty())
-	{
-		Canvas->SetDrawColor(170, 170, 175, 255);
-		Canvas->DrawText(Font, FString::Printf(TEXT("band: %s"), *Jack->GetBandName()), X, Y);
-	}
-
-	// --- work mode -----------------------------------------------------------------------------
+	// --- work mode ------------------------------------------------------------------------------
+	// Everything above recedes; this is the whole screen for as long as you hold it.
 	if (Jack->IsInWorkMode())
 	{
-		const float CX = Canvas->SizeX * 0.5f;
-		const float CY = Canvas->SizeY * 0.42f;
+		const FVector2D Eye(Canvas->SizeX * 0.5f, Canvas->SizeY * 0.44f);
+		const float PxPerDeg = 10.0f;
+		const float Tolerance = 12.0f * PxPerDeg;
 
-		// The tolerance ring: inside it a strike is clean, outside it bends dogs. Drawn so the
-		// player can see the wobble eating their margin rather than being told about it.
-		const float PixelsPerDeg = 9.0f;
-		const float Tolerance = 12.0f * PixelsPerDeg;   // hammerMaxAngleErrorDegrees
-		Canvas->SetDrawColor(120, 120, 130, 120);
-		Canvas->DrawTile(Canvas->DefaultTexture, CX - Tolerance, CY - 1, Tolerance * 2, 2, 0, 0, 1, 1);
-		Canvas->DrawTile(Canvas->DefaultTexture, CX - 1, CY - Tolerance, 2, Tolerance * 2, 0, 0, 1, 1);
+		// The tolerance ring: inside it a strike is clean, outside it bends dogs. Drawn as a ring
+		// so the player watches the wobble eat their margin rather than reading a number for it.
+		for (int32 i = 0; i < 72; ++i)
+		{
+			const float A = i * 5.0f;
+			const float B = A + 5.0f;
+			Canvas->K2_DrawLine(OnArc(Eye, Tolerance, A), OnArc(Eye, Tolerance, B), 1.5f,
+				FLinearColor(0.85f, 0.85f, 0.90f, 0.30f));
+		}
 
-		// Where the hammer actually is: aim plus wobble.
 		const float Err = Jack->GetAngleErrorDeg();
-		const float R = Err * PixelsPerDeg;
-		const bool bClean = Err < 12.0f * 0.35f;
-		Canvas->SetDrawColor(bClean ? 120 : 220, bClean ? 220 : 110, 110, 255);
-		Canvas->DrawTile(Canvas->DefaultTexture, CX + R - 5, CY - 5, 10, 10, 0, 0, 1, 1);
+		const float Quality = FMath::Clamp(1.0f - Err / 12.0f, 0.0f, 1.0f);
+		const FVector2D Tip = Eye + FVector2D(Err * PxPerDeg, 0.0f);
+		const FLinearColor Mark = FLinearColor::LerpUsingHSV(
+			FLinearColor(0.95f, 0.35f, 0.25f, 1.0f), FLinearColor(0.55f, 0.85f, 0.45f, 1.0f),
+			Quality);
 
-		// Draw strength. Release near the top for power, but only if the angle is clean.
-		const float BarW = 220.0f;
-		Bar(Canvas, CX - BarW * 0.5f, CY + Tolerance + 30.0f, BarW, 12.0f,
-			Jack->GetSwingPower(), FLinearColor(0.85f, 0.70f, 0.30f));
+		Canvas->K2_DrawLine(Tip + FVector2D(-9, 0), Tip + FVector2D(9, 0), 2.0f, Mark);
+		Canvas->K2_DrawLine(Tip + FVector2D(0, -9), Tip + FVector2D(0, 9), 2.0f, Mark);
 
-		Canvas->SetDrawColor(235, 235, 235, 255);
-		Canvas->DrawText(Font, FString::Printf(TEXT("dog %.0f%%   %.1f deg off   wobble %.1f deg%s"),
-			Jack->GetDogDepth() * 100.0f, Err, Jack->GetWobbleDeg(),
-			FMath::Abs(Jack->GetLean()) > 0.05f
-				? *FString::Printf(TEXT("   leaning %.0f%%"), Jack->GetLean() * 100.0f)
-				: TEXT("")),
-			CX - BarW * 0.5f, CY + Tolerance + 50.0f);
+		// Draw strength, as an arc under the ring so the eye never leaves the joint.
+		const float Power = Jack->GetSwingPower();
+		if (Power > 0.0f)
+		{
+			for (int32 i = 0; i < FMath::RoundToInt(40 * Power); ++i)
+			{
+				const float A = 250.0f - (i * 110.0f / 40.0f);
+				const float B = A - 110.0f / 40.0f;
+				Canvas->K2_DrawLine(OnArc(Eye, Tolerance + 22.0f, A),
+					OnArc(Eye, Tolerance + 22.0f, B), 5.0f,
+					FLinearColor(0.90f, 0.72f, 0.30f, 0.95f));
+			}
+		}
 
-		Canvas->SetDrawColor(200, 200, 205, 255);
-		Canvas->DrawText(Font, *Jack->GetLastStrikeResult(), CX - BarW * 0.5f, CY + Tolerance + 70.0f);
+		// How far in the dog is, as a bar that fills toward seating.
+		const float BarW = 180.0f;
+		const float BarX = Eye.X - BarW * 0.5f;
+		const float BarY = Eye.Y + Tolerance + 54.0f;
+		Canvas->SetDrawColor(0, 0, 0, 120);
+		Canvas->DrawTile(Canvas->DefaultTexture, BarX - 1, BarY - 1, BarW + 2, 8, 0, 0, 1, 1);
+		Canvas->SetDrawColor(205, 180, 120, 240);
+		Canvas->DrawTile(Canvas->DefaultTexture, BarX, BarY, BarW * Jack->GetDogDepth(), 6, 0, 0, 1, 1);
+
+		const FString Work = FString::Printf(TEXT("dog %.0f%%   %.1f° off"),
+			Jack->GetDogDepth() * 100.0f, Err);
+		float W = 0.0f, H = 0.0f;
+		Canvas->TextSize(Small, Work, W, H);
+		Label(Canvas, Small, Work, Eye.X - W * 0.5f, BarY + 14.0f,
+			FLinearColor(0.85f, 0.83f, 0.80f, 0.85f));
+
+		if (!Jack->GetLastStrikeResult().IsEmpty())
+		{
+			Canvas->TextSize(Font, Jack->GetLastStrikeResult(), W, H);
+			Label(Canvas, Font, Jack->GetLastStrikeResult(), Eye.X - W * 0.5f, BarY + 36.0f,
+				FLinearColor(0.90f, 0.88f, 0.84f, 0.90f));
+		}
 	}
 
-	Canvas->SetDrawColor(150, 150, 155, 255);
-	Canvas->DrawText(Font, Jack->IsInWorkMode()
-		? TEXT("mouse aims the hammer   A/D lean   hold LMB draw, release to strike   let go of RMB to stop")
-		: TEXT("WASD climb   E tap the joint   RMB dog it in   R lash a ladder   Q stance"),
-		X, Canvas->SizeY - 28.0f);
+	// --- controls -------------------------------------------------------------------------------
+	// Bottom-right, dim, and only a prototype affordance: a shipping build teaches these in the
+	// first level rather than printing them.
+	{
+		const FString Keys = Jack->IsInWorkMode()
+			? TEXT("mouse aims  ·  A/D lean  ·  hold LMB draw, release to strike")
+			: TEXT("WASD climb  ·  E tap  ·  RMB dog in  ·  R lash  ·  Q stance");
+		float W = 0.0f, H = 0.0f;
+		Canvas->TextSize(Small, Keys, W, H);
+		Label(Canvas, Small, Keys, Canvas->SizeX - W - 28.0f, Canvas->SizeY - 30.0f,
+			FLinearColor(0.72f, 0.70f, 0.68f, 0.45f));
+	}
 }
