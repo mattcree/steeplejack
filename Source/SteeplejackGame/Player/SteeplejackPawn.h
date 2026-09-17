@@ -10,6 +10,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
 
+#include "Anchor.h"
 #include "Types.h"
 
 #include "SteeplejackPawn.generated.h"
@@ -75,6 +76,18 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Steeplejack") FString GetLastStrikeResult() const { return LastStrike; }
 
+	// --- the ascent ---------------------------------------------------------------------------
+	// You can only climb as high as you have built. Every metre above the topmost lashed ladder
+	// has to be earned: tap a joint, drive a dog, lash the next section. That is the loop, and the
+	// resources are finite so it is also the decision.
+	UFUNCTION(BlueprintPure, Category = "Steeplejack") float GetLadderTopMetres() const { return LadderTopM; }
+	UFUNCTION(BlueprintPure, Category = "Steeplejack") int32 GetLaddersLeft() const { return LaddersLeft; }
+	UFUNCTION(BlueprintPure, Category = "Steeplejack") int32 GetDogsLeft() const { return DogsLeft; }
+	UFUNCTION(BlueprintPure, Category = "Steeplejack") int32 GetAnchorCount() const { return Anchors.Num(); }
+	UFUNCTION(BlueprintPure, Category = "Steeplejack") FString GetTapReading() const { return TapReading; }
+	UFUNCTION(BlueprintPure, Category = "Steeplejack") int32 GetTapPipShape() const { return TapPipShape; }
+	UFUNCTION(BlueprintPure, Category = "Steeplejack") FString GetSpanWarning() const { return SpanWarning; }
+
 private:
 	void MoveForward(float Value);
 	void MoveRight(float Value);
@@ -86,6 +99,9 @@ private:
 	void EnterWorkMode();
 	void LeaveWorkMode();
 	void ResolveStrike();
+	void TapJoint();
+	void LashLadder();
+	void SeatAnchor();
 
 	AChimneyActor* FindChimney() const;
 
@@ -109,6 +125,16 @@ private:
 	float   StrikeCooldown = 0.0f;
 	FString LastStrike;
 	sj::Joint WorkJoint{};
+
+	// The stack you have built. Anchors are where dogs went in; LadderTopM is how high the
+	// topmost lashed section reaches, and therefore how high you may climb.
+	TArray<sj::Anchor> Anchors;
+	float   LadderTopM = 5.0f;    // the first section stands off the ground
+	int32   LaddersLeft = 12;
+	int32   DogsLeft = 14;
+	FString TapReading;
+	int32   TapPipShape = -1;
+	FString SpanWarning;
 
 	UPROPERTY() TObjectPtr<AChimneyActor> Chimney;
 };

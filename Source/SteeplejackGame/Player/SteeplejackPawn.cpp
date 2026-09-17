@@ -7,7 +7,9 @@
 #include "Components/CapsuleComponent.h"
 #include "EngineUtils.h"
 #include "Meters.h"
+#include "Anchor.h"
 #include "Verbs/Hammer.h"
+#include "Verbs/Tap.h"
 #include "Wobble.h"
 #include "Rng.h"
 
@@ -126,10 +128,44 @@ void ASteeplejackPawn::Tick(float DeltaSeconds)
 	}
 	SetActorLocation(Location + Delta, false);
 
-	const float NewHeightM = GetActorLocation().Z / kUUPerMetre;
+	// You cannot climb past the top of what you have lashed. This is the loop: every metre above
+	// the ladder stack has to be built before it can be stood on.
+	float NewHeightM = GetActorLocation().Z / kUUPerMetre;
+	if (bOnLadder && NewHeightM > LadderTopM)
+	{
+		NewHeightM = LadderTopM;
+		SetActorLocation(FVector(GetActorLocation().X, GetActorLocation().Y,
+		                         LadderTopM * kUUPerMetre), false);
+	}
 	if (NewHeightM < 0.0f)
 	{
+		NewHeightM = 0.0f;
 		SetActorLocation(FVector(GetActorLocation().X, GetActorLocation().Y, 0.0f), false);
+	}
+
+	// The span you are standing on: distance from the highest anchor below you to the ladder top.
+	// It is what decides how much the section flexes, and it feeds straight back into the meters.
+	{
+		float Below = 0.0f;
+		for (const sj::Anchor& A : Anchors)
+		{
+			if (A.height <= NewHeightM + 0.01f)
+			{
+				Below = FMath::Max(Below, A.height);
+			}
+		}
+		const float Span = FMath::Max(0.0f, NewHeightM - Below);
+		const sj::SpanBand Band = sj::anchor::ClassifySpan(Span, T);
+		switch (Band)
+		{
+		case sj::SpanBand::Rigid:  SpanWarning.Reset(); break;
+		case sj::SpanBand::Flex:
+			SpanWarning = FString::Printf(TEXT("%.1fm span — the ladder is flexing"), Span); break;
+		case sj::SpanBand::Sway:
+			SpanWarning = FString::Printf(TEXT("%.1fm span — heavy sway"), Span); break;
+		case sj::SpanBand::Buckle:
+			SpanWarning = FString::Printf(TEXT("%.1fm span — THIS WILL BUCKLE"), Span); break;
+		}
 	}
 
 	// Feed the sim. Exposure and height are what nerve reads; `working` is what grip reads.
@@ -185,8 +221,20 @@ void ASteeplejackPawn::Tick(float DeltaSeconds)
 		Context.working = bWorking;
 	}
 
-	sj::grip::Step(Meters, DeltaSeconds, Context, T);
-	sj::nerve::Step(Meters, DeltaSeconds, Context, T);
+	// A flexing span makes you grip harder; a swaying one frightens you. The multipliers are the
+	// span table's, applied by stepping the meters for a longer slice of time rather than by
+	// reaching inside them — the meters stay the only place their own rules live.
+	{
+		float Below = 0.0f;
+		for (const sj::Anchor& A : Anchors)
+		{
+			if (A.height <= NewHeightM + 0.01f) { Below = FMath::Max(Below, A.height); }
+		}
+		const sj::SpanBand Band =
+			sj::anchor::ClassifySpan(FMath::Max(0.0f, NewHeightM - Below), T);
+		sj::grip::Step(Meters, DeltaSeconds * sj::anchor::GripDrainMultiplier(Band, T), Context, T);
+		sj::nerve::Step(Meters, DeltaSeconds * sj::anchor::NerveDrainMultiplier(Band, T), Context, T);
+	}
 
 	// Grip gone: you come off. METER-005 owns the slip-save window; until it exists, falling is
 	// simply what happens, which is at least honest about the stakes.
@@ -252,6 +300,11 @@ void ASteeplejackPawn::EnterWorkMode()
 		LastStrike = TEXT("you need to be on the brickwork to work");
 		return;
 	}
+	if (DogsLeft <= 0)
+	{
+		LastStrike = TEXT("out of dogs");
+		return;
+	}
 	bWorkMode = true;
 	Aim = FVector2D::ZeroVector;
 	SwingPower = 0.0f;
@@ -310,10 +363,8 @@ void ASteeplejackPawn::ResolveStrike()
 
 	if (R.seated)
 	{
-		LastStrike = FString::Printf(TEXT("dog seated at %.0f%% — %s joint"),
-			DogDepth * 100.0f,
-			WorkJoint.quality > 0.7f ? TEXT("sound") :
-			WorkJoint.quality > 0.4f ? TEXT("fair") : TEXT("perished"));
+		SeatAnchor();
+		LeaveWorkMode();
 	}
 	else
 	{
@@ -321,6 +372,78 @@ void ASteeplejackPawn::ResolveStrike()
 			Power * 100.0f, AngleErr, DogDepth * 100.0f,
 			R.spalled > 0.15f ? TEXT(", brick spalling") : TEXT(""));
 	}
+}
+
+void ASteeplejackPawn::TapJoint()
+{
+	if (!bOnLadder)
+	{
+		TapReading = TEXT("nothing to tap down here");
+		return;
+	}
+	const sj::Tuning& T = SteeplejackTuning::Get();
+
+	// The joint at this height. Same seed as EnterWorkMode, so what you tap is what you drive.
+	sj::Joint J{};
+	sj::Rng Rng(static_cast<uint64_t>(GetHeightMetres() * 100.0f) ^ 0x5D3Bu);
+	J.quality = Rng.RangeFloat(0.2f, 0.95f);
+	J.height = GetHeightMetres();
+
+	const sj::TapResult R = sj::tap::Tap(J, T, Context.gloves);
+	TapPipShape = R.pipShape;
+
+	static const TCHAR* Words[] = { TEXT("cracked — it rattles"), TEXT("perished — dull thud"),
+	                                TEXT("fair — firm"), TEXT("sound — it rings") };
+	TapReading = FString::Printf(TEXT("%s%s"),
+		Words[FMath::Clamp(static_cast<int32>(R.tier), 0, 3)],
+		R.confidence < 1.0f ? TEXT("  (gloves — hard to tell)") : TEXT(""));
+
+	// Tapping costs grip: a hand is off the ladder to hold the hammer.
+	Context.working = true;
+}
+
+void ASteeplejackPawn::SeatAnchor()
+{
+	const sj::Tuning& T = SteeplejackTuning::Get();
+	const sj::Anchor A = sj::anchor::Make(WorkJoint, DogDepth, 0.0f, T);
+	Anchors.Add(A);
+	--DogsLeft;
+
+	static const TCHAR* Rated[] = { TEXT("FAILED"), TEXT("poor"), TEXT("fair"), TEXT("sound") };
+	LastStrike = FString::Printf(TEXT("dog in at %.0fm — %s anchor, %.1f kN. %d dogs left"),
+		A.height, Rated[FMath::Clamp(static_cast<int32>(A.rate), 0, 3)], A.capacityKN, DogsLeft);
+}
+
+void ASteeplejackPawn::LashLadder()
+{
+	const sj::Tuning& T = SteeplejackTuning::Get();
+
+	if (LaddersLeft <= 0)
+	{
+		LastStrike = TEXT("no ladder sections left — that is as high as this goes");
+		return;
+	}
+	// You lash to an anchor, so there has to be one at or above where you are standing.
+	float Best = -1.0f;
+	for (const sj::Anchor& A : Anchors)
+	{
+		if (A.rate != sj::AnchorRate::Failed && A.height >= GetHeightMetres() - 1.0f)
+		{
+			Best = FMath::Max(Best, A.height);
+		}
+	}
+	if (Best < 0.0f)
+	{
+		LastStrike = TEXT("nothing to lash to — get a dog in first");
+		return;
+	}
+
+	const float Rise = T.GetF("ladderLengthMetres") - T.GetF("ladderMinOverlapMetres");
+	LadderTopM = FMath::Min(Best + Rise,
+		Chimney ? Chimney->GetBuiltHeightMetres() : LadderTopM + Rise);
+	--LaddersLeft;
+	LastStrike = FString::Printf(TEXT("lashed to the dog at %.0fm — ladder tops out at %.0fm. %d left"),
+		Best, LadderTopM, LaddersLeft);
 }
 
 void ASteeplejackPawn::MoveForward(float Value) { InputForward = Value; }
@@ -396,4 +519,6 @@ void ASteeplejackPawn::SetupPlayerInputComponent(UInputComponent* Input)
 	Input->BindAction(TEXT("Stance"), IE_Pressed, this, &ASteeplejackPawn::CycleStance);
 	Input->BindAction(TEXT("WorkMode"), IE_Pressed, this, &ASteeplejackPawn::EnterWorkMode);
 	Input->BindAction(TEXT("WorkMode"), IE_Released, this, &ASteeplejackPawn::LeaveWorkMode);
+	Input->BindAction(TEXT("Tap"), IE_Pressed, this, &ASteeplejackPawn::TapJoint);
+	Input->BindAction(TEXT("Lash"), IE_Pressed, this, &ASteeplejackPawn::LashLadder);
 }

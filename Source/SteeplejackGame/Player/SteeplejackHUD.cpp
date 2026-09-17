@@ -66,6 +66,42 @@ void ASteeplejackHUD::DrawHUD()
 		Left < 0.0f ? TEXT("") : *FString::Printf(TEXT("~%.0fs of work left"), Left)),
 		X, Y);
 
+	// The ascent: what you have built, and what it cost you. Materials are the decision -- bring
+	// too few and you do not reach the top.
+	Y += 22.0f;
+	Canvas->SetDrawColor(215, 205, 180, 255);
+	Canvas->DrawText(Font, FString::Printf(
+		TEXT("ladder tops out at %.0fm   %d ladders   %d dogs   %d anchors"),
+		Jack->GetLadderTopMetres(), Jack->GetLaddersLeft(), Jack->GetDogsLeft(),
+		Jack->GetAnchorCount()), X, Y);
+
+	if (!Jack->GetSpanWarning().IsEmpty())
+	{
+		Y += 20.0f;
+		const bool bBuckle = Jack->GetSpanWarning().Contains(TEXT("BUCKLE"));
+		Canvas->SetDrawColor(bBuckle ? 235 : 225, bBuckle ? 70 : 170, 60, 255);
+		Canvas->DrawText(Font, *Jack->GetSpanWarning(), X, Y);
+	}
+
+	if (!Jack->GetTapReading().IsEmpty())
+	{
+		Y += 20.0f;
+		Canvas->SetDrawColor(200, 210, 220, 255);
+		// The pip is a shape, never a colour (rule 8): a player who cannot hear the ring and a
+		// player who cannot tell red from green must both be able to read the joint.
+		static const TCHAR* Pips[] = { TEXT("(O)"), TEXT("[#]"), TEXT("/_\\"), TEXT(">|<") };
+		const int32 Pip = Jack->GetTapPipShape();
+		Canvas->DrawText(Font, FString::Printf(TEXT("%s  %s"),
+			(Pip >= 0 && Pip < 4) ? Pips[Pip] : TEXT("   "), *Jack->GetTapReading()), X, Y);
+	}
+
+	if (!Jack->GetLastStrikeResult().IsEmpty() && !Jack->IsInWorkMode())
+	{
+		Y += 20.0f;
+		Canvas->SetDrawColor(180, 180, 185, 255);
+		Canvas->DrawText(Font, *Jack->GetLastStrikeResult(), X, Y);
+	}
+
 	Y += 22.0f;
 	if (!Jack->GetBandName().IsEmpty())
 	{
@@ -114,6 +150,6 @@ void ASteeplejackHUD::DrawHUD()
 	Canvas->SetDrawColor(150, 150, 155, 255);
 	Canvas->DrawText(Font, Jack->IsInWorkMode()
 		? TEXT("mouse aims the hammer   A/D lean   hold LMB draw, release to strike   let go of RMB to stop")
-		: TEXT("WASD move / climb   mouse look   RMB or F work the brickwork   LMB work   Q stance"),
+		: TEXT("WASD climb   E tap the joint   RMB dog it in   R lash a ladder   Q stance"),
 		X, Canvas->SizeY - 28.0f);
 }
