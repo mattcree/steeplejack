@@ -4,7 +4,7 @@ title: Shared JSON reader for SteeplejackSim
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.5
-status: in_progress
+status: review
 assignee: agent
 depends_on: [CORE-007, CORE-011]
 owns:
@@ -114,4 +114,59 @@ Do not add a JSON *writer*. Do not add a schema validator — `tools/validate_da
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+`Json.h` / `Json.cpp` (one reader: a tree, with the flat view built on it), `tests/unit/test_json.cpp`
+(13 cases, 62 assertions), `Tuning.cpp` reading through it, and the `Json.h` contract written into
+`interfaces.md` before the implementation. 61 test cases green.
+
+**The headline: `tests/unit/test_tuning.cpp` passes unchanged** — `git diff` against main shows no
+edit to it. That is acceptance 3, and it is the whole safety argument for the extraction. It matters
+more than it sounds: that file pins three SHA-256 digests over the flattened tuning data, so if a
+single dotted path, value kind or map ordering had shifted, the digests would move and the tests
+would fail. They do not. The flattening is behaviourally identical, proved by a hash rather than by
+reading the diff.
+
+**Decisions**
+
+- *A tree, with the flat view on top — not a move.* CORE-007's reader never built a tree; it emitted
+  `(dotted.path, leaf)` pairs as it parsed. Right for tuning, where every access is a key lookup;
+  useless for CORE-008, which walks `bands[]` in order and checks each band against its neighbour.
+- *File order is contract.* `Members()` and `Elements()` return vectors in file order. Bands are
+  contiguous height ranges validated pairwise, which is meaningless if the order is whatever a hash
+  map decided. A test asserts `zebra, apple, mango` come back in that order, so a future switch to a
+  sorted container fails loudly instead of silently reordering CORE-008's input.
+- *`null` parses; refusing it is the caller's policy.* CORE-007's reader made `null` a hard parse
+  error reading "null is not a tuning value" — a tuning rule in a JSON reader's clothes. `JsonValue`
+  now yields `Kind::Null` and `Tuning` rejects it, keeping the message and its test.
+- *`JsonError` becomes `TuningError` at the `Tuning::Parse` boundary.* Callers of `Tuning` should not
+  have to know JSON is how tuning happens to be stored, and `interfaces.md` says Tuning fails with
+  `TuningError`. Origin and line pass through, which is why the existing error tests pass untouched.
+- *`Type()`, not `Kind()`.* The sketch in this task said `Kind Kind() const`, which does not compile:
+  a member function cannot share a name with the nested type it returns. Renamed here and in
+  `interfaces.md`.
+- *No `SJ_API` on `JsonValue` yet.* `Tuning.h` does not include `Json.h`, so the type never crosses
+  the module boundary. CORE-015 owns `Json.h` and will fold it into one export rule rather than have
+  this task invent a second.
+
+**Acceptance 5, which is why this happened before CORE-008 rather than during it**
+
+`06-waterside.json` parses and its `bands` array has 4 elements in file order. The test goes past the
+criterion: it checks contiguity (`bands[i].from == bands[i-1].to`) and that the top band reaches
+`structure.height`. Both are rules `LevelData::Validate()` must re-implement, so expressing them here
+proves the tree API fits its second caller before that caller is written against it. A shared reader
+that turns out not to fit is worse than two readers, because the second caller bends around it.
+
+**Surprises**
+
+- *A universal character name is folded inside a raw string literal.* The test for rejecting the
+  four-hex-digit escape was written as a raw string, and the compiler turned it into the character
+  `A` before the reader ever saw it — so the test passed against the wrong input. It is now assembled
+  at runtime from `char(92)`, with a comment, because the obvious spelling tests nothing.
+- *`tools/check_links.py` does not skip fenced code blocks*, so a subscript operator followed by a
+  parameter list in a `.md` file reads as a markdown link and fails `make check-links`. It shaped the
+  `At()` naming. Still worth fixing; no task yet.
+
+**Follow-ups**
+
+- **CORE-008** is unblocked and should use `JsonValue`; its `## Interface` and `depends_on` already say so.
+- **CORE-015** should add `Json.h` to the export rule; it already owns the file.
+- `tools/check_links.py` should skip fenced code blocks. No task yet.
