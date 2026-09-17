@@ -4,7 +4,7 @@ title: Tuning loader with hot reload
 milestone: M0
 discipline: [ENG]
 estimate_days: 1
-status: review
+status: done
 assignee: agent
 depends_on: [CORE-004]
 owns:
