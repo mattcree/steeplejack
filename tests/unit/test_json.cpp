@@ -214,6 +214,51 @@ TEST_CASE("Json: the errors that matter are rejections, not guesses")
               .find("unknown escape") != std::string::npos);
 }
 
+TEST_CASE("Json: the rejection paths the tuning reader had, which nothing else covers")
+{
+    // These three were reachable in CORE-007's reader and had no test on either side of the
+    // extraction — found by a reviewer running a 50-input differential probe against main. The
+    // behaviour is unchanged; what was missing was anything that would notice if it changed.
+
+    // An escape at the very end of the input, so there is no character after the backslash.
+    const std::string backslash(1, char(92));
+    CHECK(MessageOf([&] { (void)JsonValue::Parse("{\"a\":\"x" + backslash, "t.json"); })
+              .find("unterminated escape") != std::string::npos);
+
+    // A number token that scans as a number and does not parse as one.
+    CHECK(MessageOf([] { (void)JsonValue::Parse(R"({"a": 1.2.3})", "t.json"); })
+              .find("malformed number") != std::string::npos);
+    CHECK_THROWS_AS(JsonValue::Parse(R"({"a": 1e400})", "t.json"), JsonError);   // out of range
+    CHECK_THROWS_AS(JsonValue::Parse(R"({"a": 1e})", "t.json"), JsonError);
+
+    // A structural character that is not the one expected. Both messages name what was wanted and
+    // what was there, which is the difference between a fixable error and a hunt.
+    const std::string missingColon =
+        MessageOf([] { (void)JsonValue::Parse(R"({"a" 1})", "t.json"); });
+    CHECK(missingColon.find("expected ':'") != std::string::npos);
+    CHECK(missingColon.find("found '1'") != std::string::npos);
+
+    CHECK(MessageOf([] { (void)JsonValue::Parse(R"({a: 1})", "t.json"); })
+              .find("expected '\"'") != std::string::npos);
+}
+
+TEST_CASE("Json: Size and Has on a value that is neither an object nor an array")
+{
+    const JsonValue d = JsonValue::Parse(R"({"n": 1, "s": "x", "list": [1, 2]})", "t.json");
+
+    // A scalar has no members and no elements, and saying 0 is better than asserting: a caller
+    // walking a tree should be able to ask without first checking the kind.
+    CHECK(d.At("n").Size() == 0);
+    CHECK(d.At("s").Size() == 0);
+    CHECK(d.At("list").Size() == 2);
+    CHECK(d.Size() == 3);
+
+    // Has() on a non-object is false rather than an error, for the same reason.
+    CHECK_FALSE(d.At("n").Has("anything"));
+    CHECK_FALSE(d.At("list").Has("anything"));
+    CHECK(d.Has("n"));
+}
+
 TEST_CASE("Json: the escapes that are supported round-trip")
 {
     const JsonValue d = JsonValue::Parse(R"({"a": "one\ttwo\nthree \"quoted\" back\\slash"})",

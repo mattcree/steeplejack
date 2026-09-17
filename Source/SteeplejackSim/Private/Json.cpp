@@ -1,9 +1,18 @@
 // The JSON reader — CORE-014.
 //
-// Moved out of Tuning.cpp, where CORE-007 wrote it, and grown a tree. The parsing itself is
-// unchanged in behaviour: same accepted subset, same rejections, same "origin:line: what" errors.
-// What is new is that it builds a value rather than only emitting leaves, because CORE-008 has to
-// walk level bands in order and check each against its neighbour.
+// Moved out of Tuning.cpp, where CORE-007 wrote it, and grown a tree. Same accepted subset, same
+// rejections, same "origin:line: what" errors — with two deliberate deltas, both verified against
+// the old reader by a 50-input differential probe and both recorded in CORE-014's Outcome:
+//
+//   * `null` now parses to Kind::Null instead of being a parse error, because whether a null is
+//     acceptable is the caller's policy. Tuning still rejects one. Consequence: in a document with
+//     both a null and a later syntax error, the syntax error is now reported first, since the whole
+//     document is parsed before Tuning inspects any leaf.
+//   * The \u rejection message no longer says "in tuning files", because this reader serves level
+//     files too.
+//
+// What is new otherwise is that it builds a value rather than only emitting leaves, because
+// CORE-008 has to walk level bands in order and check each against its neighbour.
 
 #include "Json.h"
 
