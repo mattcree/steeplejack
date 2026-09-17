@@ -23,8 +23,8 @@ comma   := ,
 
 # `make play` knobs. MAP is what to open; PLAY_CMDS is what to do once it is open.
 MAP       ?= /Game/Maps/ShotTest
-PLAY_CMDS ?= DisableAllScreenMessages; shot showui
-PLAY_SECS ?= 90
+PLAY_CMDS ?= shot showui
+PLAY_SECS ?= 180
 
 .DEFAULT_GOAL := help
 
