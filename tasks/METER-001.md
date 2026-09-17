@@ -48,7 +48,7 @@ Nerve is METER-002. Wobble is METER-003. Slip resolution is METER-005.
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-`Meters.h`, `MetersGrip.cpp`, `tests/unit/test_grip.cpp` (11 cases, 64k assertions), and two new
+`Meters.h`, `MetersGrip.cpp`, `tests/unit/test_grip.cpp` (12 cases, 64k assertions), and two new
 fields on `MeterContext`. All six acceptance criteria pass.
 
 **The interface could not express the mechanic, so this task extended it**
@@ -73,12 +73,12 @@ This is rule 9: the doc and the design disagreed, and the doc was the thinner of
 own that file (CORE-014, CORE-015, CORE-016, plus CORE-011 which is done), and CORE-016 is
 `status: blocked` — depending on it to satisfy the ownership validator would have blocked this task
 behind a question about exception handling. The additions needed are the two `MeterContext` fields
-and the four `grip::` helpers below. Folded into CORE-015's acceptance, which owns the file and is
+and the five `grip::` helpers below. Folded into CORE-015's acceptance, which owns the file and is
 ready. Until that lands, `interfaces.md`'s `Types.h` and `Meters.h` blocks are stale.
 
 **Decisions**
 
-- *Four helpers beyond the two signatures in the doc.* `MaxGrip`, `RecoverRate`, `Tremor`,
+- *Five helpers beyond the two signatures in the doc.* `MaxGrip`, `RecoverRate`, `Tremor`,
   `Slipping` and `SecondsOfWorkLeft` are additive — no existing signature changed. `Tremor` and
   `Slipping` exist because acceptance 4 and 5 ask the model to *report* those conditions and
   `Meters` has no flag for either; putting the threshold comparison in one place stops five verbs
@@ -126,7 +126,14 @@ the one number another task builds on.
 
 There is now a test that sweeps all of them and asserts the worst case stays above the slip-save
 window, so a tuning bump to `wet` or `crackedRib` that shrinks the warning below a reactable margin
-fails the suite instead of shipping.
+fails the suite instead of shipping. Confirmed live in review by mutation: raising `crackedRib` to
+1.4, or `slipSaveWindowMs` to 1000, both make it fail.
+
+**One thing METER-005 should know before it treats this as a law:** the test compares against
+`climbing.json`'s top-level `slipSaveWindowMs` of 900. `meters.json` gives the `assisted` difficulty
+a 1400 ms window, which is *longer* than the 0.95 s worst-case telegraph. That is in the player's
+favour on the easiest difficulty and not a fairness violation, so it is deliberately not asserted —
+but `lead > window` is not universally true and should not be assumed.
 
 **Verified by running it, not only by testing it**
 

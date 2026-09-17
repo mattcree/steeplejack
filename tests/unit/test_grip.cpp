@@ -290,7 +290,8 @@ TEST_CASE("Grip: Acceptance 5: at zero it reports a slip and does not resolve on
     CHECK(sj::grip::Slipping(m));
 }
 
-TEST_CASE("Grip: Acceptance 6: grip never leaves [0, max], whatever it is fed")
+TEST_CASE("Grip: Acceptance 6: grip never leaves [0, max] over every stance, tick size "
+          "and cold/working combination")
 {
     // A property test over the awkward combinations rather than a single happy path. Grip is read
     // by every verb, so one out-of-range value would propagate as a plausible wrong number.
