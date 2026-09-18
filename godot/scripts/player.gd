@@ -19,6 +19,11 @@ const GRAVITY := 22.0
 const MOUSE_SENS := 0.0025
 const TURN_RATE := 12.0
 
+## The stride of the run clip, in metres per second. Playback is scaled by how fast he is actually
+## travelling, so his feet keep up with the ground instead of skating over it. Eyeballed — if the
+## feet slip forwards, raise it; if he moonwalks, lower it.
+const RUN_CLIP_SPEED := 4.6
+
 const LADDER_REACH := 0.9        ## You are on a ladder when you can hold it.
 const BODY_OFF_LADDER := 0.40
 const MOUNT_HEIGHT := 1.6        ## You get on a ladder from the ground, not by brushing past it.
@@ -77,6 +82,12 @@ func _ready() -> void:
 		push_error("could not start: %s" % jack.get_last_error())
 		get_tree().quit(1)
 		return
+
+	# glTF animations import unlooped, so idle and run play once and then he freezes mid-stride.
+	# Nothing warns about this; the character simply stops a second or two after you start.
+	for clip in ["idle", "run"]:
+		if anim.has_animation(clip):
+			anim.get_animation(clip).loop_mode = Animation.LOOP_LINEAR
 
 	_spawn = global_position
 	chimney.build(jack)
@@ -170,7 +181,7 @@ func _climb(dt: float, ladder_world: Vector3) -> void:
 	out = out.normalized()
 	var tangent := Vector3(-out.z, 0.0, out.x)
 	global_position = held + out * BODY_OFF_LADDER + tangent * side * 0.9
-	body.global_rotation.y = atan2(-out.x, -out.z)
+	body.global_rotation.y = _face(-out)   # into the brickwork, not away from it
 
 	if height_m() <= 0.02 and up < 0.0:
 		on_ladder = false
@@ -190,8 +201,7 @@ func _walk(dt: float) -> void:
 	if wish.length() > 0.01:
 		flat = flat.move_toward(wish * WALK_SPEED, ACCEL * dt)
 		# Turn to face travel rather than snapping. The lag is most of what reads as weight.
-		body.rotation.y = lerp_angle(body.rotation.y, atan2(-wish.x, -wish.z),
-			clampf(TURN_RATE * dt, 0.0, 1.0))
+		body.rotation.y = lerp_angle(body.rotation.y, _face(wish), clampf(TURN_RATE * dt, 0.0, 1.0))
 	else:
 		flat = flat.move_toward(Vector3.ZERO, FRICTION * dt)
 
@@ -226,16 +236,29 @@ func _fall(metres: float) -> void:
 	_fell_from = 0.0
 
 
+## The yaw that points the model along `dir`.
+##
+## Mannequiny is modelled facing +Z, while a Godot node's forward is -Z. Everything that turns him
+## goes through here so that offset is stated once, rather than being wrong in two places — which is
+## what it was: he ran backwards facing the camera, and faced away from the wall on the ladder.
+func _face(dir: Vector3) -> float:
+	return atan2(dir.x, dir.z)
+
+
 func _animate() -> void:
 	if anim == null:
 		return
+	var speed := Vector2(velocity.x, velocity.z).length()
+	# Match the cycle to the ground he is covering. A run clip played at a fixed rate while the
+	# character accelerates is the thing that reads as feet skating.
+	anim.speed_scale = clampf(speed / RUN_CLIP_SPEED, 0.55, 1.8) if speed > 0.6 else 1.0
 	# Three clips is the whole vocabulary this model has that suits the game. There is no climbing
 	# animation in it, so on the ladder he holds still rather than pretending — a run cycle on a
 	# ladder reads worse than stillness.
 	var want := "idle"
 	if not on_ladder and not is_on_floor():
 		want = "air_jump"
-	elif not on_ladder and Vector2(velocity.x, velocity.z).length() > 0.6:
+	elif not on_ladder and speed > 0.6:
 		want = "run"
 	if want != _playing and anim.has_animation(want):
 		anim.play(want, 0.2)

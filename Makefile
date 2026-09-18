@@ -410,5 +410,6 @@ godot-script: godot-import
 # same bug twice.
 godot-test: godot-build godot-import
 	@$(GODOT) --path godot --headless --script res://scripts/test_ladder.gd
+	@$(GODOT) --path godot --headless --script res://scripts/test_character.gd
 
 .PHONY: godot-deps godot-build godot-import godot-test godot-editor godot-run godot-script
