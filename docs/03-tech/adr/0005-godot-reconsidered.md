@@ -108,9 +108,53 @@ able to break the pawn while fixing the HUD. Faster iteration makes mistakes che
 does not make them less likely. If the loop stays "agent changes it, agent looks at a PNG, agent
 declares it good", the same session repeats in Godot with shorter gaps between the errors.
 
+## Two arguments raised after the first draft, both of which change the answer
+
+**1. Agent competence is not engine-independent.** The project lead's hypothesis: there is far more
+open-source Godot work to learn from than Unreal work. The premise holds, and the mechanism is
+sharper than a repository count. The standard Unreal division is C++ for core systems and
+**Blueprints for the gameplay layer** — and Blueprints are binary graphs. The precise layer an agent
+most needs to imitate (how a character, camera and gameplay glue are actually assembled) is the
+layer that cannot exist as text. Epic's reference project is account-gated, commercial UE titles are
+never opened, and most UE knowledge is video. Godot is MIT, its engine and many complete small games
+are readable, and both `.tscn` and GDScript are text.
+
+The observed error profile matches: API knowledge was fine; *shape* knowledge was not. The worst
+failure of the session was hand-writing a bone poser on a `PoseableMeshComponent` when `ACharacter`
+plus the template's animation setup was the boilerplate answer. That is not a missing function, it
+is a missing sense of what a normal project looks like.
+
+**2. Less nuance means more progress.** Unreal offers many plausible-but-wrong paths where Godot
+offers one: Pawn or Character; PoseableMesh or animation blueprint or Control Rig; setting a
+movement mode per tick or on change; material usage flags you must already know to tick. Every
+failure this session was a wrong fork taken where a standard existed. Unreal compounds it by
+reporting success having done nothing — three separate times in one session.
+
+**3. The flaw this exposes in ADR-0004.** Its mitigation for losing agent-executability is the
+sim/presentation split, and that split assigns `Content/` and `Source/SteeplejackGame/` **to
+humans**. There is no human doing Unreal presentation work on this project. The mitigation therefore
+covers the logic layer and leaves uncovered the layer that is actually failing. ADR-0004 is
+internally sound and rests on a staffing assumption that is false in practice. This is the single
+strongest argument in this document and it was absent from the first draft.
+
 ## Recommendation
 
-**Stay on Unreal, and fix the three actual causes.** In priority order:
+**Revised.** The first draft of this document recommended staying on Unreal. That recommendation
+assumed agent effectiveness was roughly engine-independent and that ADR-0004's ownership split
+described real labour. Both assumptions are wrong, so the recommendation changes.
+
+**Move to Godot, if and only if the visual target can flex.** That condition is the whole decision
+and it belongs to the project lead. ADR-0004 was not a mistake — it correctly optimised for "it just
+needs to look great" and correctly priced agent-executability as the cost. What has changed is the
+discovery that the cost falls on the only worker this project has.
+
+- If the look is non-negotiable, stay on Unreal — and then the project genuinely needs a human doing
+  the presentation layer, because that is what ADR-0004 says and it is not optional.
+- If the look can become "good, readable, stylised, shipped", move. Roughly a week, and the sim,
+  tests, data and docs — ~100% of the gameplay logic — come across untouched.
+
+Either way, three things are true and worth doing first, because they are the causes that are not
+about engines at all:
 
 1. **Put a playable build in the project lead's hands.** This is the highest-value single change in
    the project right now, in any engine. Judgement moves from my reading of a frame to someone
@@ -123,23 +167,31 @@ declares it good", the same session repeats in Godot with shorter gaps between t
    sweeps hot-reload leftovers; a missing mesh logs an error). The pattern — Unreal reporting
    success having done nothing — is the specific friction worth engineering against.
 
-**What would change this recommendation:** if a played build shows the game is fine and the problem
-really is that presentation work cannot be done at an acceptable rate, then R8 has beaten its
-mitigation and Godot becomes correct. That is a decidable question and it costs about a week to act
-on. It is worth spending a day to answer it properly rather than deciding from a bad session.
+**Honest weight of the evidence.** One bad session is thin, and some of it was plain carelessness
+rather than anything structural — asserting tool behaviour without running it, which is a recorded
+recurring failure and would have cost the same in any engine. That argues for not over-reacting. It
+does not rescue the staffing point, which stands independently of how well or badly the session
+went.
 
 The sim/presentation split means this option stays open and bounded. ADR-0004 called that property
-"worth protecting even though we do not expect to use it again". It is doing its job today.
+"worth protecting even though we do not expect to use it again". It is doing its job today, one day
+later, which is an unusually fast return on a piece of foresight.
 
-## Consequences if accepted
+## Consequences if accepted (move to Godot)
 
-- ADR-0004 stands. This document records that it was challenged and why it held.
-- A task is added to produce a playable build the project lead can run and drive.
-- No code changes follow from this document by itself.
+- ADR-0004 is superseded by a new ADR recording the move; ADR-0001's reasoning becomes live again
+  for the premise it was given, which is the premise we are back to.
+- The visual target in [`../../01-gdd/13-art-direction.md`](../../01-gdd/13-art-direction.md) is
+  renegotiated in the same breath. Moving to Godot while holding "it just needs to look great" fixed
+  would be choosing to fail at both.
+- Budget ~1 week. The sim, tests, `data/`, `docs/` and `tasks/` carry over untouched;
+  `Source/SteeplejackGame/`, `tools/editor/` and `Content/` are rewritten or regenerated.
+- R1, R2, R3 and R6 return to the register and need owners.
 
-## Consequences if rejected
+## Consequences if rejected (stay on Unreal)
 
-- ADR-0004 is superseded by a new ADR recording the move back; ADR-0001's reasoning becomes live
-  again for the premise it was given.
-- Budget ~1 week, and expect the visual target to be renegotiated in the same breath — going to
-  Godot while holding "it just needs to look great" fixed would be choosing to fail at both.
+- ADR-0004 stands, and its ownership line becomes a staffing commitment rather than a diagram:
+  someone human has to own `Content/` and `Source/SteeplejackGame/`.
+- Agent work stays inside the sim, `data/`, `tools/`, `tests/` and `docs/`, and presentation tasks
+  move to the `editor_required` queue rather than being attempted speculatively.
+- The playable build is still the first thing to produce, for the same reason.
