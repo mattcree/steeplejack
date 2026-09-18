@@ -405,4 +405,10 @@ godot-script: godot-import
 	@test -n "$(SCRIPT)" || (echo "usage: make godot-script SCRIPT=res://scripts/foo.gd" && exit 1)
 	@$(GODOT) --path godot --headless --script $(SCRIPT)
 
-.PHONY: godot-deps godot-build godot-import godot-editor godot-run godot-script
+# The playable build's own regression tests. Godot cannot render headlessly, so these drive nodes
+# directly and assert on state — no substitute for playing it, but a substitute for shipping the
+# same bug twice.
+godot-test: godot-build godot-import
+	@$(GODOT) --path godot --headless --script res://scripts/test_ladder.gd
+
+.PHONY: godot-deps godot-build godot-import godot-test godot-editor godot-run godot-script
