@@ -16,6 +16,7 @@ const WALK_SPEED := 4.2
 const ACCEL := 22.0
 const FRICTION := 14.0
 const GRAVITY := 22.0
+const JUMP_SPEED := 6.0
 const MOUSE_SENS := 0.0025
 const TURN_RATE := 12.0
 
@@ -27,6 +28,9 @@ const RUN_CLIP_SPEED := 4.6
 const LADDER_REACH := 0.9        ## You are on a ladder when you can hold it.
 const BODY_OFF_LADDER := 0.40
 const MOUNT_HEIGHT := 1.6        ## You get on a ladder from the ground, not by brushing past it.
+const SHUFFLE_SPEED := 1.3       ## Metres per second sideways along the face.
+const SHUFFLE_OFF := 0.7         ## Shuffle this far and you are off it.
+const REMOUNT_DELAY := 0.8       ## After stepping off, long enough to walk away before it grabs you.
 const KILLING_FALL := 4.0        ## Metres. Below this you land; above it you do not.
 
 const DOG_BAG := 6
@@ -65,6 +69,8 @@ var _pitch := -0.1
 var _spawn := Vector3.ZERO
 var _fell_from := 0.0
 var _playing := ""
+var _shuffle := 0.0              ## How far sideways off the ladder line he has worked himself.
+var _remount_block := 0.0
 
 
 func height_m() -> float:
@@ -124,7 +130,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_R: _lash()
 			KEY_F: _pick_up()
 			KEY_Q: _cycle_stance()
-			KEY_SPACE: _let_go()
+			KEY_SPACE: _space()
 
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_RIGHT:
@@ -143,13 +149,17 @@ func _physics_process(dt: float) -> void:
 	var to_ladder := Vector2(global_position.x - ladder_world.x, global_position.z - ladder_world.z)
 	var within_reach := to_ladder.length() < LADDER_REACH + BODY_OFF_LADDER
 
-	# You get on a ladder from the ground. Attaching at whatever height you happen to pass is what
-	# made it impossible to step off: you left, and the next frame put you straight back on.
-	if not on_ladder and within_reach and height_m() <= MOUNT_HEIGHT and is_on_floor():
+	# You get on a ladder from the ground, and not for a moment after you have just got off it.
+	# Without the delay, stepping off at the foot re-attached on the very next frame — you were
+	# standing next to it, on the floor, within reach, which is exactly the mounting condition.
+	_remount_block = maxf(0.0, _remount_block - dt)
+	if (not on_ladder and within_reach and height_m() <= MOUNT_HEIGHT and is_on_floor()
+			and _remount_block <= 0.0):
 		on_ladder = true
+		_shuffle = 0.0
 		message = "on the ladder"
 	if on_ladder and not within_reach:
-		on_ladder = false
+		_step_off("off the ladder")
 
 	if work_mode:
 		velocity = Vector3.ZERO
@@ -172,6 +182,14 @@ func _climb(dt: float, ladder_world: Vector3) -> void:
 		else jack.tuning_f("slideSpeedMetresPerSecond", 2.4))
 	set_height_m(clampf(height_m() + up * rate * dt, 0.0, ladder_top))
 
+	# Working yourself sideways off the stile. This has to accumulate: the first version recomputed
+	# the offset from the key every frame, so it never got further than one step and you could never
+	# leave.
+	_shuffle += side * SHUFFLE_SPEED * dt
+	if absf(_shuffle) > SHUFFLE_OFF:
+		_step_off("stepped off the ladder")
+		return
+
 	# The ladder has his body: the only thing he controls is how far up it he is. Shuffling sideways
 	# carries him off it, which at the foot of the stack is simply stepping off.
 	var held := ladder_world
@@ -180,12 +198,11 @@ func _climb(dt: float, ladder_world: Vector3) -> void:
 	out.y = 0.0
 	out = out.normalized()
 	var tangent := Vector3(-out.z, 0.0, out.x)
-	global_position = held + out * BODY_OFF_LADDER + tangent * side * 0.9
+	global_position = held + out * BODY_OFF_LADDER + tangent * _shuffle
 	body.global_rotation.y = _face(-out)   # into the brickwork, not away from it
 
 	if height_m() <= 0.02 and up < 0.0:
-		on_ladder = false
-		message = "off the ladder"
+		_step_off("off the ladder")
 
 
 func _walk(dt: float) -> void:
@@ -218,13 +235,31 @@ func _walk(dt: float) -> void:
 		_fell_from = height_m()
 
 
+## Space means the obvious thing for wherever he is: on the ground it is a jump, on a ladder it is
+## letting go. You pressed it expecting a jump and got dropped down the stack.
+func _space() -> void:
+	if on_ladder:
+		_let_go()
+	elif is_on_floor():
+		velocity.y = JUMP_SPEED
+		_fell_from = height_m()
+
+
+## The one place he leaves the ladder, so the cooldown can never be forgotten at one of them.
+func _step_off(why: String) -> void:
+	on_ladder = false
+	_shuffle = 0.0
+	_remount_block = REMOUNT_DELAY
+	_fell_from = height_m()
+	message = why
+
+
 func _let_go() -> void:
 	if not on_ladder:
 		return
-	on_ladder = false
-	_fell_from = height_m()
-	if height_m() > KILLING_FALL:
-		message = "you let go"
+	var h := height_m()
+	_step_off("you let go" if h > KILLING_FALL else "off the ladder")
+	if h > KILLING_FALL:
 		jack.shock("nearMiss")
 
 

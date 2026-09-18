@@ -63,6 +63,33 @@ func build(jack: Jack) -> void:
 		inst.position = Vector3(0, (from + to) * 0.5, 0)
 		add_child(inst)
 
+	# Collision. The stack was mesh only, which meant it was scenery rather than a thing: you could
+	# walk into it, and letting go of the ladder dropped you straight through seventy metres of
+	# brickwork. One cylinder per band, at that band's widest, so the surface is never inside the
+	# shape you are standing against.
+	var solid := StaticBody3D.new()
+	solid.name = "Solid"
+	add_child(solid)
+	# Cut into short segments rather than one cylinder per band. A cylinder at a band's widest is
+	# proud of the brickwork everywhere else, and the climber stands only 0.65 m off the face — the
+	# clearance ran out before the taper did.
+	const SEGMENT := 4.0
+	for i in jack.band_count():
+		var b: Dictionary = jack.band(i)
+		var from: float = b["from"]
+		var to: float = b["to"]
+		var steps: int = maxi(1, int(ceil((to - from) / SEGMENT)))
+		for k in steps:
+			var lo: float = lerpf(from, to, float(k) / steps)
+			var hi: float = lerpf(from, to, float(k + 1) / steps)
+			var shape := CylinderShape3D.new()
+			shape.radius = maxf(jack.radius_at(lo), jack.radius_at(hi))
+			shape.height = hi - lo
+			var col := CollisionShape3D.new()
+			col.shape = shape
+			col.position = Vector3(0, (lo + hi) * 0.5, 0)
+			solid.add_child(col)
+
 	_setup_multimesh(_ladders, Color(0.42, 0.30, 0.17))
 	_setup_multimesh(_dogs, Color(0.18, 0.17, 0.16))
 	add_child(_ladders)

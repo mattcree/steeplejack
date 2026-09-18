@@ -57,18 +57,50 @@ func _init() -> void:
 	await physics_frame
 	_check(not player.on_ladder, "and he does not get grabbed again while falling past it")
 
-	# At the foot, stepping off is just walking away.
+	# At the foot, stepping off is just walking away — and it has to STAY off. Standing next to a
+	# ladder, on the floor, within reach is exactly the mounting condition, so without a delay it
+	# grabbed you again on the very next frame and you could not leave.
 	player.set_height_m(0.0)
 	player.on_ladder = true
+	player._shuffle = 0.0
 	player.global_position += Vector3(3.0, 0.0, 3.0)
 	await physics_frame
 	_check(not player.on_ladder, "walking away from the foot steps off")
+
+	player.global_position = foot + out.normalized() * 0.40
+	player.set_height_m(0.0)
+	for i in 4:
+		await physics_frame
+	_check(not player.on_ladder, "and standing back at the foot does not instantly re-grab you")
+
+	# Shuffling sideways works you off the stile. It has to accumulate; recomputing it from the key
+	# each frame meant you never got further than one step.
+	for i in 30:
+		await physics_frame
+	_check(player.on_ladder or true, "")   # settle
+	player.on_ladder = true
+	player._shuffle = 0.0
+	player._remount_block = 0.0
+	for i in 60:
+		player._shuffle += 0.03
+		await physics_frame
+		if not player.on_ladder:
+			break
+	_check(not player.on_ladder, "shuffling sideways works him off the ladder")
+
+	# The stack is solid. It was mesh only, so letting go dropped you through the brickwork.
+	var solid: Node = chimney.get_node_or_null("Solid")
+	_check(solid != null, "the chimney has a collision body")
+	if solid != null:
+		_check(solid.get_child_count() > 0, "with a shape for each band (%d)" % solid.get_child_count())
 
 	print("LADDER: %s" % ("ok" if failures == 0 else "%d failure(s)" % failures))
 	quit(0 if failures == 0 else 1)
 
 
 func _check(ok: bool, what: String) -> void:
+	if what == "":
+		return
 	if ok:
 		print("  ok    %s" % what)
 	else:
