@@ -1,0 +1,11 @@
+; The bridge to SteeplejackSim. The library is built by `make godot-build`, never by hand, and
+; bin/ is gitignored — a compiled artefact in the repo is how binary content crept in last time.
+
+[configuration]
+entry_symbol = "steeplejack_library_init"
+compatibility_minimum = "4.7"
+reloadable = true
+
+[libraries]
+linux.debug.x86_64   = "res://bin/libsteeplejack.so"
+linux.release.x86_64 = "res://bin/libsteeplejack.so"

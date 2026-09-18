@@ -1,0 +1,15 @@
+; Engine configuration. Text, diffable, and written by hand or by script — which is the entire
+; reason this project is in Godot. See docs/03-tech/adr/0006-move-to-godot.md.
+
+config_version=5
+
+[application]
+
+config/name="Steeplejack"
+config/description="A game about climbing tall things and taking them down."
+run/main_scene="res://scenes/proving_ground.tscn"
+config/features=PackedStringArray("4.4", "Forward Plus")
+
+[rendering]
+
+renderer/rendering_method="forward_plus"

@@ -362,3 +362,47 @@ help:
         test-tools check-verify check-blueprints install-hooks help watch ue-root \
         play run build-map materials ue-py ue-kill mcp mcp-status mcp-stop \
         wt-start wip wt-status land wt-drop doctor
+
+# ---------------------------------------------------------------- Godot
+GODOT ?= $(firstword $(wildcard $(HOME)/.local/bin/godot /usr/bin/godot) godot)
+GODOT_CPP_REF ?= master
+# Must match the engine in $(GODOT). godot-cpp master ships API files for 4.3 through 4.7; picking
+# the one that matches is what stops the extension and the editor disagreeing about the ABI.
+GODOT_API_VERSION ?= 4.7
+# godot-cpp links libstdc++ statically by default, for portable shipping binaries. On an immutable
+# host there is no static libstdc++ to link against and the error only says "have you installed the
+# static version of the stdc++ library?". Off for local builds; a shipping build turns it back on.
+GODOT_STATIC_CPP ?= OFF
+
+godot-deps:
+	@test -d .deps/godot-cpp || git clone --depth 1 --branch $(GODOT_CPP_REF) \
+	  https://github.com/godotengine/godot-cpp.git .deps/godot-cpp
+	@echo "godot-cpp ready at .deps/godot-cpp"
+
+godot-build: godot-deps
+	@cmake -S . -B build-godot -DSTEEPLEJACK_GODOT=ON -DCMAKE_BUILD_TYPE=Release -DGODOTCPP_API_VERSION=$(GODOT_API_VERSION) -DGODOTCPP_USE_STATIC_CPP=$(GODOT_STATIC_CPP) >/dev/null
+	@cmake --build build-godot --target steeplejack_gd -j$$(nproc)
+	@ls -la godot/bin/
+
+# Open the editor.
+godot-editor:
+	@$(GODOT) --path godot --editor
+
+# Run the game in a window.
+godot-run:
+	@$(GODOT) --path godot
+
+# Run a script headlessly against the project — the Godot equivalent of `make ue-py`, and the
+# way anything gets verified without a human watching.
+#   make godot-script SCRIPT=res://scripts/prove_sim.gd
+# A project Godot has never opened has no .godot/ and therefore no registered extensions, and the
+# only symptom is "Identifier not declared" from GDScript. Import first, every time; it is fast
+# once the cache exists.
+godot-import:
+	@$(GODOT) --path godot --headless --import >/dev/null 2>&1 || true
+
+godot-script: godot-import
+	@test -n "$(SCRIPT)" || (echo "usage: make godot-script SCRIPT=res://scripts/foo.gd" && exit 1)
+	@$(GODOT) --path godot --headless --script $(SCRIPT)
+
+.PHONY: godot-deps godot-build godot-import godot-editor godot-run godot-script

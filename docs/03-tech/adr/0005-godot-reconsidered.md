@@ -1,6 +1,6 @@
 # ADR-0005 — Godot reconsidered
 
-- **Status:** Proposed — awaiting project lead
+- **Status:** Decided — see [ADR-0006](0006-move-to-godot.md), which accepted the move
 - **Date:** 2026-09-17
 - **Revisits:** [ADR-0004](0004-engine-change-to-unreal.md), which superseded [ADR-0001](0001-engine-choice.md)
 - **Question:** the presentation work is going badly. Is Unreal the reason?

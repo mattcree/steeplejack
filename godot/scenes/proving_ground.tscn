@@ -1,0 +1,36 @@
+; Hand-written, and that is the point: this file is the thing Unreal could not give us. A scene as
+; readable text that an agent can write, diff and review.
+;
+; A stub. Ground, sky and a light so `make godot-run` opens something rather than erroring. The
+; stack itself is generated from data/levels/*.json, same as before — see rule 3, no hand-placed
+; level geometry.
+
+[gd_scene load_steps=4 format=3]
+
+[sub_resource type="ProceduralSkyMaterial" id="Sky"]
+sky_horizon_color = Color(0.64, 0.65, 0.67, 1)
+ground_horizon_color = Color(0.64, 0.65, 0.67, 1)
+
+[sub_resource type="Sky" id="SkyRes"]
+sky_material = SubResource("Sky")
+
+[sub_resource type="Environment" id="Env"]
+background_mode = 2
+sky = SubResource("SkyRes")
+tonemap_mode = 2
+fog_enabled = true
+fog_light_color = Color(0.72, 0.75, 0.78, 1)
+fog_density = 0.002
+
+[node name="ProvingGround" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.86, -0.35, 0.37, 0, 0.72, 0.69, -0.51, -0.59, 0.62, 0, 40, 0)
+light_energy = 1.4
+shadow_enabled = true
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.97, 0.26, 0, -0.26, 0.97, 0, 3, 14)

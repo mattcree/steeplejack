@@ -29,3 +29,7 @@ reference-footage/
 # The real likeness denylist is private — see tools/likeness_denylist.txt
 tools/likeness_denylist.local.txt
 *.local.txt
+godot/bin/
+.deps/
+godot/.godot/
+build-godot/
