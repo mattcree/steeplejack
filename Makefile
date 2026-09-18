@@ -408,8 +408,23 @@ godot-script: godot-import
 # The playable build's own regression tests. Godot cannot render headlessly, so these drive nodes
 # directly and assert on state — no substitute for playing it, but a substitute for shipping the
 # same bug twice.
+## godot-test: drive the real scene headlessly and assert on state
+##
+## Bounded, because a parse error in any .gd file makes one of these hang for ever rather than
+## fail: the scene never loads, the script never reaches its quit(), and the run just sits there.
+## A gate that hangs is worse than a gate that fails, because nobody reads a hang as a result.
 godot-test: godot-build godot-import
-	@$(GODOT) --path godot --headless --script res://scripts/test_ladder.gd
-	@$(GODOT) --path godot --headless --script res://scripts/test_character.gd
+	@for t in test_ladder test_character test_slip; do \
+		timeout 120 $(GODOT) --path godot --headless --script res://scripts/$$t.gd; \
+		rc=$$?; \
+		if [ $$rc -eq 124 ]; then \
+			printf '\033[31mFAILED\033[0m  %s hung for 120 s and was killed.\n' "$$t"; \
+			printf '        Almost always a GDScript parse error — the scene never loads, so the\n'; \
+			printf '        script never reaches quit(). The parse error is printed above.\n'; \
+			exit 1; \
+		elif [ $$rc -ne 0 ]; then \
+			exit $$rc; \
+		fi; \
+	done
 
 .PHONY: godot-deps godot-build godot-import godot-test godot-editor godot-run godot-script

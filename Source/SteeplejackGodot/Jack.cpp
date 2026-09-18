@@ -4,6 +4,7 @@
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include "Rng.h"
+#include "Slip.h"
 #include "Verbs/Hammer.h"
 #include "Verbs/Tap.h"
 #include "Wobble.h"
@@ -88,6 +89,17 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("shock", "event"), &Jack::shock);
 	ClassDB::bind_method(D_METHOD("wobble_deg", "gust"), &Jack::wobble_deg);
 
+	ClassDB::bind_method(D_METHOD("set_difficulty", "difficulty"), &Jack::set_difficulty);
+	ClassDB::bind_method(D_METHOD("get_difficulty"), &Jack::get_difficulty);
+	ClassDB::bind_method(D_METHOD("grab"), &Jack::grab);
+	ClassDB::bind_method(D_METHOD("slip_in_progress"), &Jack::slip_in_progress);
+	ClassDB::bind_method(D_METHOD("slip_window_left"), &Jack::slip_window_left);
+	ClassDB::bind_method(D_METHOD("slip_window_seconds"), &Jack::slip_window_seconds);
+	ClassDB::bind_method(D_METHOD("can_slip_save"), &Jack::can_slip_save);
+	ClassDB::bind_method(D_METHOD("last_slip_outcome"), &Jack::last_slip_outcome);
+	ClassDB::bind_method(D_METHOD("fall", "height"), &Jack::fall);
+	ClassDB::bind_method(D_METHOD("new_shift"), &Jack::new_shift);
+
 	ClassDB::bind_method(D_METHOD("tap", "height", "wearing_gloves"), &Jack::tap);
 	ClassDB::bind_method(D_METHOD("strike", "height", "current_depth", "power", "angle_error_deg",
 	                              "tool_condition"), &Jack::strike);
@@ -117,6 +129,12 @@ bool Jack::load(const String& tuning_dir, const String& level_path)
 		meters.stance = sj::Stance::OneHand;
 		meters.exposure = sj::Exposure::Platform;
 		anchors.clear();
+		// A new shift is a new clock and a new budget. Without this, loading a second level
+		// inherits the first one's cooldown and the first slip of the new level is unsaveable.
+		now = 0.0f;
+		slip = sj::SlipModel(slip.GetDifficulty());
+		outcome = sj::SlipOutcome::None;
+		grab_latched = false;
 		last_error = String();
 		return true;
 	}
@@ -211,8 +229,90 @@ void Jack::step(double dt)
 {
 	if (!tuning) { return; }
 	const float d = static_cast<float>(dt);
+	now += d;
 	sj::grip::Step(meters, d, context, *tuning);
 	sj::nerve::Step(meters, d, context, *tuning);
+
+	// Grip reaching zero is a slip, and the slip opens and closes here rather than in GDScript.
+	// Both halves in one place is the only way the window cannot be left open by a script that
+	// returned early — and an early return is the normal shape of a _physics_process.
+	if (sj::grip::Slipping(meters))
+	{
+		slip.BeginSlip(now, *tuning);
+	}
+	else
+	{
+		// Grip is back, so the hand is back on and he can lose it again. The two calls are the two
+		// halves of one edge; dropping this one leaves a climber who slipped once unable to slip
+		// for the rest of the shift.
+		slip.HandBackOn();
+	}
+	outcome = slip.Resolve(now, grab_latched, meters, *tuning);
+	grab_latched = false;
+}
+
+void Jack::new_shift()
+{
+	if (!tuning) { return; }
+	meters = sj::nerve::FreshShift(*tuning);
+	meters.exposure = sj::Exposure::Platform;
+	// The clock keeps running. It is the cooldown's clock, and a slip-save budget that reset every
+	// time you fell would reward falling.
+	slip.HandBackOn();
+	outcome = sj::SlipOutcome::None;
+	grab_latched = false;
+}
+
+void Jack::set_difficulty(int difficulty)
+{
+	slip.SetDifficulty(static_cast<sj::Difficulty>(std::clamp(difficulty, 0, 2)));
+}
+
+void Jack::grab()
+{
+	grab_latched = true;
+}
+
+double Jack::slip_window_left() const
+{
+	return static_cast<double>(slip.WindowFractionLeft(now));
+}
+
+double Jack::slip_window_seconds() const
+{
+	return tuning ? static_cast<double>(slip.WindowSeconds(*tuning)) : 0.0;
+}
+
+bool Jack::can_slip_save() const
+{
+	return tuning && slip.CanSlipSave(now, *tuning);
+}
+
+Dictionary Jack::fall(double height)
+{
+	Dictionary d;
+	if (!tuning) { return d; }
+
+	// Whatever you are tied to is the highest dog below you — the same one the ladder is lashed to
+	// and the same one the span is measured from. A default Anchor is rate Failed with zero
+	// capacity, which is the right answer when there is nothing below you at all.
+	sj::Anchor tied{};
+	for (const sj::Anchor& a : anchors)
+	{
+		if (a.rate != sj::AnchorRate::Failed && static_cast<double>(a.height) <= height + 0.01
+		    && a.height >= tied.height)
+		{
+			tied = a;
+		}
+	}
+
+	const sj::FallResult r = sj::ResolveFall(meters, tied, *tuning);
+	d["tied_on"] = sj::IsTiedOn(meters.stance);
+	d["caught"] = r.caught;
+	d["anchor_failed"] = r.anchorFailed;
+	d["shock_kn"] = static_cast<double>(r.shockLoadKN);
+	d["capacity_kn"] = static_cast<double>(r.capacityKN);
+	return d;
 }
 
 bool Jack::tremoring() const { return tuning && sj::grip::Tremor(meters, *tuning); }

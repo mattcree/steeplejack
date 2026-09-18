@@ -110,6 +110,10 @@ func _draw() -> void:
 	if player.work_mode:
 		_draw_work(jack)
 
+	# Over everything, because for 900 ms nothing else on this screen matters.
+	if player.jack.slip_in_progress():
+		_draw_slip(jack)
+
 	# There is no objective marker because the objective is the top and you can see it. But you
 	# cannot see the *rule*, so it is said once and then never again.
 	if now < 14.0:
@@ -118,6 +122,10 @@ func _draw() -> void:
 
 
 func _next_step() -> String:
+	if player.jack.slip_in_progress():
+		return ""
+	if player.fall_reason != "":
+		return "Your stack is still up. Climb it again."
 	if player.work_mode:
 		return "Line the dog up, then hold the left button to draw — release to strike."
 	if player.at_cradle() and (not player.carrying_ladder or player.dogs_carried == 0):
@@ -137,6 +145,8 @@ func _next_step() -> String:
 
 ## [key, verb, available, why-not]
 func _affordances() -> Array:
+	if player.jack.slip_in_progress():
+		return [["SPACE", "grab", true, ""]]
 	if player.work_mode:
 		return [
 			["mouse", "place the dog", true, ""],
@@ -165,7 +175,7 @@ func _affordances() -> Array:
 func _draw_work(jack: Jack) -> void:
 	var eye := Vector2(size.x * 0.5, size.y * 0.44)
 	var px_per_deg := 10.0
-	var tolerance: float = jack.tuning_f("strikeMaxAngleDeg", 12.0) * px_per_deg
+	var tolerance: float = jack.tuning_f("hammerMaxAngleErrorDegrees", 12.0) * px_per_deg
 
 	# The tolerance ring: inside it a strike is clean, outside it bends dogs. A ring rather than a
 	# number, so the player watches the wobble eat their margin instead of reading it.
@@ -188,6 +198,48 @@ func _draw_work(jack: Jack) -> void:
 	draw_rect(Rect2(bar, Vector2(bar_w * player.dog_depth, 6)), Color(0.80, 0.71, 0.47, 0.94))
 	_centre("dog %.0f%%   %.1f° off" % [player.dog_depth * 100.0, err], bar.y + 20,
 		Color(0.85, 0.83, 0.80, 0.85), 13)
+
+	# How long this stance buys you, counted down in seconds. The flashing arc says "soon" and this
+	# says "four" — and the fairness contract is that the player can explain the fall afterwards,
+	# which means knowing before it that they were spending something and how much was left.
+	var left: float = jack.seconds_of_work_left()
+	if left >= 0.0 and left < 12.0:
+		var urgency := clampf(1.0 - left / 12.0, 0.0, 1.0)
+		_centre("%.0f s of grip left in this stance" % ceilf(left), bar.y + 40,
+			Color(0.92, 0.72 - 0.4 * urgency, 0.35 - 0.2 * urgency, 0.75 + 0.25 * urgency), 13)
+
+
+## The slip.
+##
+## A ring that closes, a word, and the key. Three things and no colour dependency between them: the
+## ring shrinking is the timer, and someone who cannot tell the red from the gold can still see it
+## going. Per docs/01-gdd/14-accessibility.md, nothing here may be the only channel a cue arrives on.
+func _draw_slip(jack: Jack) -> void:
+	var left: float = jack.slip_window_left()
+	var eye := Vector2(size.x * 0.5, size.y * 0.42)
+
+	# Everything else dims. This is not decoration — it is what makes a 900 ms window findable on a
+	# screen that also has a chimney, a stack, two meters and five affordances on it.
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.03, 0.02, 0.45 * (1.0 - left * 0.4)))
+
+	var r := 96.0
+	draw_arc(eye, r, 0, TAU, 72, Color(0.9, 0.88, 0.85, 0.25), 3.0)
+	# Closing clockwise from the top, so "running out" reads the way a clock does.
+	draw_arc(eye, r, -PI * 0.5, -PI * 0.5 + TAU * left, 72, Color(0.95, 0.31, 0.22, 0.95), 9.0)
+
+	# And it closes inwards as well as round, so the shape alone carries the time.
+	draw_arc(eye, r * (0.25 + 0.55 * left), 0, TAU, 48, Color(0.95, 0.31, 0.22, 0.55), 3.0)
+
+	_centre("GRAB", eye.y - 8.0, Color(0.98, 0.95, 0.90, 0.95), 46)
+	_centre("SPACE", eye.y + 34.0, Color(0.95, 0.92, 0.88, 0.88), 20)
+
+	# Why this is happening, in three words, while it happens. Afterwards is too late to learn it.
+	_centre("your grip went", eye.y + r + 34.0, Color(0.90, 0.86, 0.82, 0.80), 15)
+
+	# And whether there was ever anything to grab at. A window that is already spent looks exactly
+	# like one you missed, unless it says so.
+	if not jack.can_slip_save():
+		_centre("nothing left to catch with", eye.y + r + 56.0, Color(0.95, 0.45, 0.35, 0.85), 14)
 
 
 # --- drawing helpers ----------------------------------------------------------------------------

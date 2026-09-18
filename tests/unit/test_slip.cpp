@@ -76,7 +76,7 @@ float WindowFor(const char* row)
 
 // ---------------------------------------------------------------- the window
 
-TEST_CASE("the window is the difficulty table's, in seconds")
+TEST_CASE("Slip: the window is the difficulty table's, in seconds")
 {
     CHECK(SlipModel(Difficulty::Jack).WindowSeconds(Tune()) == doctest::Approx(WindowFor("jack")));
     CHECK(SlipModel(Difficulty::Assisted).WindowSeconds(Tune())
@@ -94,7 +94,7 @@ TEST_CASE("the window is the difficulty table's, in seconds")
     CHECK(WindowFor("jack") > WindowFor("owd_hand"));
 }
 
-TEST_CASE("climbing.json's loose slip keys agree with the jack row")
+TEST_CASE("Slip: climbing.json's loose slip keys agree with the jack row")
 {
     // climbing.json carries slipSaveWindowMs and slipSaveCooldownSeconds at the top level, and
     // meters.json carries the same two per difficulty. Two files holding one answer eventually
@@ -106,7 +106,7 @@ TEST_CASE("climbing.json's loose slip keys agree with the jack row")
           == doctest::Approx(Tune().GetF("difficulty.jack.slipSaveCooldownSeconds")));
 }
 
-TEST_CASE("a slip opens a window and closes it on time")
+TEST_CASE("Slip: a slip opens a window and closes it on time")
 {
     SlipModel s;
     Meters m = Slipping();
@@ -125,7 +125,7 @@ TEST_CASE("a slip opens a window and closes it on time")
     CHECK_FALSE(s.InProgress());
 }
 
-TEST_CASE("a grab on the last step of the window still counts")
+TEST_CASE("Slip: a grab on the last step of the window still counts")
 {
     // The frame the player will swear they hit. Checked at exactly the boundary because that is
     // where an ordering mistake between "expired" and "grabbed" shows up and nowhere else.
@@ -137,7 +137,7 @@ TEST_CASE("a grab on the last step of the window still counts")
     CHECK(s.Resolve(window, true, m, Tune()) == SlipOutcome::Saved);
 }
 
-TEST_CASE("a grab after the window has closed does not save you")
+TEST_CASE("Slip: a grab after the window has closed does not save you")
 {
     SlipModel s;
     Meters m = Slipping();
@@ -148,7 +148,7 @@ TEST_CASE("a grab after the window has closed does not save you")
     CHECK(m.grip == doctest::Approx(0.0f));
 }
 
-TEST_CASE("a second trigger does not re-arm a slip already running")
+TEST_CASE("Slip: a second trigger does not re-arm a slip already running")
 {
     SlipModel s;
     Meters m = Slipping();
@@ -161,9 +161,56 @@ TEST_CASE("a second trigger does not re-arm a slip already running")
     CHECK(s.Resolve(window, false, m, Tune()) == SlipOutcome::Fell);
 }
 
+TEST_CASE("Slip: a slip is an edge, not a level")
+{
+    // The one that would make the game unplayable rather than merely wrong. A fall leaves the
+    // climber at zero grip, which is the same condition that slipped him — so calling BeginSlip
+    // every step, which is the only way the caller can call it, slipped him again immediately,
+    // spent the budget he had just been handed, and fell him again with no way out.
+    SlipModel s;
+    Meters m = Slipping();
+    const float window = s.WindowSeconds(Tune());
+
+    s.BeginSlip(0.0f, Tune());
+    REQUIRE(s.Resolve(window, false, m, Tune()) == SlipOutcome::Fell);
+    CHECK(s.HandIsOff());
+
+    // Grip is still zero, and the caller is still calling every step. Nothing may happen.
+    for (int i = 1; i <= 200; ++i)
+    {
+        const float t = window + static_cast<float>(i) * sj::kTick;
+        s.BeginSlip(t, Tune());
+        CHECK_FALSE(s.InProgress());
+        CHECK(s.Resolve(t, true, m, Tune()) == SlipOutcome::None);
+    }
+
+    // Grip comes back — he has his hand on the rung again — and only then can he lose it again.
+    s.HandBackOn();
+    CHECK_FALSE(s.HandIsOff());
+    CHECK(s.BeginSlip(100.0f, Tune()) == doctest::Approx(window));
+    CHECK(s.InProgress());
+}
+
+TEST_CASE("Slip: a save re-arms as soon as grip is back")
+{
+    // The save leaves grip at 15%, so the caller's next step calls HandBackOn and the latch opens
+    // straight away. It is the cooldown that stops the next slip being saved, not the latch.
+    SlipModel s;
+    Meters m = Slipping();
+
+    s.BeginSlip(0.0f, Tune());
+    REQUIRE(s.Resolve(0.1f, true, m, Tune()) == SlipOutcome::Saved);
+    REQUIRE(m.grip > 0.0f);
+
+    s.HandBackOn();
+    m.grip = 0.0f;
+    CHECK(s.BeginSlip(0.2f, Tune()) == doctest::Approx(0.0f));   // within the cooldown: no window
+    CHECK(s.Resolve(0.2f, true, m, Tune()) == SlipOutcome::Fell);
+}
+
 // ---------------------------------------------------------------- what a save costs
 
-TEST_CASE("a save leaves grip at the tuned fraction and takes the nerve shock")
+TEST_CASE("Slip: a save leaves grip at the tuned fraction and takes the nerve shock")
 {
     SlipModel s;
     Meters m = Slipping();
@@ -181,7 +228,7 @@ TEST_CASE("a save leaves grip at the tuned fraction and takes the nerve shock")
     CHECK(Tune().GetF("nerveShock.slipSave") == doctest::Approx(-25.0f));
 }
 
-TEST_CASE("grabbing at nothing is not free grip")
+TEST_CASE("Slip: grabbing at nothing is not free grip")
 {
     // The one that would ruin the game quietly: if Resolve paid out without a slip in progress,
     // holding the grab key would top your hands up for ever and the meter would decide nothing.
@@ -198,7 +245,7 @@ TEST_CASE("grabbing at nothing is not free grip")
 
 // ---------------------------------------------------------------- the budget
 
-TEST_CASE("the budget is one save per cooldown")
+TEST_CASE("Slip: the budget is one save per cooldown")
 {
     SlipModel s;
     Meters m = Slipping();
@@ -207,6 +254,12 @@ TEST_CASE("the budget is one save per cooldown")
     CHECK(s.CanSlipSave(0.0f, Tune()));   // the first slip of a shift is always savable
     s.BeginSlip(0.0f, Tune());
     REQUIRE(s.Resolve(0.1f, true, m, Tune()) == SlipOutcome::Saved);
+
+    // The save left grip at 15%, so the caller's next step reports the hand back on. That is the
+    // real loop, and without it the edge latch — not the budget — would be what stops the next
+    // slip, which would be the right behaviour arrived at for the wrong reason.
+    s.HandBackOn();
+    m.grip = 0.0f;
 
     // Inside the cooldown there is no window at all — you are falling from the moment you slip,
     // which is the point of the budget.
@@ -218,7 +271,7 @@ TEST_CASE("the budget is one save per cooldown")
     CHECK(Tune().GetF("difficulty.jack.slipSaveCooldownSeconds") == doctest::Approx(60.0f));
 }
 
-TEST_CASE("the budget comes back")
+TEST_CASE("Slip: the budget comes back")
 {
     SlipModel s;
     Meters m = Slipping();
@@ -228,11 +281,12 @@ TEST_CASE("the budget comes back")
     REQUIRE(s.Resolve(0.1f, true, m, Tune()) == SlipOutcome::Saved);
 
     CHECK(s.CanSlipSave(0.1f + cooldown, Tune()));
+    s.HandBackOn();
     m.grip = 0.0f;
     CHECK(s.BeginSlip(0.1f + cooldown, Tune()) == doctest::Approx(s.WindowSeconds(Tune())));
 }
 
-TEST_CASE("a fall does not spend the budget")
+TEST_CASE("Slip: a fall does not spend the budget")
 {
     // Falling has already cost you the shift. Charging the budget for it as well would mean the
     // save you never got was also the save you cannot have next time.
@@ -242,9 +296,14 @@ TEST_CASE("a fall does not spend the budget")
     s.BeginSlip(0.0f, Tune());
     REQUIRE(s.Resolve(s.WindowSeconds(Tune()), false, m, Tune()) == SlipOutcome::Fell);
     CHECK(s.CanSlipSave(1.0f, Tune()));
+
+    // And the budget really is spendable again once he has his hand back — CanSlipSave alone
+    // would still read true with the edge latch holding the slip shut.
+    s.HandBackOn();
+    CHECK(s.BeginSlip(1.0f, Tune()) == doctest::Approx(s.WindowSeconds(Tune())));
 }
 
-TEST_CASE("the telegraph fraction runs from one to zero")
+TEST_CASE("Slip: the telegraph fraction runs from one to zero")
 {
     SlipModel s;
     const float window = s.WindowSeconds(Tune());
@@ -259,7 +318,7 @@ TEST_CASE("the telegraph fraction runs from one to zero")
 
 // ---------------------------------------------------------------- the fall
 
-TEST_CASE("one hand on a rung is tied to nothing")
+TEST_CASE("Slip: one hand on a rung is tied to nothing")
 {
     CHECK_FALSE(sj::IsTiedOn(Stance::OneHand));
     CHECK_FALSE(sj::IsTiedOn(Stance::HookedLeg));
@@ -268,7 +327,7 @@ TEST_CASE("one hand on a rung is tied to nothing")
     CHECK(sj::IsTiedOn(Stance::Chair));
 }
 
-TEST_CASE("an unclipped fall is not caught and loads nothing")
+TEST_CASE("Slip: an unclipped fall is not caught and loads nothing")
 {
     Meters m = Slipping();
     m.stance = Stance::OneHand;
@@ -284,7 +343,7 @@ TEST_CASE("an unclipped fall is not caught and loads nothing")
     CHECK(m.nerve == doctest::Approx(before));   // the shift is over; nerve is not the cost
 }
 
-TEST_CASE("a sound anchor holds the shock load and a fair one does not")
+TEST_CASE("Slip: a sound anchor holds the shock load and a fair one does not")
 {
     // The shock load is the player's weight times the dynamic factor, and the anchor table is
     // what decides. Both come out of the tuning, so this reads as the designer's arithmetic
@@ -316,7 +375,7 @@ TEST_CASE("a sound anchor holds the shock load and a fair one does not")
     CHECK(m2.nerve == doctest::Approx(m2.nerveMax + Tune().GetF("nerveShock.anchorFail")));
 }
 
-TEST_CASE("a failed anchor cannot catch you")
+TEST_CASE("Slip: a failed anchor cannot catch you")
 {
     Meters m = Slipping();
     m.stance = Stance::Clipped;

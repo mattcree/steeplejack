@@ -51,11 +51,14 @@ bool SlipModel::CanSlipSave(float now, const Tuning& t) const noexcept
 
 float SlipModel::BeginSlip(float now, const Tuning& t) noexcept
 {
-    if (slipping_)
+    if (handOff_)
     {
-        return window_;   // already coming off; a second trigger does not buy a second window
+        // Already coming off, or left off by the fall this one resolved into. A second trigger
+        // buys neither a second window nor a second slip.
+        return window_;
     }
 
+    handOff_ = true;
     slipping_ = true;
     slipBegan_ = now;
     window_ = CanSlipSave(now, t) ? WindowSeconds(t) : 0.0f;

@@ -16,6 +16,7 @@
 #include "Anchor.h"
 #include "Level.h"
 #include "Meters.h"
+#include "Slip.h"
 #include "Tuning.h"
 #include "Types.h"
 
@@ -70,6 +71,39 @@ public:
 	bool shock(const godot::String& event);
 	double wobble_deg(double gust) const;
 
+	// --- the slip ------------------------------------------------------------------------------
+	// Grip reaching zero opens the window inside `step`, and `step` closes it. Neither is something
+	// the game layer can forget to do, because a 900 ms window that a script forgets to expire is a
+	// player hanging in the air for ever.
+	//
+	// The grab is latched rather than polled: a key that goes down and up between two physics
+	// frames is a grab the player made, and losing it would be the single most infuriating bug
+	// this feature could have.
+	void set_difficulty(int difficulty);
+	int64_t get_difficulty() const { return static_cast<int64_t>(slip.GetDifficulty()); }
+	/** The grab input. Call from `_input`; the next `step` reads and clears it. */
+	void grab();
+	bool slip_in_progress() const { return slip.InProgress(); }
+	/** 1 at the moment of the slip falling to 0 at its close. What the closing ring draws. */
+	double slip_window_left() const;
+	double slip_window_seconds() const;
+	bool can_slip_save() const;
+	/** What the last `step` decided: 0 nothing, 1 saved, 2 fell. */
+	int64_t last_slip_outcome() const { return static_cast<int64_t>(outcome); }
+
+	/**
+	 * Resolve a fall against whatever you are tied to at this height.
+	 * `{caught, anchor_failed, shock_kn, capacity_kn, tied_on}`.
+	 */
+	godot::Dictionary fall(double height);
+
+	/**
+	 * Come back the next day. Meters back to a fresh shift and the slip budget with them; the
+	 * level, the dogs you drove and the ladder you lashed are untouched, because the stack is the
+	 * checkpoint and losing it is the one thing a fall must never do.
+	 */
+	void new_shift();
+
 	// --- the verbs -----------------------------------------------------------------------------
 	/** Sound the brickwork. `{tier, tier_name, pip, confidence}`. */
 	godot::Dictionary tap(double height, bool wearing_gloves);
@@ -111,6 +145,12 @@ private:
 	sj::MeterContext context{};
 	std::vector<sj::Anchor> anchors;
 	godot::String last_error;
+
+	sj::SlipModel slip{};
+	sj::SlipOutcome outcome{sj::SlipOutcome::None};
+	bool grab_latched{false};
+	/** In-level seconds. The slip's budget and window are absolute times against this. */
+	float now{0.0f};
 };
 
 }  // namespace steeplejack

@@ -66,9 +66,18 @@ public:
     // exactly the reason it falls you on any other closed window. One code path, so the terrifying
     // case cannot be the one that was never tested.
     //
-    // Calling it while a slip is already in progress does nothing and returns the window already
-    // running. You cannot re-arm your way out of one.
+    // **A slip is an edge, not a level.** Your hand comes off once and cannot come off again until
+    // you have got it back on, so calling this every step while grip sits at zero is correct and
+    // does nothing after the first. Without that latch a fall — which is exactly what leaves a
+    // climber at zero grip — slips him again on the very next step, spends the budget he was just
+    // given, and falls him again, for ever. `HandBackOn` is what re-arms it.
     float BeginSlip(float now, const Tuning& t) noexcept;
+
+    // Grip came back. Call every step that grip is above zero; it is the other half of the edge.
+    void HandBackOn() noexcept { handOff_ = false; }
+
+    // Whether a hand is currently off — slipping, or left off by a slip that resolved into a fall.
+    bool HandIsOff() const noexcept { return handOff_; }
 
     bool InProgress() const noexcept { return slipping_; }
 
@@ -91,6 +100,7 @@ public:
 
 private:
     Difficulty difficulty_{Difficulty::Jack};
+    bool       handOff_{false};   // the edge latch — see BeginSlip
     bool       slipping_{false};
     float      slipBegan_{0.0f};
     float      window_{0.0f};

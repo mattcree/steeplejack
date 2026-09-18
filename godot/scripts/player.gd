@@ -37,6 +37,11 @@ const DOG_BAG := 6
 const CRADLE_RADIUS := 8.0
 const TOOL_CONDITION := 0.85
 
+## What the sim's last step decided about the slip. Mirrors sj::SlipOutcome.
+const SLIP_NONE := 0
+const SLIP_SAVED := 1
+const SLIP_FELL := 2
+
 @onready var jack: Jack = Jack.new()
 @onready var boom: SpringArm3D = $Boom
 @onready var body: Node3D = $Body
@@ -71,6 +76,8 @@ var _fell_from := 0.0
 var _playing := ""
 var _shuffle := 0.0              ## How far sideways off the ladder line he has worked himself.
 var _remount_block := 0.0
+var _slipping := false           ## Mirrors the sim, so the rising edge can be acted on once.
+var fall_reason := ""            ## The one sentence the player must be able to say themselves.
 
 
 func height_m() -> float:
@@ -124,6 +131,19 @@ func _unhandled_input(event: InputEvent) -> void:
 		Input.mouse_mode = (Input.MOUSE_MODE_VISIBLE
 			if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED else Input.MOUSE_MODE_CAPTURED)
 
+	# The grab is latched in the sim rather than polled in _physics_process, because a key that
+	# goes down and up between two physics frames is still a grab the player made, and losing that
+	# one would be the most infuriating bug this feature could have. It is taken before anything
+	# else looks at the input: while you are coming off a ladder, no other verb means anything.
+	if jack.slip_in_progress():
+		var pressed_grab: bool = (event is InputEventKey and event.pressed and not event.echo
+			and event.keycode == KEY_SPACE)
+		var clicked_grab: bool = (event is InputEventMouseButton and event.pressed
+			and event.button_index == MOUSE_BUTTON_LEFT)
+		if pressed_grab or clicked_grab:
+			jack.grab()
+		return
+
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_E: _tap()
@@ -144,6 +164,17 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _physics_process(dt: float) -> void:
 	boom.rotation = Vector3(_pitch, _yaw, 0.0)
+
+	# Hanging by one hand. Nothing he does moves him and no verb is available; the only input that
+	# means anything is the grab, and _step_sim is what closes the window on it. Stepping the sim
+	# is not optional here — the window is the sim's and it expires there, not on a timer in this
+	# script, which is why this early return still goes through it.
+	if _slipping:
+		velocity = Vector3.ZERO
+		_step_sim(dt)
+		_read_slip()
+		_animate()
+		return
 
 	var ladder_world: Vector3 = chimney.global_position + chimney.face_point(height_m())
 	var to_ladder := Vector2(global_position.x - ladder_world.x, global_position.z - ladder_world.z)
@@ -169,8 +200,72 @@ func _physics_process(dt: float) -> void:
 		_walk(dt)
 
 	_step_sim(dt)
+	_read_slip()
 	_update_work(dt)
 	_animate()
+
+
+## What the sim decided about the slip on the step that just ran.
+##
+## The rising edge is acted on here and nowhere else: a slip cancels work mode, because a man whose
+## hand has come off is not still lining a dog up, and leaving the hammer live through a slip meant
+## you could strike while falling.
+func _read_slip() -> void:
+	var now_slipping: bool = jack.slip_in_progress()
+	if now_slipping and not _slipping:
+		work_mode = false
+		drawing = false
+		swing_power = 0.0
+		message = ""
+	_slipping = now_slipping
+
+	match jack.last_slip_outcome():
+		SLIP_SAVED:
+			# Hanging one-handed with almost nothing left. The nerve cost is the real one, and it
+			# is what makes the next dog measurably harder.
+			message = "caught it. Hanging one-handed — get your other hand back on."
+			fall_reason = ""
+		SLIP_FELL:
+			_came_off()
+
+
+## The window closed with no grab. What happens next is decided by what you were tied to, which is
+## a decision you made minutes ago with the anchor rating on screen in front of you.
+func _came_off() -> void:
+	_slipping = false
+	var r: Dictionary = jack.fall(height_m())
+
+	if not r.get("tied_on", false):
+		_fall_to_ground("you had one hand on a rung and nothing else. Nothing caught you.")
+		return
+
+	if r.get("caught", false):
+		# The line held. You are still on the stack, three seconds of clipping on well spent.
+		fall_reason = ""
+		message = "the line held — %.1f kN on a dog rated %.1f kN. Get back on." % [
+			r["shock_kn"], r["capacity_kn"]]
+		return
+
+	_fall_to_ground("the dog let go: %.1f kN of shock load on one rated %.1f kN." % [
+		r["shock_kn"], r["capacity_kn"]])
+
+
+## The fall. **The stack stays up** — it is the checkpoint, and the whole reason a fall stings
+## without wiping the twenty-five minutes you spent building it. You come back the next day and
+## climb what you already built.
+func _fall_to_ground(why: String) -> void:
+	fall_reason = why
+	message = "%s You come back the next day — your stack is still up there." % why
+	jack.new_shift()
+	global_position = _spawn
+	velocity = Vector3.ZERO
+	on_ladder = false
+	work_mode = false
+	drawing = false
+	_shuffle = 0.0
+	_remount_block = REMOUNT_DELAY
+	_fell_from = 0.0
+	_slipping = false
 
 
 func _climb(dt: float, ladder_world: Vector3) -> void:
@@ -264,11 +359,7 @@ func _let_go() -> void:
 
 
 func _fall(metres: float) -> void:
-	message = "you fell %.0f m. Back to the cradle." % metres
-	global_position = _spawn
-	velocity = Vector3.ZERO
-	on_ladder = false
-	_fell_from = 0.0
+	_fall_to_ground("you dropped %.0f m onto hard ground." % metres)
 
 
 ## The yaw that points the model along `dir`.
@@ -306,8 +397,11 @@ func _key(k: Key) -> float:
 
 func _step_sim(dt: float) -> void:
 	var h := maxf(height_m(), 0.0)
-	jack.set_context(h, 9.0, carrying_ladder, work_mode)
-	jack.set_exposure(1 if on_ladder else 0)   # Ladder, else Platform
+	# `working` means a hand is off the ladder, which during a slip is not a figure of speech. Left
+	# as work_mode alone, grip recovered through the whole 900 ms — so the meter that had just run
+	# out was visibly refilling while the player scrambled for the key.
+	jack.set_context(h, 9.0, carrying_ladder, work_mode or _slipping)
+	jack.set_exposure(2 if _slipping else (1 if on_ladder else 0))   # Hanging, Ladder, Platform
 	jack.step(dt)
 
 	# The span you are standing on: from the highest dog below you to where you are. The entire risk

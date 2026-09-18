@@ -412,6 +412,8 @@ public:
 
     bool  CanSlipSave(float now, const Tuning&) const noexcept;
     float BeginSlip(float now, const Tuning&) noexcept;   // window, seconds; 0 = budget spent
+    void  HandBackOn() noexcept;                         // grip is back; re-arm the edge
+    bool  HandIsOff() const noexcept;
     bool  InProgress() const noexcept;
     float WindowFractionLeft(float now) const noexcept;   // 1 → 0, the telegraph
 
