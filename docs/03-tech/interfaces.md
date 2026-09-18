@@ -400,14 +400,45 @@ float   DriftPerMinuteCm(Lashing, const Tuning&) noexcept;
 
 ```cpp
 enum class SlipOutcome : uint8_t { None, Saved, Fell };
+enum class Difficulty  : uint8_t { Assisted, Jack, OwdHand };
 
 class SlipModel {
 public:
-    bool        CanSlipSave(float now, const Tuning&) const noexcept;
-    float       BeginSlip(float now, const Tuning&) noexcept;   // window, seconds
-    SlipOutcome Resolve(float grabbedAt, const Tuning&) noexcept;
+    explicit SlipModel(Difficulty = Difficulty::Jack) noexcept;
+    void  SetDifficulty(Difficulty) noexcept;
+
+    float WindowSeconds(const Tuning&) const noexcept;
+    float CooldownSeconds(const Tuning&) const noexcept;
+
+    bool  CanSlipSave(float now, const Tuning&) const noexcept;
+    float BeginSlip(float now, const Tuning&) noexcept;   // window, seconds; 0 = budget spent
+    bool  InProgress() const noexcept;
+    float WindowFractionLeft(float now) const noexcept;   // 1 → 0, the telegraph
+
+    SlipOutcome Resolve(float now, bool grabbed, Meters&, const Tuning&) noexcept;
 };
+
+struct FallResult { bool caught{}, anchorFailed{}; float shockLoadKN{}, capacityKN{}; };
+
+FallResult ResolveFall(Meters&, const Anchor& tiedTo, const Tuning&) noexcept;
 ```
+
+**Three departures from the signature this document fixed before the module existed**, each
+recorded here rather than made quietly in the implementation:
+
+- **`Resolve` takes `now` and `grabbed` rather than a `grabbedAt`.** As fixed, a slip nobody
+  grabbed at never resolved — there was no call that reported the fall, so the expiry would have
+  been a timer in the presentation layer, which is where game rules are not allowed to live. One
+  call per frame carrying the input has one call site and no way to forget the expiry.
+- **`Resolve` takes `Meters&`.** The save costs grip and nerve. As fixed, the caller applied that
+  cost, which is a rule outside the sim — and one every caller could get subtly different.
+- **`Difficulty` is new.** `meters.json` has held the difficulty table since METER-002 and nothing
+  could read it; acceptance 1 is that the window tracks it. It lives in `Slip.h` because this is
+  the first module to need it, and belongs in `Types.h` as soon as a second one does.
+
+`BeginSlip` returning **0 for a spent budget** is deliberate rather than a sentinel to branch on: a
+budget you have already spent is a zero-length window, and `Resolve` falls you on the first call
+for the same reason it falls you on any other closed window. There is no second code path.
 
 ---
 

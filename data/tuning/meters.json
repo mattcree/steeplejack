@@ -43,7 +43,8 @@
     "sawSomethingFall": -15.0,
     "copingPeel": -30.0,
     "bellStrike": -35.0,
-    "sitIntoChair": -20.0
+    "sitIntoChair": -20.0,
+    "caughtByLine": -50.0
   },
   "nerveBands": { "calm": 70.0, "uneasy": 40.0, "bad": 20.0 },
   "nerveWobbleMultiplier": { "calm": 1.0, "uneasy": 2.0, "bad": 3.0 },

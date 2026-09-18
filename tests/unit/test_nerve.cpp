@@ -199,7 +199,10 @@ TEST_CASE("Nerve: Acceptance 3: every shock in the tuning data is implemented")
         }
     }
 
-    REQUIRE(found.size() == 9);   // six in the GDD table, nine in the data — the data is the spec
+    // Deliberately an exact count rather than a floor, so that adding a shock to the data forces
+    // whoever added it to come and look at this test. `caughtByLine` is METER-005's: the GDD gives
+    // −50 for a fall the safety line catches and the data had no key for it.
+    REQUIRE(found.size() == 10);   // six in the GDD table, ten in the data — the data is the spec
 
     for (const std::string& event : found)
     {
