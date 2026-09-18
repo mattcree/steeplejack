@@ -3,6 +3,7 @@
 // Godot loads godot/bin/libsteeplejack.so and calls steeplejack_library_init, which is the only
 // symbol the engine knows about. Everything the game can reach from GDScript is registered here.
 
+#include "Jack.h"
 #include "SteeplejackTuning.h"
 
 #include <godot_cpp/classes/engine.hpp>
@@ -21,6 +22,7 @@ void initialize_steeplejack(ModuleInitializationLevel level)
 		return;
 	}
 	GDREGISTER_CLASS(steeplejack::SteeplejackTuning);
+	GDREGISTER_CLASS(steeplejack::Jack);
 }
 
 void uninitialize_steeplejack(ModuleInitializationLevel)

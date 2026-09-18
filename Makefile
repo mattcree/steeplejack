@@ -385,11 +385,11 @@ godot-build: godot-deps
 	@ls -la godot/bin/
 
 # Open the editor.
-godot-editor:
+godot-editor: godot-import
 	@$(GODOT) --path godot --editor
 
-# Run the game in a window.
-godot-run:
+# Run the game in a window. Builds first, so a fresh clone is one command away from playing.
+godot-run: godot-build godot-import
 	@$(GODOT) --path godot
 
 # Run a script headlessly against the project — the Godot equivalent of `make ue-py`, and the

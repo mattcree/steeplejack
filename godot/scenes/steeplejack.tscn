@@ -1,0 +1,94 @@
+; The playable scene. Sky, sun, ground, a spawn point and a HUD — the stack itself is generated
+; from data/levels/*.json by chimney.gd, because rule 3 says no hand-placed level geometry.
+;
+; Hand-written text, reviewable in a diff. That is why we are in this engine.
+
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://scripts/chimney.gd" id="1_chimney"]
+[ext_resource type="Script" path="res://scripts/player.gd" id="2_player"]
+[ext_resource type="Script" path="res://scripts/hud.gd" id="3_hud"]
+
+[sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
+sky_top_color = Color(0.25, 0.42, 0.66, 1)
+sky_horizon_color = Color(0.72, 0.73, 0.71, 1)
+ground_bottom_color = Color(0.28, 0.27, 0.25, 1)
+ground_horizon_color = Color(0.72, 0.73, 0.71, 1)
+sun_angle_max = 12.0
+
+[sub_resource type="Sky" id="Sky"]
+sky_material = SubResource("SkyMat")
+
+[sub_resource type="Environment" id="Env"]
+background_mode = 2
+sky = SubResource("Sky")
+ambient_light_source = 3
+ambient_light_energy = 0.6
+tonemap_mode = 3
+tonemap_white = 6.0
+ssao_enabled = true
+fog_enabled = true
+fog_light_color = Color(0.74, 0.76, 0.78, 1)
+fog_density = 0.0015
+fog_sky_affect = 0.4
+adjustment_enabled = true
+adjustment_contrast = 1.05
+adjustment_saturation = 1.05
+
+[sub_resource type="CapsuleShape3D" id="Capsule"]
+radius = 0.34
+height = 1.8
+
+[sub_resource type="WorldBoundaryShape3D" id="GroundShape"]
+
+[sub_resource type="PlaneMesh" id="GroundMesh"]
+size = Vector2(600, 600)
+
+[node name="Steeplejack" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.77, 0.43, -0.47, 0, 0.74, 0.67, 0.64, -0.52, 0.57, 0, 60, 0)
+light_energy = 2.2
+light_color = Color(1, 0.94, 0.85, 1)
+shadow_enabled = true
+directional_shadow_max_distance = 220.0
+
+[node name="Ground" type="StaticBody3D" parent="."]
+
+[node name="Mesh" type="MeshInstance3D" parent="Ground"]
+mesh = SubResource("GroundMesh")
+
+[node name="Collision" type="CollisionShape3D" parent="Ground"]
+shape = SubResource("GroundShape")
+
+[node name="Chimney" type="Node3D" parent="."]
+script = ExtResource("1_chimney")
+
+[node name="Player" type="CharacterBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -26, 1, 14)
+script = ExtResource("2_player")
+
+[node name="Shape" type="CollisionShape3D" parent="Player"]
+shape = SubResource("Capsule")
+
+[node name="Body" type="MeshInstance3D" parent="Player"]
+mesh = SubResource("Capsule")
+
+[node name="Boom" type="SpringArm3D" parent="Player"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+spring_length = 4.3
+margin = 0.2
+
+[node name="Camera" type="Camera3D" parent="Player/Boom"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9, 0.4, 0)
+fov = 70.0
+
+[node name="HUD" type="Control" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("3_hud")
