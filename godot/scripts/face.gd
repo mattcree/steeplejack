@@ -61,6 +61,8 @@ var _work_depth := 0.0
 var _bent: MultiMeshInstance3D
 ## Set by the player: joints with a dog bent into them.
 var bent_ids := {}
+## Dogs started and left part-driven, by how far in: the spike stands out by what is left to drive.
+var started_ids := {}
 ## Set by the player: joints a dog was torn out of. A scar, and the joint is spent.
 var pulled_ids := {}
 ## The old fixtures: joint id -> rust. Drawn as dogs gone orange and flaking in proportion — the
@@ -351,6 +353,10 @@ func _rebuild() -> void:
 			lugs.append(_on_face(j, Vector2(0.0, 0.0), 0.21))
 		elif j["occupied"] and bent_ids.has(j["id"]):
 			bent.append(_on_face(j, Vector2(0.02, -0.03), 0.07, deg_to_rad(38.0)))
+		elif started_ids.has(j["id"]):
+			var left := 0.11 * (1.0 - clampf(float(started_ids[j["id"]]), 0.0, 1.0))
+			dogs.append(_on_face(j, Vector2.ZERO, 0.11 + left))
+			lugs.append(_on_face(j, Vector2(0.0, 0.0), 0.21 + left))
 		elif j["occupied"]:
 			# A driven dog: the spike standing out of the joint, and the lug across its end.
 			dogs.append(_on_face(j, Vector2.ZERO, 0.11))

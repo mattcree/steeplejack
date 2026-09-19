@@ -118,6 +118,10 @@ var _tap_landed := false
 var last_tap := {}
 ## Joints with a dog bent into them. Wasted material should be something you can look at.
 var bent_joints := {}
+## Dogs started and left: joint id to how far in. Stepping back to rest mid-drive used to reset the
+## dog to nothing, so on a hard joint and a tired arm a dog could never be seated — the ascent test
+## hammered one joint for half an hour of game time finding that out.
+var started_dogs := {}
 
 ## Lashing — VERB-005. A mode, like work: the rope is going round and nothing else is.
 var lashing := false
@@ -189,6 +193,10 @@ var _rung_count := 0
 ## Stands in for W/S when non-zero. A headless test cannot press a key, and a test of "frozen stops
 ## you climbing" that cannot press the climb key passes whether the rule works or not.
 var climb_input := 0.0
+## The same for walking: x is right, y is forward, relative to the camera. For a test that plays.
+var walk_input := Vector2.ZERO
+## And for looking: a world point to aim at instead of the camera's ray. INF when unused.
+var aim_override := Vector3.INF
 var _carried_ladder: Node3D      ## the section on his back, shown only while he is carrying one
 
 ## The fall — 02-climbing-system.md §6 and CAM-002: "Camera goes wide, time dilates ~40%, the ladder
@@ -347,7 +355,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			# The camera orbits; the body does not turn with it. The body turns to face where it is
 			# going, which is most of what makes a third-person character look like it has weight.
 			_yaw -= event.relative.x * MOUSE_SENS
-			_pitch = clampf(_pitch - event.relative.y * MOUSE_SENS, -1.2, 0.6)
+			# Down to 77 degrees: steep enough to pick a joint at your own feet. At 69 the lowest
+			# joint a climber could point at was level with his boots, and the next dog for a
+			# rigid span is often lower than that.
+			_pitch = clampf(_pitch - event.relative.y * MOUSE_SENS, -1.35, 0.6)
 
 	if event.is_action_pressed("ui_cancel"):
 		Input.mouse_mode = (Input.MOUSE_MODE_VISIBLE
@@ -613,6 +624,9 @@ func _climb(dt: float, ladder_world: Vector3) -> void:
 func _walk(dt: float) -> void:
 	var f := _key(KEY_W) - _key(KEY_S)
 	var r := _key(KEY_D) - _key(KEY_A)
+	if walk_input != Vector2.ZERO:
+		r = walk_input.x
+		f = walk_input.y
 	# Movement is relative to where the camera is looking, which is what every third-person game
 	# does and what hands expect.
 	var wish := Basis(Vector3.UP, _yaw) * Vector3(r, 0.0, -f)
@@ -876,6 +890,10 @@ func _find_target() -> int:
 	# ladder and never a dead key.
 	var aim_at: Vector3 = hit["position"] if not hit.is_empty() else (
 		hands + (chimney.global_position - hands).normalized() * 0.6)
+	# A test that plays says where it is looking directly. Only the mouse-to-ray step is skipped —
+	# test_face covers that — and every rule after it (reach, the ladder, occupied) still applies.
+	if aim_override.is_finite():
+		aim_at = aim_override
 	aim_at.y = clampf(aim_at.y, hands.y - reach, hands.y + reach)
 	# The nearest usable joint to where you are looking. Not simply the nearest: a joint under the
 	# ladder is nearest surprisingly often, because the ladder goes up exactly where you look.
@@ -951,6 +969,11 @@ func _toggle_work_mode() -> void:
 		work_mode = false
 		drawing = false
 		swing_power = 0.0
+		if work_joint >= 0 and dog_depth > 0.0:
+			started_dogs[work_joint] = dog_depth
+			if face != null:
+				face.started_ids[work_joint] = dog_depth
+				face.touch()
 		return
 	if not on_ladder:
 		_say("you drive a dog from the ladder")
@@ -970,7 +993,12 @@ func _toggle_work_mode() -> void:
 	_aim_hammer_at(work_joint)
 	var j: Dictionary = face.joint(work_joint)
 	work_height = j.get("height", height_m())
-	dog_depth = 0.0
+	# Back to a dog already started: it is where it was left.
+	dog_depth = float(started_dogs.get(work_joint, 0.0))
+	started_dogs.erase(work_joint)
+	if face != null and face.started_ids.has(work_joint):
+		face.started_ids.erase(work_joint)
+		face.touch()
 	aim = Vector2.ZERO
 	if jack.joint(work_joint).get("tapped", -1) < 0:
 		_say("you have not sounded this one")
@@ -1487,7 +1515,9 @@ func _draw_gin() -> void:
 	var length := maxf(wheel_at.y - float(haul["height"]), 0.5)
 	var a := deg_to_rad(float(haul["swing_deg"]))
 	var load_at := wheel_at + n * sin(a) * length - Vector3.UP * cos(a) * length
-	load_node.global_position = load_at - (load_at - wheel_at).normalized() * 2.5
+	# The section hangs 2.5 m above its hook point, except in the last metres under the wheel, where
+	# that would put its middle on the wheel and leave look_at nothing to look along.
+	load_node.global_position = load_at - (load_at - wheel_at).normalized() * minf(2.5, length - 0.1)
 	load_node.look_at_from_position(load_node.global_position, wheel_at, n.cross(Vector3.UP))
 	load_node.rotate_object_local(Vector3.RIGHT, PI * 0.5)
 	rope.global_position = (wheel_at + load_at) * 0.5
@@ -1626,10 +1656,10 @@ func _lash() -> void:
 	if not on_ladder:
 		_say("you lash a ladder from the ladder")
 		return
-	var best: float = jack.highest_anchor_below(height_m() + 100.0)
+	var best: float = _lash_dog_height()
 	var rise: float = jack.tuning_f("ladderLengthMetres", 5.0) - jack.tuning_f("ladderMinOverlapMetres", 1.0)
 	if best < 0.0 or best + 0.1 < ladder_top - rise:
-		_say("nothing to lash to — get a dog in above you")
+		_say("nothing to lash to — get a dog in above you, within reach")
 		return
 	if best + rise <= ladder_top + 0.5:
 		_say("that dog is too low — a section lashed there reaches no higher. Drive one near the top")
@@ -1880,12 +1910,45 @@ func at_cradle() -> bool:
 ## not is not worth lashing to — a new player drives a dog at his feet, lashes, and the ladder goes
 ## no higher, having spent a section on nothing.
 func has_lashable_anchor() -> bool:
-	var best: float = jack.highest_anchor_below(height_m() + 100.0)
+	var best: float = _lash_dog_height()
 	var rise: float = _rise()
 	return best >= 0.0 and best + 0.1 >= ladder_top - rise and best + rise > ladder_top + 0.5
 
 
+## The highest intact dog he can get a rope round: within reach of his hands.
+##
+## It was the highest dog *anywhere*, which was harmless while every dog was one he had driven —
+## and stopped being harmless the moment the old fixtures put dogs in the wall at 30-42 m. Standing
+## at 5 m, R lashed a section to a fixture thirty-seven metres above him and the ladder jumped to
+## 45.8 m. A lashing is a rope tied by hand, so the dog has to be where his hand is. Found by
+## test_ascent, the test that plays the whole climb.
+func _lash_dog_height() -> float:
+	var hands := height_m() + 0.55
+	var reach: float = jack.tuning_f("tapTestMaxRangeMetres", 2.5)
+	var best := -1.0
+	for i in jack.anchor_count():
+		var a: Dictionary = jack.anchor_at(i)
+		if a.get("failed", false) or int(a.get("rate", 0)) == 0:
+			continue
+		var h: float = a["height"]
+		if absf(h - hands) <= reach and h > best:
+			best = h
+	return best
+
+
 ## Whether the joint he is pointing at has been sounded.
+## The span a dog in the targeted joint would make, from the top of the ladder structure — the
+## single most important risk number in the game, shown before the dog goes in rather than after.
+## -1 with no target.
+func target_span() -> float:
+	if target_id < 0 or face == null:
+		return -1.0
+	var h: float = float(face.joint(target_id).get("height", -1.0))
+	if h < 0.0:
+		return -1.0
+	return h - maxf(jack.stack_top(), 0.0)
+
+
 func target_tapped() -> bool:
 	return target_id >= 0 and jack.joint(target_id).get("tapped", -1) >= 0
 

@@ -447,5 +447,9 @@ godot-test: godot-build godot-import
 			exit $$rc; \
 		fi; \
 	done
+	@# The whole game, played: cradle to cap with the real verbs. Unpaced (--fixed-fps), so fifteen
+	@# minutes of game time takes under a minute; still bounded, for the same reason as above.
+	@timeout 300 $(GODOT) --path godot --headless --fixed-fps 60 --script res://scripts/test_ascent.gd \
+		|| (printf '\033[31mFAILED\033[0m  test_ascent (124 = hung: a parse error, or the bot stuck)\n'; exit 1)
 
 .PHONY: godot-deps godot-build godot-import godot-test godot-editor godot-run godot-script

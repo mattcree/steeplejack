@@ -197,10 +197,13 @@ func _next_step() -> String:
 	# Where the next dog goes is the thing a new player gets wrong: near the top of what is built,
 	# as high as he can reach, so the next section goes as high as it can. A dog at his feet on the
 	# first rung is a dog that buys nothing.
-	if player.height_m() < player.ladder_top - 1.2:
-		return "Climb to the top of what you've built — the next dog goes as high as you can reach."
+	if player.height_m() < player.ladder_top - 1.2 and player.target_span() < 3.0:
+		return "Climb up what you've built — the next dog wants to be about 4 m above your last one."
 	if player.target_id < 0:
 		return "Look up at the brickwork above you to pick a joint."
+	var span: float = player.target_span()
+	if span > 0.0 and span < 1.5:
+		return "Too close to your last dog to buy much height — look higher."
 	if not player.target_tapped():
 		return "Tap it to hear what it is worth [E] — or trust your eye and drive a dog [right mouse]."
 	return "Drive a dog into that joint, or look for a better one.  [right mouse]"
@@ -235,7 +238,7 @@ func _affordances() -> Array:
 		["W/S", "climb", true, ""],
 		["E", "sound this joint" if not sounded else "sound it again", has_target,
 			"no joint in reach — look at the brickwork"],
-		["RMB", "drive a dog into it", has_target and player.dogs_carried > 0,
+		["RMB", _drive_label(), has_target and player.dogs_carried > 0,
 			"no joint in reach" if not has_target else "no dogs in the bag"],
 		["R", "lash the next ladder", player.has_lashable_anchor() and player.carrying_ladder,
 			"you are not carrying one" if not player.carrying_ladder else "needs a dog seated above you"],
@@ -253,6 +256,18 @@ func _gin_label() -> String:
 	if absf(player.height_m() + 0.55 - player.gin_height) < player.GIN_REACH:
 		return "haul a section up" if not player.carrying_ladder else "haul (lash the one you have first)"
 	return "move the gin wheel up to a dog in reach"
+
+
+## "drive a dog into it — a 4.3 m span, flexing". The span a dog there would make, and what the
+## table makes of it, before the dog goes in. MVP criterion 4 asks whether players *voluntarily*
+## take the risky span, and nobody can volunteer for a risk they cannot see.
+func _drive_label() -> String:
+	var span: float = player.target_span()
+	if span <= 0.0:
+		return "drive a dog into it"
+	var band: int = player.jack.classify_span(span)
+	var what: String = ["rigid", "flexing", "swaying", "it will buckle"][clampi(band, 0, 3)]
+	return "drive a dog into it — a %.1f m span, %s" % [span, what]
 
 
 func jack_free_hands() -> bool:
