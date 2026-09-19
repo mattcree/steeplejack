@@ -124,6 +124,12 @@ func _draw() -> void:
 	if player.rigging_to >= 0:
 		_draw_rig(jack)
 
+	# Rule 8: every audio cue has a visual fallback. This one is not optional in a second way too —
+	# the fairness table makes the gust's 1.2 s warning the thing that separates a fair failure from
+	# a bug, and a warning only some players receive is not a warning.
+	if jack.gust_tell():
+		_draw_gust_tell(jack)
+
 	# Over everything, because for 900 ms nothing else on this screen matters.
 	if player.jack.slip_in_progress():
 		_draw_slip(jack)
@@ -268,6 +274,25 @@ func _draw_rig(jack: Jack) -> void:
 	_centre("%.0f grip a second becomes %.0f" % [from_rate, to_rate], eye.y + 48.0,
 		Color(0.80, 0.78, 0.74, 0.75), 13)
 	_centre("[Q] to stop", eye.y + 70.0, Color(0.72, 0.70, 0.67, 0.65), 13)
+
+
+## The gust, arriving. 1.2 seconds, and then it hits your hands.
+##
+## Drawn along the top edge rather than in the middle, because the player is usually looking at a
+## joint and a reticle when it starts and must not have either covered up. It closes inwards from
+## both sides, so it reads as something converging on you and gives the remaining time as a length
+## rather than as a number nobody will read in a second.
+func _draw_gust_tell(jack: Jack) -> void:
+	var p: float = jack.gust_tell_progress()
+	var col := Color(0.62, 0.74, 0.86, 0.45 + 0.55 * p)
+
+	var margin := 40.0
+	var span: float = (size.x * 0.5 - margin) * (1.0 - p)
+	var y := 26.0
+	draw_line(Vector2(margin, y), Vector2(margin + span, y), col, 3.0 + 3.0 * p)
+	draw_line(Vector2(size.x - margin, y), Vector2(size.x - margin - span, y), col, 3.0 + 3.0 * p)
+
+	_centre("gust", y + 16.0, Color(0.88, 0.92, 0.96, 0.5 + 0.5 * p), 16)
 
 
 ## The slip.

@@ -136,6 +136,42 @@ LevelData LevelData::Parse(const std::string& json, const std::string& origin)
         }
     }
 
+    if (doc.Has("weather"))
+    {
+        const JsonValue& w = doc.At("weather");
+        level.weather_.windBase = Number(w, "windBase");
+        if (w.Has("precipitation"))
+        {
+            level.weather_.precipitation = Text(w, "precipitation");
+        }
+        if (w.Has("windAtHeight") && w.At("windAtHeight").Type() == JsonValue::Kind::Array)
+        {
+            for (const JsonValue& pair : w.At("windAtHeight").Elements())
+            {
+                const std::vector<JsonValue>& xy = pair.Elements();
+                if (xy.size() >= 2)
+                {
+                    level.weather_.windAtHeight.push_back(
+                        Vec2{static_cast<float>(xy[0].AsNumber()),
+                             static_cast<float>(xy[1].AsNumber())});
+                }
+            }
+        }
+        // `null` here means a sheltered level with no gusts at all, which is a different thing from
+        // a range of zero — so the presence of the array is the flag, not its contents.
+        if (w.Has("gustIntervalSeconds")
+            && w.At("gustIntervalSeconds").Type() == JsonValue::Kind::Array)
+        {
+            const std::vector<JsonValue>& g = w.At("gustIntervalSeconds").Elements();
+            if (g.size() >= 2)
+            {
+                level.weather_.hasGusts = true;
+                level.weather_.gustEverySecondsMin = static_cast<float>(g[0].AsNumber());
+                level.weather_.gustEverySecondsMax = static_cast<float>(g[1].AsNumber());
+            }
+        }
+    }
+
     if (doc.Has("site"))
     {
         const JsonValue& s = doc.At("site");
@@ -160,6 +196,32 @@ LevelData LevelData::Parse(const std::string& json, const std::string& origin)
     }
 
     return level;
+}
+
+float WeatherSpec::WindAt(float height) const noexcept
+{
+    if (windAtHeight.empty())
+    {
+        return windBase;
+    }
+    // Held flat outside the authored range. A level that gives a curve up to its own top has said
+    // everything it needs to; extrapolating past it would invent weather nobody designed.
+    if (height <= windAtHeight.front().x)
+    {
+        return windBase * windAtHeight.front().y;
+    }
+    for (std::size_t i = 1; i < windAtHeight.size(); ++i)
+    {
+        const Vec2& lo = windAtHeight[i - 1];
+        const Vec2& hi = windAtHeight[i];
+        if (height <= hi.x)
+        {
+            const float span = hi.x - lo.x;
+            const float t = (span > 0.0f) ? (height - lo.x) / span : 0.0f;
+            return windBase * (lo.y + (hi.y - lo.y) * t);
+        }
+    }
+    return windBase * windAtHeight.back().y;
 }
 
 LevelData LevelData::LoadFrom(const std::string& path)

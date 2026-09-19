@@ -91,6 +91,7 @@ var rigging_to := -1             ## Stance being rigged, or -1. The HUD draws th
 var rig_left := 0.0              ## Seconds of it still to do.
 var rig_total := 0.0
 var _rig_at := 0.0               ## The height he was at when he started. Moving off it breaks it.
+var _gust_told := false          ## Rising edge of the tell, so the cue fires once per gust.
 var _slipping := false           ## Mirrors the sim, so the rising edge can be acted on once.
 var fall_reason := ""            ## The one sentence the player must be able to say themselves.
 
@@ -122,7 +123,10 @@ func set_height_m(h: float) -> void:
 
 func _ready() -> void:
 	var tuning_dir := ProjectSettings.globalize_path("res://../data/tuning")
-	var level_path := ProjectSettings.globalize_path("res://../data/levels/06-waterside.json")
+	# The MVP is one grey-box 55 m chimney in an empty field and this is it. 06-waterside is an M4
+	# felling level and was being played as if it were the MVP build, which is four bands and
+	# fifteen metres off-spec. `--level` overrides it: `make shot LEVEL=06-waterside`.
+	var level_path := ProjectSettings.globalize_path("res://../data/levels/%s.json" % _level_id())
 	if not jack.load(tuning_dir, level_path):
 		push_error("could not start: %s" % jack.get_last_error())
 		get_tree().quit(1)
@@ -162,6 +166,15 @@ func _ready() -> void:
 ## He used to spawn looking wherever the scene file happened to leave him, which was at an empty
 ## field with the chimney off to one side. The first frame of a game about climbing something tall
 ## has one job.
+## Which level to play. Defaults to the MVP grey box; `--level <id>` picks another.
+func _level_id() -> String:
+	var args := OS.get_cmdline_user_args()
+	for i in args.size():
+		if args[i] == "--level" and i + 1 < args.size():
+			return args[i + 1]
+	return "00-greybox"
+
+
 func _look_at_stack() -> void:
 	var to := chimney.global_position - global_position
 	to.y = 0.0
@@ -484,9 +497,23 @@ func _step_sim(dt: float) -> void:
 	# `working` means a hand is off the ladder, which during a slip is not a figure of speech. Left
 	# as work_mode alone, grip recovered through the whole 900 ms — so the meter that had just run
 	# out was visibly refilling while the player scrambled for the key.
-	jack.set_context(h, 9.0, carrying_ladder, work_mode or _slipping or rigging_to >= 0)
+	#
+	# The wind is the level's own, at this height, with whatever the gust is adding. It used to be a
+	# hard-coded 9 m/s everywhere, which made every level's authored wind profile decorative — and
+	# wind is a term in both the nerve drain and the wobble, so it was a difficulty dial the
+	# designer had and the game ignored.
+	jack.set_context(h, jack.wind_at(h), carrying_ladder,
+		work_mode or _slipping or rigging_to >= 0)
 	if foley != null:
 		foley.set_height(h)
+
+	# The 1.2 second warning, once per gust. The fairness table allows a gust to blow you off only
+	# if this played first, so it is fired from the sim's own phase and never from a timer here.
+	var telling: bool = jack.gust_tell()
+	if telling and not _gust_told:
+		if foley != null:
+			foley.cue("gustTell")
+	_gust_told = telling
 	jack.set_exposure(2 if _slipping else (1 if on_ladder else 0))   # Hanging, Ladder, Platform
 	jack.step(dt)
 
@@ -544,7 +571,9 @@ func _update_work(dt: float) -> void:
 		swing_power = clampf(swing_power + dt * 1.6, 0.0, 1.0)
 	# Wobble is computed in one place, by the sim, and it eats your margin while you hold the draw.
 	drift_phase += dt * 2.3
-	var w: float = jack.wobble_deg(0.0)
+	# The gust, at last. `wobble_deg` has taken this argument since METER-003 and the only caller
+	# passed zero, so a gust could not move your hands — which is most of what a gust is for.
+	var w: float = jack.wobble_deg(jack.gust_strength())
 	aim.x += sin(drift_phase) * w * dt
 	aim.y += cos(drift_phase * 0.7) * w * dt
 

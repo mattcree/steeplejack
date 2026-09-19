@@ -51,7 +51,19 @@ func _init() -> void:
 	chimney = world.get_node("Chimney")
 	jack = player.jack
 
-	var script: PackedStringArray = OS.get_cmdline_user_args()
+	# `--level <id>` is the player's, not ours. Left in, it would be joined into the last pose
+	# command and reported as an unknown verb on every run that picked a level.
+	var argv: PackedStringArray = OS.get_cmdline_user_args()
+	var script := PackedStringArray()
+	var skip := false
+	for a in argv:
+		if skip:
+			skip = false
+			continue
+		if a == "--level":
+			skip = true
+			continue
+		script.append(a)
 	var line := " ".join(script)
 	for raw in line.split(",", false):
 		await _run(raw.strip_edges())

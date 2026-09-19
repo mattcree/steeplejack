@@ -420,11 +420,13 @@ godot-script: godot-import
 ##
 ## See the command vocabulary at the top of godot/scripts/shot.gd.
 CMDS ?=
+LEVEL ?=
 SHOT_RES ?= 1600x900
 shot: godot-build godot-import
 	@command -v xvfb-run >/dev/null || (echo "shot needs xvfb-run (package xorg-x11-server-Xvfb)" && exit 1)
 	@timeout 600 xvfb-run -a -s "-screen 0 $(SHOT_RES)x24" \
 		$(GODOT) --path godot --resolution $(SHOT_RES) --script res://scripts/shot.gd -- $(CMDS) \
+		$(if $(LEVEL),--level $(LEVEL),) \
 		2>&1 | grep -vE "^(WARNING|MESA|Note:|     at:)" || true
 
 ## godot-test: drive the real scene headlessly and assert on state

@@ -57,6 +57,31 @@ struct ExclusionSpec
     int32_t     bearing{}, distance{};
 };
 
+// The weather, which until now was the one block of every level file that nothing read.
+//
+// Wind matters mechanically rather than decoratively: it is a term in the nerve drain and a term in
+// wobble, so a level's wind profile is a difficulty dial the designer already has and the game was
+// ignoring — the presentation layer passed a hard-coded 9 m/s at every height of every level.
+struct WeatherSpec
+{
+    float windBase{};
+
+    // Multiplier against height, as authored: [[0, 1.0], [40, 1.6], [70, 2.1]]. Interpolated
+    // linearly between points and held flat outside them, so a level need only give the corners.
+    std::vector<Vec2> windAtHeight;
+
+    // Seconds between gusts, as a range to draw from. `hasGusts` is false when the level says
+    // `null`, which is how a sheltered level says "no gusts" — distinct from a range of [0,0],
+    // which would be a gust every frame.
+    bool  hasGusts{};
+    float gustEverySecondsMin{}, gustEverySecondsMax{};
+
+    std::string precipitation;
+
+    // Wind speed in m/s at a height, base times the interpolated multiplier.
+    float WindAt(float height) const noexcept;
+};
+
 struct SiteSpec
 {
     float                      safeLineDistance{};
@@ -88,6 +113,7 @@ public:
     const std::vector<BandSpec>& Bands() const noexcept { return bands_; }
     const StructureSpec& Structure() const noexcept { return structure_; }
     const SiteSpec& Site() const noexcept { return site_; }
+    const WeatherSpec& Weather() const noexcept { return weather_; }
 
     // Every rule `tools/validate_data.py` enforces, in the same order, with messages that name the
     // same things. Empty means the level is playable. Never throws: a broken level must be
@@ -100,6 +126,7 @@ private:
     StructureSpec         structure_;
     std::vector<BandSpec> bands_;
     SiteSpec              site_;
+    WeatherSpec           weather_;
     std::string           origin_;
 };
 

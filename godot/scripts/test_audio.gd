@@ -97,6 +97,21 @@ func _init() -> void:
 	_check(_has_second_event(cracked, foley.tap_stream(0).mix_rate),
 		"the cracked tap rattles after the strike rather than just decaying")
 
+	# The gust tell. Its *length* is the mechanic: 10-failure-and-difficulty.md allows a gust to
+	# blow you off only if a 1.2 s warning played first, so a cue that runs short leaves a window in
+	# which the gust is unannounced and the failure is unfair by the project's own definition.
+	var tell: AudioStreamWAV = foley.cue_stream("gustTell")
+	_check(tell != null, "there is a gust tell")
+	if tell != null:
+		var secs: float = float(_samples(tell).size()) / tell.mix_rate
+		_check(absf(secs - 1.2) < 0.05, "and it is the design's 1.2 s pre-roll (%.2f s)" % secs)
+		var pcm := _samples(tell)
+		# It has to swell rather than start at full. A cue that is loudest at its start does not
+		# read as something arriving.
+		var first := _peak_of(pcm, 0, pcm.size() / 4)
+		var last := _peak_of(pcm, pcm.size() * 3 / 4, pcm.size())
+		_check(last > first * 1.4, "and swells towards the gust (%.2f -> %.2f)" % [first, last])
+
 	# The wind bed has to loop without a click, which is the most noticeable fault a four-second
 	# loop can have.
 	var wind: AudioStreamWAV = foley.wind_stream()
@@ -124,6 +139,13 @@ func _samples(s: AudioStreamWAV) -> PackedFloat32Array:
 	for i in out.size():
 		out[i] = float(bytes.decode_s16(i * 2)) / 32768.0
 	return out
+
+
+func _peak_of(pcm: PackedFloat32Array, from: int, to: int) -> float:
+	var m := 0.0
+	for i in range(maxi(from, 0), mini(to, pcm.size())):
+		m = maxf(m, absf(pcm[i]))
+	return m
 
 
 func _peak(pcm: PackedFloat32Array) -> float:

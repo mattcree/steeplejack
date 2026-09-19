@@ -70,6 +70,7 @@
   "baseWobbleDegrees": 1.0,
   "gustWobbleDegrees": 3.5,
   "gustPreRollSeconds": 1.2,
+  "gustWindMultiplier": 0.9,
 
   "difficulty": {
     "assisted":  { "nerveDrain": 0.6, "slipSaveWindowMs": 1400, "slipSaveCooldownSeconds": 30.0, "daylight": 1.4, "injuriesPersist": false },

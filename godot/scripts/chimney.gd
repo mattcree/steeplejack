@@ -31,6 +31,12 @@ const BAND_COLOURS := {
 	"existing-band": Color(0.16, 0.13, 0.12),
 	"wind-band": Color(0.34, 0.25, 0.19),
 	"internal": Color(0.20, 0.20, 0.22),
+	# The MVP level's own four. They were all falling through to the default, so the grey box —
+	# the level the whole MVP test is run on — was one flat colour top to bottom and its four
+	# bands were invisible. The legend only works if it covers the levels being played.
+	"salt-bloom": Color(0.44, 0.42, 0.38),
+	"old-fixtures": Color(0.24, 0.20, 0.18),
+	"perished": Color(0.38, 0.32, 0.24),
 }
 
 ## Weathering, top to bottom. The level file carries `sootTo` and `bleachFrom` and nothing read

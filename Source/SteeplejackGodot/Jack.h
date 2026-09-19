@@ -16,7 +16,9 @@
 #include "Anchor.h"
 #include "Level.h"
 #include "Meters.h"
+#include "Rng.h"
 #include "Slip.h"
+#include "Wind.h"
 #include "Tuning.h"
 #include "Types.h"
 
@@ -76,6 +78,19 @@ public:
 	/** A named fright. Unknown events are refused rather than silently ignored. */
 	bool shock(const godot::String& event);
 	double wobble_deg(double gust) const;
+
+	// --- the weather ---------------------------------------------------------------------------
+	// Driven by `step`, from the level file's own weather block. The game layer asks what the wind
+	// is; it does not decide, and it does not decide when a gust arrives either.
+	/** Wind speed in m/s at a height, gust included. */
+	double wind_at(double height) const;
+	/** The 1.2 s warning. The cue that makes being blown off a fair failure rather than a bug. */
+	bool gust_tell() const;
+	/** 0 to 1 through the tell, for a cue that rises rather than one that just plays. */
+	double gust_tell_progress() const;
+	/** 0 to 1 gust strength. Zero for the whole of the tell, deliberately. */
+	double gust_strength() const;
+	bool level_has_gusts() const;
 
 	// --- the slip ------------------------------------------------------------------------------
 	// Grip reaching zero opens the window inside `step`, and `step` closes it. Neither is something
@@ -151,6 +166,10 @@ private:
 	sj::MeterContext context{};
 	std::vector<sj::Anchor> anchors;
 	godot::String last_error;
+
+	sj::WindModel wind{};
+	/** The weather's own substream, forked once, so adding a subsystem cannot shift its values. */
+	std::unique_ptr<sj::Rng> weather_rng;
 
 	sj::SlipModel slip{};
 	sj::SlipOutcome outcome{sj::SlipOutcome::None};

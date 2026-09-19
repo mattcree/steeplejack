@@ -42,6 +42,14 @@
     "lowpassHz": 8000, "noise": 0.15, "rattle": 0.0
   },
 
+  "_gustComment": "The 1.2 s pre-roll. 10-failure-and-difficulty.md allows a gust to blow you off ONLY if this played first, so it is a mechanic with a duration fixed by gustPreRollSeconds, not a flourish. Rendered as a rising filtered-noise swell rather than a tone, because it has to read as weather arriving and not as a UI beep.",
+  "gustTell": {
+    "seconds": 1.2,
+    "fromHz": 240.0,
+    "toHz": 1900.0,
+    "gain": 0.55
+  },
+
   "wind": {
     "loopSeconds": 4.0,
     "lowpassHz": 620,

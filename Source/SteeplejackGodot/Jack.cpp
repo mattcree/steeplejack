@@ -5,6 +5,7 @@
 
 #include "Rng.h"
 #include "Slip.h"
+#include "Wind.h"
 #include "Verbs/Hammer.h"
 #include "Verbs/Tap.h"
 #include "Wobble.h"
@@ -93,6 +94,12 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("shock", "event"), &Jack::shock);
 	ClassDB::bind_method(D_METHOD("wobble_deg", "gust"), &Jack::wobble_deg);
 
+	ClassDB::bind_method(D_METHOD("wind_at", "height"), &Jack::wind_at);
+	ClassDB::bind_method(D_METHOD("gust_tell"), &Jack::gust_tell);
+	ClassDB::bind_method(D_METHOD("gust_tell_progress"), &Jack::gust_tell_progress);
+	ClassDB::bind_method(D_METHOD("gust_strength"), &Jack::gust_strength);
+	ClassDB::bind_method(D_METHOD("level_has_gusts"), &Jack::level_has_gusts);
+
 	ClassDB::bind_method(D_METHOD("set_difficulty", "difficulty"), &Jack::set_difficulty);
 	ClassDB::bind_method(D_METHOD("get_difficulty"), &Jack::get_difficulty);
 	ClassDB::bind_method(D_METHOD("grab"), &Jack::grab);
@@ -136,6 +143,12 @@ bool Jack::load(const String& tuning_dir, const String& level_path)
 		// A new shift is a new clock and a new budget. Without this, loading a second level
 		// inherits the first one's cooldown and the first slip of the new level is unsaveable.
 		now = 0.0f;
+		// The weather gets its own substream off the level's seed, so the gusts are the same on
+		// every machine and in every replay, and so that adding another subsystem later cannot
+		// shift them (Rng::Fork is const for exactly that reason).
+		weather_rng = std::make_unique<sj::Rng>(
+			sj::Rng(level->Structure().weatherSeed).Fork(0x57494E44u));   // literal: 'WIND'
+		wind.Begin(level->Weather(), *weather_rng, *tuning);
 		slip = sj::SlipModel(slip.GetDifficulty());
 		outcome = sj::SlipOutcome::None;
 		grab_latched = false;
@@ -234,6 +247,10 @@ void Jack::step(double dt)
 	if (!tuning) { return; }
 	const float d = static_cast<float>(dt);
 	now += d;
+	if (level && weather_rng)
+	{
+		wind.Step(d, level->Weather(), *weather_rng, *tuning);
+	}
 	sj::grip::Step(meters, d, context, *tuning);
 	sj::nerve::Step(meters, d, context, *tuning);
 
@@ -290,6 +307,22 @@ double Jack::stance_drain_rate(int stance) const
 	if (!tuning) { return 0.0; }
 	return static_cast<double>(
 		sj::grip::DrainRate(static_cast<sj::Stance>(std::clamp(stance, 0, 4)), context, *tuning));
+}
+
+double Jack::wind_at(double height) const
+{
+	if (!level || !tuning) { return 0.0; }
+	return static_cast<double>(
+		wind.SpeedAt(static_cast<float>(height), level->Weather(), *tuning));
+}
+
+bool Jack::gust_tell() const { return wind.Tell(); }
+double Jack::gust_strength() const { return static_cast<double>(wind.Strength()); }
+bool Jack::level_has_gusts() const { return level && level->Weather().hasGusts; }
+
+double Jack::gust_tell_progress() const
+{
+	return tuning ? static_cast<double>(wind.TellProgress(*tuning)) : 0.0;
 }
 
 void Jack::set_difficulty(int difficulty)

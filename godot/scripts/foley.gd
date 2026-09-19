@@ -53,6 +53,7 @@ func _ready() -> void:
 	for key in ["hammer", "bent", "seated"]:
 		_one_shot[key] = _render(_spec[key])
 	_wind = _render_wind(_spec["wind"])
+	_one_shot["gustTell"] = _render_gust_tell(_spec["gustTell"])
 
 	# A small pool, because a player already playing cannot be reused and the tap test is meant to
 	# be something you do constantly.
@@ -205,6 +206,43 @@ func _render_wind(w: Dictionary) -> AudioStreamWAV:
 	return s
 
 
+## The gust warning: filtered noise whose cutoff sweeps up over the pre-roll.
+##
+## Not a tone. A rising note is a UI sound and this is weather arriving — the player has to read it
+## as "something is coming at me", not as "the game would like your attention". Sweeping the filter
+## rather than the pitch is what makes noise sound like it is approaching.
+##
+## Its length is the design's pre-roll and nothing else, because the fairness contract is about
+## *that* duration: a cue that runs short leaves a gap in which the gust is unannounced.
+func _render_gust_tell(g: Dictionary) -> AudioStreamWAV:
+	var rate: int = int(_spec.get("sampleRate", 22050))
+	var seconds: float = float(g["seconds"])
+	var n := int(seconds * rate)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5150
+
+	var buf := PackedFloat32Array()
+	buf.resize(n)
+	var lp := 0.0
+	var from_hz: float = float(g["fromHz"])
+	var to_hz: float = float(g["toHz"])
+	var gain: float = float(g["gain"])
+
+	for i in n:
+		var t := float(i) / rate
+		var u: float = t / maxf(seconds, 0.001)
+		# Cutoff sweeps on a curve rather than linearly, so most of the brightening happens late and
+		# the cue is still arriving when the gust lands.
+		var cutoff: float = lerpf(from_hz, to_hz, u * u)
+		var a: float = _one_pole(cutoff, rate)
+		lp += (rng.randf_range(-1.0, 1.0) - lp) * a
+		# Swells in, and does not fall away at the end: it hands straight over to the gust.
+		var env: float = smoothstep(0.0, 0.35, u) * (0.45 + 0.55 * u)
+		buf[i] = clampf(lp * env * gain * 4.0, -1.0, 1.0)
+
+	return _to_stream(buf, rate, false)
+
+
 func _one_pole(cutoff_hz: float, rate: int) -> float:
 	# The usual one-pole smoothing coefficient. Not a filter anyone would ship, and entirely enough
 	# to put four hundred hertz between a ring and a thud.
@@ -234,6 +272,10 @@ func _to_stream(buf: PackedFloat32Array, rate: int, looping: bool) -> AudioStrea
 
 func tap_stream(tier: int) -> AudioStreamWAV:
 	return _taps[tier] if tier >= 0 and tier < _taps.size() else null
+
+
+func cue_stream(name: String) -> AudioStreamWAV:
+	return _one_shot.get(name)
 
 
 func wind_stream() -> AudioStreamWAV:

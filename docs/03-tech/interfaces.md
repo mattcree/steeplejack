@@ -446,6 +446,33 @@ for the same reason it falls you on any other closed window. There is no second 
 
 ---
 
+## `Wind.h` — ENV-003
+
+```cpp
+enum class GustPhase : uint8_t { Calm, Building, Blowing, Easing };
+
+class WindModel {
+public:
+    void  Begin(const WeatherSpec&, Rng&, const Tuning&) noexcept;
+    void  Step(float dt, const WeatherSpec&, Rng&, const Tuning&) noexcept;
+    GustPhase Phase() const noexcept;
+    bool  Tell() const noexcept;              // the 1.2 s warning, and it is the feature
+    float TellProgress(const Tuning&) const noexcept;
+    float Strength() const noexcept;          // 0 during the tell, by design
+    float SpeedAt(float height, const WeatherSpec&, const Tuning&) const noexcept;
+};
+```
+
+`Strength()` is **zero for the whole of the tell**. The fairness table allows "a gust blew you off"
+only if the 1.2 s cue played first, so the warning and the consequence cannot overlap even by a
+step. A caller drawing its telegraph from `Strength() > 0` has built one that arrives with the
+thing it is warning about.
+
+Gust timing is drawn from a caller-supplied seeded stream, never an ambient one, so a recorded
+shift replays with the same gusts at the same moments (ADR-0003).
+
+---
+
 ## `Reachability.h` — CORE-009
 
 ```cpp
