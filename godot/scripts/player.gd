@@ -281,6 +281,10 @@ func _ready() -> void:
 		_carried_ladder = _make_carried_ladder(skel)
 	if face != null:
 		face.jack = jack
+		for i in jack.anchor_count():
+			var a: Dictionary = jack.anchor_at(i)
+			if a.get("fixture", false):
+				face.fixture_rust[int(a["joint"])] = float(a["rust"])
 
 	_spawn = global_position
 	_base_fov = camera.fov

@@ -148,6 +148,12 @@ LevelData LevelData::Parse(const std::string& json, const std::string& origin)
                 };
                 heights("forcePerishedAt", band.forcePerishedAt);
                 heights("forceCrackedAt", band.forceCrackedAt);
+                band.fixtureCount = static_cast<int32_t>(Number(pr, "fixtureCount", 0.0f));
+                band.fixtureSpacingMetres = Number(pr, "fixtureSpacingMetres", 0.0f);
+                if (pr.Has("fixtureRated") && pr.At("fixtureRated").Type() == JsonValue::Kind::Bool)
+                {
+                    band.fixtureRated = pr.At("fixtureRated").AsBool();
+                }
             }
             level.bands_.push_back(std::move(band));
         }

@@ -63,6 +63,10 @@ var _bent: MultiMeshInstance3D
 var bent_ids := {}
 ## Set by the player: joints a dog was torn out of. A scar, and the joint is spent.
 var pulled_ids := {}
+## The old fixtures: joint id -> rust. Drawn as dogs gone orange and flaking in proportion — the
+## telegraph for a dog nobody can rate.
+var fixture_rust := {}
+var _rusty: Array[MultiMeshInstance3D] = []
 var _scars: MultiMeshInstance3D
 
 ## Anchor pips — UI-001. One at every dog on the stack, in the world rather than on the screen, so
@@ -133,6 +137,13 @@ func _ready() -> void:
 	torus.material = _lit(ROPE, 0.95)
 	_rope = _wrap(torus)
 	_rope_live = _wrap(torus)
+
+	# Rusted dogs, in three grades of rust. Read at close range, as the design says it should be:
+	# from the ladder the lightly rusted and the flaking are plainly different, and from the ground
+	# they are all just old dogs.
+	for grade in 3:
+		var c := Color(0.30, 0.22, 0.17).lerp(Color(0.62, 0.30, 0.12), float(grade) / 2.0)
+		_rusty.append(_bank_box(Vector3(0.05, 0.05, 0.22), _lit(c, 0.95)))
 
 	# Where a dog was torn out: a dark, spalled hole. The cascade happened here and the wall says so.
 	_scars = _bank(Vector2(0.16, 0.10), _lit(Color(0.07, 0.06, 0.05)))
@@ -209,10 +220,15 @@ func update_pips() -> void:
 		var failed: bool = a.get("failed", false)
 		var rate: int = 0 if failed else clampi(int(a["rate"]), 0, 3)
 		label.text = PIP_TEXT[rate]
+		# An old fixture is shown as what it is — unrated — and never as what it holds. The fairness
+		# table: "the fixture is unrated, never mislabelled". Its rust, on the dog itself, is the tell.
 		# Chalk for the sound ones, a warning for the rest, a flare for the pulled. The words and
 		# the shapes carry it; the colour is only a help.
 		label.modulate = [Color(0.98, 0.45, 0.32), Color(0.96, 0.72, 0.40),
 			Color(0.90, 0.88, 0.80), CHALK][rate]
+		if a.get("fixture", false) and not failed:
+			label.text = "? unrated"
+			label.modulate = Color(0.86, 0.66, 0.48)
 		var n: Vector3 = j["normal"]
 		label.global_position = (j["pos"] as Vector3) + n * 0.45 + Vector3.UP * 0.18
 
@@ -321,6 +337,7 @@ func _rebuild() -> void:
 	var lugs: Array = []
 	var bent: Array = []
 	var scars: Array = []
+	var rusty: Array = [[], [], []]
 
 	for j in _joints:
 		if under_ladder(j) and not j["occupied"]:
@@ -328,6 +345,10 @@ func _rebuild() -> void:
 		var seen: int = j["look"]
 		if pulled_ids.has(j["id"]):
 			scars.append(_on_face(j, Vector2.ZERO, PROUD))
+		elif j["occupied"] and fixture_rust.has(j["id"]):
+			var grade := clampi(int(float(fixture_rust[j["id"]]) / 0.17), 0, 2)
+			rusty[grade].append(_on_face(j, Vector2.ZERO, 0.11))
+			lugs.append(_on_face(j, Vector2(0.0, 0.0), 0.21))
 		elif j["occupied"] and bent_ids.has(j["id"]):
 			bent.append(_on_face(j, Vector2(0.02, -0.03), 0.07, deg_to_rad(38.0)))
 		elif j["occupied"]:
@@ -373,6 +394,8 @@ func _rebuild() -> void:
 	_fill(_lugs, lugs)
 	_fill(_bent, bent)
 	_fill(_scars, scars)
+	for grade in 3:
+		_fill(_rusty[grade], rusty[grade])
 
 	var rope: Array = []
 	for id in _kept_lashes:

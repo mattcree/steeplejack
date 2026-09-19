@@ -83,9 +83,10 @@ the fall and resume-at-stack; wind and gusts with the 1.2 s tell; the climbing, 
 and fall cameras; the HUD; fog and a town silhouette; the four tap sounds, the hammer, the wind and the
 height mix.
 
-**Not yet:** hand IK onto the rungs (CLIMB-005); the stack saved to disk (CLIMB-006); the old-fixtures
-band's dogs already in the wall (LVL-001); rope, boot and breathing foley (AUD-004); an options screen
-for the accessibility toggles that exist (A11Y-001); the character (ART-020). Each is a task.
+**Not yet:** hand IK onto the rungs (CLIMB-005); the stack saved to disk (CLIMB-006); an options screen
+for the accessibility toggles that exist (A11Y-001); the character (ART-020). Each is a task. And
+LVL-001 — whether the Grey Box's four bands actually play as four experiences — is a judgement that
+needs someone who did not build it to climb it twice.
 
 ## The three pillars
 

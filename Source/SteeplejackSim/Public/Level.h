@@ -48,6 +48,11 @@ struct BandSpec
     // Authored joints, as heights. Placed on the climbing line, because the only reason to author a
     // joint is to put it where the player is certain to meet it — level 1's cracked joint at 7 m.
     std::vector<float> forcePerishedAt, forceCrackedAt;
+    // Dogs a previous jack left in the wall. The Grey Box's old-fixtures band has nine, 1.4 m
+    // apart, unrated: free to lash to, and nobody can tell you what they will hold.
+    int32_t fixtureCount{0};
+    float   fixtureSpacingMetres{0.0f};
+    bool    fixtureRated{true};
 
     float Span() const noexcept { return to - from; }
     bool  Contains(float height) const noexcept { return height >= from && height < to; }

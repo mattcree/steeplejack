@@ -200,6 +200,25 @@ bool Jack::load(const String& tuning_dir, const String& level_path)
 		grid = std::make_unique<sj::JointGrid>(sj::JointGrid::Generate(
 			*level, sj::Rng(level->Structure().weatherSeed), *tuning, kClimbBearing));
 		tapped.clear();
+
+		// The old fixtures: dogs a previous jack left, already in the wall beside the ladder line,
+		// not part of the ladder until somebody lashes to one. Their rating is real and hidden;
+		// their rust is what shows.
+		fixture_rust.clear();
+		for (const sj::FixtureSpec& f :
+		     sj::anchor::OldFixtures(*level, sj::Rng(level->Structure().weatherSeed), *tuning))
+		{
+			const int32_t jid = joint_id_at(static_cast<double>(f.height));
+			if (jid < 0) { continue; }
+			const sj::Joint& j = grid->ById(jid);
+			sj::Anchor a = sj::anchor::Make(j, 1.0f, f.rust, *tuning);
+			a.jointId = jid;
+			a.height = j.height;
+			a.freeFixture = true;
+			const int32_t idx = stack.AddAnchor(a);
+			grid->SetOccupied(jid, true);
+			fixture_rust[idx] = f.rust;
+		}
 		slip = sj::SlipModel(slip.GetDifficulty());
 		outcome = sj::SlipOutcome::None;
 		grab_latched = false;
@@ -774,6 +793,11 @@ Dictionary Jack::anchor_at(int64_t index) const
 	const sj::Anchor& a = stack.AnchorAt(static_cast<int32_t>(index) + 1);
 	d["failed"] = stack.AnchorFailed(static_cast<int32_t>(index) + 1);
 	d["joint"] = static_cast<int64_t>(a.jointId);
+	d["fixture"] = a.freeFixture;
+	{
+		const auto it = fixture_rust.find(static_cast<int32_t>(index) + 1);
+		d["rust"] = static_cast<double>(it == fixture_rust.end() ? 0.0f : it->second);
+	}
 	d["rate"] = static_cast<int64_t>(a.rate);
 	d["rate_name"] = String(RateName(a.rate));
 	d["capacity_kn"] = static_cast<double>(a.capacityKN);

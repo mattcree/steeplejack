@@ -371,3 +371,51 @@ TEST_CASE("JointGrid: an occupied joint is not offered for a second dog")
     CHECK(second >= 0);
     CHECK(second != first);
 }
+
+// ---------------------------------------------------------------- the old fixtures
+
+#include "Anchor.h"
+
+TEST_CASE("JointGrid: the Grey Box's old-fixtures band has its nine rusted dogs")
+{
+    // LVL-000's third band: "nine rusted dogs from a previous jack, unrated". Until they existed
+    // nobody could judge whether the band was a gamble (LVL-001), because there was nothing there.
+    const LevelData l = Level("00-greybox");
+    const std::vector<sj::FixtureSpec> f = sj::anchor::OldFixtures(l, Rng(1000), Tune());
+    REQUIRE(f.size() == 9);
+    for (std::size_t i = 0; i < f.size(); ++i)
+    {
+        CHECK(f[i].height >= 30.0f);
+        CHECK(f[i].height < 42.0f);
+        CHECK(f[i].rust >= Tune().GetF("fixtureRustMin"));
+        CHECK(f[i].rust <= Tune().GetF("fixtureRustMax"));
+        if (i > 0)
+        {
+            CHECK(f[i].height - f[i - 1].height == doctest::Approx(1.4f));
+        }
+    }
+    // The same level, the same fixtures, the same rust.
+    const std::vector<sj::FixtureSpec> again = sj::anchor::OldFixtures(l, Rng(1000), Tune());
+    for (std::size_t i = 0; i < f.size(); ++i)
+    {
+        CHECK(again[i].rust == f[i].rust);
+    }
+    // And a level without the band has none.
+    CHECK(sj::anchor::OldFixtures(Level("01-back-yard"), Rng(1001), Tune()).empty());
+}
+
+TEST_CASE("JointGrid: a fixture's rust can take a sound joint down to poor — so it is a gamble")
+{
+    // If every fixture rated the same, taking one would be obviously right or obviously wrong, and
+    // the band would be a tax rather than a decision. So the rust range has to span the ratings.
+    sj::Joint sound{};
+    sound.quality = 0.80f;
+    sound.tier = sj::JointTier::Sound;
+    const float least = Tune().GetF("fixtureRustMin");
+    const float most = Tune().GetF("fixtureRustMax");
+    CHECK(sj::anchor::Rate(sound, 1.0f, least, Tune()) == sj::AnchorRate::Sound);
+    CHECK(sj::anchor::Rate(sound, 1.0f, most, Tune()) < sj::AnchorRate::Sound);
+    sj::Joint fair{};
+    fair.quality = 0.55f;
+    CHECK(sj::anchor::Rate(fair, 1.0f, most, Tune()) <= sj::AnchorRate::Poor);
+}

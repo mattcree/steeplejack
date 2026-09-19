@@ -262,6 +262,8 @@ private:
 	std::unique_ptr<sj::JointGrid> grid;
 	/** What the player has learned by tapping, by joint id. Chalk marks are drawn from this. */
 	std::map<int32_t, int32_t> tapped;
+	/** Stack anchor index -> rust, for the old fixtures. What the renderer shows, never the rating. */
+	std::map<int32_t, float> fixture_rust;
 	sj::LashState lashing{};
 	sj::HaulState hauling{};
 	float haul_top{0.0f};
