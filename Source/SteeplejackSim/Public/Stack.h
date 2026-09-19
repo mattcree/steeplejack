@@ -74,6 +74,12 @@ public:
     const Anchor& AnchorAt(int32_t i) const noexcept;
     const Section& SectionAt(int32_t i) const noexcept;
     bool AnchorFailed(int32_t i) const noexcept;
+    // Whether a ladder is lashed to this anchor. Only those carry load: a dog driven into the wall
+    // and never lashed to holds nothing up, however good it is. The ground always counts.
+    bool InStructure(int32_t i) const noexcept;
+    // The highest intact anchor a section is lashed to, or the ground. Where the next section's
+    // lower end is.
+    int32_t TopOfStructure() const noexcept;
     bool SectionFailed(int32_t i) const noexcept;
     float SectionDriftCm(int32_t i) const noexcept;
 

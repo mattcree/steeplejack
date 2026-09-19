@@ -332,3 +332,23 @@ TEST_CASE("Stack: a quick hitch walks off its dog, and a full lashing does not")
     }
     CHECK(full.SectionDriftCm(f) == doctest::Approx(0.0f));
 }
+
+TEST_CASE("Stack: a dog nobody lashed a ladder to carries nothing")
+{
+    // The first game-side test found this: a player surveys a working position by driving a few
+    // dogs, keeps one, lashes to it — and the load model spread his weight across every dog in the
+    // wall, including the ones holding nothing up. A driven, unlashed dog is not part of the ladder.
+    Stack s;
+    const int32_t spare = s.AddAnchor(Dog(6.0f, AnchorRate::Poor));
+    const int32_t used = s.AddAnchor(Dog(7.0f, AnchorRate::Sound));
+    const int32_t sec = s.AddSection(0, used, Lashing::Full);
+
+    CHECK_FALSE(s.InStructure(spare));
+    CHECK(s.InStructure(used));
+    CHECK(s.InStructure(0));
+    const std::vector<float> share = s.Shares(sec, 1.2f, Tune());
+    CHECK(share[static_cast<std::size_t>(spare)] == doctest::Approx(0.0f));
+
+    // And the next section starts from the last *lashed* dog, not the last driven one.
+    CHECK(s.TopOfStructure() == used);
+}

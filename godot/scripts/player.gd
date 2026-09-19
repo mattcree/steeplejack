@@ -128,9 +128,15 @@ var _lash_spin := 0.0            ## signed radians the mouse has turned through 
 var _lash_heading := INF
 var _lash_signed := 0.0          ## smoothed signed turn rate; a back-and-forth wiggle cancels out
 var _lash_presses: Array[float] = []
-## Every section lashed, bottom to top: {top, lashing, slipping, joint}. A hitch walks; a full
-## lashing does not. CLIMB-001 reads this to make that consequence real.
+## Every section lashed, bottom to top: {top, lashing, slipping, joint}.
 var sections: Array = []
+
+## The stack, as of the last step: span, band, buckling, drift. What the HUD reads.
+var stack_info := {}
+## Dogs that have pulled, in the order they went, for the fuse. {height, at}.
+var fuse: Array = []
+## The standing ladder at the foot, before anything is lashed.
+const STANDING_TOP := 5.0
 var drift_phase := 0.0
 
 var on_ladder := false
@@ -359,6 +365,7 @@ func _physics_process(dt: float) -> void:
 	_update_tap(dt)
 	_update_work(dt)
 	_update_lash(dt)
+	_update_stack(dt)
 	_animate()
 
 
@@ -380,7 +387,10 @@ func _read_slip() -> void:
 	match jack.last_slip_outcome():
 		SLIP_SAVED:
 			# Hanging one-handed with almost nothing left. The nerve cost is the real one, and it
-			# is what makes the next dog measurably harder.
+			# is what makes the next dog measurably harder. If the ladder under him went, he caught
+			# the top of what is still standing.
+			if height_m() > ladder_top:
+				set_height_m(ladder_top)
 			_say("caught it. Hanging one-handed — get your other hand back on.")
 			fall_reason = ""
 		SLIP_FELL:
@@ -396,6 +406,15 @@ func _came_off() -> void:
 	if not r.get("tied_on", false):
 		_fall_to_ground("you had one hand on a rung and nothing else. Nothing caught you.")
 		return
+
+	for h in r.get("cascade", []):
+		fuse.append({"height": h, "at": _now + 0.18 * fuse.size()})
+	if not r.get("cascade", []).is_empty():
+		ladder_top = clampf(maxf(STANDING_TOP, jack.stack_top() + _rise()) if jack.stack_top() > 0.0
+			else STANDING_TOP, 0.0, chimney.height_m)
+		chimney.set_ladder_top(ladder_top)
+		if face != null:
+			face.touch()
 
 	if r.get("caught", false):
 		# The line held. You are still on the stack, three seconds of clipping on well spent.
@@ -450,7 +469,8 @@ func _climb(dt: float, ladder_world: Vector3) -> void:
 
 	# The ladder has his body: the only thing he controls is how far up it he is. Shuffling sideways
 	# carries him off it, which at the foot of the stack is simply stepping off.
-	var held := ladder_world
+	# He is on the ladder, so he goes where it goes: out with it as it bows.
+	var held := ladder_world + chimney.bow_at(height_m())
 	held.y = global_position.y
 	var out := held - chimney.global_position
 	out.y = 0.0
@@ -627,6 +647,10 @@ func _step_sim(dt: float) -> void:
 	# economy — longer spans mean fewer anchors, which is faster, right up until the section bows.
 	var below: float = jack.highest_anchor_below(h)
 	var span: float = h - maxf(below, 0.0)
+	# The span of the section he is actually on, dog to dog, once there is one. That is the number
+	# the table is written against and the one that can buckle.
+	if stack_info.get("section", -1) >= 0:
+		span = float(stack_info["span"])
 	var band: int = jack.classify_span(span)
 	span_warning = "" if band == 0 else "%.1fm span — %s" % [span, jack.span_name(band)]
 
@@ -880,6 +904,70 @@ func _aim_hammer_at(id: int) -> void:
 	ClimbClip.aim_hammer(anim, skel, (j["pos"] as Vector3) + chimney.global_position)
 
 
+## The stack — CLIMB-001 and 002. Where a decision made ten minutes ago comes due.
+##
+## Each step the sim loads the dogs under him and reports what went. The game only reacts: shortens
+## the ladder to what is still standing, burns the fuse, and — if what went was under him — slips
+## him, because §6 of the climbing system is explicit that an anchor failing under you is a slip.
+func _update_stack(dt: float) -> void:
+	stack_info = jack.stack_step(dt, maxf(height_m(), 0.0), on_ladder and not _slipping)
+	chimney.set_bow(stack_info.get("section_lower", 0.0), stack_info.get("section_upper", 0.0),
+		_bow_now() if on_ladder else 0.0)
+
+	var failed: Array = stack_info.get("failed", [])
+	var went: bool = stack_info.get("any_section_failed", false) or not failed.is_empty()
+	if not went:
+		return
+
+	for h in failed:
+		fuse.append({"height": h, "at": _now + 0.18 * fuse.size()})
+		var jid := _joint_of_anchor_at(float(h))
+		if face != null and jid >= 0:
+			face.pulled_ids[jid] = true
+	if face != null:
+		face.touch()
+	if foley != null:
+		foley.cue("bent", 0.8)
+
+	var was_top := ladder_top
+	ladder_top = clampf(maxf(STANDING_TOP, jack.stack_top() + _rise()) if jack.stack_top() > 0.0
+		else STANDING_TOP, 0.0, chimney.height_m)
+	chimney.set_ladder_top(ladder_top)
+
+	var why := ""
+	if not failed.is_empty():
+		why = "%d dog%s pulled — the stack above %.0f m is down" % [
+			failed.size(), "" if failed.size() == 1 else "s", float(failed[failed.size() - 1])]
+	elif stack_info.get("buckling", false) or stack_info.get("band", 0) == 3:
+		why = "the section buckled"
+	else:
+		why = "the hitch walked off the dog"
+	_say(why)
+
+	# Under him? Then he is coming off.
+	if on_ladder and (height_m() > ladder_top + 0.05 or stack_info.get("section_failed", false)):
+		fall_reason = why
+		jack.slip_now()
+	elif ladder_top < was_top:
+		pass   # it went above him: the way up is gone, and he can see it from here
+
+
+func _rise() -> float:
+	return jack.tuning_f("ladderLengthMetres", 5.0) - jack.tuning_f("ladderMinOverlapMetres", 1.0)
+
+
+## How far the section he is on is bowing right now. Deflection under a point load peaks with the
+## load at mid-span, so the ladder bounces as he climbs through the middle of a long section — the
+## flex the span table promises, "visible, the ladder bounces as you climb", without a word of UI.
+func _bow_now() -> float:
+	var lo: float = stack_info.get("section_lower", 0.0)
+	var hi: float = stack_info.get("section_upper", 0.0)
+	if hi <= lo:
+		return 0.0
+	var u := clampf((height_m() - lo) / (hi - lo), 0.0, 1.0)
+	return float(stack_info.get("flex_m", 0.0)) * sin(PI * u)
+
+
 ## A puff of mortar dust at a joint.
 func _dust_at(id: int, amount: int) -> void:
 	if face == null or id < 0:
@@ -1073,6 +1161,8 @@ func _tie_off() -> void:
 	carrying_ladder = false
 	sections.append({"top": ladder_top, "lashing": kind, "slipping": st["slipping"],
 		"joint": lash_joint})
+	var dog_h: float = face.joint(lash_joint).get("height", ladder_top) if face != null else ladder_top
+	jack.stack_lash(_anchor_height_of_joint(lash_joint, dog_h), kind)
 	if face != null:
 		face.keep_lash(lash_joint, st["wraps"])
 		face.set_lash(-1, 0, 0.0, 0.0)
@@ -1092,6 +1182,15 @@ func _abandon_lash(why: String) -> void:
 	if face != null:
 		face.set_lash(-1, 0, 0.0, 0.0)
 	_say(why)
+
+
+## The height the sim recorded for the dog in a joint.
+func _anchor_height_of_joint(joint_id: int, fallback: float) -> float:
+	for i in jack.anchor_count():
+		var a: Dictionary = jack.anchor_at(i)
+		if int(a.get("joint", -1)) == joint_id:
+			return float(a["height"])
+	return fallback
 
 
 ## The joint a seated dog is in, by the dog's height.

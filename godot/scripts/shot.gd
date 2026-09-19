@@ -14,7 +14,7 @@
 # commands in that file still mean what they say.
 #
 #   climb <m>        on the ladder at that height, with stack lashed up to it
-#   dog <m>          a dog seated at that height, as if driven cleanly
+#   dog <m> [lash]   a dog seated and lashed at that height (lash 1 hitch, 2 full)
 #   carry            a ladder on the shoulder and a full bag of dogs
 #   tap              sound the joint he is pointing at, through the real flow
 #   tapall [r]       sound every joint in reach (or r x reach), for a frame of the chalk
@@ -93,8 +93,11 @@ func _run(cmd: String) -> void:
 			_lash_to(a)
 			_put_on_ladder(a)
 		"dog":
+			# Driven and lashed: the ladder goes up to it, and the stack knows about the section, so
+			# a long span between two `dog`s is a long span that can buckle.
 			_lash_to(a)
-			jack.seat_anchor(a, 1.0, 0.0)
+			var d: Dictionary = jack.seat_anchor(a, 1.0, 0.0)
+			jack.stack_lash(float(d.get("height", a)), int(b) if b > 0.0 else 2)
 			if player.face != null:
 				player.face.touch()
 		"carry":

@@ -17,6 +17,7 @@ const RUNG_GAP := 0.28
 const RAIL_THICK := 0.07
 
 const BRICK := preload("res://shaders/brick.gdshader")
+const MAX_VISIBLE_BOW := 0.34
 
 var height_m: float = 0.0
 var _base_r: float = 1.0
@@ -24,6 +25,10 @@ var _top_r: float = 1.0
 var _ladder_top: float = 0.0
 var _ladders := MultiMeshInstance3D.new()
 var _ghost := MultiMeshInstance3D.new()
+## The section bowing under him: between these heights, this far out at mid-span.
+var _bow_lo := 0.0
+var _bow_hi := 0.0
+var _bow := 0.0
 var _dogs := MultiMeshInstance3D.new()
 
 # Not art direction — a legend. The level file says a band is ivy or a wind band, and until there
@@ -270,22 +275,64 @@ func set_ladder_top(top: float) -> void:
 	var rungs := int(floor(top / RUNG_GAP))
 	var transforms: Array[Transform3D] = []
 
-	# Two rails running the whole lashed height, drawn continuously: a seam every five metres reads
-	# as a break in the ladder rather than as a joint between sections.
-	for side in [-RAIL_GAP * 0.5, RAIL_GAP * 0.5]:
-		var p := face_point(top * 0.5) + Vector3(0, 0, side)
-		transforms.append(Transform3D(
-			Basis().scaled(Vector3(RAIL_THICK, top, RAIL_THICK)), p))
+	# Rails in rung-length pieces rather than one long box, so a section can bow. The pieces meet
+	# end to end with no gap, so a straight ladder still reads as one continuous rail.
+	var steps := int(ceil(top / RUNG_GAP))
+	for k in steps:
+		var lo := k * RUNG_GAP
+		var hi := minf((k + 1) * RUNG_GAP, top)
+		var mid := (lo + hi) * 0.5
+		# Tilted to follow the curve, so a bowed rail is a curve and not a staircase of offset boxes.
+		var slope: float = (_bow_at(hi) - _bow_at(lo)).length() * signf(
+			_bow_at(hi).dot(FACE) - _bow_at(lo).dot(FACE)) / maxf(hi - lo, 0.001)
+		var tilt := Basis(Vector3(0, 0, 1), atan(slope) * -FACE.x)
+		for side in [-RAIL_GAP * 0.5, RAIL_GAP * 0.5]:
+			transforms.append(Transform3D(
+				tilt * Basis().scaled(Vector3(RAIL_THICK, hi - lo + 0.004, RAIL_THICK)),
+				face_point(mid) + Vector3(0, 0, side) + _bow_at(mid)))
 
 	for i in range(1, rungs + 1):
 		var h := i * RUNG_GAP
 		transforms.append(Transform3D(
 			Basis().scaled(Vector3(RAIL_THICK * 0.8, RAIL_THICK * 0.8, RAIL_GAP)),
-			face_point(h)))
+			face_point(h) + _bow_at(h)))
 
 	_ladders.multimesh.instance_count = transforms.size()
 	for i in transforms.size():
 		_ladders.multimesh.set_instance_transform(i, transforms[i])
+
+
+## The section he is on bows out from the wall by `amount` at mid-span.
+##
+## Camera and feel §4: "Ladders visibly bend under load, proportional to span. It is a vertex
+## shader and a spring, it costs nothing, and it communicates the single most important risk number
+## in the game without any UI." Not a shader here — the rungs themselves move — but the same idea:
+## a long span is something you see going soft under you before any number says so. Rebuilt only
+## when the bow has changed by more than a few millimetres.
+func set_bow(lo: float, hi: float, amount: float) -> void:
+	if absf(amount - _bow) < 0.003 and absf(lo - _bow_lo) < 0.01 and absf(hi - _bow_hi) < 0.01:
+		return
+	_bow_lo = lo
+	_bow_hi = hi
+	_bow = amount
+	set_ladder_top(_ladder_top)
+
+
+func _bow_at(h: float) -> Vector3:
+	if _bow <= 0.0 or _bow_hi <= _bow_lo or h < _bow_lo or h > _bow_hi:
+		return Vector3.ZERO
+	var u := (h - _bow_lo) / (_bow_hi - _bow_lo)
+	# Outward, away from the wall: a ladder under load bows away from what it is lashed to.
+	#
+	# Capped for the eye. The sim's deflection on a buckling 10 m span is a metre and a half, which
+	# is true of a ladder that is failing and reads on screen as the renderer failing instead. A
+	# third of a metre is already alarming; past it, the bar and the words carry the rest.
+	return FACE * minf(_bow, MAX_VISIBLE_BOW) * sin(PI * u)
+
+
+## Where on the ladder a climber at this height holds on, bow included.
+func bow_at(h: float) -> Vector3:
+	return _bow_at(h)
 
 
 ## The section being lashed, from `from` to `to`, translucent. Zero length hides it.

@@ -133,6 +133,9 @@ func _draw() -> void:
 	if player.lashing:
 		_draw_lash(jack)
 
+	_draw_stack_warnings()
+	_draw_fuse()
+
 	# Rule 8: every audio cue has a visual fallback. This one is not optional in a second way too —
 	# the fairness table makes the gust's 1.2 s warning the thing that separates a fair failure from
 	# a bug, and a warning only some players receive is not a warning.
@@ -154,6 +157,9 @@ func _next_step() -> String:
 	if player.jack.slip_in_progress():
 		return ""
 	if player.rigging_to >= 0 or player.lashing:
+		return ""
+	# A section failing under him owns the screen. Advice about lashing is noise while it goes.
+	if player.stack_info.get("buckling", false):
 		return ""
 	if player.fall_reason != "":
 		return "Your stack is still up. Climb it again."
@@ -337,6 +343,70 @@ func _draw_pip(jack: Jack) -> void:
 			_: v = exp(-u * 11.0) + (0.55 * exp(-(u - 0.3) * 7.0) if u > 0.3 else 0.0)   # rattle
 		env.append(base + Vector2(u * w, -v * 14.0))
 	draw_polyline(env, Color(c.r, c.g, c.b, a * 0.8), 2.0)
+
+
+## The stack's warnings. The fairness table: "Ladder buckled — fair, because the span was over 8 m
+## and the HUD said so." So the HUD says so, loudly, for the whole of the 8 seconds, with the time
+## left as a bar that empties — and says the one thing to do about it.
+func _draw_stack_warnings() -> void:
+	var st: Dictionary = player.stack_info
+	if st.is_empty():
+		return
+	if st.get("buckling", false):
+		var left: float = st.get("buckle_left", 0.0)
+		var limit: float = player.jack.tuning_f("buckleSecondsUnderLoad", 8.0)
+		var t := float(Time.get_ticks_msec()) / 1000.0
+		var pulse := 0.65 + 0.35 * sin(t * (8.0 + 10.0 * (1.0 - left / limit)))
+		var y := size.y * 0.22
+		_centre("THIS SECTION IS BOWING", y, Color(0.98, 0.42, 0.30, pulse), 26)
+		_centre("%.1f s — get off it, up or down" % left, y + 28.0, Color(0.96, 0.90, 0.84, 0.92), 16)
+		var w := 320.0
+		var at := Vector2((size.x - w) * 0.5, y + 44.0)
+		draw_rect(Rect2(at, Vector2(w, 6)), Color(0, 0, 0, 0.45))
+		draw_rect(Rect2(at, Vector2(w * clampf(left / limit, 0.0, 1.0), 6)), Color(0.98, 0.42, 0.30, 0.9))
+
+	# A quick hitch walking off its dog. Slow, and shown as distance so it reads as a fact about the
+	# rope rather than as a timer.
+	if int(st.get("lashing", 0)) == 1 and float(st.get("drift_cm", 0.0)) > 0.2:
+		var drift: float = st["drift_cm"]
+		var off: float = st.get("walk_off_cm", 15.0)
+		var col := Color(0.92, 0.70, 0.35, 0.9) if drift < off * 0.7 else Color(0.98, 0.42, 0.30, 0.95)
+		var hand := Vector2(HAND.x, size.y + HAND.y)
+		_label("hitch walking — %.1f of %.0f cm" % [drift, off],
+			Vector2(HAND.x + NERVE_R + 26, hand.y + 62), col, 13)
+
+
+## The fuse. 02-climbing-system.md: "On a cascade, the HUD flashes each anchor as it goes, bottom of
+## screen, like a fuse burning." One mark per dog that pulled, lit in the order they went, so a
+## cascade is something the player watches happen and can read back afterwards — which is the
+## only way it can be fair.
+func _draw_fuse() -> void:
+	var fuse: Array = player.fuse
+	if fuse.is_empty():
+		return
+	var now: float = player._now
+	var last: float = float(fuse[fuse.size() - 1]["at"])
+	if now - last > 6.0:
+		return
+	var n := fuse.size()
+	var step := 34.0
+	var y := size.y - 150.0
+	var x0 := size.x * 0.5 - step * float(n - 1) * 0.5
+	for i in n:
+		var f: Dictionary = fuse[i]
+		var lit: bool = now >= float(f["at"])
+		var age: float = now - float(f["at"])
+		var p := Vector2(x0 + step * i, y)
+		if lit:
+			var flare := clampf(1.0 - age / 0.5, 0.0, 1.0)
+			draw_circle(p, 9.0 + 8.0 * flare, Color(0.98, 0.52, 0.22, 0.35 * flare))
+			draw_line(p + Vector2(-7, -7), p + Vector2(7, 7), Color(0.98, 0.42, 0.30, 0.95), 3.0)
+			draw_line(p + Vector2(7, -7), p + Vector2(-7, 7), Color(0.98, 0.42, 0.30, 0.95), 3.0)
+			_label("%.0f m" % float(f["height"]), p + Vector2(-14, 26), Color(0.92, 0.88, 0.84, 0.85), 12)
+		else:
+			draw_arc(p, 7.0, 0, TAU, 16, Color(0.9, 0.88, 0.84, 0.35), 1.5)
+		if i < n - 1:
+			draw_line(p + Vector2(10, 0), p + Vector2(step - 10, 0), Color(0.9, 0.88, 0.84, 0.25), 1.0)
 
 
 ## Lashing — VERB-005.

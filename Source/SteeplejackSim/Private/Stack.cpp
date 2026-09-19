@@ -80,6 +80,45 @@ bool Stack::AnchorFailed(int32_t i) const noexcept
     return i < 0 || i >= AnchorCount() || anchorFailed_[static_cast<std::size_t>(i)];
 }
 
+bool Stack::InStructure(int32_t i) const noexcept
+{
+    if (i == 0)
+    {
+        return true;
+    }
+    if (AnchorFailed(i))
+    {
+        return false;
+    }
+    for (int32_t s = 0; s < SectionCount(); ++s)
+    {
+        if (!SectionFailed(s) && (sections_[static_cast<std::size_t>(s)].upperAnchor == i
+                                  || sections_[static_cast<std::size_t>(s)].lowerAnchor == i))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+int32_t Stack::TopOfStructure() const noexcept
+{
+    int32_t best = 0;
+    for (int32_t s = 0; s < SectionCount(); ++s)
+    {
+        if (SectionFailed(s))
+        {
+            continue;
+        }
+        const int32_t u = sections_[static_cast<std::size_t>(s)].upperAnchor;
+        if (AnchorAt(u).height > AnchorAt(best).height)
+        {
+            best = u;
+        }
+    }
+    return best;
+}
+
 bool Stack::SectionFailed(int32_t i) const noexcept
 {
     return i < 0 || i >= SectionCount() || sectionFailed_[static_cast<std::size_t>(i)];
@@ -152,12 +191,13 @@ std::vector<float> Stack::Shares(int32_t atSection, float totalKN, const Tuning&
         return out;
     }
 
-    // Every intact anchor at or below the top of his section, nearest first.
+    // Every intact anchor in the structure at or below the top of his section, nearest first. Not
+    // every dog in the wall: one nobody lashed a ladder to is holding nothing up.
     const float top = AnchorAt(SectionAt(atSection).upperAnchor).height;
     std::vector<int32_t> below;
     for (int32_t i = 0; i < AnchorCount(); ++i)
     {
-        if (!AnchorFailed(i) && anchors_[static_cast<std::size_t>(i)].height <= top + kSameHeight)
+        if (InStructure(i) && anchors_[static_cast<std::size_t>(i)].height <= top + kSameHeight)
         {
             below.push_back(i);
         }
@@ -220,7 +260,7 @@ std::vector<int32_t> Stack::Cascade(int32_t failed, float shockKN, const Tuning&
     const float h = anchors_[static_cast<std::size_t>(failed)].height;
     for (int32_t i = 0; i < AnchorCount(); ++i)
     {
-        if (!AnchorFailed(i) && anchors_[static_cast<std::size_t>(i)].height < h)
+        if (InStructure(i) && anchors_[static_cast<std::size_t>(i)].height < h)
         {
             below.push_back(i);
         }

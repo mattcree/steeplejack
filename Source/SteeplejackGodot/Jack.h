@@ -19,6 +19,7 @@
 #include "Meters.h"
 #include "Rng.h"
 #include "Slip.h"
+#include "Stack.h"
 #include "Wind.h"
 #include "Verbs/Lash.h"
 #include "Tuning.h"
@@ -107,6 +108,9 @@ public:
 	int64_t get_difficulty() const { return static_cast<int64_t>(slip.GetDifficulty()); }
 	/** The grab input. Call from `_input`; the next `step` reads and clears it. */
 	void grab();
+	/** Something let go under him. 02-climbing-system.md §6: "When grip hits zero, or an anchor
+	 *  fails under you, you get a slip." Opens the window if the budget allows, and costs nerve. */
+	void slip_now();
 	bool slip_in_progress() const { return slip.InProgress(); }
 	/** 1 at the moment of the slip falling to 0 at its close. What the closing ring draws. */
 	double slip_window_left() const;
@@ -157,6 +161,27 @@ public:
 	/** A dog bent into a joint spoils it: occupied, and holding nothing. */
 	void spoil_joint(int64_t id);
 
+	// --- the stack — CLIMB-001/002 ----------------------------------------------------------------
+	// Where the anchor loop's decisions come due. Sections are lashed between dogs; the climber's
+	// weight goes into the dogs below him; a dog loaded past its rating pulls, and a cascade can
+	// follow. The game layer steps it and reacts; it decides none of it.
+
+	/** Lash a section to the dog at `dog_height`, from the highest intact dog below it. */
+	int64_t stack_lash(double dog_height, int64_t lashing);
+	/** Highest intact lashed dog, or 0 with no sections. The ladder tops out `rise` above it. */
+	double stack_top() const;
+	/**
+	 * One step with the climber at `height` (on_ladder false for nobody on it). Returns
+	 * `{failed: [dog heights, in order], section_failed: bool, buckling: bool, buckle_left: s,
+	 *   span: m, band: int, drift_cm: cm, walk_off_cm: cm, lashing: int, flex_m: m,
+	 *   section_lower: m, section_upper: m}`.
+	 */
+	godot::Dictionary stack_step(double dt, double height, bool on_ladder);
+	/** How the section at this height is doing, without stepping anything. */
+	godot::Dictionary stack_section_at(double height) const;
+	/** Whether the dog at this index (anchor_at's) has pulled. */
+	bool anchor_failed(int64_t index) const;
+
 	// --- lashing -------------------------------------------------------------------------------
 	// One lash in progress at a time, held here so the rope's state is the sim's and not a copy.
 	/** Start a fresh lashing. */
@@ -182,7 +207,8 @@ public:
 	double seat_depth() const;
 	/** Drive a dog home and remember it. `{rate, rate_name, capacity_kn, height}`. */
 	godot::Dictionary seat_anchor(double height, double depth, double spall);
-	int64_t anchor_count() const { return static_cast<int64_t>(anchors.size()); }
+	/** Dogs in the wall, not counting the ground. Index 0 is the first dog driven. */
+	int64_t anchor_count() const { return static_cast<int64_t>(stack.AnchorCount()) - 1; }
 	godot::Dictionary anchor_at(int64_t index) const;
 	/** The highest sound anchor at or below a height, or -1. */
 	double highest_anchor_below(double height) const;
@@ -220,7 +246,7 @@ private:
 	std::unique_ptr<sj::LevelData> level;
 	sj::Meters meters{};
 	sj::MeterContext context{};
-	std::vector<sj::Anchor> anchors;
+	sj::Stack stack{};
 	godot::String last_error;
 
 	sj::WindModel wind{};

@@ -6,6 +6,7 @@
 #include "JointGrid.h"
 #include "Rng.h"
 #include "Slip.h"
+#include "Stack.h"
 #include "Wind.h"
 #include "Verbs/Hammer.h"
 #include "Verbs/Lash.h"
@@ -106,6 +107,7 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("set_difficulty", "difficulty"), &Jack::set_difficulty);
 	ClassDB::bind_method(D_METHOD("get_difficulty"), &Jack::get_difficulty);
 	ClassDB::bind_method(D_METHOD("grab"), &Jack::grab);
+	ClassDB::bind_method(D_METHOD("slip_now"), &Jack::slip_now);
 	ClassDB::bind_method(D_METHOD("slip_in_progress"), &Jack::slip_in_progress);
 	ClassDB::bind_method(D_METHOD("slip_window_left"), &Jack::slip_window_left);
 	ClassDB::bind_method(D_METHOD("slip_window_seconds"), &Jack::slip_window_seconds);
@@ -125,6 +127,12 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("seat_anchor_joint", "id", "depth", "spall"),
 	                     &Jack::seat_anchor_joint);
 	ClassDB::bind_method(D_METHOD("spoil_joint", "id"), &Jack::spoil_joint);
+
+	ClassDB::bind_method(D_METHOD("stack_lash", "dog_height", "lashing"), &Jack::stack_lash);
+	ClassDB::bind_method(D_METHOD("stack_top"), &Jack::stack_top);
+	ClassDB::bind_method(D_METHOD("stack_step", "dt", "height", "on_ladder"), &Jack::stack_step);
+	ClassDB::bind_method(D_METHOD("stack_section_at", "height"), &Jack::stack_section_at);
+	ClassDB::bind_method(D_METHOD("anchor_failed", "index"), &Jack::anchor_failed);
 
 	ClassDB::bind_method(D_METHOD("lash_begin"), &Jack::lash_begin);
 	ClassDB::bind_method(D_METHOD("lash_step", "dt", "turns_per_second"), &Jack::lash_step);
@@ -163,7 +171,7 @@ bool Jack::load(const String& tuning_dir, const String& level_path)
 		meters = sj::nerve::FreshShift(*tuning);
 		meters.stance = sj::Stance::OneHand;
 		meters.exposure = sj::Exposure::Platform;
-		anchors.clear();
+		stack = sj::Stack{};
 		// A new shift is a new clock and a new budget. Without this, loading a second level
 		// inherits the first one's cooldown and the first slip of the new level is unsaveable.
 		now = 0.0f;
@@ -364,6 +372,13 @@ void Jack::grab()
 	grab_latched = true;
 }
 
+void Jack::slip_now()
+{
+	if (!tuning) { return; }
+	sj::nerve::Shock(meters, "anchorFail", *tuning);
+	slip.BeginSlip(now, *tuning);
+}
+
 double Jack::slip_window_left() const
 {
 	return static_cast<double>(slip.WindowFractionLeft(now));
@@ -387,13 +402,16 @@ Dictionary Jack::fall(double height)
 	// Whatever you are tied to is the highest dog below you — the same one the ladder is lashed to
 	// and the same one the span is measured from. A default Anchor is rate Failed with zero
 	// capacity, which is the right answer when there is nothing below you at all.
+	int32_t tied_id = -1;
 	sj::Anchor tied{};
-	for (const sj::Anchor& a : anchors)
+	for (int32_t i = 1; i < stack.AnchorCount(); ++i)
 	{
-		if (a.rate != sj::AnchorRate::Failed && static_cast<double>(a.height) <= height + 0.01
+		const sj::Anchor& a = stack.AnchorAt(i);
+		if (!stack.AnchorFailed(i) && static_cast<double>(a.height) <= height + 0.01
 		    && a.height >= tied.height)
 		{
 			tied = a;
+			tied_id = i;
 		}
 	}
 
@@ -403,6 +421,21 @@ Dictionary Jack::fall(double height)
 	d["anchor_failed"] = r.anchorFailed;
 	d["shock_kn"] = static_cast<double>(r.shockLoadKN);
 	d["capacity_kn"] = static_cast<double>(r.capacityKN);
+
+	// The half of METER-005 that waited for CLIMB-002. A dog that lets go under the line's shock
+	// drops that shock onto the next one down, and the one below that — the grimmest moment in the
+	// game, and one the player can trace, because the order comes back.
+	Array cascade;
+	if (r.anchorFailed && tied_id > 0)
+	{
+		for (int32_t i : stack.Cascade(tied_id, r.shockLoadKN * tuning->GetF("cascadeShockRetained"),
+		                               *tuning))
+		{
+			cascade.append(static_cast<double>(stack.AnchorAt(i).height));
+			if (grid) { grid->SetOccupied(stack.AnchorAt(i).jointId, true); }
+		}
+	}
+	d["cascade"] = cascade;
 	return d;
 }
 
@@ -608,7 +641,7 @@ Dictionary Jack::seat_anchor_joint(int64_t id, double depth, double spall)
 	sj::Anchor a = sj::anchor::Make(j, static_cast<float>(depth), static_cast<float>(spall), *tuning);
 	a.jointId = j.id;
 	a.height = j.height;
-	anchors.push_back(a);
+	stack.AddAnchor(a);
 	grid->SetOccupied(j.id, true);
 	d["rate"] = static_cast<int64_t>(a.rate);
 	d["rate_name"] = String(RateName(a.rate));
@@ -662,7 +695,7 @@ Dictionary Jack::seat_anchor(double height, double depth, double spall)
 	sj::Anchor a = sj::anchor::Make(joint_at(height), static_cast<float>(depth),
 	                                static_cast<float>(spall), *tuning);
 	a.jointId = jid;
-	anchors.push_back(a);
+	stack.AddAnchor(a);
 	if (grid && jid >= 0) { grid->SetOccupied(jid, true); }
 	d["rate"] = static_cast<int64_t>(a.rate);
 	d["rate_name"] = String(RateName(a.rate));
@@ -674,8 +707,9 @@ Dictionary Jack::seat_anchor(double height, double depth, double spall)
 Dictionary Jack::anchor_at(int64_t index) const
 {
 	Dictionary d;
-	if (index < 0 || index >= static_cast<int64_t>(anchors.size())) { return d; }
-	const sj::Anchor& a = anchors[static_cast<size_t>(index)];
+	if (index < 0 || index >= anchor_count()) { return d; }
+	const sj::Anchor& a = stack.AnchorAt(static_cast<int32_t>(index) + 1);
+	d["failed"] = stack.AnchorFailed(static_cast<int32_t>(index) + 1);
 	d["joint"] = static_cast<int64_t>(a.jointId);
 	d["rate"] = static_cast<int64_t>(a.rate);
 	d["rate_name"] = String(RateName(a.rate));
@@ -687,14 +721,99 @@ Dictionary Jack::anchor_at(int64_t index) const
 double Jack::highest_anchor_below(double height) const
 {
 	double best = -1.0;
-	for (const sj::Anchor& a : anchors)
+	for (int32_t i = 1; i < stack.AnchorCount(); ++i)
 	{
-		if (a.rate != sj::AnchorRate::Failed && static_cast<double>(a.height) <= height + 0.01)
+		const sj::Anchor& a = stack.AnchorAt(i);
+		if (!stack.AnchorFailed(i) && a.rate != sj::AnchorRate::Failed
+		    && static_cast<double>(a.height) <= height + 0.01)
 		{
 			best = std::max(best, static_cast<double>(a.height));
 		}
 	}
 	return best;
+}
+
+// --- the stack ------------------------------------------------------------------------------------
+
+namespace {
+int32_t StackIndexAt(const sj::Stack& s, double height)
+{
+	for (int32_t i = 1; i < s.AnchorCount(); ++i)
+	{
+		if (!s.AnchorFailed(i) && std::fabs(static_cast<double>(s.AnchorAt(i).height) - height) < 0.01)
+		{
+			return i;
+		}
+	}
+	return -1;
+}
+}  // namespace
+
+int64_t Jack::stack_lash(double dog_height, int64_t lashing_kind)
+{
+	const int32_t upper = StackIndexAt(stack, dog_height);
+	if (upper < 0) { return -1; }
+	// From the top of the stack as it stands — the last dog a ladder was lashed to, or the ground.
+	// Not the last dog *driven*: a dog you drove and never lashed to is not part of the ladder, and
+	// measuring the span from it would make a 7 m section look like a 30 cm one.
+	const int32_t lower = stack.TopOfStructure();
+	return stack.AddSection(lower, upper,
+		static_cast<sj::Lashing>(std::clamp<int64_t>(lashing_kind, 0, 2)));
+}
+
+double Jack::stack_top() const
+{
+	return static_cast<double>(stack.TopHeight());
+}
+
+bool Jack::anchor_failed(int64_t index) const
+{
+	return stack.AnchorFailed(static_cast<int32_t>(index) + 1);
+}
+
+Dictionary Jack::stack_section_at(double height) const
+{
+	Dictionary d;
+	const int32_t sec = stack.SectionAt(static_cast<float>(height));
+	d["section"] = static_cast<int64_t>(sec);
+	if (sec < 0 || !tuning) { return d; }
+	const sj::Section& s = stack.SectionAt(sec);
+	d["span"] = static_cast<double>(s.span);
+	d["band"] = static_cast<int64_t>(stack.Band(sec, *tuning));
+	d["lashing"] = static_cast<int64_t>(s.lashing);
+	d["drift_cm"] = static_cast<double>(stack.SectionDriftCm(sec));
+	d["walk_off_cm"] = static_cast<double>(tuning->GetF("lashHitchWalkOffCm"));
+	d["flex_m"] = static_cast<double>(
+		stack.FlexDeflectionM(sec, tuning->GetF("playerLoadKN"), *tuning));
+	d["section_lower"] = static_cast<double>(stack.AnchorAt(s.lowerAnchor).height);
+	d["section_upper"] = static_cast<double>(stack.AnchorAt(s.upperAnchor).height);
+	return d;
+}
+
+Dictionary Jack::stack_step(double dt, double height, bool on_ladder)
+{
+	Dictionary d = stack_section_at(height);
+	if (!tuning) { return d; }
+	const int32_t sec = on_ladder ? stack.SectionAt(static_cast<float>(height)) : -1;
+	const sj::StackEvents ev = stack.Step(static_cast<float>(dt), sec,
+	                                      tuning->GetF("playerLoadKN"), *tuning);
+	Array failed;
+	for (int32_t i : ev.failedAnchors)
+	{
+		failed.append(static_cast<double>(stack.AnchorAt(i).height));
+	}
+	d["failed"] = failed;
+	bool mine = false;
+	for (int32_t f : ev.failedSections)
+	{
+		mine = mine || f == sec;
+	}
+	d["section_failed"] = mine;
+	d["any_section_failed"] = !ev.failedSections.empty();
+	d["buckling"] = ev.buckling >= 0;
+	d["buckle_left"] = static_cast<double>(ev.buckleSecondsLeft);
+	d["drift_cm"] = static_cast<double>(stack.SectionDriftCm(sec));
+	return d;
 }
 
 int64_t Jack::classify_span(double span) const

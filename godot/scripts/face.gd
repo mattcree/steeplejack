@@ -61,6 +61,9 @@ var _work_depth := 0.0
 var _bent: MultiMeshInstance3D
 ## Set by the player: joints with a dog bent into them.
 var bent_ids := {}
+## Set by the player: joints a dog was torn out of. A scar, and the joint is spent.
+var pulled_ids := {}
+var _scars: MultiMeshInstance3D
 
 ## Rope round a dog's lug: {joint id: wraps} for finished lashings, plus the one going on now.
 var _kept_lashes := {}
@@ -122,6 +125,9 @@ func _ready() -> void:
 	torus.material = _lit(ROPE, 0.95)
 	_rope = _wrap(torus)
 	_rope_live = _wrap(torus)
+
+	# Where a dog was torn out: a dark, spalled hole. The cascade happened here and the wall says so.
+	_scars = _bank(Vector2(0.16, 0.10), _lit(Color(0.07, 0.06, 0.05)))
 
 	# A bent dog: the spike kinked, standing out of a joint it has spoiled.
 	_bent = _bank_box(Vector3(0.045, 0.045, 0.16), _lit(Color(0.30, 0.20, 0.14), 0.7))
@@ -264,12 +270,15 @@ func _rebuild() -> void:
 	var dogs: Array = []
 	var lugs: Array = []
 	var bent: Array = []
+	var scars: Array = []
 
 	for j in _joints:
 		if under_ladder(j) and not j["occupied"]:
 			continue   # hidden by the ladder, and not a joint anyone can use
 		var seen: int = j["look"]
-		if j["occupied"] and bent_ids.has(j["id"]):
+		if pulled_ids.has(j["id"]):
+			scars.append(_on_face(j, Vector2.ZERO, PROUD))
+		elif j["occupied"] and bent_ids.has(j["id"]):
 			bent.append(_on_face(j, Vector2(0.02, -0.03), 0.07, deg_to_rad(38.0)))
 		elif j["occupied"]:
 			# A driven dog: the spike standing out of the joint, and the lug across its end.
@@ -313,9 +322,12 @@ func _rebuild() -> void:
 	_fill(_dogs, dogs)
 	_fill(_lugs, lugs)
 	_fill(_bent, bent)
+	_fill(_scars, scars)
 
 	var rope: Array = []
 	for id in _kept_lashes:
+		if pulled_ids.has(id):
+			continue
 		var kj := joint(id)
 		if not kj.is_empty():
 			rope.append_array(_coil(kj, _kept_lashes[id]))
