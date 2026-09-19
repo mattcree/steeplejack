@@ -231,7 +231,11 @@ const FALL_LONGEST := 2.4        ## game seconds, whatever the height
 const FALL_BLACK_HOLD := 1.4
 ## A11Y-001 / CAM-002 acceptance 4: no slow motion and no camera snap, just the cut. For players the
 ## wide spinning fall would make ill — and it must not change a single outcome, only what is shown.
-var motion_minimal := false
+## The motion options — A11Y-001. Real ones in the game, in-memory defaults in a test.
+var settings: GameSettings
+var _bob_phase := 0.0
+var options_open := false        ## the motion options overlay, on F1
+var options_row := 0
 
 ## The gin wheel — VERB-007. A pulley lashed to a dog, a rope to the yard.
 var gin_joint := -1
@@ -314,7 +318,10 @@ func _ready() -> void:
 				face.fixture_rust[int(a["joint"])] = float(a["rust"])
 
 	_spawn = global_position
-	_base_fov = camera.fov
+	var in_game: bool = get_tree().current_scene != null and get_tree().current_scene == get_parent()
+	settings = GameSettings.new(GameSettings.PATH if in_game else "")
+	settings.changed.connect(_apply_settings)
+	_apply_settings()
 	var town: Town = get_node_or_null("../Town")
 	if town != null:
 		town.build(jack.level_name())
@@ -348,6 +355,61 @@ func _level_id() -> String:
 		if args[i] == "--level" and i + 1 < args.size():
 			return args[i + 1]
 	return "00-greybox"
+
+
+## F1 opens the motion options; arrows choose and change; F1 or Esc closes. Keyboard only, so it
+## works for someone who cannot hold a mouse steady — and it does not pause, because the climb has
+## no pause either: open it on the ground, or belted on.
+func _options_input(event: InputEvent) -> bool:
+	if not (event is InputEventKey and event.pressed):
+		return options_open and (event is InputEventMouseButton or event is InputEventMouseMotion)
+	var key: int = event.keycode
+	if key == KEY_F1 and not event.echo:
+		options_open = not options_open
+		return true
+	if not options_open:
+		return false
+	var rows: int = GameSettings.ROWS.size()
+	match key:
+		KEY_ESCAPE:
+			options_open = false
+		KEY_UP, KEY_W:
+			options_row = (options_row - 1 + rows) % rows
+		KEY_DOWN, KEY_S:
+			options_row = (options_row + 1) % rows
+		KEY_LEFT, KEY_A:
+			settings.step(GameSettings.ROWS[options_row][0], -1)
+		KEY_RIGHT, KEY_D, KEY_ENTER, KEY_SPACE:
+			settings.step(GameSettings.ROWS[options_row][0], 1)
+	return true   # while it is open, nothing reaches the climb
+
+
+## The options, applied now — acceptance 4 is "without a restart".
+func _apply_settings() -> void:
+	_base_fov = float(settings.get_value("fov"))
+	camera.fov = _base_fov
+	_pitch = clampf(_pitch, _pitch_floor(), 0.6)
+
+
+## Down to 77 degrees: steep enough to pick a joint at your own feet. At 69 the lowest joint a
+## climber could point at was level with his boots, and the next dog for a rigid span is often
+## lower than that. Reduce look-down holds it at 60, the accessibility table's figure.
+func _pitch_floor() -> float:
+	return -deg_to_rad(60.0) if bool(settings.get_value("reduce_look_down")) else -1.35
+
+
+## The fall, as the options have it. Time dilation off, or the minimal fall camera, is an
+## immediate cut to black; only the minimal camera also holds the view still.
+func _fall_slowed() -> bool:
+	return bool(settings.get_value("fall_time_dilation")) and not _fall_minimal()
+
+
+func _fall_minimal() -> bool:
+	return settings.get_value("fall_camera") == "minimal"
+
+
+func _fall_cuts_at_once() -> bool:
+	return _fall_minimal() or not bool(settings.get_value("fall_time_dilation"))
 
 
 ## The checkpoint — CLIMB-006. The stack is the game's only save: quit halfway up and the ladders
@@ -485,6 +547,8 @@ func _look_at_stack() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _options_input(event):
+		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if work_mode:
 			# In work mode the mouse stops steering your head and starts steering the hammer. That
@@ -496,10 +560,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			# going, which is most of what makes a third-person character look like it has weight.
 			_yaw -= event.relative.x * MOUSE_SENS
 			_mouse_at = _now
-			# Down to 77 degrees: steep enough to pick a joint at your own feet. At 69 the lowest
-			# joint a climber could point at was level with his boots, and the next dog for a
-			# rigid span is often lower than that.
-			_pitch = clampf(_pitch - event.relative.y * MOUSE_SENS, -1.35, 0.6)
+			_pitch = clampf(_pitch - event.relative.y * MOUSE_SENS, _pitch_floor(), 0.6)
 
 	if event.is_action_pressed("ui_cancel"):
 		Input.mouse_mode = (Input.MOUSE_MODE_VISIBLE
@@ -860,7 +921,7 @@ func _begin_fall(why: String) -> void:
 	out.y = 0.0
 	velocity = out.normalized() * 1.6
 	_say("")
-	if not motion_minimal:
+	if _fall_slowed():
 		Engine.time_scale = FALL_TIME_SCALE
 	if foley != null:
 		foley.cue("gustTell", 0.7)   # the rush of it; the same noise as wind arriving, lower
@@ -874,7 +935,7 @@ func _update_fall(dt: float) -> void:
 	# Cut before impact, always. The design is explicit, and there is nothing to be gained by showing
 	# the landing that the player would not rather imagine.
 	if fall_black <= 0.0 and (height_m() < FALL_CUT_ABOVE or _fall_t > FALL_LONGEST
-			or is_on_floor() or motion_minimal):
+			or is_on_floor() or _fall_cuts_at_once()):
 		fall_black = 0.01
 		Engine.time_scale = 1.0
 		velocity = Vector3.ZERO
@@ -1316,14 +1377,14 @@ func _update_camera(dt: float) -> void:
 	# The fall camera: snaps wide, character centred, the stack in frame above him as he drops past
 	# it. The one camera that *snaps* rather than eases — a fall is not a moment for a gentle pan.
 	var snap := false
-	if falling and not motion_minimal and fall_black <= 0.0:
+	if falling and not _fall_minimal() and fall_black <= 0.0:
 		length = FALL_BOOM_LENGTH
 		pitch = 0.22
 		side = 0.0
 		snap = true
 
 	var fov := _base_fov
-	if falling and not motion_minimal:
+	if falling and not _fall_minimal():
 		fov = _base_fov + FALL_FOV_WIDEN
 	if at_top:
 		length = TOP_BOOM_LENGTH
@@ -1341,10 +1402,32 @@ func _update_camera(dt: float) -> void:
 	boom.spring_length = lerpf(boom.spring_length, length, k)
 	_cam_side = lerpf(_cam_side, side, k)
 
-	# The impact frame. Decays in a few frames; small enough never to move the aim.
+	# The impact frame. Decays in a few frames; small enough never to move the aim. Scaled by the
+	# screen-shake option, down to none.
 	_kick = move_toward(_kick, 0.0, dt * 0.12)
-	camera.h_offset = _cam_side + randf_range(-_kick, _kick)
-	camera.v_offset = randf_range(-_kick, _kick)
+	var shake: float = _kick * float(settings.get_value("screen_shake"))
+	camera.h_offset = _cam_side + randf_range(-shake, shake)
+	camera.v_offset = randf_range(-shake, shake) + _head_bob(dt)
+	camera.rotation.z = _nerve_sway()
+
+
+## Head bob, walking — off by default (14-accessibility.md). A couple of centimetres at a run.
+func _head_bob(dt: float) -> float:
+	if not bool(settings.get_value("head_bob")) or on_ladder or not is_on_floor():
+		return 0.0
+	var speed := Vector2(velocity.x, velocity.z).length()
+	_bob_phase += dt * speed * 2.2
+	return sin(_bob_phase) * 0.025 * clampf(speed / RUN_CLIP_SPEED, 0.0, 1.0)
+
+
+## The nerve sway: a slow roll of the view as nerve goes, up to a degree and a half at the bottom
+## band. Off by default — a good effect that makes some people unwell, so it is opt-in. Slow
+## enough (a ten-second cycle) that it reads as breathing, not as shaking.
+func _nerve_sway() -> float:
+	if not bool(settings.get_value("camera_sway")) or not on_ladder or jack == null:
+		return 0.0
+	var fear := clampf(float(jack.nerve_band()) / 3.0, 0.0, 1.0)
+	return sin(_now * 0.63) * deg_to_rad(1.5) * fear
 
 
 ## Point the hammer clips at a joint, so the blow lands where the player chose.

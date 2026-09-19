@@ -42,6 +42,8 @@ func _draw() -> void:
 	var hand := Vector2(HAND.x, size.y + HAND.y)
 	var now := float(Time.get_ticks_msec()) / 1000.0
 
+	_draw_vignette(jack)
+
 	var grip: float = jack.grip()
 	var nerve: float = jack.nerve()
 	var nerve_max: float = maxf(jack.nerve_max(), 1.0)
@@ -136,6 +138,9 @@ func _draw() -> void:
 
 	if player.lashing:
 		_draw_lash(jack)
+
+	if player.options_open:
+		_draw_options()
 
 	if player.hauling:
 		_draw_haul()
@@ -235,6 +240,7 @@ func _affordances() -> Array:
 			["mouse", "look", true, ""],
 			["F", "take a ladder and dogs", player.at_cradle(), "only at the cradle, at the foot of the stack"],
 			[Q_KEY, "stance — rig it on the stack", false, "you rig a stance up there, not down here"],
+			["F1", "motion and vertigo options", true, ""],
 		]
 	var has_target: bool = player.target_id >= 0
 	var sounded: bool = player.target_tapped()
@@ -806,3 +812,52 @@ func _centre(text: String, y: float, col: Color, px: int = 15) -> void:
 func _ease(t: float) -> float:
 	t = clampf(t, 0.0, 1.0)
 	return t * t * (3.0 - 2.0 * t)
+
+
+## The tunnel at the edges when nerve is going — 03-meters-grip-nerve.md's "tunnel vignette" in the
+## bottom band, a lighter one in the band above. An option, on by default (14-accessibility.md).
+## Steady, never pulsing: it deepens as the band drops and that is all it does.
+var _vignette_tex: GradientTexture2D
+
+func _draw_vignette(jack: Jack) -> void:
+	if player.settings == null or not bool(player.settings.get_value("low_nerve_vignette")):
+		return
+	var band: int = jack.nerve_band()
+	if band < 2 or player.at_top:
+		return
+	if _vignette_tex == null:
+		var g := Gradient.new()
+		g.set_color(0, Color(0, 0, 0, 0))
+		g.set_color(1, Color(0, 0, 0, 1))
+		g.add_point(0.55, Color(0, 0, 0, 0))
+		_vignette_tex = GradientTexture2D.new()
+		_vignette_tex.gradient = g
+		_vignette_tex.fill = GradientTexture2D.FILL_RADIAL
+		_vignette_tex.fill_from = Vector2(0.5, 0.5)
+		_vignette_tex.fill_to = Vector2(1.05, 0.5)
+		_vignette_tex.width = 256
+		_vignette_tex.height = 256
+	var a := 0.35 if band == 2 else 0.6
+	draw_texture_rect(_vignette_tex, Rect2(Vector2.ZERO, size), false, Color(1, 1, 1, a))
+
+
+## The motion options, F1. A plain list: the one being changed is bright, and the keys are said.
+func _draw_options() -> void:
+	var rows: Array = GameSettings.ROWS
+	var w := 460.0
+	var h := 64.0 + 26.0 * rows.size() + 40.0
+	var at := Vector2((size.x - w) * 0.5, (size.y - h) * 0.5)
+	draw_rect(Rect2(at, Vector2(w, h)), Color(0.05, 0.05, 0.06, 0.86))
+	_label("Motion and vertigo", at + Vector2(24, 36), Color(0.96, 0.94, 0.90, 0.95), 18)
+	for i in rows.size():
+		var y := at.y + 70.0 + 26.0 * i
+		var on: bool = i == player.options_row
+		var col := Color(0.98, 0.96, 0.92, 0.98) if on else Color(0.78, 0.76, 0.72, 0.8)
+		if on:
+			draw_rect(Rect2(Vector2(at.x + 12, y - 18), Vector2(w - 24, 24)), Color(1, 1, 1, 0.07))
+		_label(String(rows[i][1]), Vector2(at.x + 24, y), col, 14)
+		var v: String = player.settings.shown(rows[i][0])
+		var vw := _font.get_string_size(v, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+		_label(("‹ %s ›" % v) if on else v, Vector2(at.x + w - 24 - vw - (14.0 if on else 0.0), y), col, 14)
+	_label("↑↓ choose   ←→ change   F1 close  ·  saved as you go", Vector2(at.x + 24, at.y + h - 16),
+		Color(0.70, 0.68, 0.64, 0.75), 12)

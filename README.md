@@ -62,6 +62,7 @@ the section you are carrying to that dog. Climb what you built. Again.
 | **T** | | brew up — needs both hands, so belt on first |
 | **C** / hold **V** | | a cigarette (costs you the top of your nerve for the shift) / look at the view |
 | **space** | jump | let go. When grip runs out and a hand comes off, **space** is the grab |
+| **F1** | motion and vertigo options — sway, head bob, FOV, look-down, shake, the fall | same |
 | **Esc** | release the mouse | |
 
 **Grip** (the fast arc) drains while a hand is off the ladder — working, tapping, lashing, hauling —
@@ -91,8 +92,7 @@ the fall and resume-at-stack; wind and gusts with the 1.2 s tell; the climbing, 
 and fall cameras; the HUD; fog and a town silhouette; the four tap sounds, the hammer, the wind and the
 height mix.
 
-**Not yet:** hand IK onto the rungs (CLIMB-005); an options screen
-for the accessibility toggles that exist (A11Y-001); the character (ART-020). Each is a task. And
+**Not yet:** hand IK onto the rungs (CLIMB-005); the character (ART-020). Each is a task. And
 LVL-001 — whether the Grey Box's four bands actually play as four experiences — is a judgement that
 needs someone who did not build it to climb it twice.
 

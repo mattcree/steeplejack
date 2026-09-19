@@ -31,6 +31,7 @@
 #   stance <0-4>     one hand / hooked leg / clipped / belted / chair
 #   strain <g> <n>   drained meters, to see the telegraphs
 #   slip             grip to nothing, so the slip window is open
+#   options          the F1 motion options overlay, open
 #   cam <yaw> <pit>  aim the camera, degrees
 #   boom <m>         how far back the camera sits
 #   fov <deg>        lens
@@ -152,6 +153,8 @@ func _run(cmd: String) -> void:
 			await _drain_to(a, b)
 		"slip":
 			await _drain_to(0.0, -1.0)
+		"options":
+			player.options_open = true
 		"cam":
 			player._yaw = deg_to_rad(a)
 			player._pitch = deg_to_rad(b)
