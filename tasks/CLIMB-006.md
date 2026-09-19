@@ -70,7 +70,12 @@ so the hitch walks, then a shock that pulls a dog. A control asserts that histor
 there, and after restoring, the two stacks are stepped side by side for ten seconds and must
 produce the same events.
 
-**Follow-ups:** the Godot layer does not save to disk yet. The stack survives a fall within a
-session ("the next morning, your stack is still up there") but not a quit. Wiring it needs a
-binding pair (`save_stack`/`load_stack`) and a restore of the face's occupied joints from the
-anchors' joint ids.
+**In the game (added the same night):** `Jack.save_stack`/`restore_stack`/`stack_sections`. The
+player autosaves to `user://checkpoint-<level>.json`: it compares every 2 s and writes only on a
+change, and it also writes on quit. It restores on start, and redraws the rope coils, the cradle
+count and the ladder top. Reaching the top clears the save, and `--fresh` ignores it. A checkpoint
+for an edited level is refused with a message and **not deleted**, because it is someone's climb.
+Tests and shots never checkpoint: only the running main scene does, or a test that names its own
+path. `godot/scripts/test_checkpoint.gd` covers all of it and is in `make godot-test`.
+
+**Follow-ups:** none.

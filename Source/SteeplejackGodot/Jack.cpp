@@ -18,6 +18,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
 #include <string>
 
 using namespace godot;
@@ -125,6 +128,9 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("last_slip_outcome"), &Jack::last_slip_outcome);
 	ClassDB::bind_method(D_METHOD("fall", "height"), &Jack::fall);
 	ClassDB::bind_method(D_METHOD("new_shift"), &Jack::new_shift);
+	ClassDB::bind_method(D_METHOD("save_stack"), &Jack::save_stack);
+	ClassDB::bind_method(D_METHOD("restore_stack", "json"), &Jack::restore_stack);
+	ClassDB::bind_method(D_METHOD("stack_sections"), &Jack::stack_sections);
 
 	ClassDB::bind_method(D_METHOD("climb_bearing"), &Jack::climb_bearing);
 	ClassDB::bind_method(D_METHOD("joint_count"), &Jack::joint_count);
@@ -181,7 +187,15 @@ bool Jack::load(const String& tuning_dir, const String& level_path)
 	try
 	{
 		tuning = std::make_unique<sj::Tuning>(sj::Tuning::LoadAll(tuning_dir.utf8().get_data()));
-		level = std::make_unique<sj::LevelData>(sj::LevelData::LoadFrom(level_path.utf8().get_data()));
+		const std::string path = level_path.utf8().get_data();
+		level = std::make_unique<sj::LevelData>(sj::LevelData::LoadFrom(path));
+		{
+			std::ifstream in(path, std::ios::binary);
+			std::stringstream text;
+			text << in.rdbuf();
+			level_fingerprint = sj::save::LevelFingerprint(text.str());
+			level_id = std::filesystem::path(path).stem().string();
+		}
 		meters = sj::nerve::FreshShift(*tuning);
 		meters.stance = sj::Stance::OneHand;
 		meters.exposure = sj::Exposure::Platform;
@@ -344,6 +358,58 @@ void Jack::step(double dt)
 	}
 	outcome = slip.Resolve(now, grab_latched, meters, *tuning);
 	grab_latched = false;
+}
+
+String Jack::save_stack() const
+{
+	try
+	{
+		if (!tuning) { return String(); }
+		return String(sj::save::SerialiseStack(stack, level_id, level_fingerprint).c_str());
+	}
+	catch (const std::exception& e)
+	{
+		UtilityFunctions::push_error("jack: save_stack: ", e.what());
+		return String();
+	}
+}
+
+bool Jack::restore_stack(const String& json)
+{
+	try
+	{
+		if (!tuning || !grid) { return false; }
+		sj::Stack restored = sj::save::RestoreStack(json.utf8().get_data(), level_id, level_fingerprint);
+		stack = std::move(restored);
+		for (int32_t i = 1; i < stack.AnchorCount(); ++i)
+		{
+			const int32_t jid = stack.AnchorAt(i).jointId;
+			if (jid >= 0) { grid->SetOccupied(jid, true); }
+		}
+		return true;
+	}
+	catch (const std::exception& e)
+	{
+		last_error = String(e.what());
+		return false;
+	}
+}
+
+Array Jack::stack_sections() const
+{
+	Array out;
+	for (int32_t i = 0; i < stack.SectionCount(); ++i)
+	{
+		const sj::Section& sec = stack.SectionAt(i);
+		const sj::Anchor& up = stack.AnchorAt(sec.upperAnchor);
+		Dictionary d;
+		d["upper_joint"] = static_cast<int64_t>(up.jointId);
+		d["upper_height"] = static_cast<double>(up.height);
+		d["lashing"] = static_cast<int64_t>(sec.lashing);
+		d["failed"] = stack.SectionFailed(i);
+		out.append(d);
+	}
+	return out;
 }
 
 void Jack::new_shift()

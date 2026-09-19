@@ -22,6 +22,7 @@ const SHOULDER_HEIGHT := 0.55   ## above his origin, which is his middle, not hi
 const ARM_REACH := 0.85          ## shoulder to hammer face
 const LEAN_MAX := 0.75           ## the most he shifts on the rungs to get there
 const LEAN_RATE := 14.0          ## fast enough to arrive before the tap's contact at 0.16 s
+const CHECKPOINT_EVERY := 2.0    ## seconds between looks at whether the stack changed
 const RAIL_HALF := 0.22          ## half the gap between the stiles; chimney.gd's RAIL_GAP / 2
 const WALL_FOLLOW_DELAY := 1.5   ## seconds after the mouse last moved before the ladder view squares up
 const WALL_FOLLOW_RATE := 1.2    ## how fast it does, per second — a drift, not a snap
@@ -187,6 +188,12 @@ var drift_phase := 0.0
 
 var on_ladder := false
 var _yaw := 0.0
+## A test sets this before the scene enters the tree, to checkpoint somewhere that is not the
+## player's own save.
+var checkpoint_path := ""
+var _checkpointing := false      ## only in the real game, never in a test or a shot
+var _ckpt_saved := ""            ## what is on disk, so an unchanged stack is not rewritten
+var _ckpt_clock := 0.0
 var _gear: Node3D                ## the stance, made visible: clip line, belt, chair
 var _body_base := Vector3.ZERO   ## the body's resting place under the player; the lean is added to it
 var _lean := Vector3.ZERO        ## world-space shift towards the joint being tapped or worked
@@ -312,6 +319,7 @@ func _ready() -> void:
 	if town != null:
 		town.build(jack.level_name())
 	chimney.build(jack)
+	_restore_checkpoint()
 	# After the build, not before: the chimney's height is zero until then, so aiming at the top of
 	# it aimed at the ground and the opening shot came out flat and pointed at a field.
 	_look_at_stack()
@@ -320,7 +328,10 @@ func _ready() -> void:
 	# one there hangs the process with no output at all, which is a miserable thing to debug.
 	if DisplayServer.get_name() != "headless":
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	_say("%s. Walk to the foot of the stack." % jack.level_name())
+	if message.begins_with("Your stack") or message.begins_with("Last time"):
+		pass   # the checkpoint's news is the more useful first line
+	else:
+		_say("%s. Walk to the foot of the stack." % jack.level_name())
 	print("steeplejack: %s — %.0f m, %d bands, tuning %s" % [
 		jack.level_name(), jack.total_height(), jack.band_count(), jack.tuning_hash().substr(0, 12)])
 
@@ -337,6 +348,89 @@ func _level_id() -> String:
 		if args[i] == "--level" and i + 1 < args.size():
 			return args[i + 1]
 	return "00-greybox"
+
+
+## The checkpoint — CLIMB-006. The stack is the game's only save: quit halfway up and the ladders
+## you lashed are still there next time, with the shift reset and you at the foot of them.
+##
+## Only when this is the running game. Tests and shots build the same scene, and one that found a
+## checkpoint from last night's play would start half-way up a stack nobody asked for. `--fresh`
+## starts a clean job and leaves the file alone until the new stack overwrites it.
+func _checkpoint_path() -> String:
+	if checkpoint_path != "":
+		return checkpoint_path
+	return "user://checkpoint-%s.json" % _level_id()
+
+
+func _restore_checkpoint() -> void:
+	_checkpointing = checkpoint_path != "" or (
+		get_tree().current_scene != null and get_tree().current_scene == get_parent())
+	if not _checkpointing or OS.get_cmdline_user_args().has("--fresh"):
+		return
+	if not FileAccess.file_exists(_checkpoint_path()):
+		return
+	var text := FileAccess.get_file_as_string(_checkpoint_path())
+	if not jack.restore_stack(text):
+		# An edited level or an old format. Said once, and the file is left for a human to look at
+		# rather than deleted: it is the only copy of someone's climb.
+		push_warning("checkpoint not restored: %s" % jack.get_last_error())
+		_say("Last time's stack could not be put back: the job has changed. Starting fresh.")
+		return
+	_ckpt_saved = text
+	var built := 0
+	for sec in jack.stack_sections():
+		if sec["failed"]:
+			continue
+		built += 1
+		ladders_at_base -= 1
+		var wraps := int(jack.tuning_f("lashWrapsFull" if int(sec["lashing"]) == LASHING_FULL
+			else "lashWrapsQuickHitch", 6))
+		if face != null:
+			face.keep_lash(int(sec["upper_joint"]), wraps)
+		sections.append({"top": float(sec["upper_height"]), "lashing": int(sec["lashing"]),
+			"slipping": false, "joint": int(sec["upper_joint"])})
+	ladder_top = clampf(maxf(STANDING_TOP, jack.stack_top() + _rise()) if jack.stack_top() > 0.0
+		else STANDING_TOP, 0.0, chimney.height_m)
+	if face != null:
+		face.touch()
+	if built > 0:
+		_say("Your stack is where you left it: %d sections, up to %.0f m." % [built, ladder_top])
+
+
+func _update_checkpoint(dt: float) -> void:
+	if not _checkpointing or at_top:
+		return
+	_ckpt_clock += dt
+	if _ckpt_clock < CHECKPOINT_EVERY:
+		return
+	_ckpt_clock = 0.0
+	_write_checkpoint()
+
+
+func _write_checkpoint() -> void:
+	if not _checkpointing or at_top or jack.stack_sections().is_empty():
+		return
+	var text: String = jack.save_stack()
+	if text == "" or text == _ckpt_saved:
+		return
+	var f := FileAccess.open(_checkpoint_path(), FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_string(text)
+	f.close()
+	_ckpt_saved = text
+
+
+func _clear_checkpoint() -> void:
+	if _checkpointing and FileAccess.file_exists(_checkpoint_path()):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_checkpoint_path()))
+	_ckpt_saved = ""
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_PREDELETE:
+		if jack != null:
+			_write_checkpoint()
 
 
 ## Square the view up to the wall in front of him, looking a little up.
@@ -523,6 +617,7 @@ func _physics_process(dt: float) -> void:
 	_animate()
 	_update_lean(dt)
 	_update_gear()
+	_update_checkpoint(dt)
 
 
 ## What the sim decided about the slip on the step that just ran.
@@ -1326,6 +1421,8 @@ func _facing_out() -> bool:
 ## the top is the one moment they will read it. After that it is just the view.
 func _arrive_at_top() -> void:
 	at_top = true
+	# The job is done; there is nothing to come back to.
+	_clear_checkpoint()
 	on_ladder = false
 	top_since = _now
 	work_mode = false

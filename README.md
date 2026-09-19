@@ -73,6 +73,14 @@ gets it back.
 sways and hits its dogs harder; more than 8 m and it bows and fails in eight seconds under you. A dog
 in bad mortar holds its share of you — until something above it lets go.
 
+**The joint you point at is captioned** with what the brick shows (clean, weathered, salt bloom,
+cracked) and, once you have tapped it, what it sounded like. The eye can be wrong about a joint and
+the tap is not: that is the point of tapping.
+
+**Your stack is the save.** Quit halfway up and the ladders you lashed are still there next time,
+with you at the foot of them and a fresh shift. Reaching the top clears it. To start a job over,
+run with `-- --fresh`.
+
 ## What is in the build
 
 Everything on the MVP's list except where noted: the joint grid from each band's own distribution,
@@ -83,7 +91,7 @@ the fall and resume-at-stack; wind and gusts with the 1.2 s tell; the climbing, 
 and fall cameras; the HUD; fog and a town silhouette; the four tap sounds, the hammer, the wind and the
 height mix.
 
-**Not yet:** hand IK onto the rungs (CLIMB-005); the stack saved to disk (CLIMB-006); an options screen
+**Not yet:** hand IK onto the rungs (CLIMB-005); an options screen
 for the accessibility toggles that exist (A11Y-001); the character (ART-020). Each is a task. And
 LVL-001 — whether the Grey Box's four bands actually play as four experiences — is a judgement that
 needs someone who did not build it to climb it twice.

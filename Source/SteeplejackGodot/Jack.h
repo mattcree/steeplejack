@@ -145,6 +145,14 @@ public:
 	 */
 	void new_shift();
 
+	// The checkpoint — CLIMB-006. The stack as JSON, and back. Restoring re-marks every anchor's
+	// joint as occupied, so the face shows the dogs where they were. False, with get_last_error(),
+	// for a checkpoint from another level, an edited level file, or an unknown version.
+	godot::String save_stack() const;
+	bool restore_stack(const godot::String& json);
+	// Every section: {upper_joint, upper_height, lashing, failed}. For redrawing a restored stack.
+	godot::Array stack_sections() const;
+
 	// --- the face ------------------------------------------------------------------------------
 	// Every joint the player can see, read, tap and drive into comes from the grid, by id. Before
 	// the grid a joint was a hash of the height and the level's bands were ignored; see
@@ -270,6 +278,8 @@ private:
 
 	std::unique_ptr<sj::Tuning> tuning;
 	std::unique_ptr<sj::LevelData> level;
+	std::string level_id;            // the file's stem, which is what a checkpoint is keyed on
+	std::string level_fingerprint;   // save::LevelFingerprint of the file's bytes
 	sj::Meters meters{};
 	sj::MeterContext context{};
 	sj::Stack stack{};
