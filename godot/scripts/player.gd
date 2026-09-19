@@ -18,6 +18,10 @@ const FRICTION := 14.0
 const GRAVITY := 22.0
 const JUMP_SPEED := 6.0
 const MOUSE_SENS := 0.0025
+const SHOULDER_HEIGHT := 0.55   ## above his origin, which is his middle, not his feet
+const ARM_REACH := 0.85          ## shoulder to hammer face
+const LEAN_MAX := 0.75           ## the most he shifts on the rungs to get there
+const LEAN_RATE := 14.0          ## fast enough to arrive before the tap's contact at 0.16 s
 const WALL_FOLLOW_DELAY := 1.5   ## seconds after the mouse last moved before the ladder view squares up
 const WALL_FOLLOW_RATE := 1.2    ## how fast it does, per second — a drift, not a snap
 const TURN_RATE := 12.0
@@ -182,6 +186,8 @@ var drift_phase := 0.0
 
 var on_ladder := false
 var _yaw := 0.0
+var _body_base := Vector3.ZERO   ## the body's resting place under the player; the lean is added to it
+var _lean := Vector3.ZERO        ## world-space shift towards the joint being tapped or worked
 var _mouse_at := -100.0          ## When the player last turned the view; the ladder camera waits for them.
 var _pitch := -0.1
 var _spawn := Vector3.ZERO
@@ -268,6 +274,7 @@ func set_height_m(h: float) -> void:
 
 
 func _ready() -> void:
+	_body_base = body.position
 	var tuning_dir := ProjectSettings.globalize_path("res://../data/tuning")
 	# The MVP is one grey-box 55 m chimney in an empty field and this is it. 06-waterside is an M4
 	# felling level and was being played as if it were the MVP build, which is four bands and
@@ -512,6 +519,7 @@ func _physics_process(dt: float) -> void:
 		# translucent section on the stack instead, and it cannot be in two places.
 		_carried_ladder.visible = carrying_ladder and not lashing
 	_animate()
+	_update_lean(dt)
 
 
 ## What the sim decided about the slip on the step that just ran.
@@ -790,6 +798,44 @@ func _update_fall(dt: float) -> void:
 ## what it was: he ran backwards facing the camera, and faced away from the wall on the ladder.
 func _face(dir: Vector3) -> float:
 	return atan2(dir.x, dir.z)
+
+
+## Leaning into the joint. The tap reaches tapTestMaxRangeMetres, 2.5 m, and an arm with a
+## hammer on the end reaches about 0.85 m. So on anything but the nearest joints the arm swung
+## at empty air half a metre short, the tap "landed" on nothing, and the player could not tell what
+## he had just tapped. It is the complaint the prototype got first: you need to see where you are
+## tapping.
+##
+## The range is a tuning target and not this file's to change. Instead the body leans: shifted
+## along the wall, up or across towards the joint, by what the arm cannot cover, so the hammer
+## arrives where the sound comes from. It is drawn only. The sim's position does not move, and
+## nothing about reach, grip or the ladder changes.
+func _update_lean(dt: float) -> void:
+	if body == null:
+		return
+	var want := Vector3.ZERO
+	var jid := -1
+	if tapping > 0.0:
+		jid = _tap_joint
+	elif work_mode:
+		jid = work_joint
+	if jid >= 0 and face != null and on_ladder:
+		var j: Dictionary = face.joint(jid)
+		if not j.is_empty():
+			var at: Vector3 = (j["pos"] as Vector3) + chimney.global_position
+			var shoulder := global_position + Vector3.UP * SHOULDER_HEIGHT
+			var need := at - shoulder
+			# Never into the wall or away from it: along the face and up or down only.
+			var n: Vector3 = j["normal"]
+			n.y = 0.0
+			if n.length() > 0.01:
+				n = n.normalized()
+				need -= n * need.dot(n)
+			var short := need.length() - ARM_REACH * 0.6
+			if short > 0.0:
+				want = need.normalized() * minf(short, LEAN_MAX)
+	_lean = _lean.lerp(want, clampf(dt * LEAN_RATE, 0.0, 1.0))
+	body.position = _body_base + global_transform.basis.inverse() * _lean
 
 
 func _animate() -> void:
@@ -1137,7 +1183,10 @@ func _update_camera(dt: float) -> void:
 			# Over whichever shoulder the joint is on, so his body is never between the lens and
 			# the dog.
 			var right := boom.global_transform.basis.x
-			side = WORK_BOOM_SIDE * (1.0 if right.dot(joint_at - global_position) >= 0.0 else -1.0)
+			# Plus however far he has leant towards it: the lean moves him into the line from the
+			# lens to the dog, and the first frames of it had the back of his head over the joint.
+			side = (WORK_BOOM_SIDE + _lean.length()) \
+				* (1.0 if right.dot(joint_at - global_position) >= 0.0 else -1.0)
 
 	# The top: pulls out to 4 m, drops to eye level, widens. And slowly — this is the one camera move
 	# in the game that is allowed to take its time, because the player has earned the view and
