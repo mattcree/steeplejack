@@ -374,7 +374,10 @@ const HEARD := ["chalked: it rattled — cracked", "chalked: a dead thud — per
 
 
 func _draw_target_caption() -> void:
-	if not player.on_ladder or player.target_id < 0 or player.lashing or player.hauling:
+	# Not while a panel of its own is up: rigging, lashing and hauling each draw one, and the caption
+	# landed on top of the rigging ring.
+	if not player.on_ladder or player.target_id < 0 or player.lashing or player.hauling \
+			or player.rigging_to >= 0:
 		return
 	var on = _on_screen(player.target_id)
 	if on == null:
