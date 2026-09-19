@@ -8,6 +8,7 @@
 
 #include "doctest.h"
 
+#include "Anchor.h"
 #include "Meters.h"
 #include "Tuning.h"
 #include "Verbs/Hammer.h"
@@ -253,4 +254,85 @@ TEST_CASE("Wobble: at its worst it exceeds the hammer's angle tolerance — that
 
     const float Worst = sj::WobbleAmplitudeDeg(m, ctx, 1.0f, Tune());
     CHECK(Worst > Tune().GetF("hammerMaxAngleErrorDegrees"));
+}
+
+// ---------------------------------------------------------------- VERB-003 acceptance, by number
+
+TEST_CASE("Hammer: acceptance 1, five strikes at 0.7 and under 4 degrees seat any Sound joint")
+{
+    // Right across the Sound band, up to a perfect joint, at the worst angle the criterion allows.
+    const float lo = Tune().GetF("jointQualityTierBounds.fair");
+    for (float q = lo; q <= 1.0f; q += 0.01f)
+    {
+        const Joint j = JointOfQuality(q);
+        float depth = 0.0f;
+        for (int i = 0; i < 5; ++i)
+        {
+            const StrikeResult r = sj::hammer::Strike(j, depth, 0.7f, 3.9f, 1.0f, Tune());
+            REQUIRE_FALSE(r.bent);
+            depth += r.depthGain;
+        }
+        CAPTURE(q);
+        CHECK(depth >= sj::hammer::SeatDepth(Tune()));
+    }
+}
+
+TEST_CASE("Hammer: acceptance 2, what the strike model says about 0.7 against 1.0 — and a disagreement")
+{
+    // The criterion: 0.65–0.75 power outperforms 1.0 "across the angle-error range". Per strike,
+    // it does not. Below the bend threshold a harder blow drives further; the moderate swing only
+    // wins once the angle is bad enough that full power bends the dog. The designed lesson ("full
+    // power is wrong most of the time") lives in the draw — power builds while the aim drifts, so a
+    // full draw is usually a worse angle — which is game-side and not in this function. Blocked on
+    // which of the two is meant: VERB-003's ## Blocked and BLOCKED.md. These pin the facts.
+    auto depth = [](float power, float err) {
+        const StrikeResult r = sj::hammer::Strike(JointOfQuality(0.8f), 0.0f, power, err, 1.0f, Tune());
+        return r.bent ? 0.0f : r.depthGain;
+    };
+    CHECK(depth(1.0f, 2.0f) > depth(0.7f, 2.0f));   // clean angle: power wins
+    CHECK(depth(0.7f, 8.0f) > depth(1.0f, 8.0f));   // poor angle: full power bends, moderate does not
+    CHECK(depth(1.0f, 8.0f) == 0.0f);
+}
+
+TEST_CASE("Hammer: acceptance 3, perished mortar seats in fewer strikes than sound")
+{
+    const Attempt soft = Drive(0.25f, 0.7f, 2.0f);
+    const Attempt hard = Drive(0.85f, 0.7f, 2.0f);
+    REQUIRE(soft.seated);
+    REQUIRE(hard.seated);
+    CHECK(soft.strikes < hard.strikes);
+}
+
+TEST_CASE("Hammer: acceptance 4, full power more than 10 degrees off bends the dog")
+{
+    // Deterministic, so "with high probability" is "every time": there are no dice in this module.
+    for (float err = 10.1f; err <= 20.0f; err += 0.5f)
+    {
+        CAPTURE(err);
+        CHECK(sj::hammer::Strike(JointOfQuality(0.8f), 0.3f, 1.0f, err, 1.0f, Tune()).bent);
+    }
+}
+
+TEST_CASE("Hammer: acceptance 5, over-driving a weak joint spalls, and spall costs rating")
+{
+    const Attempt weak = Drive(0.25f, 1.0f, 1.0f);
+    REQUIRE(weak.seated);
+    CHECK(weak.spall > 0.0f);
+    const Joint j = JointOfQuality(0.60f);
+    CHECK(sj::anchor::Rate(j, 1.0f, weak.spall, Tune()) <= sj::anchor::Rate(j, 1.0f, 0.0f, Tune()));
+}
+
+TEST_CASE("Hammer: acceptance 6, pure — identical inputs, identical results, in any order")
+{
+    const Joint j = JointOfQuality(0.55f);
+    const StrikeResult a = sj::hammer::Strike(j, 0.4f, 0.8f, 3.3f, 0.7f, Tune());
+    for (int i = 0; i < 100; ++i)
+    {
+        (void)sj::hammer::Strike(JointOfQuality(0.1f), 0.9f, 1.0f, 11.0f, 0.2f, Tune());
+    }
+    const StrikeResult b = sj::hammer::Strike(j, 0.4f, 0.8f, 3.3f, 0.7f, Tune());
+    CHECK(a.depthGain == b.depthGain);
+    CHECK(a.spalled == b.spalled);
+    CHECK(a.bent == b.bent);
+    CHECK(a.seated == b.seated);
 }

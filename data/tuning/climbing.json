@@ -34,6 +34,7 @@
   "hammerBaseWobbleDegrees": 1.5,
   "hammerBendRiskScale": 1.0,
   "hammerSpallRiskScale": 1.0,
+  "hammerSoftnessFloor": 0.34,
   "hammerStrikeCooldownSeconds": 0.55,
 
   "tapTestSeconds": 0.8,

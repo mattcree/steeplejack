@@ -51,7 +51,14 @@ StrikeResult Strike(const Joint& joint, float currentDepth, float power, float a
 
     // Soft mortar takes the dog faster. `quality` here is the joint's hidden condition: 1 is sound
     // brickwork that resists, 0 is perished mortar you could push a dog into with your thumb.
-    const float softness = std::clamp(1.0f - joint.quality, 0.0f, 1.0f);
+    //
+    // Floored, not the GDD's bare `1 - quality`. Transcribed as written, the best Sound joints took
+    // 34 to 170 clean strikes and a perfect one could never be seated at all — against the same
+    // document's "sound mortar needs 5–6 solid strikes" and VERB-003's acceptance 1. The stated
+    // outcome is the design; the formula was a means to it. The floor is set so the hardest joint,
+    // at 0.7 power and 3.9° off, seats in five; soft mortar still takes it in two or three.
+    const float floor = std::clamp(t.GetF("hammerSoftnessFloor"), 0.0f, 1.0f);
+    const float softness = floor + (1.0f - floor) * std::clamp(1.0f - joint.quality, 0.0f, 1.0f);
 
     // A worn hammer does not swing straight. It scales the *good* part of the strike without
     // reducing the risk, which is what makes tool condition worth paying to repair.

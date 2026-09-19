@@ -89,6 +89,11 @@ bendRisk      = power * (1 - strikeQuality)             // hard swing, bad angle
 spallRisk     = power * (1 - jointQuality) * depth      // over-driving a weak joint splits the brick
 ```
 
+`jointSoftness` is `floor + (1 - floor) * (1 - jointQuality)`, with `hammerSoftnessFloor` in
+`climbing.json`. The bare `1 - jointQuality` first written here made the best Sound joints take
+34–170 strikes and a perfect one impossible to seat, against the outcome below ("5–6 solid
+strikes"). The outcome is the design, so the formula changed (VERB-003, 2026-09-19).
+
 Outcomes the player learns to feel:
 - **Soft mortar takes the dog easily but holds it badly.** Fast to seat, Poor rating. The trap.
 - **Sound mortar resists.** Needs 5–6 solid strikes. Slow but gives you a Sound anchor.
