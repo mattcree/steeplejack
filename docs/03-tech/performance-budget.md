@@ -1,97 +1,68 @@
 # Performance Budget
 
-> Rewritten following [ADR-0004](adr/0004-engine-change-to-unreal.md). Unreal Engine 5.8.2,
-> Lumen + Nanite, deferred renderer.
+> Godot 4.7, Forward+ renderer ([ADR-0006](adr/0006-move-to-godot.md)). Rewritten 2026-09-19 when
+> Unreal was removed: the previous version budgeted Lumen, Nanite, Chaos and Niagara, none of which
+> this build uses.
 
 ## Targets
 
-| Platform | Resolution | Upscaling | Target | Floor |
-|---|---|---|---|---|
-| **Primary** — RX 7800 XT / RTX 4070 class | 1440p | TSR Quality | 60 fps | 50 fps |
-| **Minimum** — RX 6600 / RTX 3060 class | 1080p | TSR Balanced | 60 fps | 45 fps |
-| **High** — RX 7900 / RTX 4080 class | 4K | TSR Quality | 60 fps | — |
-| **Steam Deck** | 800p | TSR Performance, Lumen off, Nanite on | 30 fps | **stretch goal** |
-
-Steam Deck moved from a target to a stretch goal in ADR-0004. Revisit at M4 once the fall's cost is
-known; the honest answer may be "no Deck build", and that is acceptable.
+| Platform | Resolution | Target | Floor |
+|---|---|---|---|
+| **Primary** — RX 7800 XT / RTX 4070 class | 1440p | 60 fps | 50 fps |
+| **Minimum** — RX 6600 / RTX 3060 class | 1080p | 60 fps | 45 fps |
+| **Steam Deck** | 800p | 30 fps | stretch goal |
 
 **60 fps is the target, not 120.** This is a game about deliberate, careful movement; the frame
-budget is better spent on Lumen and volumetrics than on refresh rate.
+budget is better spent on light and atmosphere than on refresh rate.
 
-## Frame budget at 60 fps (16.6 ms), primary target
+## What is measured, and what is not
 
-| | Budget | Notes |
+| | Budget | Measured |
 |---|---|---|
-| `SteeplejackSim::Step` | **0.5 ms** | hard limit. It is arithmetic over a few hundred structs in plain C++. |
-| Base pass (Nanite) | 3.0 ms | structures, town, props — Nanite makes this scale well |
-| **Lumen GI + reflections** | 4.0 ms | the single largest cost, and the thing that makes it look photographed |
-| Shadows (virtual shadow maps) | 2.0 ms | one directional light |
-| **Volumetric fog** | 2.0 ms | atmospheric perspective is a gameplay system here, not a garnish |
-| Character + Control Rig + cloth | 1.5 ms | one character, full-body IK, Chaos Cloth |
-| Niagara (smoke, dust, weather) | 1.5 ms | |
-| Post + TSR | 1.5 ms | |
-| UI + audio | 0.6 ms | |
-| **Headroom** | 0.0 ms | tight by design — see the scalability plan |
+| **Sim step** — one full tick: wind, meters, recovery, slip, a 28-section stack | **0.5 ms** | ✅ `make test-perf`, every run: about **2 µs** |
+| Rendering, frame time on real GPUs | 16.6 ms | ❌ **nothing measures it yet** |
 
-This budget has no slack, deliberately. Lumen and volumetrics are what the project is buying with
-the engine change, and cutting them to chase headroom would defeat the decision. Slack comes from
-scalability settings, not from the budget.
+The sim budget is the one that cannot be recovered by a scalability setting, so it is the one that
+is gated. The rendering budget is not measured at all: the headless suites have no renderer, and
+`make shot` renders in software (llvmpipe), which says what a frame looks like and nothing about what
+it costs. A frame-time capture on real hardware over the reference scenes below is a task that does
+not exist yet.
 
-## Scene budgets
+## Scene budgets (what the current build is built to)
 
-| | Limit |
-|---|---|
-| Nanite triangles, typical frame | 8M (Nanite cost is resolution-bound, not triangle-bound) |
-| Non-Nanite triangles | 400k |
-| Draw calls (post-Nanite) | ≤ 400 |
-| Chaos rigid bodies, typical | ≤ 8 |
-| Chaos rigid bodies, the fall | ≤ 120, for ≤ 5 s |
-| Niagara systems, typical | 3 |
-| Niagara systems, the fall | 7 |
-| Unique master materials | ≤ 12 (heavy use of material instances) |
-| Texture streaming pool | ≤ 4 GB primary, ≤ 2 GB minimum spec |
-| `Content/` on disk | ≤ 25 GB (Git LFS; see the repo policy) |
+| | Limit | Today |
+|---|---|---|
+| The face in reach | ~12 draw calls | one MultiMesh per kind of mark, rebuilt only when he moves 0.25 m |
+| The ladder stack | a few draw calls | rails, rungs and dogs as MultiMeshes |
+| The chimney | one mesh per band | tapered cylinders + `brick.gdshader` |
+| The town | 4 draw calls | three MultiMeshes, two props, per-bank materials |
+| Audio | a handful of voices | every cue synthesised once at load from `data/audio/foley.json` |
+| Binary assets on disk | small | one character model; LFS pending (CORE-010) |
 
-## The two spikes
+## The two spikes (design intent; neither exists yet)
 
 ### 1. The fall (levels 6, 7, 12)
 
-The only moment the budget is deliberately blown, for about five seconds. Mitigations applied
-automatically for a 6 s window around impact:
+The only moment the budget may be deliberately blown, for about five seconds. The intended
+mitigations for a window around impact: the town to its cheapest form, chunks converting to static
+rubble a few seconds after first contact, a hard cap on concurrent dynamic chunks with the overflow
+spawned pre-settled, and the whole particle budget given to the dust plume.
 
-1. Town backdrop forced to its silhouette LOD (−60% of its cost).
-2. Lumen final gather quality dropped one step.
-3. Chunks convert to static rubble 4 s after first contact.
-4. Concurrent dynamic chunks capped at 120; overflow spawns pre-settled.
-5. Dust plume gets the entire Niagara budget; other systems are culled.
-
-**Regression test: the fall spike must stay under 33 ms (30 fps) on the primary target.** Dipping to
-30 fps for two seconds during a controlled demolition is acceptable. Stuttering is not.
+**Target: the fall spike stays under 33 ms (30 fps) on the primary target.** Dipping to 30 fps for
+two seconds during a controlled demolition is acceptable. Stuttering is not.
 
 ### 2. Topping (levels 5, 9, 12)
 
-Hundreds of individually removable bricks. **Never individual actors.** One `InstancedStaticMesh`
-per course; removal sets an instance transform to zero scale. The wall below the working face is a
-single Nanite mesh whose top is clipped by a material parameter. Budget: the whole topping surface
-is ≤ 3 draw calls regardless of how many bricks remain.
+Hundreds of individually removable bricks. **Never a node per brick.** One MultiMesh per course;
+removing a brick zero-scales its instance. The wall below the working face is one mesh clipped by a
+shader parameter. The whole topping surface stays at a few draw calls however many bricks remain.
 
 ## Things that will hurt if we let them
 
-| Risk | Mitigation | Owner |
-|---|---|---|
-| An actor per brick | ISM + material clipping, enforced in review | ENG |
-| The joint grid as actors or components | it is sim data; **nothing in the joint grid touches UE** | ENG |
-| Lumen cost in the fog | tune volumetric fog scattering distribution before touching Lumen quality | TECH-ART |
-| Megascans at source resolution | 2K virtual textures, 4K only on the brick master | ART |
-| `Content/` bloat | Git LFS, and a nightly size check that fails over 25 GB | PROD |
-| Blueprint tick | Blueprints are glue only; no Blueprint may tick | ENG |
-| Chaos Cloth on distant characters | cloth disabled beyond 15 m | ENG |
-| Audio: 40 concurrent falling-brick voices | one looping "rush" MetaSound + a terminating thump | AUD |
-
-## Measurement
-
-- `tools/perf_capture.py` drives a headless UE run with `-benchmark` over three reference scenes:
-  Level 01 (trivial), Level 09 (two stacks, many bricks), Level 12 act 2 (the fall).
-- Results append to `docs/03-tech/perf-history.csv`; a >10% regression fails the nightly.
-- **`SteeplejackSim::Step` is measured separately, in the standalone CMake build**, with no engine
-  involved. That number must never exceed 0.5 ms and it is checked on every commit, not nightly.
+| Risk | Mitigation |
+|---|---|
+| A node per brick, or per joint | MultiMeshes; the joint grid is sim data and never scene objects |
+| Rebuilding the face every frame | `face.gd` rebuilds only on movement or a change (`REBUILD_EVERY`) |
+| `MultiMesh.use_colors` silently ignored | colour per material, per bank (found building the town) |
+| Many simultaneous falling-brick sounds | one looping rush and a terminating thump |
+| Binary assets growing unchecked | Git LFS and a size check (CORE-010) |

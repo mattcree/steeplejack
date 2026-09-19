@@ -1,58 +1,59 @@
 # Architecture
 
-> Read [`adr/0004`](adr/0004-engine-change-to-unreal.md) (which supersedes
-> [`adr/0001`](adr/0001-engine-choice.md)), [`adr/0002`](adr/0002-physics-and-destruction.md) and
+> Read [`adr/0006`](adr/0006-move-to-godot.md) (which supersedes [`adr/0004`](adr/0004-engine-change-to-unreal.md)
+> and [`adr/0001`](adr/0001-engine-choice.md)), [`adr/0002`](adr/0002-physics-and-destruction.md) and
 > [`adr/0003`](adr/0003-determinism-and-testing.md) first. This document is the shape that follows
 > from them.
 >
-> **The one structural idea:** `SteeplejackSim` is plain C++20 with no Unreal dependency, and builds
-> two ways — linked into the game as library code, and as a standalone library with a CMake test
-> binary. That is what keeps the gameplay layer agent-executable and testable in seconds without a
-> 40 GB engine install.
+> **The one structural idea:** `SteeplejackSim` is plain C++20 with no engine dependency, and builds
+> two ways — as a standalone library with a CMake test binary, and linked into a Godot GDExtension
+> that the game loads. Every rule of the game lives there. That is what keeps the gameplay layer
+> agent-executable and testable in seconds, and it is why the engine could be changed twice without
+> the game changing.
 >
-> It is **not** a loadable UE module and has no `IMPLEMENT_MODULE`: that would need
-> `Modules/ModuleManager.h`, and rule 1 forbids Unreal headers anywhere under the module. UBT's
-> `bRequiresImplementModule = false` covers exactly this case. See CORE-001.
+> *Rewritten 2026-09-19, when Unreal was removed. The Unreal version of this page described a
+> `SteeplejackGame` module, Nanite, Chaos and instanced static meshes; none of that exists now.*
 
 ## Repository layout
 
 ```
 steeplejack/
-├── Steeplejack.uproject
 ├── AGENTS.md                      ← how to work in this repo
-├── CMakeLists.txt                 ← standalone build of the sim + its tests (no Unreal)
+├── CMakeLists.txt                 ← standalone build of the sim + its tests (no engine)
+├── Makefile                       ← every command; `make help`
 │
 ├── Source/
-│   ├── SteeplejackSim/            ← PURE C++20. No UE types. 100% unit tested. AGENT-OWNED.
+│   ├── SteeplejackSim/            ← PURE C++20. No engine types. The game's rules. AGENT-OWNED.
 │   │   ├── Public/
-│   │   │   ├── Rng.h  Types.h  Tuning.h  Level.h  Joints.h  Anchor.h
-│   │   │   ├── Stack.h  Load.h  Meters.h  Wobble.h  Weather.h  Slip.h
-│   │   │   ├── Gob.h  Fell.h  Topping.h  Scoring.h  Economy.h  Job.h
-│   │   │   ├── Intent.h  Recorder.h  Replay.h  Clock.h  Reachability.h
-│   │   │   └── Verbs/{Tap,Hammer,Lash,Haul,Prise,Bolt,Gild,Measure}.h
-│   │   ├── Private/*.cpp
-│   │   └── SteeplejackSim.Build.cs   ← the ONLY UE-aware file in this module
+│   │   │   ├── Types.h  Rng.h  Clock.h  Json.h  Tuning.h  Level.h  JointGrid.h
+│   │   │   ├── Anchor.h  Stack.h (+ the checkpoint)  Meters.h  Wobble.h  Wind.h
+│   │   │   ├── Slip.h  Recovery.h  Reachability.h  Intent.h  Recorder.h  Replay.h
+│   │   │   └── Verbs/{Tap,Hammer,Lash,Haul}.h
+│   │   └── Private/*.cpp
 │   │
-│   └── SteeplejackGame/           ← the UE module. HUMAN-OWNED (mostly).
-│       ├── Player/                controller, camera, Control Rig glue, IK
-│       ├── Structures/            procedural chimney/spire/lattice builders
-│       ├── Destruction/           Chaos Geometry Collection driving
-│       ├── VFX/  Audio/  UI/  Hub/
-│       └── SteeplejackGame.Build.cs
+│   └── SteeplejackGodot/          ← the GDExtension binding: `Jack`, one class, the only place
+│                                     sim and engine meet. Every method catches exceptions.
 │
-├── Content/                       ← BINARY. Git LFS. Materials, meshes, Control Rig,
-│                                     Niagara, MetaSounds, levels-as-shells. HUMAN-OWNED.
+├── godot/                         ← the game. Text scenes and GDScript. AGENT-OWNED.
+│   ├── project.godot
+│   ├── scenes/steeplejack.tscn
+│   ├── scripts/                   ← player, chimney, face, hud, town, foley, climb_clip, settings
+│   │                                 + test_*.gd (headless suites) and shot.gd (rendered frames)
+│   ├── shaders/brick.gdshader
+│   └── assets/characters/         ← the one imported model (binary; not yet in LFS — CORE-010)
+│
 ├── data/
-│   ├── tuning/*.json              ← ALL balance numbers. Hot-reloadable.
-│   ├── levels/*.json              ← 12 levels. No hand-placed geometry, anywhere.
+│   ├── tuning/*.json              ← ALL balance numbers. Hashed into every replay.
+│   ├── levels/*.json              ← No hand-placed geometry, anywhere.
+│   ├── audio/foley.json           ← every sound, as envelopes; synthesised at load
 │   ├── schemas/*.schema.json
-│   └── replays/*.replay
+│   └── replays/                   ← the recorded Grey Box climb (TEST-002)
 ├── tests/
-│   ├── unit/                      ← doctest, runs via CMake in ~20s with no Unreal
-│   ├── property/
-│   ├── replay/
-│   └── perf/
-├── tools/                         ← Python. Validation, task graph, conventions, perf capture.
+│   ├── unit/                      ← doctest, runs via CMake in seconds with no engine
+│   ├── replay/                    ← the replay format's round trip
+│   ├── perf/                      ← the sim-step budget
+│   └── fixtures/
+├── tools/                         ← Python. Validation, task graph, conventions, coverage.
 └── docs/
 ```
 
@@ -60,45 +61,46 @@ steeplejack/
 
 | Layer | Owner | Format | Testable headlessly |
 |---|---|---|---|
-| `Source/SteeplejackSim/` | **agents** | text C++ | ✅ in ~20 s, no engine |
-| `data/`, `tools/`, `tests/`, `docs/` | **agents** | text | ✅ in ~3 s |
-| `Source/SteeplejackGame/` | agents + humans | text C++ | partially (UE automation) |
-| `Content/` | **humans** | binary | ❌ visual review only |
+| `Source/SteeplejackSim/` | **agents** | text C++ | ✅ `make check`, seconds, no engine |
+| `data/`, `tools/`, `tests/`, `docs/` | **agents** | text | ✅ `make check` |
+| `Source/SteeplejackGodot/`, `godot/` | **agents** | text C++, GDScript, text scenes | ✅ `make godot-test`; frames with `make shot` |
+| `godot/assets/` | **humans** | binary (LFS pending, CORE-010) | ❌ visual review only |
 
-Roughly 45% of the work and ~100% of the gameplay logic stays in the top two rows.
+Almost everything is text an agent can author and review. The exceptions are the character model and
+any recorded audio, and the project prefers what can be generated: the town is built from a seed, the
+chimney from its level file, and the foley from envelopes.
 
 ## The frame
 
-```cpp
-// ASteeplejackGameMode::Tick(float DeltaSeconds)
-Accumulator += DeltaSeconds;
-int Steps = 0;
-while (Accumulator >= sj::kTick && Steps++ < sj::kMaxCatchUpSteps)   // 1/60, cap 5
-{
-    const sj::IntentBuffer Intents = InputMapper.Collect();   // presentation -> sim
-    PrevState = Sim.Snapshot();
-    Sim.Step(Intents, sj::kTick);                             // pure C++, no UE
-    Recorder.Record(Tick++, Intents);                         // for replay
-    Accumulator -= sj::kTick;
-}
+Godot's physics tick *is* the fixed step: the project runs physics at 60 Hz, and the player advances
+the sim once per tick from `_physics_process`.
 
-// rendering
-const float Alpha = Accumulator / sj::kTick;
-Presentation.Render(sj::Lerp(PrevState, Sim.State(), Alpha));
+```gdscript
+# godot/scripts/player.gd — once per physics tick (1/60 s)
+func _physics_process(dt):
+    ...                      # read input into intents: climb, tap, strike, lash, haul
+    jack.set_context(...)    # height, wind, what he is carrying, whether a hand is off
+    jack.step(dt)            # meters, slip, wind, recovery — pure C++, no engine
+    stack_info = jack.stack_step(dt, height_m(), on_ladder)   # load, buckling, cascades
+    _animate(); _update_lean(dt); _update_gear(); _update_checkpoint(dt)
 ```
 
-`Sim.Step` must complete in **< 0.5 ms** at all times. It is arithmetic over a few hundred plain
-structs in C++; this is not ambitious, and it is measured on every commit in the standalone build.
+`--fixed-fps 60` runs the same ticks unpaced, which is how the headless suites play fifteen minutes
+of game time in under a minute and why their results are deterministic.
+
+The orchestration of the verbs — which key starts a tap, when a blow lands — lives in `player.gd`.
+The rules those verbs apply live in the sim. That split is why ADR-0003's full intent replay is not
+yet possible: the intents are formed in GDScript. `Recorder`/`Replay` exist and round-trip to the bit
+(CORE-006); what is missing is a sim-side step that applies intents to the verbs.
 
 ## Key data structures
 
 ```cpp
-// Source/SteeplejackSim/Public/Types.h
-// Plain C++20. No FVector, no TArray, no UObject — the standalone CMake build depends on it.
+// Source/SteeplejackSim/Public/Types.h — plain C++20; no engine types anywhere in the module.
 namespace sj {
 
 struct Vec2 { float x, y; };
-struct Vec3 { float x, y, z; };                      // ours, not FVector
+struct Vec3 { float x, y, z; };                      // ours; converted once, in the binding
 
 enum class JointTier  : uint8_t { Cracked, Perished, Fair, Sound };
 enum class AnchorRate : uint8_t { Failed, Poor, Fair, Sound };
@@ -113,36 +115,47 @@ struct Anchor  { int32_t jointId; float height, depth, spall;
 struct Section { int32_t lowerAnchor, upperAnchor;
                  float span, condition, buckleTimer; Lashing lashing; };
 struct Meters  { float grip, nerve, nerveMax; Stance stance; Exposure exposure; };
-struct GobCell { int16_t seg, course; bool removed, propped; float strength; };
-struct Prop    { int16_t seg; float loadKN; bool dud, burnt; };
-struct FallPlan{ float hingeBearing, angularError;
-                 std::vector<float> fractureHeights; std::vector<Vec2> debrisFan; };
-
-class Stack {
-public:
-    std::vector<float>   LoadShare(int atSection, float totalKN, const Tuning&) const;
-    std::vector<int32_t> CascadeFrom(int failedAnchor, const Tuning&) const;  // in failure order
-    // ...
-};
 
 } // namespace sj
 ```
 
+`Stack` (anchors, sections, load sharing, cascades, buckling, hitch drift) and `JointGrid` (the
+face, generated from a level's bands) are the two big ones; see [`interfaces.md`](interfaces.md).
+
+**Planned, not built:** the demolition side of the game — gob cells, props and the fall plan for
+felling (`GobCell`, `Prop`, `FallPlan`), topping, scoring and the economy. Their signatures are in
+`interfaces.md`; nothing implements them yet.
+
 ## Procedural structure generation
 
-`Source/SteeplejackGame/Structures/ChimneyBuilder.cpp` takes a level's `structure` block and emits:
-- a shaft mesh (lathe from a profile curve, with batter steps and bands)
-- a **joint grid** (`sj::JointGrid`, sim data — never scene objects) — the gameplay surface
-- a cell grid for topping, if the level tops
-- a **Chaos Geometry Collection** (baked offline, loaded here), if the level fells
-- per-instance parameters for the brick master material (soot gradient, salt bloom, erosion, cracking)
+Nothing about a chimney is hand-modelled. From a level's `structure` and `bands`:
 
-Nothing about a chimney is hand-modelled. Adding a level is: write a JSON file, run the validator,
-play it. **A level designer must be able to go from idea to playable in under thirty minutes.** If
-that stops being true, fix it immediately — it is the production system that makes 12 levels
-affordable.
+- the **sim** generates the joint grid (`JointGrid::Generate`) — the gameplay surface, sim data,
+  never scene objects — and the old fixtures in it;
+- **`chimney.gd`** builds the shaft as one tapered cylinder per band, with `brick.gdshader` drawing
+  the brick, the band colours and the soot; the cap and flue; the ladder stack as MultiMeshes (with
+  the bow of an over-long section); the cradle and brazier at the foot;
+- **`face.gd`** draws the patch of wall within reach joint by joint — the visual tells, salt bloom,
+  cracks, chalk, dogs, rope coils, anchor pips — as a dozen MultiMesh banks;
+- **`town.gd`** builds the town from a seed: three MultiMeshes and two moving props.
+
+Adding a level is: write a JSON file, `make validate`, `make test-levels` (which proves it can be
+climbed with its own loadout — CORE-009), play it. **A level designer must be able to go from idea
+to playable in under thirty minutes.**
 
 ## Save data
+
+What exists:
+
+- **The checkpoint** — `user://checkpoint-<level>.json`, the serialised stack (CLIMB-006). Written
+  when the stack changes and on quit, restored on start, cleared at the top. Versioned, and
+  fingerprinted against the level file so an edited level refuses an old stack.
+- **Settings** — `user://settings.cfg`, the motion and vertigo options (A11Y-001).
+
+**The in-progress stack is the checkpoint.** Nothing else about mid-level state is saved — the
+player resumes at the foot of their own ladders with the shift reset.
+
+Planned for the career (M3):
 
 ```jsonc
 {
@@ -150,28 +163,18 @@ affordable.
   "career": { "day": 34, "money": 4180, "reputation": 62, "injury": null },
   "inventory": { "ladders": [{"id":0,"condition":0.8}, ...], "dogs": 41, "rope": 2, "upgrades": ["good_hammer"] },
   "engine": { "parts_owned": ["wheels","axles","tubes"] },
-  "jobs": { "06-waterside": { "completed": true, "best_invoice": {...} } },
-  "in_progress": {            // set only if a shift ended badly
-     "level": "10-hartford",
-     "stack": [ ... serialised Stack ... ],
-     "materials_remaining": {...}
-  }
+  "jobs": { "06-waterside": { "completed": true, "best_invoice": {...} } }
 }
 ```
-
-**The in-progress stack is the checkpoint.** Nothing else about mid-level state is saved — the
-player resumes at the bottom of their own ladders with the shift reset.
 
 ## Performance-critical paths
 
 | Path | Budget | Approach |
 |---|---|---|
-| `Sim.Step` | < 0.5 ms | plain C++ arithmetic; gob solver recomputed on change only |
-| Chimney shaft | Nanite, 1 primitive | procedural mesh + the brick master material |
-| Ladder sections | 1 ISM | instanced; flex via a per-instance custom data float |
-| Interactive bricks | ≤ 3 draw calls | ISM per course; removal = zero-scale the instance |
-| Town backdrop | ≤ 40 primitives | instanced kit, Nanite, silhouette LOD beyond 200 m |
-| Fall (5 s) | ≤ 120 Chaos bodies | the only heavy moment; scalability drops applied |
-| Dust column | 1 Niagara system | the whole particle budget lives here |
+| Sim step | < 0.5 ms | plain C++ arithmetic; `make test-perf` times a full tick with a 28-section stack — about 2 µs |
+| Chimney shaft | one mesh per band | tapered cylinders + `brick.gdshader` |
+| Ladder stack | a few MultiMeshes | rails, rungs and dogs instanced; the bow is geometry, not a shader |
+| The face in reach | ~12 draw calls | one MultiMesh per kind of mark, rebuilt only when he moves 0.25 m |
+| Town | 4 draw calls | three MultiMeshes and two props, per-bank materials |
 
 See [`performance-budget.md`](performance-budget.md).
