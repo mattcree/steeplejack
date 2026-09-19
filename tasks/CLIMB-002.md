@@ -52,7 +52,24 @@ No visual or audio feedback — UI-001 renders the fuse.
 <!-- Filled in by the implementer before building, if estimate_days > 1. -->
 
 ## Blocked
-<!-- Only if blocked. Question / what I tried / options / recommendation. -->
+
+**Not blocking the build — a question about which of two numbers is the design.**
+
+*The question.* Acceptance 2 asks for the top three anchors to take 78-82% of the load on a
+12-section stack, and the context says "falloff 0.55, so the top three anchors take about 80%". They
+disagree. `0.55^n` normalised over the chain puts 83.4% on the top three (over twelve dogs and the
+ground; 83.4% over twelve dogs alone as well — the tail is too small to matter).
+
+*What I did.* Implemented the data exactly as written, and tested the formula rather than the range,
+so the number moves as soon as the falloff does. `test_stack.cpp` documents the disagreement in the
+case that would otherwise assert the range.
+
+*Options.* (a) Widen the acceptance to about 83% — the GDD's formula and `climbing.json` agree with
+each other and only the range is off. (b) Set `loadShareFalloff` to 0.585, which gives 80.1%.
+
+*Recommendation.* (a). "About 80%" was describing the formula, and 83% is about 80%. Changing a
+tuning target to fit an acceptance range written from a mental approximation of it would be the
+wrong way round.
 
 ## Outcome
 <!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->

@@ -15,6 +15,7 @@ move the row to Resolved with the date.
 | Task | Raised | The question, in one line | Recommendation |
 |---|---|---|---|
 | [GDD-001](tasks/GDD-001.md) | 2026-09-17 | Two nerve questions the data answers and no document does: (a) is `bellStrike` at -35 meant to be the worst shock in the game, worse than an anchor failing under you; (b) at a belted stance at the height and wind caps, nerve drains 3x faster than grip and freezes in 30 s — is nerve still the slow meter? | (a) keep the data, document the three missing shocks; (b) needs a designer — the formula and data are the GDD's own and faithfully implemented |
+| [CLIMB-002](tasks/CLIMB-002.md) | 2026-09-19 | `loadShareFalloff` 0.55 puts **83.4%** of the load on the top three anchors of a 12-section stack; acceptance 2 says 78-82% and the context says 0.55 gives "about 80%". Which number is the design? | Widen the acceptance: the GDD's formula and the data agree with each other, only the range is off. If 80% is the target, 0.585 gives 80.1%. Built with 0.55 as written; nothing waits on this |
 | [CORE-016](tasks/CORE-016.md) | 2026-09-17 | Should `SteeplejackSim` use C++ exceptions? The packaged game target does not compile without them, and `interfaces.md` mandates them in one section and forbids them in another. | Set `bForceEnableExceptions = true` on the game target and keep the throw-on-missing contract |
 
 ## Standing decisions the lead owes the project
