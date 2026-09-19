@@ -49,9 +49,11 @@
   "lashHoldTurnsPerSecond": 0.55,
 
   "haulSpeedMetresPerSecond": 0.9,
-  "haulSwingGainPerSpeed": 0.6,
-  "haulSwingDampPerSteerInput": 0.8,
+  "haulSwingGainPerSpeed": 1.9,
+  "haulSwingDampPerSteerInput": 4.6,
   "haulFoulAmplitudeDegrees": 22.0,
+  "haulAirDampingPerSecond": 0.04,
+  "haulWindDegPerS2PerMs": 0.12,
 
   "shimSeconds": 4.0,
   "clipOnSeconds": 3.0,

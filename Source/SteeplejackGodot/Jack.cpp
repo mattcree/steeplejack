@@ -10,6 +10,7 @@
 #include "Stack.h"
 #include "Wind.h"
 #include "Verbs/Hammer.h"
+#include "Verbs/Haul.h"
 #include "Verbs/Lash.h"
 #include "Verbs/Tap.h"
 #include "Wobble.h"
@@ -116,6 +117,7 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("get_difficulty"), &Jack::get_difficulty);
 	ClassDB::bind_method(D_METHOD("grab"), &Jack::grab);
 	ClassDB::bind_method(D_METHOD("slip_now"), &Jack::slip_now);
+	ClassDB::bind_method(D_METHOD("grip_hit", "amount"), &Jack::grip_hit);
 	ClassDB::bind_method(D_METHOD("slip_in_progress"), &Jack::slip_in_progress);
 	ClassDB::bind_method(D_METHOD("slip_window_left"), &Jack::slip_window_left);
 	ClassDB::bind_method(D_METHOD("slip_window_seconds"), &Jack::slip_window_seconds);
@@ -141,6 +143,10 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("stack_step", "dt", "height", "on_ladder"), &Jack::stack_step);
 	ClassDB::bind_method(D_METHOD("stack_section_at", "height"), &Jack::stack_section_at);
 	ClassDB::bind_method(D_METHOD("anchor_failed", "index"), &Jack::anchor_failed);
+
+	ClassDB::bind_method(D_METHOD("haul_begin", "top_m"), &Jack::haul_begin);
+	ClassDB::bind_method(D_METHOD("haul_step", "dt", "pull", "steer", "wind_ms", "load_kg"),
+	                     &Jack::haul_step);
 
 	ClassDB::bind_method(D_METHOD("lash_begin"), &Jack::lash_begin);
 	ClassDB::bind_method(D_METHOD("lash_step", "dt", "turns_per_second"), &Jack::lash_step);
@@ -401,6 +407,11 @@ void Jack::grab()
 	grab_latched = true;
 }
 
+void Jack::grip_hit(double amount)
+{
+	meters.grip = std::max(0.0f, meters.grip - static_cast<float>(amount));
+}
+
 void Jack::slip_now()
 {
 	if (!tuning) { return; }
@@ -605,6 +616,29 @@ Dictionary Jack::strike_joint(int64_t id, double current_depth, double power,
 	d["seated"] = r.seated;
 	d["quality"] = static_cast<double>(
 		sj::hammer::StrikeQuality(static_cast<float>(angle_error_deg), *tuning));
+	return d;
+}
+
+void Jack::haul_begin(double top_m)
+{
+	hauling = sj::HaulState{};
+	haul_top = static_cast<float>(top_m);
+}
+
+Dictionary Jack::haul_step(double dt, double pull, double steer, double wind_ms, double load_kg)
+{
+	Dictionary d;
+	if (!tuning) { return d; }
+	sj::haul::Step(hauling, static_cast<float>(dt), static_cast<float>(pull),
+	               static_cast<float>(steer), static_cast<float>(wind_ms),
+	               static_cast<float>(load_kg), haul_top, *tuning);
+	d["height"] = static_cast<double>(hauling.height);
+	d["swing_deg"] = static_cast<double>(hauling.swingDeg);
+	d["swing_vel"] = static_cast<double>(hauling.swingVel);
+	d["amplitude"] = static_cast<double>(sj::haul::AmplitudeDeg(hauling, haul_top, *tuning));
+	d["foul_at"] = static_cast<double>(tuning->GetF("haulFoulAmplitudeDegrees"));
+	d["fouled"] = hauling.fouled;
+	d["arrived"] = sj::haul::Arrived(hauling, haul_top);
 	return d;
 }
 

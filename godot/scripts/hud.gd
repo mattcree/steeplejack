@@ -133,6 +133,9 @@ func _draw() -> void:
 	if player.lashing:
 		_draw_lash(jack)
 
+	if player.hauling:
+		_draw_haul()
+
 	_draw_stack_warnings()
 	_draw_fuse()
 	_draw_recovery(jack, hand)
@@ -163,7 +166,7 @@ func _next_step() -> String:
 		return ""
 	if player.jack.slip_in_progress():
 		return ""
-	if player.rigging_to >= 0 or player.lashing:
+	if player.rigging_to >= 0 or player.lashing or player.hauling:
 		return ""
 	# A section failing under him owns the screen. Advice about lashing is noise while it goes.
 	if player.stack_info.get("buckling", false):
@@ -197,7 +200,7 @@ func _affordances() -> Array:
 		return [["SPACE", "grab", true, ""]]
 	if player.rigging_to >= 0:
 		return [[Q_KEY, "stop rigging", true, ""]]
-	if player.lashing:
+	if player.lashing or player.hauling:
 		return []
 	if player.work_mode:
 		return [
@@ -225,8 +228,17 @@ func _affordances() -> Array:
 		[Q_KEY, _next_stance_label(), true, ""],
 		["T", "brew up", jack_free_hands(),
 			"you need both hands — belt on first"],
+		["G", _gin_label(), true, ""],
 		["C / V", "a cigarette  ·  look at the view (hold)", true, ""],
 	]
+
+
+func _gin_label() -> String:
+	if player.gin_joint < 0:
+		return "rig the gin wheel on a dog in reach"
+	if absf(player.height_m() + 0.55 - player.gin_height) < player.GIN_REACH:
+		return "haul a section up" if not player.carrying_ladder else "haul (lash the one you have first)"
+	return "move the gin wheel up to a dog in reach"
 
 
 func jack_free_hands() -> bool:
@@ -489,6 +501,45 @@ func _draw_fuse() -> void:
 			draw_arc(p, 7.0, 0, TAU, 16, Color(0.9, 0.88, 0.84, 0.35), 1.5)
 		if i < n - 1:
 			draw_line(p + Vector2(10, 0), p + Vector2(step - 10, 0), Color(0.9, 0.88, 0.84, 0.25), 1.0)
+
+
+## The swing meter — VERB-007. A pendulum the player can read at a glance: the rope hanging from
+## a pivot at the current swing angle, the arc it is sweeping, and the foul marks either side. The
+## amplitude arc is what matters — it shows how big the swing *is*, where the rope alone would read
+## upright at the bottom of every swing, which is exactly when the player needs to know.
+func _draw_haul() -> void:
+	var h: Dictionary = player.haul
+	if h.is_empty():
+		return
+	var foul: float = h.get("foul_at", 22.0)
+	var amp: float = h.get("amplitude", 0.0)
+	var ang: float = h.get("swing_deg", 0.0)
+	var pivot := Vector2(size.x * 0.5, size.y * 0.16)
+	var r := 110.0
+
+	# Scale so the foul marks sit well out, not at the edge of a quarter circle.
+	var k := 2.0
+	var danger := clampf(amp / foul, 0.0, 1.0)
+	var col := Color(0.86, 0.80, 0.62).lerp(Color(0.98, 0.42, 0.30), danger * danger)
+
+	draw_arc(pivot, r, PI * 0.5 - deg_to_rad(foul * k), PI * 0.5 + deg_to_rad(foul * k), 32,
+		Color(0.9, 0.88, 0.84, 0.18), 5.0)
+	draw_arc(pivot, r, PI * 0.5 - deg_to_rad(amp * k), PI * 0.5 + deg_to_rad(amp * k), 32,
+		Color(col.r, col.g, col.b, 0.7), 5.0)
+	for sgn in [-1.0, 1.0]:
+		var at: float = PI * 0.5 + sgn * deg_to_rad(foul * k)
+		draw_line(pivot + Vector2(cos(at), sin(at)) * (r - 10), pivot + Vector2(cos(at), sin(at)) * (r + 10),
+			Color(0.98, 0.42, 0.30, 0.9), 3.0)
+	var rope_at: float = PI * 0.5 - deg_to_rad(ang * k)
+	draw_line(pivot, pivot + Vector2(cos(rope_at), sin(rope_at)) * r, Color(0.95, 0.93, 0.88, 0.9), 2.0)
+	draw_circle(pivot + Vector2(cos(rope_at), sin(rope_at)) * r, 7.0, Color(0.95, 0.93, 0.88, 0.95))
+	draw_circle(pivot, 4.0, Color(0.95, 0.93, 0.88, 0.8))
+
+	var below: float = player.gin_height - float(h.get("height", 0.0))
+	_centre("load %.0f m below   ·   swing %.0f°, fouls at %.0f°" % [below, amp, foul],
+		pivot.y + r + 26.0, Color(0.92, 0.90, 0.86, 0.9), 14)
+	_centre("hold W to haul   ·   push the mouse against the swing   ·   G to let it go",
+		pivot.y + r + 46.0, Color(0.80, 0.78, 0.74, 0.7), 13)
 
 
 ## Lashing — VERB-005.

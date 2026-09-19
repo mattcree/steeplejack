@@ -26,6 +26,8 @@
 #   top              all the way up, and onto the cap
 #   tea              belt on and brew up
 #   fall             come off, untied, from where he is
+#   gin              rig the gin wheel on the highest dog in reach, and start a haul
+#   haulfor <s> [1]  haul flat out for s seconds, steering against the swing if 1
 #   stance <0-4>     one hand / hooked leg / clipped / belted / chair
 #   strain <g> <n>   drained meters, to see the telegraphs
 #   slip             grip to nothing, so the slip window is open
@@ -179,6 +181,22 @@ func _run(cmd: String) -> void:
 			player._arrive_at_top()
 			player._cam_yaw = player._yaw
 			player._cam_pitch = player._pitch
+		"gin":
+			# Rig the gin wheel on the highest dog in reach and start a haul from the cradle.
+			await _wait(2)
+			player._gin_wheel()
+			player._gin_wheel()
+		"haulfor":
+			# Haul flat out for `a` seconds; b = 1 steers against the swing like a good hand.
+			player.climb_input = 1.0
+			for i in int(a * 60.0):
+				if b > 0.0 and not player.haul.is_empty():
+					var vel_sign := signf(float(player.haul.get("swing_deg", 0.0)))
+					player._haul_dx = -vel_sign * 40.0
+				await physics_frame
+				if not player.hauling:
+					break
+			player.climb_input = 0.0
 		"fall":
 			# Off, untied, from where he is — through the real fall.
 			player._begin_fall("you had one hand on a rung and nothing else. Nothing caught you.")

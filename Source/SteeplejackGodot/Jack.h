@@ -22,6 +22,7 @@
 #include "Slip.h"
 #include "Stack.h"
 #include "Wind.h"
+#include "Verbs/Haul.h"
 #include "Verbs/Lash.h"
 #include "Tuning.h"
 #include "Types.h"
@@ -121,6 +122,8 @@ public:
 	/** Something let go under him. 02-climbing-system.md §6: "When grip hits zero, or an anchor
 	 *  fails under you, you get a slip." Opens the window if the budget allows, and costs nerve. */
 	void slip_now();
+	/** Something knocked his hand: grip down by `amount`. A load swinging into him, say. */
+	void grip_hit(double amount);
 	bool slip_in_progress() const { return slip.InProgress(); }
 	/** 1 at the moment of the slip falling to 0 at its close. What the closing ring draws. */
 	double slip_window_left() const;
@@ -192,6 +195,15 @@ public:
 	/** Whether the dog at this index (anchor_at's) has pulled. */
 	bool anchor_failed(int64_t index) const;
 
+	// --- hauling — VERB-007 ----------------------------------------------------------------------
+	/** Hook a load at the foot, under a gin wheel at `top_m`. */
+	void haul_begin(double top_m);
+	/**
+	 * One step. `pull` 0..1, `steer` -1..1. Returns
+	 * `{height, swing_deg, amplitude, foul_at, fouled, arrived}`.
+	 */
+	godot::Dictionary haul_step(double dt, double pull, double steer, double wind_ms, double load_kg);
+
 	// --- lashing -------------------------------------------------------------------------------
 	// One lash in progress at a time, held here so the rope's state is the sim's and not a copy.
 	/** Start a fresh lashing. */
@@ -251,6 +263,8 @@ private:
 	/** What the player has learned by tapping, by joint id. Chalk marks are drawn from this. */
 	std::map<int32_t, int32_t> tapped;
 	sj::LashState lashing{};
+	sj::HaulState hauling{};
+	float haul_top{0.0f};
 
 	std::unique_ptr<sj::Tuning> tuning;
 	std::unique_ptr<sj::LevelData> level;

@@ -205,6 +205,17 @@ const FALL_BLACK_HOLD := 1.4
 ## A11Y-001 / CAM-002 acceptance 4: no slow motion and no camera snap, just the cut. For players the
 ## wide spinning fall would make ill — and it must not change a single outcome, only what is shown.
 var motion_minimal := false
+
+## The gin wheel — VERB-007. A pulley lashed to a dog, a rope to the yard.
+var gin_joint := -1
+var gin_height := 0.0
+var hauling := false
+var haul := {}                   ## the sim's last word on the load
+var _haul_dx := 0.0              ## mouse sideways this frame: the hand on the rope
+var haul_steer := 0.0
+var _gin: Node3D                 ## wheel, rope and load, drawn in the world
+const GIN_REACH := 2.2           ## how close to the wheel he has to be to work the rope
+const HAUL_STEER_GAIN := 0.02    ## mouse pixels a frame to a full push on the rope
 var _kick := 0.0                 ## Camera impulse from a hammer blow, decaying.
 var _cam_yaw := 0.0              ## Where the camera actually is, easing towards where it wants to be.
 var _cam_pitch := -0.1
@@ -353,6 +364,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if lashing:
 		_lash_input(event)
 		return
+	if hauling:
+		if event is InputEventMouseMotion:
+			_haul_dx += event.relative.x
+		if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_G:
+			_stop_haul("you let the rope run — the load goes back to the yard")
+		return
 
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
@@ -360,6 +377,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_R: _lash()
 			KEY_F: _pick_up()
 			KEY_Q: _cycle_stance()
+			KEY_G: _gin_wheel()
 			KEY_T: _recover(REC_TEA)
 			KEY_C: _recover(REC_CIG)
 			KEY_V: _recover(REC_VIEW)
@@ -415,7 +433,7 @@ func _physics_process(dt: float) -> void:
 		velocity = Vector3.ZERO
 	elif at_top:
 		_on_top(dt)
-	elif work_mode or lashing:
+	elif work_mode or lashing or hauling:
 		velocity = Vector3.ZERO
 	elif on_ladder:
 		_climb(dt, ladder_world)
@@ -429,6 +447,7 @@ func _physics_process(dt: float) -> void:
 	_update_tap(dt)
 	_update_work(dt)
 	_update_lash(dt)
+	_update_haul(dt)
 	_update_stack(dt)
 	_update_recovery()
 	_update_fall(dt)
@@ -774,7 +793,7 @@ func _step_sim(dt: float) -> void:
 	# wind is a term in both the nerve drain and the wobble, so it was a difficulty dial the
 	# designer had and the game ignored.
 	jack.set_context(h, jack.wind_at(h), carrying_ladder,
-		work_mode or _slipping or rigging_to >= 0 or tapping > 0.0 or lashing)
+		work_mode or _slipping or rigging_to >= 0 or tapping > 0.0 or lashing or hauling)
 	if foley != null:
 		foley.duck(recovering == REC_TEA, dt)
 		foley.set_height(h)
@@ -1041,6 +1060,20 @@ func _update_camera(dt: float) -> void:
 		pitch = -0.12
 		length = 3.2
 
+	# The haul: 02-climbing-system.md §4, "the camera looks down the rope. This is the shot that sells
+	# the height, and it's free because the player isn't moving."
+	if hauling and gin_joint >= 0 and face != null:
+		var gj: Dictionary = face.joint(gin_joint)
+		if not gj.is_empty():
+			var gn: Vector3 = gj["normal"]
+			# Facing the wall, so the arm swings the camera out over the drop rather than into the
+			# ladder: pointed outward, the spring arm sat on the wall side, hit the ladder and
+			# crushed in until the whole frame was rails and the back of his head.
+			yaw = atan2(gn.x, gn.z) + 0.30
+			pitch = -1.0
+			length = 4.5
+			side = -0.6
+
 	# The fall camera: snaps wide, character centred, the stack in frame above him as he drops past
 	# it. The one camera that *snaps* rather than eases — a fall is not a moment for a gentle pan.
 	var snap := false
@@ -1272,6 +1305,171 @@ func _bow_now() -> float:
 		return 0.0
 	var u := clampf((height_m() - lo) / (hi - lo), 0.0, 1.0)
 	return float(stack_info.get("flex_m", 0.0)) * sin(PI * u)
+
+
+## G: rig the gin wheel on your highest dog, or — standing by it — haul the next load up.
+func _gin_wheel() -> void:
+	if not on_ladder:
+		_say("you rig a gin wheel from the ladder")
+		return
+	var near_wheel: bool = gin_joint >= 0 and absf(height_m() + 0.55 - gin_height) < GIN_REACH
+	if gin_joint < 0 or (not near_wheel and _top_dog_in_reach() >= 0):
+		var jid := _top_dog_in_reach()
+		if jid < 0:
+			_say("the gin wheel lashes to a dog — drive one in within reach first")
+			return
+		gin_joint = jid
+		gin_height = float(face.joint(jid).get("height", height_m()))
+		_say("gin wheel lashed to the dog at %.0f m. G by it to haul" % gin_height)
+		_build_gin()
+		return
+	if not near_wheel:
+		_say("the gin wheel is at %.0f m — get to it" % gin_height)
+		return
+	if carrying_ladder:
+		_say("you have a section already — lash it before you haul another")
+		return
+	if ladders_at_base <= 0:
+		_say("nothing left in the cradle to haul")
+		return
+	hauling = true
+	haul_steer = 0.0
+	_haul_dx = 0.0
+	jack.haul_begin(gin_height)
+	_say("hauling — hold W to pull, and push the mouse against the swing")
+
+
+## The highest seated dog his hand can reach.
+func _top_dog_in_reach() -> int:
+	var best := -1
+	var best_h := -1.0
+	var hands := height_m() + 0.55
+	for i in jack.anchor_count():
+		var a: Dictionary = jack.anchor_at(i)
+		if a.get("failed", false):
+			continue
+		var h: float = a["height"]
+		if absf(h - hands) <= GIN_REACH and h > best_h:
+			best_h = h
+			best = int(a.get("joint", -1))
+	return best
+
+
+func _update_haul(dt: float) -> void:
+	if _gin != null:
+		_draw_gin()
+	if not hauling:
+		return
+	var pull := 1.0 if (_key(KEY_W) > 0.0 or climb_input > 0.0) else 0.0
+	# The hand on the rope, from the mouse. Eased, so a flick is a push and not a teleport.
+	var want := clampf(_haul_dx * HAUL_STEER_GAIN / maxf(dt * 60.0, 0.01), -1.0, 1.0)
+	_haul_dx = 0.0
+	haul_steer = lerpf(haul_steer, want, clampf(dt * 12.0, 0.0, 1.0))
+	var load_kg: float = jack.tuning_f("ladderMassKg", 18.0) + 6.0   # a section and a bag of dogs
+	haul = jack.haul_step(dt, pull, haul_steer, jack.wind_at(gin_height), load_kg)
+
+	if haul.get("fouled", false):
+		var near_him: bool = float(haul["height"]) > gin_height - 4.0
+		if near_him:
+			# It came round and hit him. 02-climbing-system.md §4: nerve −20, grip −40.
+			jack.shock("haulHit")
+			jack.grip_hit(40.0)
+			_stop_haul("the load swung into you — it goes back down to the yard")
+		else:
+			if foley != null:
+				foley.cue("bent", 0.6)
+			_stop_haul("it fouled on the brickwork and slipped back down — steer against the swing")
+		return
+	if haul.get("arrived", false):
+		hauling = false
+		carrying_ladder = true
+		ladders_at_base -= 1
+		while dogs_carried < DOG_BAG and dogs_at_base > 0:
+			dogs_carried += 1
+			dogs_at_base -= 1
+		if foley != null:
+			foley.cue("seated", 0.8)
+		_say("up — a section and a bag of dogs off the hook. %d left in the cradle" % ladders_at_base)
+
+
+func _stop_haul(why: String) -> void:
+	hauling = false
+	haul = {}
+	_say(why)
+
+
+func _build_gin() -> void:
+	if _gin != null:
+		_gin.queue_free()
+	_gin = Node3D.new()
+	get_parent().add_child(_gin)
+	var iron := StandardMaterial3D.new()
+	iron.albedo_color = Color(0.25, 0.25, 0.26)
+	iron.metallic = 0.5
+	iron.roughness = 0.5
+	var hemp := StandardMaterial3D.new()
+	hemp.albedo_color = Color(0.64, 0.53, 0.35)
+	hemp.roughness = 0.95
+	var wood := StandardMaterial3D.new()
+	wood.albedo_color = Color(0.46, 0.33, 0.19)
+
+	var wheel := MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.09
+	tm.outer_radius = 0.15
+	tm.material = iron
+	wheel.mesh = tm
+	wheel.name = "Wheel"
+	_gin.add_child(wheel)
+
+	var rope := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.012
+	cm.bottom_radius = 0.012
+	cm.height = 1.0
+	cm.material = hemp
+	rope.mesh = cm
+	rope.name = "Rope"
+	_gin.add_child(rope)
+
+	var bundle := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.5, 5.0, 0.12)   # a ladder section, hung by its end
+	bm.material = wood
+	bundle.mesh = bm
+	bundle.name = "Load"
+	_gin.add_child(bundle)
+
+
+## The wheel on its dog; while hauling, the rope and the load swinging on it.
+func _draw_gin() -> void:
+	var j: Dictionary = face.joint(gin_joint) if face != null else {}
+	if j.is_empty():
+		return
+	var n: Vector3 = j["normal"]
+	var wheel_at: Vector3 = (j["pos"] as Vector3) + chimney.global_position + n * 0.34 + Vector3.UP * 0.25
+	var wheel: Node3D = _gin.get_node("Wheel")
+	wheel.global_position = wheel_at
+	wheel.global_rotation = Vector3(0.0, atan2(n.x, n.z), PI * 0.5)
+
+	var rope: Node3D = _gin.get_node("Rope")
+	var load_node: Node3D = _gin.get_node("Load")
+	rope.visible = hauling
+	load_node.visible = hauling
+	if not hauling or haul.is_empty():
+		return
+	# The load hangs off the wheel on a pendulum in the wall's normal plane: positive swing is away
+	# from the wall, and swinging back past vertical is swinging into the brickwork.
+	var length := maxf(wheel_at.y - float(haul["height"]), 0.5)
+	var a := deg_to_rad(float(haul["swing_deg"]))
+	var load_at := wheel_at + n * sin(a) * length - Vector3.UP * cos(a) * length
+	load_node.global_position = load_at - (load_at - wheel_at).normalized() * 2.5
+	load_node.look_at_from_position(load_node.global_position, wheel_at, n.cross(Vector3.UP))
+	load_node.rotate_object_local(Vector3.RIGHT, PI * 0.5)
+	rope.global_position = (wheel_at + load_at) * 0.5
+	rope.look_at_from_position(rope.global_position, wheel_at, n.cross(Vector3.UP))
+	rope.rotate_object_local(Vector3.RIGHT, PI * 0.5)
+	rope.scale = Vector3(1.0, wheel_at.distance_to(load_at), 1.0)
 
 
 ## A puff of mortar dust at a joint.
