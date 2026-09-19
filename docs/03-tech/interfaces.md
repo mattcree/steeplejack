@@ -333,6 +333,8 @@ like a fuse. Fully deterministic — no RNG in this module.
 namespace grip {
     void  Step(Meters&, float dt, const MeterContext&, const Tuning&) noexcept;
     float DrainRate(Stance, const MeterContext&, const Tuning&) noexcept;
+    float SetupSeconds(Stance, const Tuning&) noexcept;      // the stance table's third column
+    bool  NeedsRigging(Stance from, Stance to) noexcept;     // only going up the table costs time
 }
 namespace nerve {
     void    Step(Meters&, float dt, const MeterContext&, const Tuning&) noexcept;

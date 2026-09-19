@@ -40,6 +40,24 @@ SJ_API float DrainRate(Stance stance, const MeterContext& ctx, const Tuning& t) 
 // Grip recovered per second while holding on with both hands.
 SJ_API float RecoverRate(const Tuning& t) noexcept;
 
+// Seconds of rigging to get into this stance. The third column of the stance table in
+// 02-climbing-system.md §5, which had never been in the data at all — so every stance was free and
+// the whole "do I rush this one-handed or spend eight seconds rigging?" choice, which that document
+// calls the player's real choice, cost nothing to make.
+//
+// Rigging is work: a hand is off while you do it, so it drains at the stance you are leaving. That
+// is what stops a climber with no grip left from belting on to recover, which would have made the
+// meter self-healing at exactly the moment it is supposed to bite.
+SJ_API float SetupSeconds(Stance stance, const Tuning& t) noexcept;
+
+// Whether moving from `from` to `to` costs set-up time at all.
+//
+// Only going *up* the table does. Unclipping, unhooking a leg or letting a belt go are quick, and
+// the table's numbers are set-up times, not transition times. So a climber can always drop to
+// something worse instantly — which matters, because the fastest way out of a bad stance must never
+// itself take five seconds.
+SJ_API bool NeedsRigging(Stance from, Stance to) noexcept;
+
 // The ceiling. Normally gripMax; capped lower while cold, until enough work has been done to warm
 // up. This is why a winter level feels different without changing any other rule.
 //

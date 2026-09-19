@@ -15,6 +15,14 @@
     "belted": 1.0,
     "chair": 0.8
   },
+  "stanceSetupSeconds": {
+    "oneHand": 0.0,
+    "hookedLeg": 1.5,
+    "clipped": 3.0,
+    "belted": 5.0,
+    "chair": 20.0
+  },
+
   "gripTremorThreshold": 20.0,
   "gripWobbleAtZero": 2.0,
   "gripModifiers": {

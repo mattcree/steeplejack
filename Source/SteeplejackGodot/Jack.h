@@ -56,6 +56,12 @@ public:
 	void set_stance(int stance);
 	int64_t get_stance() const { return static_cast<int64_t>(meters.stance); }
 	godot::String stance_name() const;
+	godot::String stance_name_of(int stance) const;
+	/** Seconds of rigging to get into a stance, and whether getting there costs any at all. */
+	double stance_setup_seconds(int stance) const;
+	bool stance_needs_rigging(int from, int to) const;
+	/** Grip per second this stance costs while a hand is off, with every modifier applied. */
+	double stance_drain_rate(int stance) const;
 
 	// --- the meters ----------------------------------------------------------------------------
 	void step(double dt);

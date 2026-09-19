@@ -17,6 +17,7 @@ const GRIP_R := 44.0
 const NERVE_R := 56.0
 const FADE_ABOVE := 85.0
 const REST_ALPHA := 0.22
+const Q_KEY := "Q"
 
 @onready var player: Node = get_node("../Player")
 
@@ -120,6 +121,9 @@ func _draw() -> void:
 	if player.work_mode:
 		_draw_work(jack)
 
+	if player.rigging_to >= 0:
+		_draw_rig(jack)
+
 	# Over everything, because for 900 ms nothing else on this screen matters.
 	if player.jack.slip_in_progress():
 		_draw_slip(jack)
@@ -133,6 +137,8 @@ func _draw() -> void:
 
 func _next_step() -> String:
 	if player.jack.slip_in_progress():
+		return ""
+	if player.rigging_to >= 0:
 		return ""
 	if player.fall_reason != "":
 		return "Your stack is still up. Climb it again."
@@ -157,6 +163,8 @@ func _next_step() -> String:
 func _affordances() -> Array:
 	if player.jack.slip_in_progress():
 		return [["SPACE", "grab", true, ""]]
+	if player.rigging_to >= 0:
+		return [[Q_KEY, "stop rigging", true, ""]]
 	if player.work_mode:
 		return [
 			["mouse", "place the dog", true, ""],
@@ -168,9 +176,9 @@ func _affordances() -> Array:
 			["WASD", "walk", true, ""],
 			["mouse", "look", true, ""],
 			["F", "take a ladder and dogs", player.at_cradle(), "only at the cradle, at the foot of the stack"],
-			["Q", "change stance", true, ""],
+			[Q_KEY, "stance — rig it on the stack", false, "you rig a stance up there, not down here"],
 		]
-	var tapped: bool = player.tap_pip >= 0 and absf(player.tapped_at - player.global_position.y) < 1.5
+	var tapped: bool = player.tap_pip >= 0 and absf(player.tapped_at - player.height_m()) < 1.5
 	return [
 		["W/S", "climb", true, ""],
 		["E", "sound the brickwork", true, ""],
@@ -178,8 +186,26 @@ func _affordances() -> Array:
 			"sound the joint first" if not tapped else "no dogs left"],
 		["R", "lash the next ladder", player.has_lashable_anchor() and player.carrying_ladder,
 			"you are not carrying one" if not player.carrying_ladder else "needs a dog seated above you"],
-		["Q", "change stance", true, ""],
+		[Q_KEY, _next_stance_label(), true, ""],
 	]
+
+
+## What Q costs and what it buys, spelled out before it is pressed rather than after.
+##
+## This is the one decision the climbing system is built on — rush it one-handed or spend the time —
+## and the player cannot make it at all if the price is invisible.
+func _next_stance_label() -> String:
+	var jack: Jack = player.jack
+	var here: int = jack.get_stance()
+	var want: int = (here + 1) % 5
+	var name: String = jack.stance_name_of(want)
+	if not jack.stance_needs_rigging(here, want):
+		return "back to %s — instant" % name
+	# One decimal under ten seconds. A hooked leg takes 1.5 s and "2 s to rig" is a different
+	# number from the one the game charges.
+	var secs: float = jack.stance_setup_seconds(want)
+	var shown: String = ("%.1f" % secs) if secs < 10.0 else ("%.0f" % secs)
+	return "%s — %s s to rig, %.0f grip a second" % [name, shown, jack.stance_drain_rate(want)]
 
 
 func _draw_work(jack: Jack) -> void:
@@ -217,6 +243,31 @@ func _draw_work(jack: Jack) -> void:
 		var urgency := clampf(1.0 - left / 12.0, 0.0, 1.0)
 		_centre("%.0f s of grip left in this stance" % ceilf(left), bar.y + 40,
 			Color(0.92, 0.72 - 0.4 * urgency, 0.35 - 0.2 * urgency, 0.75 + 0.25 * urgency), 13)
+
+
+## Rigging a stance. Twenty seconds into a bosun's chair is a long time to stare at nothing.
+##
+## The bar says how long is left; the line under it says what it is buying. Both matter: the player
+## is spending grip *now* against a drain they will pay *later*, and a countdown with no stake
+## attached is just a wait.
+func _draw_rig(jack: Jack) -> void:
+	var eye := Vector2(size.x * 0.5, size.y * 0.42)
+	var done: float = 1.0 - (player.rig_left / maxf(player.rig_total, 0.01))
+
+	var w := 260.0
+	var at := Vector2(eye.x - w * 0.5, eye.y)
+	draw_rect(Rect2(at - Vector2(1, 1), Vector2(w + 2, 10)), Color(0, 0, 0, 0.45))
+	draw_rect(Rect2(at, Vector2(w * done, 8)), Color(0.82, 0.74, 0.48, 0.95))
+
+	_centre("rigging — %s" % jack.stance_name_of(player.rigging_to), eye.y - 26.0,
+		Color(0.94, 0.91, 0.86, 0.92), 18)
+	_centre("%.1f s" % player.rig_left, eye.y + 26.0, Color(0.88, 0.85, 0.80, 0.85), 15)
+
+	var from_rate: float = jack.stance_drain_rate(jack.get_stance())
+	var to_rate: float = jack.stance_drain_rate(player.rigging_to)
+	_centre("%.0f grip a second becomes %.0f" % [from_rate, to_rate], eye.y + 48.0,
+		Color(0.80, 0.78, 0.74, 0.75), 13)
+	_centre("[Q] to stop", eye.y + 70.0, Color(0.72, 0.70, 0.67, 0.65), 13)
 
 
 ## The slip.

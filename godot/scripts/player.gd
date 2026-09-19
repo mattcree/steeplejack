@@ -38,6 +38,10 @@ const CRADLE_RADIUS := 8.0
 const TOOL_CONDITION := 0.85
 
 ## What the sim's last step decided about the slip. Mirrors sj::SlipOutcome.
+## Move further than this while rigging and the rig is off. Enough slack for the odd physics nudge,
+## far less than a rung.
+const RIG_HOLD_STILL_M := 0.12
+
 ## How long a line stays up. Long enough to read twice, short enough that it is never a fixture.
 const MESSAGE_SECONDS := 6.0
 
@@ -82,6 +86,10 @@ var _shuffle := 0.0              ## How far sideways off the ladder line he has 
 var _remount_block := 0.0
 var _now := 0.0                  ## Seconds since the shift started. The HUD's clock, not the sim's.
 var _climb_rate := 0.0           ## Metres per second up the ladder this frame; drives the clip.
+var rigging_to := -1             ## Stance being rigged, or -1. The HUD draws the ring.
+var rig_left := 0.0              ## Seconds of it still to do.
+var rig_total := 0.0
+var _rig_at := 0.0               ## The height he was at when he started. Moving off it breaks it.
 var _slipping := false           ## Mirrors the sim, so the rising edge can be acted on once.
 var fall_reason := ""            ## The one sentence the player must be able to say themselves.
 
@@ -256,6 +264,7 @@ func _physics_process(dt: float) -> void:
 
 	_step_sim(dt)
 	_read_slip()
+	_update_rig(dt)
 	_update_work(dt)
 	_animate()
 
@@ -271,6 +280,7 @@ func _read_slip() -> void:
 		work_mode = false
 		drawing = false
 		swing_power = 0.0
+		_cancel_rig()
 		_say("")
 	_slipping = now_slipping
 
@@ -317,6 +327,7 @@ func _fall_to_ground(why: String) -> void:
 	on_ladder = false
 	work_mode = false
 	drawing = false
+	_cancel_rig()
 	_shuffle = 0.0
 	_remount_block = REMOUNT_DELAY
 	_fell_from = 0.0
@@ -454,7 +465,12 @@ func _animate() -> void:
 		# he is on when he does not. A climb cycle running while the player stands still is the
 		# ladder equivalent of feet skating.
 		var climb_speed: float = jack.tuning_f("climbSpeedMetresPerSecond", 1.6)
-		var scale := clampf(absf(_climb_rate) / maxf(climb_speed, 0.01), 0.0, 2.0)
+		# Floored rather than allowed to reach zero. A speed_scale of 0 freezes the *blend* out of
+		# idle as well as the cycle, so standing still on a ladder left him halfway between the two
+		# poses with his arms out sideways — a pose neither clip contains. At a tenth speed the
+		# stride takes seventeen seconds, which reads as a man shifting his weight rather than as a
+		# man climbing, and the blend finishes.
+		var scale := clampf(absf(_climb_rate) / maxf(climb_speed, 0.01), 0.1, 2.0)
 		anim.speed_scale = -scale if _climb_rate < -0.01 else scale
 
 
@@ -467,7 +483,7 @@ func _step_sim(dt: float) -> void:
 	# `working` means a hand is off the ladder, which during a slip is not a figure of speech. Left
 	# as work_mode alone, grip recovered through the whole 900 ms — so the meter that had just run
 	# out was visibly refilling while the player scrambled for the key.
-	jack.set_context(h, 9.0, carrying_ladder, work_mode or _slipping)
+	jack.set_context(h, 9.0, carrying_ladder, work_mode or _slipping or rigging_to >= 0)
 	jack.set_exposure(2 if _slipping else (1 if on_ladder else 0))   # Hanging, Ladder, Platform
 	jack.step(dt)
 
@@ -581,9 +597,72 @@ func _pick_up() -> void:
 	_say(("ladder on your shoulder, %d dogs in the bag" % dogs_carried) if took else "nothing left to take")
 
 
+## Q asks for the next stance up the table. Getting there takes the time the table says.
+##
+## Every stance used to be instant, which quietly deleted the choice the climbing system is built
+## on — belting on cost nothing, so there was never a reason not to, and the slip-save's whole
+## clipped-or-not distinction was free. Rigging is work: a hand is off, so it drains at the stance
+## you are *leaving*, which is also what stops a climber with nothing left belting on to recover.
 func _cycle_stance() -> void:
-	jack.set_stance((jack.get_stance() + 1) % 5)
-	_say(jack.stance_name())
+	var here: int = jack.get_stance()
+	var want: int = (here + 1) % 5
+
+	if rigging_to >= 0:
+		_say("stopped rigging")
+		_cancel_rig()
+		return
+
+	if not jack.stance_needs_rigging(here, want):
+		# Dropping back down the table. Unclipping is quick, and it has to be: the fastest way out
+		# of a stance you cannot afford must never itself take five seconds.
+		jack.set_stance(want)
+		_say(jack.stance_name())
+		return
+
+	if not on_ladder:
+		_say("rig a stance on the stack, not on the ground")
+		return
+
+	rigging_to = want
+	rig_total = jack.stance_setup_seconds(want)
+	rig_left = rig_total
+	_rig_at = height_m()
+	if rig_total <= 0.0:
+		_finish_rig()
+		return
+	_say("rigging %s — %.1f s" % [jack.stance_name_of(want), rig_total])
+
+
+func _cancel_rig() -> void:
+	rigging_to = -1
+	rig_left = 0.0
+	rig_total = 0.0
+
+
+func _finish_rig() -> void:
+	var to := rigging_to
+	_cancel_rig()
+	if to >= 0:
+		jack.set_stance(to)
+		_say(jack.stance_name())
+
+
+## Tick the rigging. Moving or working breaks it — you cannot pass a rope round a stack with the
+## hand you are climbing with, and half a lashing is no lashing.
+##
+## The interrupt is "he moved", not "a climb key is down". The two are nearly the same thing and the
+## first is the one that is actually true: it does not care how he was moved, it cannot be fooled by
+## a key held against a clamp, and it is the only one a test can drive without synthesising input.
+func _update_rig(dt: float) -> void:
+	if rigging_to < 0:
+		return
+	if not on_ladder or work_mode or absf(height_m() - _rig_at) > RIG_HOLD_STILL_M:
+		_say("rigging interrupted")
+		_cancel_rig()
+		return
+	rig_left -= dt
+	if rig_left <= 0.0:
+		_finish_rig()
 
 
 # --- what the HUD asks ---------------------------------------------------------------------------

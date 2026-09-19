@@ -76,6 +76,10 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("set_stance", "stance"), &Jack::set_stance);
 	ClassDB::bind_method(D_METHOD("get_stance"), &Jack::get_stance);
 	ClassDB::bind_method(D_METHOD("stance_name"), &Jack::stance_name);
+	ClassDB::bind_method(D_METHOD("stance_name_of", "stance"), &Jack::stance_name_of);
+	ClassDB::bind_method(D_METHOD("stance_setup_seconds", "stance"), &Jack::stance_setup_seconds);
+	ClassDB::bind_method(D_METHOD("stance_needs_rigging", "from", "to"), &Jack::stance_needs_rigging);
+	ClassDB::bind_method(D_METHOD("stance_drain_rate", "stance"), &Jack::stance_drain_rate);
 
 	ClassDB::bind_method(D_METHOD("step", "dt"), &Jack::step);
 	ClassDB::bind_method(D_METHOD("grip"), &Jack::grip);
@@ -261,6 +265,31 @@ void Jack::new_shift()
 	slip.HandBackOn();
 	outcome = sj::SlipOutcome::None;
 	grab_latched = false;
+}
+
+String Jack::stance_name_of(int stance) const
+{
+	return String(StanceName(static_cast<sj::Stance>(std::clamp(stance, 0, 4))));
+}
+
+double Jack::stance_setup_seconds(int stance) const
+{
+	if (!tuning) { return 0.0; }
+	return static_cast<double>(
+		sj::grip::SetupSeconds(static_cast<sj::Stance>(std::clamp(stance, 0, 4)), *tuning));
+}
+
+bool Jack::stance_needs_rigging(int from, int to) const
+{
+	return sj::grip::NeedsRigging(static_cast<sj::Stance>(std::clamp(from, 0, 4)),
+	                              static_cast<sj::Stance>(std::clamp(to, 0, 4)));
+}
+
+double Jack::stance_drain_rate(int stance) const
+{
+	if (!tuning) { return 0.0; }
+	return static_cast<double>(
+		sj::grip::DrainRate(static_cast<sj::Stance>(std::clamp(stance, 0, 4)), context, *tuning));
 }
 
 void Jack::set_difficulty(int difficulty)

@@ -348,3 +348,58 @@ TEST_CASE("Grip: the same inputs always give the same result")
     sj::grip::Step(b, 0.2f, c, Tune());
     CHECK(a.grip == doctest::Approx(b.grip));
 }
+
+
+// ---------------------------------------------------------------- the stance table's third column
+
+TEST_CASE("Grip: rigging a stance costs the time the design doc says")
+{
+    // 02-climbing-system.md §5 gives set-up times for all five stances and the data had none of
+    // them, so every stance was instant and "do I rush this one-handed or spend eight seconds
+    // rigging?" — which that document calls the player's real choice — cost nothing to make.
+    CHECK(sj::grip::SetupSeconds(Stance::OneHand, Tune()) == doctest::Approx(0.0f));
+    CHECK(sj::grip::SetupSeconds(Stance::HookedLeg, Tune()) == doctest::Approx(1.5f));
+    CHECK(sj::grip::SetupSeconds(Stance::Clipped, Tune()) == doctest::Approx(3.0f));
+    CHECK(sj::grip::SetupSeconds(Stance::Belted, Tune()) == doctest::Approx(5.0f));
+    CHECK(sj::grip::SetupSeconds(Stance::Chair, Tune()) == doctest::Approx(20.0f));
+}
+
+TEST_CASE("Grip: a better stance always costs more to rig and less to hold")
+{
+    // The whole table is a trade, and the trade only exists if it runs the same way in both
+    // columns. A designer who lowers a drain rate without raising its set-up has made that stance
+    // strictly better than the one below it, and deleted a choice.
+    const Stance order[] = {Stance::OneHand, Stance::HookedLeg, Stance::Clipped, Stance::Belted,
+                            Stance::Chair};
+    for (int i = 1; i < 5; ++i)
+    {
+        CHECK(sj::grip::SetupSeconds(order[i], Tune())
+              > sj::grip::SetupSeconds(order[i - 1], Tune()));
+        CHECK(sj::grip::DrainRate(order[i], Busy(), Tune())
+              <= sj::grip::DrainRate(order[i - 1], Busy(), Tune()));
+    }
+}
+
+TEST_CASE("Grip: climbing.json's loose rig times agree with the stance table")
+{
+    // clipOnSeconds, beltOnSeconds and chairRigSeconds predate the table and nothing read them.
+    // Two files holding one answer eventually hold two; the table is authoritative and this is what
+    // stops the pair drifting in silence.
+    CHECK(Tune().GetF("clipOnSeconds")
+          == doctest::Approx(Tune().GetF("stanceSetupSeconds.clipped")));
+    CHECK(Tune().GetF("beltOnSeconds")
+          == doctest::Approx(Tune().GetF("stanceSetupSeconds.belted")));
+    CHECK(Tune().GetF("chairRigSeconds")
+          == doctest::Approx(Tune().GetF("stanceSetupSeconds.chair")));
+}
+
+TEST_CASE("Grip: only going up the table costs set-up time")
+{
+    // Dropping to something worse is instant. It has to be: the fastest way out of a stance you
+    // cannot afford must never itself take five seconds.
+    CHECK(sj::grip::NeedsRigging(Stance::OneHand, Stance::Belted));
+    CHECK(sj::grip::NeedsRigging(Stance::Clipped, Stance::Chair));
+    CHECK_FALSE(sj::grip::NeedsRigging(Stance::Belted, Stance::OneHand));
+    CHECK_FALSE(sj::grip::NeedsRigging(Stance::Chair, Stance::Clipped));
+    CHECK_FALSE(sj::grip::NeedsRigging(Stance::Belted, Stance::Belted));
+}

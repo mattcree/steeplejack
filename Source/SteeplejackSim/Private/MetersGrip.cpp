@@ -55,6 +55,26 @@ float MaxGrip(const MeterContext& ctx, const Tuning& t) noexcept
     return std::min(full, t.GetF("gripModifiers.coldMaxCap"));
 }
 
+float SetupSeconds(Stance stance, const Tuning& t) noexcept
+{
+    switch (stance)
+    {
+    case Stance::OneHand:   return t.GetF("stanceSetupSeconds.oneHand");
+    case Stance::HookedLeg: return t.GetF("stanceSetupSeconds.hookedLeg");
+    case Stance::Clipped:   return t.GetF("stanceSetupSeconds.clipped");
+    case Stance::Belted:    return t.GetF("stanceSetupSeconds.belted");
+    case Stance::Chair:     return t.GetF("stanceSetupSeconds.chair");
+    }
+    return t.GetF("stanceSetupSeconds.oneHand");   // unreachable; the free one is the safe default
+}
+
+bool NeedsRigging(Stance from, Stance to) noexcept
+{
+    // The enum is ordered worst-to-best (Types.h says so and the static_asserts hold it), so
+    // "better" is just "greater" and this does not need its own table to fall out of step with.
+    return static_cast<uint8_t>(to) > static_cast<uint8_t>(from);
+}
+
 float DrainRate(Stance stance, const MeterContext& ctx, const Tuning& t) noexcept
 {
     float rate = t.GetF(DrainKeyFor(stance));
