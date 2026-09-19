@@ -213,6 +213,8 @@ var _rung_count := 0
 var climb_input := 0.0
 ## The same for walking: x is right, y is forward, relative to the camera. For a test that plays.
 var walk_input := Vector2.ZERO
+## And for shuffling on the ladder: +1 is D, which must be right as the player sees it.
+var side_input := 0.0
 ## And for looking: a world point to aim at instead of the camera's ray. INF when unused.
 var aim_override := Vector3.INF
 var _carried_ladder: Node3D      ## the section on his back, shown only while he is carrying one
@@ -781,6 +783,8 @@ func _climb(dt: float, ladder_world: Vector3) -> void:
 	if climb_input != 0.0:
 		up = climb_input
 	var side := _key(KEY_D) - _key(KEY_A)
+	if side_input != 0.0:
+		side = side_input
 
 	# Frozen: 03-meters-grip-nerve.md, "you cannot move up. You can only descend, or recover nerve
 	# in place." Nerve never kills you; it stops you, at the height it gave out, and the only ways
@@ -833,7 +837,10 @@ func _climb(dt: float, ladder_world: Vector3) -> void:
 	var out := held - chimney.global_position
 	out.y = 0.0
 	out = out.normalized()
-	var tangent := Vector3(-out.z, 0.0, out.x)
+	# Screen-right for a view facing the wall. It was the other sign, so D walked him left and A
+	# right — reported by the first person to play it, and invisible to a test that set _shuffle
+	# directly instead of pressing the key.
+	var tangent := Vector3(out.z, 0.0, -out.x)
 	global_position = held + out * BODY_OFF_LADDER + tangent * _shuffle
 	body.global_rotation.y = _face(-out)   # into the brickwork, not away from it
 

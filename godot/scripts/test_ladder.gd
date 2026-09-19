@@ -73,6 +73,38 @@ func _init() -> void:
 		await physics_frame
 	_check(not player.on_ladder, "and standing back at the foot does not instantly re-grab you")
 
+	# D moves him right as the player sees it, A left. Through the key's own path (side_input) and
+	# judged on screen, because the bug was a sign in world space: D walked him left.
+	player.on_ladder = true
+	player._shuffle = 0.0
+	player._remount_block = 0.0
+	var ch: Node3D = chimney
+	var rung3: Vector3 = ch.global_position + ch.face_point(3.0)
+	var away: Vector3 = rung3 - ch.global_position
+	away.y = 0.0
+	player.global_position = rung3 + away.normalized() * player.BODY_OFF_LADDER
+	player.set_height_m(3.0)
+	player.face_the_wall()
+	for i in 90:
+		await physics_frame   # the camera eases round to the wall
+	# The camera rides on him, so he never moves on screen; what matters is which way he moves
+	# along the camera's own right-hand axis.
+	var right: Vector3 = player.camera.global_transform.basis.x
+	var p0: Vector3 = player.global_position
+	player.side_input = 1.0
+	for i in 12:
+		await physics_frame
+	player.side_input = 0.0
+	var p1: Vector3 = player.global_position
+	var went: float = (p1 - p0).dot(right)
+	_check(player.on_ladder and went > 0.02, "D shuffles him to the right as the player sees it (%.2f m)" % went)
+	player.side_input = -1.0
+	for i in 24:
+		await physics_frame
+	player.side_input = 0.0
+	var back: float = (player.global_position - p1).dot(right)
+	_check(back < -0.02, "and A to the left (%.2f m)" % back)
+
 	# Shuffling sideways works you off the stile. It has to accumulate; recomputing it from the key
 	# each frame meant you never got further than one step.
 	for i in 30:
