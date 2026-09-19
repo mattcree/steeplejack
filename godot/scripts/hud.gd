@@ -95,7 +95,7 @@ func _draw() -> void:
 	# Only once there is something to span *from*. With no dogs driven, the span is measured from
 	# the ground and reads "62.0 m span — about to buckle" at the top of a ladder that is lashed all
 	# the way down. True, useless, and permanently on screen in alarm red.
-	if player.span_warning != "" and jack.anchor_count() > 0 and not player.at_top:
+	if player.span_warning != "" and jack.anchor_count() > 0 and not player.at_top and player.on_ladder:
 		var buckle: bool = player.span_warning.contains("buckle")
 		var col := Color(0.95, 0.30, 0.22, 0.6 + 0.4 * sin(now * 7.0)) if buckle else Color(0.92, 0.70, 0.35, 0.9)
 		_label(player.span_warning, Vector2(info_x, hand.y + 42), col, 13)
@@ -149,6 +149,8 @@ func _draw() -> void:
 	if player.jack.slip_in_progress():
 		_draw_slip(jack)
 
+	_draw_fall_cut()
+
 	# There is no objective marker because the objective is the top and you can see it. But you
 	# cannot see the *rule*, so it is said once and then never again.
 	if player._now < 14.0 and not player.at_top:
@@ -157,7 +159,7 @@ func _draw() -> void:
 
 
 func _next_step() -> String:
-	if player.at_top or player.recovering != player.REC_NONE:
+	if player.at_top or player.recovering != player.REC_NONE or player.falling or player.fade_in > 0.3:
 		return ""
 	if player.jack.slip_in_progress():
 		return ""
@@ -189,7 +191,7 @@ func _next_step() -> String:
 
 ## [key, verb, available, why-not]
 func _affordances() -> Array:
-	if player.at_top:
+	if player.at_top or player.falling or player.fade_in > 0.3:
 		return []
 	if player.jack.slip_in_progress():
 		return [["SPACE", "grab", true, ""]]
@@ -357,6 +359,24 @@ func _draw_pip(jack: Jack) -> void:
 			_: v = exp(-u * 11.0) + (0.55 * exp(-(u - 0.3) * 7.0) if u > 0.3 else 0.0)   # rattle
 		env.append(base + Vector2(u * w, -v * 14.0))
 	draw_polyline(env, Color(c.r, c.g, c.b, a * 0.8), 2.0)
+
+
+## The cut to black, and the one sentence. The fairness contract: "the player must always be able
+## to say, in one sentence, why that went wrong." So the sentence is on the black, in the sim's own
+## words, before anything else happens — and then the next morning, and the stack still standing.
+func _draw_fall_cut() -> void:
+	var black: float = player.fall_black
+	var back: float = player.fade_in
+	if black > 0.0:
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, black))
+		if black >= 1.0:
+			var y := size.y * 0.42
+			_centre("You fell %.0f m." % player.fall_from_m, y, Color(0.95, 0.93, 0.90, 0.95), 28)
+			_centre(player.fall_reason, y + 38.0, Color(0.86, 0.84, 0.80, 0.9), 16)
+	elif back > 0.0:
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, clampf(back, 0.0, 1.0)))
+		_centre("The next morning. Your stack is still up there.", size.y * 0.42,
+			Color(0.95, 0.93, 0.90, clampf(back * 1.4, 0.0, 0.95)), 18)
 
 
 ## Getting nerve back: a ring round the nerve arc filling as it comes, with what it is.

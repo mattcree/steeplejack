@@ -29,7 +29,9 @@ const BOOM_LENGTH := 4.0
 const BOOM_SIDE := 0.65
 const WORK_BOOM_LENGTH := 1.4        ## 11-camera-controls-feel.md, "pulls in to 1.4 m"
 const WORK_BOOM_SIDE := 0.55
-const TOP_BOOM_LENGTH := 4.0         ## 11-camera-controls-feel.md, "pulls out to 4 m"
+const TOP_BOOM_LENGTH := 4.0
+const FALL_BOOM_LENGTH := 6.5
+const FALL_FOV_WIDEN := 16.0         ## 11-camera-controls-feel.md, "pulls out to 4 m"
 ## How fast the camera settles on a new framing. Quick enough to be there before the first blow.
 const CAMERA_SETTLE := 7.0
 
@@ -186,6 +188,23 @@ var _blend_left := 0.0           ## Real seconds of clip blend still to run.
 ## Stands in for W/S when non-zero. A headless test cannot press a key, and a test of "frozen stops
 ## you climbing" that cannot press the climb key passes whether the rule works or not.
 var climb_input := 0.0
+var _carried_ladder: Node3D      ## the section on his back, shown only while he is carrying one
+
+## The fall — 02-climbing-system.md §6 and CAM-002: "Camera goes wide, time dilates ~40%, the ladder
+## stack you built streaks past you, and it cuts to black before impact."
+var falling := false
+var fall_from_m := 0.0
+var fall_black := 0.0            ## 0..1, the cut
+var fade_in := 0.0               ## 1..0, coming back the next day
+var _fall_t := 0.0
+var _black_held := 0.0
+const FALL_TIME_SCALE := 0.6
+const FALL_CUT_ABOVE := 3.0      ## metres off the ground at which it cuts. Before impact, always.
+const FALL_LONGEST := 2.4        ## game seconds, whatever the height
+const FALL_BLACK_HOLD := 1.4
+## A11Y-001 / CAM-002 acceptance 4: no slow motion and no camera snap, just the cut. For players the
+## wide spinning fall would make ill — and it must not change a single outcome, only what is shown.
+var motion_minimal := false
 var _kick := 0.0                 ## Camera impulse from a hammer blow, decaying.
 var _cam_yaw := 0.0              ## Where the camera actually is, easing towards where it wants to be.
 var _cam_pitch := -0.1
@@ -247,6 +266,7 @@ func _ready() -> void:
 	if skel != null:
 		ClimbClip.install(anim, skel)
 		_give_hammer(skel)
+		_carried_ladder = _make_carried_ladder(skel)
 	if face != null:
 		face.jack = jack
 
@@ -391,7 +411,9 @@ func _physics_process(dt: float) -> void:
 	if on_ladder and not within_reach:
 		_step_off("off the ladder")
 
-	if at_top:
+	if falling and fall_black > 0.0:
+		velocity = Vector3.ZERO
+	elif at_top:
 		_on_top(dt)
 	elif work_mode or lashing:
 		velocity = Vector3.ZERO
@@ -409,6 +431,11 @@ func _physics_process(dt: float) -> void:
 	_update_lash(dt)
 	_update_stack(dt)
 	_update_recovery()
+	_update_fall(dt)
+	if _carried_ladder != null:
+		# On his back whenever he has one and is not holding it up to lash it — then it is the
+		# translucent section on the stack instead, and it cannot be in two places.
+		_carried_ladder.visible = carrying_ladder and not lashing
 	_animate()
 
 
@@ -447,7 +474,7 @@ func _came_off() -> void:
 	var r: Dictionary = jack.fall(height_m())
 
 	if not r.get("tied_on", false):
-		_fall_to_ground("you had one hand on a rung and nothing else. Nothing caught you.")
+		_begin_fall("you had one hand on a rung and nothing else. Nothing caught you.")
 		return
 
 	for h in r.get("cascade", []):
@@ -466,7 +493,7 @@ func _came_off() -> void:
 			r["shock_kn"], r["capacity_kn"]])
 		return
 
-	_fall_to_ground("the dog let go: %.1f kN of shock load on one rated %.1f kN." % [
+	_begin_fall("the dog let go: %.1f kN of shock load on one rated %.1f kN." % [
 		r["shock_kn"], r["capacity_kn"]])
 
 
@@ -475,7 +502,9 @@ func _came_off() -> void:
 ## climb what you already built.
 func _fall_to_ground(why: String) -> void:
 	fall_reason = why
-	_say("%s You come back the next day — your stack is still up there." % why)
+	# Said on the black, by the fall card, and again as the next morning comes up. A third time here
+	# would be the same sentence under the other two.
+	_say("")
 	jack.new_shift()
 	global_position = _spawn
 	velocity = Vector3.ZERO
@@ -566,8 +595,12 @@ func _walk(dt: float) -> void:
 	var was_airborne := not is_on_floor()
 	move_and_slide()
 
+	# Off the ladder and dropping further than a man survives: it becomes the fall, and it cuts to
+	# black before he lands, rather than being discovered on landing.
+	if not is_on_floor() and not falling and _fell_from - height_m() > KILLING_FALL:
+		_begin_fall("you let go at %.0f m." % _fell_from)
 	if is_on_floor():
-		if was_airborne and _fell_from - height_m() > KILLING_FALL:
+		if was_airborne and not falling and _fell_from - height_m() > KILLING_FALL:
 			_fall(_fell_from - height_m())
 		_fell_from = height_m()
 
@@ -602,6 +635,59 @@ func _let_go() -> void:
 
 func _fall(metres: float) -> void:
 	_fall_to_ground("you dropped %.0f m onto hard ground." % metres)
+
+
+## He is off, and nothing is going to catch him.
+func _begin_fall(why: String) -> void:
+	if falling:
+		return
+	falling = true
+	fall_reason = why
+	fall_from_m = maxf(_fell_from, height_m())
+	_fall_t = 0.0
+	_black_held = 0.0
+	fall_black = 0.0
+	on_ladder = false
+	work_mode = false
+	drawing = false
+	_cancel_rig()
+	if lashing:
+		_abandon_lash("")
+	if recovering != REC_NONE:
+		jack.recover_interrupt()
+		recovering = REC_NONE
+	# A little way off the wall, so he falls past the stack rather than scraping down it.
+	var out := global_position - chimney.global_position
+	out.y = 0.0
+	velocity = out.normalized() * 1.6
+	_say("")
+	if not motion_minimal:
+		Engine.time_scale = FALL_TIME_SCALE
+	if foley != null:
+		foley.cue("gustTell", 0.7)   # the rush of it; the same noise as wind arriving, lower
+
+
+func _update_fall(dt: float) -> void:
+	if not falling:
+		fade_in = move_toward(fade_in, 0.0, dt * 0.8)
+		return
+	_fall_t += dt
+	# Cut before impact, always. The design is explicit, and there is nothing to be gained by showing
+	# the landing that the player would not rather imagine.
+	if fall_black <= 0.0 and (height_m() < FALL_CUT_ABOVE or _fall_t > FALL_LONGEST
+			or is_on_floor() or motion_minimal):
+		fall_black = 0.01
+		Engine.time_scale = 1.0
+		velocity = Vector3.ZERO
+	if fall_black > 0.0:
+		fall_black = minf(1.0, fall_black + dt * 8.0)
+		velocity = Vector3.ZERO
+		_black_held += dt
+		if _black_held >= FALL_BLACK_HOLD:
+			falling = false
+			fall_black = 0.0
+			fade_in = 1.0
+			_fall_to_ground(fall_reason)
 
 
 ## The yaw that points the model along `dir`.
@@ -955,7 +1041,18 @@ func _update_camera(dt: float) -> void:
 		pitch = -0.12
 		length = 3.2
 
+	# The fall camera: snaps wide, character centred, the stack in frame above him as he drops past
+	# it. The one camera that *snaps* rather than eases — a fall is not a moment for a gentle pan.
+	var snap := false
+	if falling and not motion_minimal and fall_black <= 0.0:
+		length = FALL_BOOM_LENGTH
+		pitch = 0.22
+		side = 0.0
+		snap = true
+
 	var fov := _base_fov
+	if falling and not motion_minimal:
+		fov = _base_fov + FALL_FOV_WIDEN
 	if at_top:
 		length = TOP_BOOM_LENGTH
 		fov = _base_fov + TOP_FOV_WIDEN
@@ -964,6 +1061,8 @@ func _update_camera(dt: float) -> void:
 
 	var slow: bool = at_top or recovering == REC_TEA
 	var k := clampf(dt * (CAMERA_SETTLE * 0.25 if slow else CAMERA_SETTLE), 0.0, 1.0)
+	if snap:
+		k = clampf(dt * 20.0, 0.0, 1.0)
 	_cam_yaw = lerp_angle(_cam_yaw, yaw, k)
 	_cam_pitch = lerpf(_cam_pitch, pitch, k)
 	boom.rotation = Vector3(_cam_pitch, _cam_yaw, 0.0)
@@ -1208,6 +1307,51 @@ func _dust_at(id: int, amount: int) -> void:
 	p.global_position = (j["pos"] as Vector3) + chimney.global_position + (j["normal"] as Vector3) * 0.03
 	p.emitting = true
 	get_tree().create_timer(1.5).timeout.connect(p.queue_free)
+
+
+## A ladder section across his back.
+##
+## Camera and feel's first non-negotiable: "A ladder section on his back changes his silhouette
+## and his gait." It was a line of HUD text — "ladder on your shoulder" — and nothing else, so
+## the thing he had walked to the cradle for, and would walk back down for, was invisible. Five
+## metres of it, slung diagonally, sticking out well past him either side, because that is what
+## five metres of ladder does.
+func _make_carried_ladder(skel: Skeleton3D) -> Node3D:
+	var att := BoneAttachment3D.new()
+	att.bone_name = "spine_02"
+	skel.add_child(att)
+
+	var root := Node3D.new()
+	# On the right shoulder, running fore and aft along the way he walks, front end a little up so it
+	# clears the ground. Slung across his back it swept the ground behind him like a boom.
+	root.position = Vector3(-0.20, 0.30, 0.0)
+	root.rotation = Vector3(deg_to_rad(78.0), 0.0, 0.0)
+	att.add_child(root)
+
+	var wood := StandardMaterial3D.new()
+	wood.albedo_color = Color(0.46, 0.33, 0.19)
+	wood.roughness = 0.9
+	var length := 5.0
+	for side in [-0.22, 0.22]:
+		var rail := MeshInstance3D.new()
+		var rm := BoxMesh.new()
+		rm.size = Vector3(0.06, length, 0.06)
+		rm.material = wood
+		rail.mesh = rm
+		rail.position = Vector3(0.0, 0.0, side)
+		root.add_child(rail)
+	var h := -length * 0.5 + 0.28
+	while h < length * 0.5:
+		var rung := MeshInstance3D.new()
+		var gm := BoxMesh.new()
+		gm.size = Vector3(0.045, 0.045, 0.44)
+		gm.material = wood
+		rung.mesh = gm
+		rung.position = Vector3(0.0, h, 0.0)
+		root.add_child(rung)
+		h += 0.28
+	att.visible = false
+	return att
 
 
 ## A hammer in his right hand. He was tapping and driving with nothing in it.

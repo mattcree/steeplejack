@@ -25,6 +25,7 @@
 #   tieoff           tie the lashing off
 #   top              all the way up, and onto the cap
 #   tea              belt on and brew up
+#   fall             come off, untied, from where he is
 #   stance <0-4>     one hand / hooked leg / clipped / belted / chair
 #   strain <g> <n>   drained meters, to see the telegraphs
 #   slip             grip to nothing, so the slip window is open
@@ -178,6 +179,9 @@ func _run(cmd: String) -> void:
 			player._arrive_at_top()
 			player._cam_yaw = player._yaw
 			player._cam_pitch = player._pitch
+		"fall":
+			# Off, untied, from where he is — through the real fall.
+			player._begin_fall("you had one hand on a rung and nothing else. Nothing caught you.")
 		"tea":
 			jack.set_stance(3)
 			player._recover(player.REC_TEA)

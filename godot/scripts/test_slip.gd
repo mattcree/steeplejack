@@ -78,6 +78,12 @@ func _init() -> void:
 	_check(fell, "the second slip inside a minute falls him with no window at all")
 	_check(jack.slip_window_left() <= 0.0, "and there was never anything to grab at")
 	_check(player.fall_reason != "", "and he is told why: %s" % player.fall_reason)
+	# The fall plays out — the drop, the cut to black, the card — before the next morning.
+	for i in 900:
+		if not player.falling:
+			break
+		await physics_frame
+	_check(not player.falling, "the fall plays out and ends")
 	_check(player.height_m() < 2.0, "back at the cradle, not in the air (%.1f m)" % player.height_m())
 
 	# **The whole point.** The structure is the checkpoint and a fall may not touch it.
