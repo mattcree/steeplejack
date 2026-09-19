@@ -22,6 +22,7 @@ const ARM_REACH := 0.85          ## shoulder to hammer face
 const LEAN_MAX := 0.75           ## the most he shifts on the rungs to get there
 const LEAN_RATE := 14.0          ## fast enough to arrive before the tap's contact at 0.16 s
 const CHECKPOINT_EVERY := 2.0    ## seconds between looks at whether the stack changed
+const CLIMB_IN := 0.10           ## how much closer to the rungs the drawn body hangs on the ladder
 const RAIL_HALF := 0.22          ## half the gap between the stiles; chimney.gd's RAIL_GAP / 2
 const WALL_FOLLOW_DELAY := 1.5   ## seconds after the mouse last moved before the ladder view squares up
 const WALL_FOLLOW_RATE := 1.2    ## how fast it does, per second — a drift, not a snap
@@ -194,6 +195,7 @@ var checkpoint_path := ""
 var _checkpointing := false      ## only in the real game, never in a test or a shot
 var _ckpt_saved := ""            ## what is on disk, so an unchanged stack is not rewritten
 var _ckpt_clock := 0.0
+var grip: RungGrip                ## hands and feet on the rungs
 var _gear: Node3D                ## the stance, made visible: clip line, belt, chair
 var _body_base := Vector3.ZERO   ## the body's resting place under the player; the lean is added to it
 var _lean := Vector3.ZERO        ## world-space shift towards the joint being tapped or worked
@@ -325,6 +327,10 @@ func _ready() -> void:
 		ClimbClip.install(anim, skel)
 		_give_hammer(skel)
 		_carried_ladder = _make_carried_ladder(skel)
+		grip = RungGrip.new()
+		grip.name = "RungGrip"
+		add_child(grip)
+		grip.setup(self, chimney, skel)
 	if face != null:
 		face.jack = jack
 		for i in jack.anchor_count():
@@ -692,6 +698,7 @@ func _physics_process(dt: float) -> void:
 		_carried_ladder.visible = carrying_ladder and not lashing
 	_animate()
 	_update_lean(dt)
+	_update_grip(dt)
 	_update_gear()
 	_update_checkpoint(dt)
 
@@ -1014,7 +1021,15 @@ func _update_lean(dt: float) -> void:
 			if short > 0.0:
 				want = need.normalized() * minf(short, LEAN_MAX)
 	_lean = _lean.lerp(want, clampf(dt * LEAN_RATE, 0.0, 1.0))
-	body.position = _body_base + global_transform.basis.inverse() * _lean
+	# On the ladder the drawn body hangs CLIMB_IN closer to the rungs than the capsule does. At the
+	# capsule's 0.40 m the hips were further from a rung at foot level than a leg is long, and the
+	# feet could not reach the ladder they were standing on.
+	var climb_in := Vector3.ZERO
+	if on_ladder and not falling and not at_top:
+		climb_in = -_wall_out() * CLIMB_IN
+		if grip != null:
+			climb_in -= Vector3.UP * grip.body_drop()   # settled onto the top rung (rung_grip.gd)
+	body.position = _body_base + global_transform.basis.inverse() * (_lean + climb_in)
 
 
 func _animate() -> void:
@@ -1064,17 +1079,10 @@ func _animate() -> void:
 	if want == "climb" and _blend_left > 0.0:
 		anim.speed_scale = 1.0
 	elif want == "climb":
-		# The cycle follows the ladder, not the clock: he reaches when he moves and holds the rung
-		# he is on when he does not. A climb cycle running while the player stands still is the
-		# ladder equivalent of feet skating.
-		var climb_speed: float = jack.tuning_f("climbSpeedMetresPerSecond", 1.6)
-		# Floored rather than allowed to reach zero. A speed_scale of 0 freezes the *blend* out of
-		# idle as well as the cycle, so standing still on a ladder left him halfway between the two
-		# poses with his arms out sideways — a pose neither clip contains. At a tenth speed the
-		# stride takes seventeen seconds, which reads as a man shifting his weight rather than as a
-		# man climbing, and the blend finishes.
-		var scale := clampf(absf(_climb_rate) / maxf(climb_speed, 0.01), 0.1, 2.0)
-		anim.speed_scale = -scale if _climb_rate < -0.01 else scale
+		# Held still once the blend into it is done. The hands and feet are on the rungs by IK now
+		# (rung_grip.gd), and a cycle running underneath them only made the torso and the unheld
+		# limbs pump in time with nothing — the canned-animation look this replaced.
+		anim.speed_scale = 0.0
 
 
 func _key(k: Key) -> float:
@@ -2145,6 +2153,20 @@ func _pick_up() -> void:
 		ladders_at_base -= 1
 		took = true
 	_say(("ladder on your shoulder, %d dogs in the bag" % dogs_carried) if took else "nothing left to take")
+
+
+## Hands and feet on the rungs. The hammer hand lets go to tap, strike, lash or haul, and while a
+## slip is open, because that is the hand that came off.
+func _update_grip(dt: float) -> void:
+	if grip == null:
+		return
+	var climbing := on_ladder and not falling and not at_top
+	# Busy while the swing is actually happening — the clip playing — not for the whole of
+	# tapTestSeconds: the tap clip is over in 0.42 s, and for the rest of the 0.8 the arm hung out
+	# sideways in the frozen climb pose, holding nothing.
+	var right_busy: bool = work_mode or lashing or hauling or _slipping \
+		or (_playing in ["tap", "strike", "windup"] and anim.is_playing())
+	grip.update(dt, climbing, [not lashing, not right_busy, true, true])
 
 
 ## The stance, where you can see it. Q used to change a word in the corner of the HUD and nothing
