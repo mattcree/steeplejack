@@ -4,7 +4,7 @@ title: Sim coverage gate
 milestone: M1
 discipline: [ENG]
 estimate_days: 1
-status: ready
+status: review
 assignee: null
 depends_on: [METER-005, CLIMB-006, VERB-007, CORE-009, VERB-002]
 owns:
@@ -44,4 +44,23 @@ No coverage requirement on `game/`.
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**What changed:** `tools/coverage.py` existed but could not have failed.
+
+- **It passed when it measured nothing.** "gcov produced no data" and "no gcov installed" both
+  exited 0, and it did produce no data: it pointed gcov at the wrong object directory. Both now
+  fail, the same rule as test-unit's zero-match filter (TEST-003).
+- **The total was an unweighted mean of per-file percentages,** so a 2-line header counted as
+  much as the 240-line JSON reader. It is now covered lines over total lines.
+- Measurement uses gcov's JSON over the sim library's own data files only. A header compiled
+  into several units counts a line covered if any unit ran it. Stale `.gcda` counts from an
+  earlier run are cleared first, and `build-coverage/` is gitignored.
+
+1. Only `Source/SteeplejackSim` is measured: the library's objects, filtered to that path.
+2. `--gate 99` exits 1 and the default 90 exits 0 (checked by hand; there is no automated test).
+3. Per file, worst first, with covered/total lines, so a regression is attributable.
+4. About 20 s, including the instrumented build.
+5. **Coverage at handoff: 94.2%, 1872 of 1988 lines.** The lowest `.cpp` files are Recovery.cpp
+   (84.4%) and Stack.cpp (89.2%).
+
+**Follow-ups:** it runs in CI's sim job (`python3 tools/coverage.py`), not in `make check`, whose
+budget is a second.
