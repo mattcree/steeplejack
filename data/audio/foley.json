@@ -81,8 +81,9 @@
     "gustHz": 0.21,
     "gustDepth": 0.55,
     "_comment": "A filtered noise bed. Its level is the height mix: AUD-003 wants the ground to go quiet and the wind to take over as you climb, because that is most of what altitude sounds like.",
-    "groundDb": -34.0,
-    "topDb": -11.0,
+    "_levels": "Was -34 to -11 dB, and at height it drowned the taps it exists to sit under: the first player to hear it called it way too loud. Now 13 dB down, so a tap (-6 dB peak) stands 18 dB clear of the wind at the top.",
+    "groundDb": -42.0,
+    "topDb": -24.0,
     "refHeightM": 60.0
   }
 }
