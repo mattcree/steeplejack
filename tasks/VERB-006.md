@@ -4,7 +4,7 @@ title: Lash input alternatives (rotate / mash / hold)
 milestone: M1
 discipline: [ENG]
 estimate_days: 0.5
-status: ready
+status: review
 assignee: null
 depends_on: [VERB-005]
 owns:
@@ -43,4 +43,24 @@ Do not extend this to other verbs yet — the general hold-to-toggle system is A
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**What changed:** under ADR-0006 the input layer is `player.gd` (`_lash_input`,
+`LASH_METHODS`, **L** to cycle), not `LashInput.cpp`/`.h`. That is the declared deviation from
+`owns`. The sim side is `lash::RateFromMash` and `lash::RateFromHold`.
+
+1. and 2. "Lash: VERB-006 acceptance 1 and 2" drives rotate, mash (four presses a second) and
+   hold each to six wraps, and each must tie off as a Full lashing with nothing slipping. That
+   is the same end state, but **not the same tension curve over time**, which is how
+   acceptance 2 reads. Nothing compares the curves, and hold is deliberately slower (next
+   point). A reviewer should decide whether "reachable" means the end state (as tested) or the
+   curve.
+3. `test_lash_game.gd` switches method mid-lash and checks every turn already on stays on.
+4. There is no difficulty setting in this build. **L** works in every state with no message
+   other than the method's name and how to use it.
+
+**Decisions made:** hold is slower than an expert's rotation and faster than a bad one. That
+is the task's own context ("never the best way, never a punishment"), and "Lash: holding is
+slower than a good hand and faster than a bad one" asserts it. Every method finishes as a Full
+lashing, so none of them makes a worse lashing, only a slower or faster one.
+
+**Follow-ups:** a visible list of the three methods in the F1 options, so the setting can be found
+before the first lashing. It is only discoverable from the lash HUD now.

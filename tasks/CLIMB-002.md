@@ -4,7 +4,7 @@ title: Load sharing and cascade failure
 milestone: M1
 discipline: [ENG]
 estimate_days: 2
-status: ready
+status: blocked
 assignee: null
 depends_on: [CLIMB-001]
 owns:
@@ -72,4 +72,12 @@ tuning target to fit an acceptance range written from a mental approximation of 
 wrong way round.
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**What changed:** built inside `Stack.h`/`Stack.cpp`, with the tests in
+`tests/unit/test_stack.cpp`, not `Load.h`/`Load.cpp`/`test_load.cpp`. Load sharing and cascade
+act on the stack's own anchors, and a separate module would have had to mirror them. That is the
+declared deviation from `owns`. Criteria 1 and 3–6 are the "Stack: acceptance N" tests in the
+CLIMB-002 block. Criterion 2 is the open question above, and it has a test that documents it
+rather than a range check.
+
+**Status is `blocked`** only so that it matches BLOCKED.md. Everything is built, and the answer
+changes one tuning number or one acceptance line.

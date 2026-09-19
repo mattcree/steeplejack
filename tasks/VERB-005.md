@@ -4,7 +4,7 @@ title: Lash verb: wraps, tension, hitch vs full
 milestone: M1
 discipline: [ENG]
 estimate_days: 2
-status: ready
+status: review
 assignee: null
 depends_on: [VERB-004]
 owns:
@@ -59,4 +59,17 @@ Input mapping and accessibility alternatives are VERB-006.
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**What changed:** `Verbs/Lash.h`/`Lash.cpp` and `tests/unit/test_lash.cpp`, as owned.
+The five criteria are the five tests named "Lash: acceptance N". The game side is `_lash()` and
+`lash_mouse()` in `player.gd`, and the rope coil on the dog in `face.gd`. It is covered by
+`test_lash_game.gd`.
+
+**Decisions made:** the lay rate is a tanh of turns per second, so going round faster than
+ideal gains less and less, and jerky input really is slower (acceptance 2 holds at 40%+).
+Tension bleeds when you stop. The walk-off distance is tuning (`lashHitchWalkOffCm` 15).
+
+**Surprises:** the first game-side input counted a straight back-and-forth waggle as full turns.
+`wrapf` maps both halves of a reversal to −π, so waving the mouse lashed faster than circling.
+Turns of 90° or more in one move are now discarded, and test_lash_game.gd has a check for it.
+
+**Follow-ups:** none.

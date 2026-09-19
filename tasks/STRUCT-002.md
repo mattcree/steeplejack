@@ -4,7 +4,7 @@ title: Joint grid generation from band definitions
 milestone: M0
 discipline: [ENG]
 estimate_days: 2
-status: ready
+status: review
 assignee: null
 depends_on: [CORE-008, CORE-003]
 owns:
@@ -58,4 +58,19 @@ No visual representation — the brick shader reads this later. No occupancy log
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**What changed:** the grid is `Source/SteeplejackSim/Public/JointGrid.h` and
+`Private/JointGrid.cpp`, and the tests are `tests/unit/test_joint_grid.cpp`, not
+`Joints.h`/`Joints.cpp`/`test_joints.cpp`. Those are the declared deviations from `owns`. The six
+acceptance criteria are six tests named "JointGrid: acceptance 1" to "6". Nine more cover
+clustering, the visual tell's reliability per band, forced joints and the old fixtures.
+
+**Decisions made:** each band's tiers are stratified, not drawn independently. A band of 40
+joints gets its authored proportions to the joint, which is what makes acceptance 2's "within 2%"
+hold on short bands. The visual tell (`Apparent`) is only as good as the band's
+`visualReadReliability`, and the misreads are seeded, so the same joint lies the same way every
+time. The grid is generated on its own fork of the level seed (acceptance 6).
+
+**Surprises:** authored joints (`forceCrackedAt`) overwrote each other when two fell in one
+course. They are collected first and placed after.
+
+**Follow-ups:** none.

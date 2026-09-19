@@ -4,7 +4,7 @@ title: Ladder stack: spans, flex bands, buckling
 milestone: M1
 discipline: [ENG]
 estimate_days: 2
-status: ready
+status: review
 assignee: null
 depends_on: [VERB-005]
 owns:
@@ -60,4 +60,19 @@ Load sharing and cascade are CLIMB-002. Serialisation is CLIMB-006. The flex sha
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**What changed:** `Stack.h`/`Stack.cpp` and `tests/unit/test_stack.cpp`, as owned.
+The six criteria are the six tests named "Stack: acceptance N" in the CLIMB-001 block. The
+stack also covers CLIMB-002's load sharing and cascade (see that task). In the game,
+`Jack.stack_*` drives the chimney's ladder, the bow of an over-long section and the buckle
+countdown on the HUD.
+
+**Decisions made:** flex is a power law (`ladderFlexCoeffMPerKN` 0.0000447,
+`ladderFlexExponent` 4.5), fitted to acceptance 4: 60–90 mm at 5 m under 1.2 kN and under 10 mm
+at 3 m. A section only carries load if a ladder is lashed to its anchors (`InStructure`). Before
+that rule, a dog driven and never used took a share of the climber.
+
+**Surprises:** spans were first measured from the last *driven* dog rather than the top of the
+lashed structure, so a player who drove a spare dog below the top saw the wrong span.
+`TopOfStructure` fixed it.
+
+**Follow-ups:** none.
