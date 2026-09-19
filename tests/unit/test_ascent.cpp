@@ -7,12 +7,15 @@
 #include "doctest.h"
 
 #include "Anchor.h"
+#include "Json.h"
 #include "Tuning.h"
 #include "Verbs/Hammer.h"
 #include "Verbs/Tap.h"
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
+#include <sstream>
 #include <vector>
 
 using sj::AnchorRate;
@@ -81,6 +84,40 @@ TEST_CASE("Tap: every reading carries a shape, never only a sound or a colour")
     // for a player who cannot hear the difference.
     std::sort(shapes.begin(), shapes.end());
     CHECK(std::unique(shapes.begin(), shapes.end()) == shapes.end());
+}
+
+TEST_CASE("Tap: VERB-001 acceptance 1, bare-handed, a tap reads the joint's true tier")
+{
+    for (float q = 0.0f; q <= 1.0f; q += 0.01f)
+    {
+        CAPTURE(q);
+        CHECK(sj::tap::Tap(OfQuality(q), Tune(), false).tier == sj::tap::TierOf(q, Tune()));
+    }
+}
+
+TEST_CASE("Tap: VERB-001 acceptance 3, every tap sound is a cue in the foley bank")
+{
+    // The id names a key in data/audio/foley.json's `taps`, which is what foley.gd renders. Before
+    // this test the ids ("tap_ring", ...) named nothing anywhere; the game picked by tier and the
+    // id was decoration.
+    namespace fs = std::filesystem;
+    fs::path here = fs::current_path();
+    while (!fs::exists(here / "data" / "audio" / "foley.json") && here.has_parent_path() &&
+           here != here.parent_path())
+    {
+        here = here.parent_path();
+    }
+    std::ifstream in(here / "data" / "audio" / "foley.json");
+    REQUIRE(in.good());
+    std::stringstream text;
+    text << in.rdbuf();
+    const sj::JsonValue foley = sj::JsonValue::Parse(text.str(), "foley.json");
+    for (const float q : {0.05f, 0.25f, 0.55f, 0.90f})
+    {
+        const std::string id(sj::tap::Tap(OfQuality(q), Tune(), false).soundId);
+        CAPTURE(id);
+        CHECK(foley.At("taps").Has(id));
+    }
 }
 
 TEST_CASE("Tap: gloves cost resolution, and they err in the dangerous direction")

@@ -4,7 +4,7 @@ title: Tap-test verb
 milestone: M1
 discipline: [ENG]
 estimate_days: 1
-status: ready
+status: review
 assignee: null
 depends_on: [STRUCT-002, CORE-007]
 owns:
@@ -57,4 +57,21 @@ No audio playback and no reticle rendering — AUD-001 and VERB-002 own those.
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**What changed:** `Verbs/Tap.h`/`Tap.cpp` were built with the anchor rating, and the tests are
+in `tests/unit/test_ascent.cpp` ("Tap: …"), not `test_tap.cpp`. That is the declared deviation.
+
+1. "Tap: VERB-001 acceptance 1": bare-handed, the reading is the true tier at every quality from 0
+   to 1.
+2. "Tap: gloves cost resolution, and they err in the dangerous direction" and "reading the same
+   joint twice gives the same answer": the glove penalty is deterministic, one tier optimistic.
+3. **Was not true until now.** The ids ("tap_ring", "tap_firm", …) named nothing anywhere. The
+   game picked the sound by tier, and the id was decoration. They are now the keys of
+   `data/audio/foley.json`'s `taps` bank (under ADR-0006 that bank replaces
+   `game/audio/banks/tap/`), and "Tap: VERB-001 acceptance 3" parses that file and checks every
+   id is in it.
+4. "Tap: every reading carries a shape": four distinct pip shapes.
+5. Game-side. `player.gd` times the tap by `tapTestSeconds`, and only targets joints within
+   `tapTestMaxRangeMetres` of the hands, which `test_face.gd` checks. The duration is read from
+   tuning and has no dedicated test.
+
+**Follow-ups:** none.

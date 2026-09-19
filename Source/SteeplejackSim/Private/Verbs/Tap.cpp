@@ -46,22 +46,24 @@ TapResult Tap(const Joint& joint, const Tuning& t, bool wearingGloves) noexcept
         out.tier = static_cast<JointTier>(Softened);
     }
 
+    // The sound is named by its key in data/audio/foley.json's `taps` bank, so the sim, the data
+    // and the game all mean the same cue (VERB-001 acceptance 3; test_ascent.cpp checks the keys).
     switch (out.tier)
     {
     case JointTier::Sound:
-        out.soundId = "tap_ring";
+        out.soundId = "sound";
         out.pipShape = 0;   // a full circle
         break;
     case JointTier::Fair:
-        out.soundId = "tap_firm";
+        out.soundId = "fair";
         out.pipShape = 1;   // a square
         break;
     case JointTier::Perished:
-        out.soundId = "tap_dull";
+        out.soundId = "perished";
         out.pipShape = 2;   // a triangle
         break;
     case JointTier::Cracked:
-        out.soundId = "tap_rattle";
+        out.soundId = "cracked";
         out.pipShape = 3;   // literal: shape index for the accessibility pip, a broken cross
         break;
     }
