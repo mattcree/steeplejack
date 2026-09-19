@@ -133,6 +133,11 @@ public:
     const SiteSpec& Site() const noexcept { return site_; }
     const WeatherSpec& Weather() const noexcept { return weather_; }
 
+    // The ladder sections the job comes with — `loadoutHint.ladders`. 0 when the file does not say.
+    // The reachability gate (CORE-009) proves the top can be reached with this many, and the game
+    // fills the cradle with it.
+    int32_t LoadoutLadders() const noexcept { return loadoutLadders_; }
+
     // Every rule `tools/validate_data.py` enforces, in the same order, with messages that name the
     // same things. Empty means the level is playable. Never throws: a broken level must be
     // *reportable*, not fatal, or the editor tooling cannot show a designer what is wrong.
@@ -143,6 +148,7 @@ private:
     int32_t               order_{};
     StructureSpec         structure_;
     std::vector<BandSpec> bands_;
+    int32_t               loadoutLadders_{};
     SiteSpec              site_;
     WeatherSpec           weather_;
     std::string           origin_;

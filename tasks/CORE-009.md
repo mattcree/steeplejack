@@ -4,7 +4,7 @@ title: Reachability solver and level validation gate
 milestone: M0
 discipline: [ENG]
 estimate_days: 2
-status: ready
+status: review
 assignee: null
 depends_on: [STRUCT-002]
 owns:
@@ -56,4 +56,33 @@ Not a route *recommender* — the player must find their own route. This only pr
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**What changed:** `Reachability.h`/`Reachability.cpp` and `tests/unit/test_reachability.cpp`,
+as owned. **Outside `owns`, declared:**
+
+- `Level.h`/`Level.cpp` gain `LoadoutLadders()`, parsed from `loadoutHint.ladders`.
+- `climbing.json` gains three keys that mirror the game's geometry:
+  - `climberShoulderAboveFeetMetres` 1.45 (player.gd's CAPSULE_HALF + 0.55)
+  - `climberWallStandoffMetres` 0.65 (LADDER_STANDOFF + BODY_OFF_LADDER)
+  - `ladderCoversMetres` 0.30 (face.gd's UNDER_LADDER)
+- The binding gains `loadout_ladders()`, and **the game now fills the cradle from the level**. It
+  was a hard-coded 12 against the Grey Box's 14, so a careful player could run out of ladder on
+  a level this gate had passed.
+
+1. and 4. One test solves every file in `data/levels/` with its own loadout and the grid the game
+   builds (the level's seed, the game's climbing line). All three are climbable at 6 m.
+   `make test-levels` already filters on `*Reachability*`, so a new level is gated the day it is
+   added.
+2. A 9 m cracked band is not crossable, and the route stops at the crack. A control with the
+   crack healed is climbable.
+3. Three ladders for 40 m fails, and twelve succeed.
+5. 110 m solves in about 0.2 ms, against a 500 ms budget.
+
+A fifth test shows the span limit is really read: a 5 m crack is crossable at 6 m and not at 4 m.
+
+**Decisions made:** greedy (from each dog, the highest usable joint in reach) is exact for
+existence here. A higher dog's next window reaches at least as high, so nothing a lower dog could
+do is lost. Reach is checked from every stance on the section, not just the top, because a joint
+the span allows may only be reachable standing lower.
+
+**The geometry keys duplicate numbers that `player.gd` and `face.gd` still hard-code.** If one
+side changes, the other will not follow. Follow-up: have the game read the same keys.

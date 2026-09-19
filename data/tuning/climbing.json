@@ -7,6 +7,9 @@
   "ladderLengthMetres": 5.0,
   "ladderMinOverlapMetres": 1.0,
   "ladderMassKg": 18.0,
+  "climberShoulderAboveFeetMetres": 1.45,
+  "climberWallStandoffMetres": 0.65,
+  "ladderCoversMetres": 0.30,
 
   "spanSoftMetres": 4.0,
   "spanWarnMetres": 6.0,

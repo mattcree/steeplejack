@@ -195,6 +195,11 @@ LevelData LevelData::Parse(const std::string& json, const std::string& origin)
         }
     }
 
+    if (doc.Has("loadoutHint") && doc.At("loadoutHint").Has("ladders"))
+    {
+        level.loadoutLadders_ = static_cast<int32_t>(doc.At("loadoutHint").At("ladders").AsNumber());
+    }
+
     if (doc.Has("site"))
     {
         const JsonValue& s = doc.At("site");

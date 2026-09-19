@@ -74,6 +74,7 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("tuning_hash"), &Jack::tuning_hash);
 
 	ClassDB::bind_method(D_METHOD("total_height"), &Jack::total_height);
+	ClassDB::bind_method(D_METHOD("loadout_ladders"), &Jack::loadout_ladders);
 	ClassDB::bind_method(D_METHOD("radius_at", "height"), &Jack::radius_at);
 	ClassDB::bind_method(D_METHOD("band_count"), &Jack::band_count);
 	ClassDB::bind_method(D_METHOD("band", "index"), &Jack::band);
@@ -252,6 +253,11 @@ bool Jack::load(const String& tuning_dir, const String& level_path)
 String Jack::tuning_hash() const
 {
 	return tuning ? String(tuning->Hash().c_str()) : String();
+}
+
+int64_t Jack::loadout_ladders() const
+{
+	return level ? static_cast<int64_t>(level->LoadoutLadders()) : 0;
 }
 
 double Jack::total_height() const

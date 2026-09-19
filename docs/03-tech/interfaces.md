@@ -497,10 +497,17 @@ shift replays with the same gusts at the same moments (ADR-0003).
 ## `Reachability.h` — CORE-009
 
 ```cpp
-struct Route { std::vector<int32_t> anchors; int32_t sections{}; float maxSpan{}; bool valid{}; };
+struct Route { std::vector<int32_t> anchors; int32_t sections{}; float maxSpan{}; bool valid{};
+               float reached{}; };
 
-Route Solve(const JointGrid&, int32_t ladders, float maxSpan);
+Route Solve(const JointGrid&, int32_t ladders, float maxSpan, float topM, float bearingDeg,
+            const Tuning&);
 ```
+
+*Changed in CORE-009:* the grid alone does not know how tall the structure is, where the ladder
+goes up, or how far a climber reaches, so `topM`, `bearingDeg` and the tuning are parameters.
+`reached` says how high the ladder got, which is where the level is broken when `valid` is false.
+`LevelData::LoadoutLadders()` supplies `ladders`.
 
 Used by the level validator. A level whose top cannot be reached at `maxSpan` with the authored
 ladder allowance is a broken level, and this catches it in seconds rather than in playtest.
