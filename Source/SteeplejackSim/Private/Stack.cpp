@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <utility>
 
 namespace sj {
 namespace {
@@ -32,6 +33,20 @@ const Section& NullSection() noexcept
 }
 
 }  // namespace
+
+Stack Stack::Restore(std::vector<Anchor> anchors, std::vector<bool> anchorFailed,
+                     std::vector<Section> sections, std::vector<bool> sectionFailed,
+                     std::vector<float> driftCm)
+{
+    Stack s;
+    s.anchors_ = std::move(anchors);
+    s.anchorFailed_ = std::move(anchorFailed);
+    s.sections_ = std::move(sections);
+    s.sectionFailed_ = std::move(sectionFailed);
+    s.driftCm_ = std::move(driftCm);
+    return s;
+}
+
 
 Stack::Stack() noexcept
 {

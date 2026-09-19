@@ -4,7 +4,7 @@ title: Stack serialisation (the checkpoint)
 milestone: M1
 discipline: [ENG]
 estimate_days: 1
-status: ready
+status: review
 assignee: null
 depends_on: [CLIMB-002]
 owns:
@@ -45,4 +45,32 @@ No career save (money, reputation, the engine) — that is M3.
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**What changed:** `Source/SteeplejackSim/Private/StackSerialise.cpp` implements
+`save::SerialiseStack`, `save::RestoreStack` and `save::LevelFingerprint`. They are declared at
+the foot of `Stack.h`, together with a `Stack::Restore` factory (the failed flags, drift and
+buckle timers are private). **`Stack.h` and `Stack.cpp` are outside this task's `owns`**, and are
+declared here: the factory is eleven lines and changes nothing else.
+`tests/unit/test_save.cpp` has one test per acceptance criterion, plus one for checkpoints that
+do not hang together.
+
+**Decisions made:**
+
+- The format is positional arrays per anchor and per section, with the field order fixed by the
+  version. A 28-section stack is about 2 KB against a 20 KB budget.
+- The level is identified by its id and an FNV-1a fingerprint of the level file's bytes, so any
+  edit to the level refuses the old stack (acceptance 5). The error names both fingerprints and
+  says why it matters: the dogs may no longer be in joints that exist.
+- Floats round-trip to the bit, the same way the replay format does it (CORE-006).
+- The anchors' current `loadKN` is saved. It is transient, but acceptance 1 says "identical
+  anchors".
+
+**Surprises:** the first round-trip test used a stack that had never been loaded, so it proved
+only the easy half. The fixture is now "lived in": twenty seconds of a climber on a quick hitch,
+so the hitch walks, then a shock that pulls a dog. A control asserts that history is really
+there, and after restoring, the two stacks are stepped side by side for ten seconds and must
+produce the same events.
+
+**Follow-ups:** the Godot layer does not save to disk yet. The stack survives a fall within a
+session ("the next morning, your stack is still up there") but not a quit. Wiring it needs a
+binding pair (`save_stack`/`load_stack`) and a restore of the face's occupied joints from the
+anchors' joint ids.

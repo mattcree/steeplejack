@@ -45,6 +45,8 @@
 #include "Types.h"
 
 #include <cstdint>
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace sj {
@@ -114,6 +116,13 @@ public:
     // returns every anchor that goes, in order — `failed` first. CLIMB-002's interface.
     std::vector<int32_t> Cascade(int32_t failed, float shockKN, const Tuning& t);
 
+    // A stack exactly as a checkpoint describes it — CLIMB-006. The vectors are per anchor and per
+    // section, and must agree in length; anchor 0 must be the ground. Validation of the file is the
+    // caller's (save::RestoreStack); this only assembles.
+    static Stack Restore(std::vector<Anchor> anchors, std::vector<bool> anchorFailed,
+                         std::vector<Section> sections, std::vector<bool> sectionFailed,
+                         std::vector<float> driftCm);
+
 private:
     void FailAnchor(int32_t i);
 
@@ -124,4 +133,28 @@ private:
     std::vector<float>   driftCm_;
 };
 
+// The checkpoint — CLIMB-006. The stack is the game's only save: no save points, no flags, the
+// progress is the structure the player built. Serialise the stack, never the player: on resume he
+// starts at the foot of his own ladders with the shift reset.
+namespace save {
+
+class SJ_API SaveError : public std::runtime_error
+{
+public:
+    using std::runtime_error::runtime_error;
+};
+
+// A fingerprint of the level file's bytes. A checkpoint records the one it was built on, and a
+// changed level refuses to restore rather than hanging the old route on a different wall.
+SJ_API std::string LevelFingerprint(const std::string& levelFileText);
+
+SJ_API std::string SerialiseStack(const Stack& stack, const std::string& levelId,
+                                  const std::string& levelFingerprint);
+
+// Throws SaveError: an unknown version, a different level or level file, or a stack that does not
+// hang together (a section on an anchor that does not exist).
+SJ_API Stack RestoreStack(const std::string& json, const std::string& levelId,
+                          const std::string& levelFingerprint);
+
+}  // namespace save
 }  // namespace sj
