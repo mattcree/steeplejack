@@ -123,7 +123,14 @@ func _init() -> void:
 	_check(player.at_top, "reached the top of the %.0f m stack" % chimney.height_m)
 	_check(sections >= 8, "by building it — %d sections lashed" % sections)
 	print("ASCENT: %s" % ("ok" if failures == 0 else "%d failure(s)" % failures))
+	_finished({"sections": sections, "hauls": hauls, "dogs": anchors_seated})
 	quit(0 if failures == 0 else 1)
+
+
+## Called once the climb is over, before quitting. Nothing here; a script that extends this one
+## (ascent_regression.gd) uses it to compare the outcome with a recorded one.
+func _finished(_counts: Dictionary) -> void:
+	pass
 
 
 # --- the verbs, played ---------------------------------------------------------------------------

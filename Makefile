@@ -112,9 +112,29 @@ endef
 test-levels: build-sim validate-data
 	$(call gate,*Level*$(comma)*Reachability*,level validation,CORE-008/CORE-009)
 
-## test-replay: recorded expert runs must reproduce their outcome
+## test-replay: the replay format round-trips, and the Grey Box climb matches its recording
+##   The second half needs Godot. Without it, it says so and fails — a regression gate that
+##   quietly does not run is the thing this project keeps finding and removing.
 test-replay: build-sim
-	$(call gate,*Replay*,replay regression,CORE-006/TEST-002)
+	$(call gate,*Replay*,replay format,CORE-006)
+	@$(MAKE) --no-print-directory replay-regression
+
+replay-regression: godot-build godot-import
+	@out=$$(timeout 300 $(GODOT) --path godot --headless --fixed-fps 60 \
+		--script res://scripts/ascent_regression.gd 2>&1); rc=$$?; \
+		echo "$$out" | grep -E "REPLAY|FAIL|^          |make record" || true; \
+		if [ $$rc -eq 124 ]; then echo "  replay-regression hung (parse error, or the bot stuck)"; fi; \
+		exit $$rc
+
+## record: re-record the Grey Box climb that test-replay compares against (LEVEL=00-greybox)
+##   Run it when a change is *meant* to alter the climb, and put the diff test-replay printed
+##   in the commit message: the diff is the justification.
+record: godot-build godot-import
+	@test "$(or $(LEVEL),00-greybox)" = "00-greybox" || (echo "only 00-greybox has a recorded climb" && exit 1)
+	@mkdir -p data/replays
+	@out=$$(timeout 300 $(GODOT) --path godot --headless --fixed-fps 60 \
+		--script res://scripts/ascent_regression.gd -- --record 2>&1); rc=$$?; \
+		echo "$$out" | grep -E "REPLAY|FAIL" || true; exit $$rc
 
 ## test-determinism: same seed + same intents -> same state, repeatedly
 test-determinism: build-sim
@@ -210,7 +230,7 @@ help:
         configure build-sim test-unit test-levels test-replay test-determinism test-perf \
         test-coverage \
         board ready waves critical editor-queue human-queue stale graph new-task \
-        test-tools check-verify install-hooks help watch run \
+        test-tools check-verify install-hooks help watch run replay-regression record \
         wt-start wip wt-status land wt-drop doctor
 
 # ---------------------------------------------------------------- Godot

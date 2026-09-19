@@ -1,0 +1,113 @@
+{
+  "level": "The Grey Box",
+  "reached_top": true,
+  "game_seconds": 845.5,
+  "sections": 11,
+  "hauls": 10,
+  "dogs": 11,
+  "grip_at_end": 100.0,
+  "nerve_at_end": 34.7,
+  "anchors": [
+    {
+      "height": 4.75,
+      "rating": "poor",
+      "failed": false
+    },
+    {
+      "height": 9.25,
+      "rating": "sound",
+      "failed": false
+    },
+    {
+      "height": 13.75,
+      "rating": "fair",
+      "failed": false
+    },
+    {
+      "height": 18.25,
+      "rating": "sound",
+      "failed": false
+    },
+    {
+      "height": 22.75,
+      "rating": "fair",
+      "failed": false
+    },
+    {
+      "height": 27.25,
+      "rating": "poor",
+      "failed": false
+    },
+    {
+      "height": 31.75,
+      "rating": "sound",
+      "failed": false
+    },
+    {
+      "height": 37.75,
+      "rating": "sound",
+      "failed": false
+    },
+    {
+      "height": 43.75,
+      "rating": "sound",
+      "failed": false
+    },
+    {
+      "height": 48.25,
+      "rating": "sound",
+      "failed": false
+    },
+    {
+      "height": 53.75,
+      "rating": "fair",
+      "failed": false
+    }
+  ],
+  "spans": [
+    {
+      "span": 4.75,
+      "lashing": 2
+    },
+    {
+      "span": 4.5,
+      "lashing": 2
+    },
+    {
+      "span": 4.5,
+      "lashing": 2
+    },
+    {
+      "span": 4.5,
+      "lashing": 2
+    },
+    {
+      "span": 4.5,
+      "lashing": 2
+    },
+    {
+      "span": 4.5,
+      "lashing": 2
+    },
+    {
+      "span": 6.0,
+      "lashing": 2
+    },
+    {
+      "span": 6.0,
+      "lashing": 2
+    },
+    {
+      "span": 4.5,
+      "lashing": 2
+    },
+    {
+      "span": 4.5,
+      "lashing": 2
+    },
+    {
+      "span": 5.5,
+      "lashing": 2
+    }
+  ]
+}
