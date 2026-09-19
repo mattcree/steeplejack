@@ -112,6 +112,34 @@ func _init() -> void:
 		var last := _peak_of(pcm, pcm.size() * 3 / 4, pcm.size())
 		_check(last > first * 1.4, "and swells towards the gust (%.2f -> %.2f)" % [first, last])
 
+	# --- the climb: AUD-004 --------------------------------------------------------------------------
+	# A rung is a knock, not a ring: short, low, and gone before the next one.
+	var rung: AudioStreamWAV = foley.cue_stream("rung")
+	_check(rung != null and _peak(_samples(rung)) > 0.05, "there is a rung knock, and it is not silence")
+	if rung != null:
+		var rd := _decay_seconds(_samples(rung), rung.mix_rate)
+		_check(rd < 0.12, "and it is a knock — gone in %.0f ms" % (rd * 1000.0))
+	for cue in ["creak", "thump"]:
+		var c: AudioStreamWAV = foley.cue_stream(cue)
+		_check(c != null and _peak(_samples(c)) > 0.05, "there is a %s, and it is not silence" % cue)
+
+	# The breath and the slide loop, so their seams must not click.
+	for pair in [["breath", foley.breath_stream()], ["slide", foley.slide_stream()]]:
+		var st: AudioStreamWAV = pair[1]
+		_check(st != null and st.loop_mode == AudioStreamWAV.LOOP_FORWARD, "the %s loops" % pair[0])
+		if st != null:
+			var pcm := _samples(st)
+			_check(absf(pcm[0]) < 0.05 and absf(pcm[pcm.size() - 1]) < 0.05,
+				"and its seam does not click (%.3f, %.3f)" % [pcm[0], pcm[pcm.size() - 1]])
+
+	# Breathing quickens as nerve goes. The rate is set by band, and each band is faster.
+	var rates := []
+	for band in 4:
+		foley.set_breath(band, true)
+		rates.append(foley.breath_rate())
+	_check(rates[0] < rates[1] and rates[1] < rates[2] and rates[2] < rates[3],
+		"breathing quickens band by band (%s)" % str(rates))
+
 	# The wind bed has to loop without a click, which is the most noticeable fault a four-second
 	# loop can have.
 	var wind: AudioStreamWAV = foley.wind_stream()

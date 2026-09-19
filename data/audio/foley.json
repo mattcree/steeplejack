@@ -42,6 +42,31 @@
     "lowpassHz": 8000, "noise": 0.15, "rattle": 0.0
   },
 
+  "_climbComment": "AUD-004. The ascent is 'wind, breathing, hammer, rope, and a distant town. Do not fill it' (12-audio-design.md). A knock of boot or hand on each rung, a creak of rope per turn laid, a breath that quickens as nerve goes, and the slide down — which camera-and-feel says players should love doing, and which was silent.",
+  "rung": {
+    "decayMs": 70, "transient": 0.55, "partials": [176, 402, 890],
+    "lowpassHz": 2600, "noise": 0.35, "rattle": 0.0
+  },
+  "creak": {
+    "decayMs": 180, "transient": 0.10, "partials": [310, 347],
+    "lowpassHz": 1800, "noise": 0.55, "rattle": 0.45,
+    "rattleDelayMs": 12, "rattleHz": 31
+  },
+  "thump": {
+    "decayMs": 160, "transient": 1.0, "partials": [62, 118, 240],
+    "lowpassHz": 900, "noise": 0.6, "rattle": 0.0
+  },
+  "breath": {
+    "_comment": "One breath, in and out, looped. Its rate follows the nerve band — calm is four seconds, the worst band under one and a half — and its level rises as nerve goes. The nerve arc already breathes on screen at the same rate, which is the visual fallback rule 8 asks for.",
+    "seconds": 4.0, "inhale": 0.42, "lowpassHz": 1500, "gain": 0.5,
+    "ratePerBand": [1.0, 1.35, 1.9, 2.7],
+    "dbPerBand": [-38.0, -30.0, -23.0, -17.0]
+  },
+  "slide": {
+    "loopSeconds": 2.0, "lowpassHz": 2400, "highpassHz": 500, "gain": 0.8,
+    "maxDb": -6.0
+  },
+
   "_gustComment": "The 1.2 s pre-roll. 10-failure-and-difficulty.md allows a gust to blow you off ONLY if this played first, so it is a mechanic with a duration fixed by gustPreRollSeconds, not a flourish. Rendered as a rising filtered-noise swell rather than a tone, because it has to read as weather arriving and not as a UI beep.",
   "gustTell": {
     "seconds": 1.2,

@@ -34,6 +34,11 @@ var _taps: Array[AudioStreamWAV] = []
 var _one_shot := {}
 var _wind: AudioStreamWAV
 
+var _breath: AudioStreamWAV
+var _slide: AudioStreamWAV
+var _breath_player: AudioStreamPlayer
+var _slide_player: AudioStreamPlayer
+
 var _players: Array[AudioStreamPlayer] = []
 var _next := 0
 var _wind_player: AudioStreamPlayer
@@ -50,8 +55,10 @@ func _ready() -> void:
 
 	for key in TIER_KEYS:
 		_taps.append(_render(_spec["taps"][key]))
-	for key in ["hammer", "bent", "seated"]:
+	for key in ["hammer", "bent", "seated", "rung", "creak", "thump"]:
 		_one_shot[key] = _render(_spec[key])
+	_breath = _render_breath(_spec["breath"])
+	_slide = _render_slide(_spec["slide"])
 	_wind = _render_wind(_spec["wind"])
 	_one_shot["gustTell"] = _render_gust_tell(_spec["gustTell"])
 
@@ -67,6 +74,18 @@ func _ready() -> void:
 	_wind_player.volume_db = _spec["wind"]["groundDb"]
 	add_child(_wind_player)
 	_wind_player.play()
+
+	_breath_player = AudioStreamPlayer.new()
+	_breath_player.stream = _breath
+	_breath_player.volume_db = -80.0
+	add_child(_breath_player)
+	_breath_player.play()
+
+	_slide_player = AudioStreamPlayer.new()
+	_slide_player.stream = _slide
+	_slide_player.volume_db = -80.0
+	add_child(_slide_player)
+	_slide_player.play()
 
 
 func _load() -> Dictionary:
@@ -102,6 +121,27 @@ func set_height(metres: float) -> void:
 	var w: Dictionary = _spec["wind"]
 	var t: float = clampf(metres / maxf(w["refHeightM"], 1.0), 0.0, 1.0)
 	_wind_player.volume_db = lerpf(w["groundDb"], w["topDb"], t) - _duck
+
+
+## His breathing, by nerve band: 0 calm .. 3 worst. Faster and louder as it goes. Silent on the
+## ground and when calm enough that nobody would hear it.
+func set_breath(band: int, audible: bool) -> void:
+	if _breath_player == null:
+		return
+	var b: Dictionary = _spec["breath"]
+	var k := clampi(band, 0, 3)
+	_breath_player.pitch_scale = float(b["ratePerBand"][k])
+	var want: float = float(b["dbPerBand"][k]) if audible else -80.0
+	_breath_player.volume_db = lerpf(_breath_player.volume_db, want, 0.05)
+
+
+## The slide down, by how fast he is going: 0 still .. 1 flat out.
+func set_slide(amount: float) -> void:
+	if _slide_player == null:
+		return
+	var a := clampf(amount, 0.0, 1.0)
+	_slide_player.volume_db = lerpf(-60.0, float(_spec["slide"]["maxDb"]), sqrt(a)) if a > 0.02 else -80.0
+	_slide_player.pitch_scale = 0.8 + 0.5 * a
 
 
 ## Over a brew the wind drops. METER-004: "the camera settles, the wind noise drops".
@@ -249,6 +289,56 @@ func _render_gust_tell(g: Dictionary) -> AudioStreamWAV:
 	return _to_stream(buf, rate, false)
 
 
+## One breath, in and out, looped. Filtered noise with the inhale sharper than the exhale.
+func _render_breath(b: Dictionary) -> AudioStreamWAV:
+	var rate: int = int(_spec.get("sampleRate", 22050))
+	var seconds: float = float(b["seconds"])
+	var n := int(seconds * rate)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7007
+	var buf := PackedFloat32Array()
+	buf.resize(n)
+	var lp := 0.0
+	var a: float = _one_pole(float(b["lowpassHz"]), rate)
+	var inhale: float = float(b["inhale"])
+	for i in n:
+		var u := float(i) / float(n)
+		# In, a short gap, out, a longer gap. The shape a listener reads as breathing rather than as
+		# a noise that comes and goes.
+		var env := 0.0
+		if u < inhale:
+			env = sin(PI * u / inhale) * 0.8
+		elif u > inhale + 0.06 and u < 0.92:
+			var v: float = (u - inhale - 0.06) / (0.92 - inhale - 0.06)
+			env = sin(PI * v) * 0.55
+		lp += (rng.randf_range(-1.0, 1.0) - lp) * a
+		buf[i] = clampf(lp * env * float(b["gain"]) * 4.0, -1.0, 1.0)
+	return _to_stream(buf, rate, true)
+
+
+## The rush of the slide: bright filtered noise, looped, faded at the seam.
+func _render_slide(sl: Dictionary) -> AudioStreamWAV:
+	var rate: int = int(_spec.get("sampleRate", 22050))
+	var seconds: float = float(sl["loopSeconds"])
+	var n := int(seconds * rate)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4242
+	var buf := PackedFloat32Array()
+	buf.resize(n)
+	var lp := 0.0
+	var lp2 := 0.0
+	var a: float = _one_pole(float(sl["lowpassHz"]), rate)
+	var hp: float = _one_pole(float(sl["highpassHz"]), rate)
+	for i in n:
+		var t := float(i) / rate
+		lp += (rng.randf_range(-1.0, 1.0) - lp) * a
+		lp2 += (lp - lp2) * hp
+		var band := lp - lp2   # low-pass minus a lower low-pass: a crude band-pass, and enough
+		var edge: float = minf(1.0, minf(t, seconds - t) / 0.15)
+		buf[i] = clampf(band * float(sl["gain"]) * 5.0 * edge, -1.0, 1.0)
+	return _to_stream(buf, rate, true)
+
+
 func _one_pole(cutoff_hz: float, rate: int) -> float:
 	# The usual one-pole smoothing coefficient. Not a filter anyone would ship, and entirely enough
 	# to put four hundred hertz between a ring and a thud.
@@ -282,6 +372,18 @@ func tap_stream(tier: int) -> AudioStreamWAV:
 
 func cue_stream(name: String) -> AudioStreamWAV:
 	return _one_shot.get(name)
+
+
+func breath_stream() -> AudioStreamWAV:
+	return _breath
+
+
+func slide_stream() -> AudioStreamWAV:
+	return _slide
+
+
+func breath_rate() -> float:
+	return _breath_player.pitch_scale if _breath_player != null else 0.0
 
 
 func wind_stream() -> AudioStreamWAV:

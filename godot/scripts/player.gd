@@ -185,6 +185,7 @@ var _remount_block := 0.0
 var _now := 0.0                  ## Seconds since the shift started. The HUD's clock, not the sim's.
 var _climb_rate := 0.0           ## Metres per second up the ladder this frame; drives the clip.
 var _blend_left := 0.0           ## Real seconds of clip blend still to run.
+var _rung_count := 0
 ## Stands in for W/S when non-zero. A headless test cannot press a key, and a test of "frozen stops
 ## you climbing" that cannot press the climb key passes whether the rule works or not.
 var climb_input := 0.0
@@ -566,6 +567,21 @@ func _climb(dt: float, ladder_world: Vector3) -> void:
 		return
 	_climb_rate = (height_m() - before) / maxf(dt, 0.0001)
 
+	# A knock on every rung he passes, hand and boot alternately. The climb had no sound at all,
+	# and a ladder under a man is not silent.
+	var rung_gap: float = chimney.RUNG_GAP
+	if foley != null and floor(before / rung_gap) != floor(height_m() / rung_gap) and _climb_rate > -3.0:
+		_rung_count += 1
+		foley.cue("rung", 0.92 + 0.12 * float(_rung_count % 2))
+
+	# The slide down: S is fast, and it is the reward for the climb. Loud, a rush, and a thump at
+	# the bottom (camera and feel, non-negotiable 6). Nothing did any of that.
+	if foley != null:
+		foley.set_slide(clampf(-_climb_rate / rate, 0.0, 1.0) if up < 0.0 else 0.0)
+		if up < 0.0 and before > 0.4 and height_m() <= 0.05:
+			foley.cue("thump")
+			_kick = 0.02
+
 	# Working yourself sideways off the stile. This has to accumulate: the first version recomputed
 	# the offset from the key every frame, so it never got further than one step and you could never
 	# leave.
@@ -797,6 +813,10 @@ func _step_sim(dt: float) -> void:
 	if foley != null:
 		foley.duck(recovering == REC_TEA, dt)
 		foley.set_height(h)
+		# Breathing with the nerve band, from the stack upward; at the foot nobody is frightened.
+		foley.set_breath(jack.nerve_band(), (on_ladder or at_top) and h > 6.0)
+		if not on_ladder:
+			foley.set_slide(0.0)
 
 	# The 1.2 second warning, once per gust. The fairness table allows a gust to blow you off only
 	# if this played first, so it is fired from the sim's own phase and never from a timer here.
@@ -1692,7 +1712,10 @@ func _update_lash(dt: float) -> void:
 	# forth is not.
 	_lash_signed = lerpf(_lash_signed, instant, clampf(dt * 6.0, 0.0, 1.0))
 	lash_rate = absf(_lash_signed)
+	var wraps_before: int = jack.lash_state()["wraps"]
 	jack.lash_step(dt, lash_rate)
+	if foley != null and int(jack.lash_state()["wraps"]) > wraps_before:
+		foley.cue("creak", 0.9 + 0.05 * float(wraps_before))   # each turn a touch tighter
 	if face != null:
 		var st: Dictionary = jack.lash_state()
 		face.set_lash(lash_joint, st["wraps"], st["laid"], st["tension"])
