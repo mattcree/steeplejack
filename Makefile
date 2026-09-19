@@ -408,6 +408,25 @@ godot-script: godot-import
 # The playable build's own regression tests. Godot cannot render headlessly, so these drive nodes
 # directly and assert on state — no substitute for playing it, but a substitute for shipping the
 # same bug twice.
+## shot: pose the jack and photograph him — the Godot answer to `make play`
+##
+## Godot's --headless has no renderer at all. Under a virtual X display it renders fine, software
+## rasterised, a few seconds a frame. Before this, every visual change in this engine was shipped
+## without anyone having looked at a frame of it.
+##
+##   make shot
+##   make shot CMDS="climb 26,shot at-26m"
+##   make shot CMDS="carry,dog 20,climb 21,work,shot dogging-in"
+##
+## See the command vocabulary at the top of godot/scripts/shot.gd.
+CMDS ?=
+SHOT_RES ?= 1600x900
+shot: godot-build godot-import
+	@command -v xvfb-run >/dev/null || (echo "shot needs xvfb-run (package xorg-x11-server-Xvfb)" && exit 1)
+	@timeout 600 xvfb-run -a -s "-screen 0 $(SHOT_RES)x24" \
+		$(GODOT) --path godot --resolution $(SHOT_RES) --script res://scripts/shot.gd -- $(CMDS) \
+		2>&1 | grep -vE "^(WARNING|MESA|Note:|     at:)" || true
+
 ## godot-test: drive the real scene headlessly and assert on state
 ##
 ## Bounded, because a parse error in any .gd file makes one of these hang for ever rather than
