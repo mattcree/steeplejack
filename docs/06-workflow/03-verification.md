@@ -13,15 +13,15 @@ Cheapest and fastest first. Everything above a rung only runs if the rungs below
 | 0b | **Every `verify:` filter runs real tests** | `make check-verify` | ~2 s | CI |
 | 1 | **Enforced conventions** | `make check-conventions` | ~1 s | pre-commit, CI |
 | 2 | Data validation (schemas, tuning, task graph) | `make validate` | ~2 s | pre-commit, CI |
-| 3 | Doc link integrity + Blueprint rule | `make check-links check-blueprints` | ~1 s | CI |
-| 4 | Sim build (**no Unreal needed**) | `make build-sim` | ~20 s | pre-commit, CI |
+| 3 | Doc link integrity | `make check-links` | ~1 s | CI |
+| 4 | Sim build (**no engine needed**) | `make build-sim` | ~20 s | pre-commit, CI |
 | 5 | Sim unit + property tests | `make test-unit` | ~10 s | pre-commit, CI |
 | 6 | Level validation (schema + beat rule + reachability) | `make test-levels` | ~10 s | CI |
-| 7 | Replay regression | `make test-replay` | ~20 s | CI |
-| 8 | Determinism + `Sim::Step` budget | `make test-determinism test-perf` | ~40 s | CI |
-| 9 | Game module build | `make build-game` | ~10 min | CI (self-hosted) |
-| 10 | UE automation tests | `make test-automation` | ~5 min | CI (self-hosted) |
-| 11 | Frame-time capture, screenshot diff | `make perf-capture` | ~15 min | nightly |
+| 7 | Replay: the format's round trip, then the recorded Grey Box climb | `make test-replay` | ~40 s | CI (format); locally (climb — needs Godot) |
+| 8 | Determinism + the sim-step budget | `make test-determinism test-perf` | ~5 s | CI |
+| 9 | The game, headless: every verb, and a bot that climbs to the top | `make godot-test` | ~3 min | locally (needs Godot) |
+| 10 | The game, rendered: posed frames, and a whole climb as a contact sheet | `make shot`, `make ascent-sheet` | s / ~20 min | locally, and **look at them** |
+| 11 | Frame-time capture on real GPUs | — | — | **does not exist yet** |
 | 12 | **Human playtest** | see the playtest plan | hours | per milestone |
 
 ### Empty gates must not report success
@@ -57,9 +57,9 @@ names the binary actually exposes, and fails on any task at `review` or `done` w
 nothing — a task claiming it was verified by a command that ran zero tests. Filters belonging to
 unwritten modules are listed as pending, not failures. It runs in `make ci`.
 
-**Rungs 1–8 need neither Unreal nor a GPU.** They cover 100% of the gameplay logic and run on a
-GitHub-hosted runner in under two minutes. That is the practical payoff of ADR-0004's module split,
-and it is why the gameplay layer stays agent-executable on an engine whose asset formats are binary.
+**Rungs 1–8 need neither an engine nor a GPU** (except the recorded climb in 7). They cover all of
+the gameplay rules and run on a GitHub-hosted runner in under two minutes. Rungs 9–10 need Godot and
+run locally; CI has no Godot yet.
 
 `make check` runs 1–5. That's your local gate and it must stay under **60 seconds**, forever. If it
 creeps past that, people stop running it, and then rungs 1–5 stop being real.
@@ -134,13 +134,11 @@ branch; never skippable for a PR, because CI runs the same gates.
   seconds, and it is the gate that catches most agent mistakes.
 - **sim** (no engine): CMake build plus the whole doctest suite — unit, property, level, replay,
   determinism, step budget. Under two minutes on a GitHub-hosted runner.
-- **game** (self-hosted runner with UE 5.8): editor build and UE automation tests. Enabled by
-  CORE-002.
+There is no Godot job yet. `make godot-test` and the recorded climb in `make test-replay` run
+locally; adding Godot to CI (it is a single binary, and runs headless) is the obvious next step.
 
-Nightly adds frame-time capture and screenshot diffs.
-
-**A red `sim` job is more urgent than a red `game` job**, because the sim holds every gameplay
-decision and the game module holds none.
+**A red `sim` job is the most urgent thing in the repo**, because the sim holds every gameplay
+decision.
 
 ### Rung 0 — testing the tests
 
@@ -156,9 +154,9 @@ ignore red.
 
 ## Coverage
 
-`SteeplejackSim` must hold **≥ 90% line coverage** (llvm-cov on the standalone build), enforced at
-the M1 gate and thereafter. `SteeplejackGame` and `Content/` are not coverage-gated — they are
-presentation, and their correctness is visual.
+`SteeplejackSim` must hold **≥ 90% line coverage** (gcov on an instrumented standalone build,
+`make test-coverage`; 94.2% on 2026-09-19). The Godot layer is not coverage-gated — it is
+presentation, checked by `make godot-test` and by looking at frames.
 
 This asymmetry is the point of the sim/presentation split: we put all the logic somewhere it can be
 tested exhaustively and cheaply, and we test the rest with our eyes.

@@ -13,7 +13,7 @@ These are one-time, and **every one of them is the project lead's, not an agent'
 | 3 | Convention checkers have their own tests | `python3 tools/test_conventions.py` | ✅ 20 cases |
 | 4 | **Likeness denylist populated** | `tools/likeness_denylist.local.txt` | ⬜ **inert** |
 | 5 | Git LFS enabled on the remote | CORE-010 | ⬜ |
-| 6 | Unreal 5.8 installed, `UE_ROOT` set | CORE-001 verified it | ✅ |
+| 6 | Godot 4.7 at `~/.local/bin/godot` (Unreal is removed; ADR-0006) | `make godot-test` | ✅ |
 | 7 | A human named for the editor queue | `make human-queue` | ⬜ |
 | 8 | You are reachable for escalations | `BLOCKED.md` | ⬜ |
 | 9 | The git guard hook is active | `.claude/settings.json` → `hooks.PreToolUse` | ✅ 25 cases |
@@ -35,7 +35,7 @@ Two queues come back, and the split matters more than anything else in this docu
 
 ```
 AGENT-CLAIMABLE (n)   — an agent can do these start to finish
-NEEDS A HUMAN (m)     — Unreal editor, a recording, or a room full of testers
+NEEDS A HUMAN (m)     — an art tool, a recording, or a room full of testers
 ```
 
 **Spawn agents only for the first queue.** The second is your personal backlog and it runs in
@@ -111,7 +111,7 @@ Regardless of what a task says:
 - **Change `docs/03-tech/interfaces.md`** outside a task that owns it. Other agents are
   implementing against those signatures right now.
 - **Answer their own escalation.** Blocked means blocked.
-- **Touch `Content/`.** It is binary, it is human-owned, and it goes through Git LFS.
+- **Author binary assets** (models, textures, recordings). They are human-owned and go through Git LFS.
 - **Populate the likeness denylist.** That is the project lead's, deliberately.
 
 ## The first run, concretely

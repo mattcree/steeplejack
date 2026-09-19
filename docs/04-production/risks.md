@@ -1,5 +1,7 @@
 # Risks
 
+> **2026-09-19 — Unreal is removed from the project ([ADR-0006](../03-tech/adr/0006-move-to-godot.md)):** several risks below were written about Unreal. R8 (binary assets agents cannot author) is much smaller now: the game is text scenes and GDScript. Control Rig, Chaos, MetaSounds and MetaHuman are no longer available answers.
+
 Ordered by expected damage. Each has an owner, a trigger to watch for, and a decided response —
 **not** a vague "monitor".
 

@@ -1,5 +1,7 @@
 # Work Breakdown
 
+> **2026-09-19 — Unreal is removed from the project ([ADR-0006](../03-tech/adr/0006-move-to-godot.md)):** tasks below that named Unreal work are `cut` in `tasks/`, each with a line saying why and where the feature lives in Godot, if it does. `make ready` is the live view.
+
 Task IDs are stable and referenced from commits (`CLIMB-004: seat the dog`). Estimates are in
 **ideal days** for one competent worker.
 

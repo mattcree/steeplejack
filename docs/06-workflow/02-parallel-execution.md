@@ -1,5 +1,7 @@
 # Parallel Execution
 
+> **2026-09-19 — Unreal is removed from the project ([ADR-0006](../03-tech/adr/0006-move-to-godot.md)):** the examples below name Unreal-era tasks and tools. The principle (parallel generation, serial merging; keep binary work off the critical path) is unchanged.
+
 How to run many agents at once without them colliding, duplicating, or quietly diverging.
 
 ## The three mechanisms

@@ -14,7 +14,7 @@ A task is done when **every** applicable box is ticked. Not "mostly". Partial wo
 
 ## Any task touching `SteeplejackSim`
 
-- [ ] **`make build-sim` succeeds with no Unreal installed** — no engine headers, no engine types
+- [ ] **`make build-sim` succeeds with no engine installed** — no engine headers, no engine types
 - [ ] No ambient RNG, no clocks, no mutable statics, no stdout
 - [ ] All constants come from `data/tuning/*.json` — **zero magic numbers**
 - [ ] Unit tests cover every branch, including the failure outcomes
@@ -54,12 +54,11 @@ A task is done when **every** applicable box is ticked. Not "mostly". Partial wo
 
 - [ ] Within the triangle and draw-call budget for its category
 - [ ] Palette members only (see [`../01-gdd/13-art-direction.md`](../01-gdd/13-art-direction.md))
-- [ ] Megascans or an instance of an existing master material — **no bespoke material authoring**
+- [ ] An existing shader or material with parameters — **no bespoke material per asset**
 - [ ] Binary assets committed through Git LFS
 - [ ] Readable in silhouette
 - [ ] No unique textures on background assets
-- [ ] Nanite enabled on static geometry; no hand-authored LOD chains
-- [ ] LODs authored where the budget requires them
+- [ ] LODs where the budget requires them (Godot generates them on import)
 
 ## Any audio task
 

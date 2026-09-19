@@ -1,5 +1,7 @@
 # 00 — Vision
 
+> **2026-09-19 — Unreal is removed from the project ([ADR-0006](03-tech/adr/0006-move-to-godot.md)):** the art notes below mention Megascans, an Unreal-era plan. The game is Godot now (ADR-0006); the pillars are unchanged.
+
 ## One-liner
 
 A third-person game about climbing tall industrial structures by building your own route up them,

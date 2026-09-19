@@ -1,5 +1,7 @@
 # 13 — Art Direction
 
+> **2026-09-19 — Unreal is removed from the project ([ADR-0006](../03-tech/adr/0006-move-to-godot.md)):** this was written for Unreal (Lumen, Megascans, MetaHuman). The look it describes is still the target; how it is reached in Godot, and with what assets, is open.
+
 > Rewritten following [ADR-0004](../03-tech/adr/0004-engine-change-to-unreal.md). The previous
 > version targeted flat-shaded low-poly. This one targets the key art.
 

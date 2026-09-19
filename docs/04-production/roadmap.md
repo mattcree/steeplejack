@@ -1,5 +1,7 @@
 # Roadmap
 
+> **2026-09-19 — Unreal is removed from the project ([ADR-0006](../03-tech/adr/0006-move-to-godot.md)):** the milestone plans below name Unreal work (the two-module project, Nanite, Chaos, Niagara, a self-hosted UE runner). The game is Godot now; read those items for their intent, not their tools.
+
 Seven milestones. Each has a **gate** — a question that must be answered before the next begins.
 Durations assume a small team (2–4 people or an agent team of equivalent throughput) and are
 deliberately not padded; treat them as ordering and relative weight, not commitments.

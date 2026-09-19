@@ -79,7 +79,7 @@ What a well-meaning agent will be tempted to also do. Say no here so it doesn't 
 | `reads` | no | paths it needs to read. Advisory — helps an agent load the right context. |
 | `spec` | yes (code/design tasks) | `path#anchor` refs. Validated that the file exists. |
 | `verify` | yes | one shell command that proves the task is done |
-| `editor_required` | yes | `true` if a human must drive the Unreal editor. Batched separately — see risk R8. |
+| `editor_required` | yes | `true` if a human must drive an art or animation tool. Batched separately — see risk R8. |
 | `risk` | no | `R1`…`R10` from [`../04-production/risks.md`](../04-production/risks.md) |
 
 ## Writing good acceptance criteria

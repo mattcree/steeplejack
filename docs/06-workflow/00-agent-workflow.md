@@ -28,7 +28,7 @@ Three ideas do all the work:
 2. **A work item is self-contained.** An agent should be able to do a task having read *only* the
    task file and the spec sections it names. If you need context the task didn't give you, that is
    a bug in the task, and you fix the task file as part of the work.
-3. **Conventions are machine-enforced or they don't exist.** "Don't put Unreal types in
+3. **Conventions are machine-enforced or they don't exist.** "Don't put engine types in
    `SteeplejackSim`" is a script, not a sentence. See [`04-enforced-conventions.md`](04-enforced-conventions.md).
 
 ---
@@ -93,8 +93,8 @@ Every task carries one command in its `verify:` field. It must pass.
 make check          # the full local gate: conventions, data, tasks, links, sim build + tests
 ```
 
-`make check` needs `cmake`, `ninja` and a C++20 compiler — **not Unreal**. Only tasks that own
-`SteeplejackGame` or `Content/` paths need the engine.
+`make check` needs `cmake`, `ninja` and a C++20 compiler — **no engine**. Only tasks that own
+`godot/` or `Source/SteeplejackGodot/` paths need Godot (`make godot-test`).
 
 Then walk the applicable sections of
 [`../04-production/definition-of-done.md`](../04-production/definition-of-done.md). All of it,
@@ -160,7 +160,7 @@ Set `status: done`. Run `make board` and check nothing is unexpectedly unblocked
 helpers, formatting, log messages.
 
 **Never guess about:** game design, tuning targets, whether a failure needs a telegraph, whether
-something belongs in `SteeplejackSim` or `SteeplejackGame`, scope. Those are decided in `docs/` or by the design lead.
+something belongs in `SteeplejackSim` or `godot/`, scope. Those are decided in `docs/` or by the design lead.
 
 When blocked:
 

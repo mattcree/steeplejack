@@ -11,13 +11,12 @@ Scope: the modules needed for M0 and M1. M2+ interfaces are added at the start o
 
 ## Conventions
 
-Per [ADR-0004](adr/0004-engine-change-to-unreal.md), `SteeplejackSim` is **plain C++20 with no
-Unreal dependency**, so that it builds standalone under CMake and its tests run in CI without the
-engine. That constraint is enforced by `tools/check_conventions.py` and it is not negotiable.
+Per [ADR-0006](adr/0006-move-to-godot.md), `SteeplejackSim` is **plain C++20 with no engine
+dependency**, so that it builds standalone under CMake and its tests run in CI without an engine. That constraint is enforced by `tools/check_conventions.py` and it is not negotiable.
 
 - Namespace `sj`. Header-per-module in `Public/`, implementation in `Private/`.
-- **No UE types.** No `FVector`, `TArray`, `FString`, `UObject`, `FMath`, `UE_LOG`, no `.generated.h`.
-  Use `sj::Vec3`, `std::vector`, `std::string`, `<cmath>`.
+- **No engine types.** No `godot::Vector3`, `godot::String`, nothing from `godot_cpp` (and none of
+  Unreal's either). Use `sj::Vec3`, `std::vector`, `std::string`, `<cmath>`.
 - **No allocation in `Step()`.** Buffers are sized at construction. The sim runs 60×/s forever.
 - Time is always an explicit `float dt` in seconds. Never a global clock.
 - Randomness is always an injected `Rng&`. Never `rand()`, never a static.
@@ -514,20 +513,21 @@ ladder allowance is a broken level, and this catches it in seconds rather than i
 
 ---
 
-## The UE boundary
+## The engine boundary
 
-`SteeplejackGame` may call into `sj::` freely. **`sj::` may never call into UE.** There is exactly
-one adapter layer:
+The game may call into `sj::` freely, through the binding. **`sj::` may never call into Godot.** There
+is exactly one adapter:
 
 ```cpp
-// Source/SteeplejackGame/SimBridge.h — the only place the two worlds meet
-FVector  ToUE(sj::Vec3) noexcept;
-sj::Vec3 ToSim(const FVector&) noexcept;
-sj::IntentBuffer CollectIntents(const UEnhancedInputComponent&);
-void ApplySimState(const sj::JobState&, ASteeplejackCharacter&, UHUDWidget&);
+// Source/SteeplejackGodot/Jack.h — the only place the two worlds meet. A GDExtension class that
+// GDScript sees as `Jack`: it owns the sim's state for one job (tuning, level, meters, stack, grid,
+// wind, slip), exposes it as Dictionaries and plain values, and converts sj::Vec3 <-> Vector3.
+class Jack : public godot::RefCounted { ... };
 ```
 
-If you find yourself wanting a second adapter, the boundary is in the wrong place — escalate.
+Every method in it catches exceptions: the sim throws by contract (a missing tuning key is a bug that
+must be loud), and an exception crossing into Godot would take the game down with it. If you find
+yourself wanting a second adapter, the boundary is in the wrong place — escalate.
 
 ---
 
