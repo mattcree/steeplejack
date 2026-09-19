@@ -164,9 +164,15 @@ TEST_CASE("Wind: nothing bites without a tell in front of it")
     Rng rng(29);
     wind.Begin(w, rng, Tune());
 
+    // ENV-003 acceptance 2 says a thousand gusts with zero exceptions, so it runs until it has seen
+    // a thousand, counted on the rising edge of the bite. One CHECK per step would be a quarter of a
+    // million assertions; the failures are counted instead and checked once.
+    const float preroll = Tune().GetF("gustPreRollSeconds") - sj::kTick * 2.0f;
     float tell_run = 0.0f;
-    bool any_bite = false;
-    for (int i = 0; i < 60 * 200; ++i)
+    bool biting = false;
+    int gusts = 0;
+    int unannounced = 0;
+    for (long i = 0; gusts < 1000 && i < 60L * 60 * 60 * 24; ++i)
     {
         wind.Step(sj::kTick, w, rng, Tune());
         if (wind.Tell())
@@ -175,16 +181,25 @@ TEST_CASE("Wind: nothing bites without a tell in front of it")
         }
         else if (wind.Strength() > 0.0f)
         {
-            any_bite = true;
-            // A full pre-roll happened, and it happened immediately before this.
-            CHECK(tell_run >= Tune().GetF("gustPreRollSeconds") - sj::kTick * 2.0f);
+            if (!biting)
+            {
+                ++gusts;
+                // A full pre-roll happened, and it happened immediately before this.
+                if (tell_run < preroll)
+                {
+                    ++unannounced;
+                }
+            }
+            biting = true;
         }
         else if (wind.Phase() == GustPhase::Calm)
         {
             tell_run = 0.0f;   // calm again; the next gust needs its own warning
+            biting = false;
         }
     }
-    CHECK(any_bite);
+    CHECK(gusts == 1000);
+    CHECK(unannounced == 0);
 }
 
 TEST_CASE("Wind: the phases run in order and come back to calm")

@@ -4,7 +4,7 @@ title: Nerve recovery: stand, brew up, cigarette, look at the view
 milestone: M1
 discipline: [ENG, ART]
 estimate_days: 2
-status: ready
+status: review
 assignee: null
 depends_on: [METER-002]
 owns:
@@ -52,4 +52,20 @@ The music cue itself is an M3 audio task; use a placeholder. No flask inventory 
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**What changed:** `Source/SteeplejackSim/Public/Recovery.h` and `Private/Recovery.cpp`
+model the four actions (stand, brew up, cigarette, look at the view), with durations and amounts
+from tuning. `tests/unit/test_recovery.cpp` covers acceptance 1–5 as named tests, plus "nothing
+recovers past the ceiling" and passive recovery on a platform or low down. The Unreal
+`TeaState.cpp` is replaced under ADR-0006 by `_recover()` in `godot/scripts/player.gd`. That code
+does the slow fixed framing out over the town, the tea line, and the camera that takes its time.
+
+**Decisions made:** `recover.descendBelowMetres` and `recover.viewAboveMetres` are tuning keys, not
+literals. Tea is refused below the belted stance, and the refusal says why ("you need both hands —
+belt on first"). The HUD shows that reason next to the key before the player presses it.
+
+**Acceptance 6 is not verified.** It needs a human by design: a screen capture of one uninterrupted
+tea break, checked against `11-camera-controls-feel.md#camera` for framing, the audio duck and
+the twelve seconds. `make shot CMDS="climb 20,tea,wait 3,shot tea"` gives a still
+of the framing. It does not show the duck or the duration.
+
+**Follow-ups:** the capture for acceptance 6.
