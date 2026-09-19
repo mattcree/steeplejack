@@ -389,12 +389,25 @@ A 2-DOF pendulum integrated at the fixed step. Not a rope simulation.
 ## `Verbs/Lash.h` — VERB-005
 
 ```cpp
-struct LashState { int32_t wraps{}; float tension{}; bool tied{}, slipping{}; };
+struct LashState { int32_t wraps{}; float tension{}; bool tied{}, slipping{}; float laid{}; };
 
-void    StepLash(LashState&, float dt, float rotationRate, const Tuning&) noexcept;
+namespace lash {
+void    Step(LashState&, float dt, float rotationRate, const Tuning&) noexcept;
 Lashing TieOff(LashState&, const Tuning&) noexcept;
 float   DriftPerMinuteCm(Lashing, const Tuning&) noexcept;
+float   LayRate(float rotationRate, const Tuning&) noexcept;
+float   RateFromMash(float pressesPerSecond, const Tuning&) noexcept;   // VERB-006
+float   RateFromHold(const Tuning&) noexcept;                           // VERB-006
+}
 ```
+
+Namespaced as `lash::Step` rather than the free `StepLash` fixed here first, to match every other
+verb in the sim (`tap::`, `hammer::`, `anchor::`). `laid` is the progress towards the next wrap —
+without it a wrap would be a threshold on a float the caller cannot see, and the HUD could not draw
+the rope going round.
+
+`RateFromMash` and `RateFromHold` are VERB-006's: every input method becomes the same turn rate, so
+the conversion is a rule and lives where it can be tested, not in the input layer.
 
 ---
 

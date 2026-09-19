@@ -64,6 +64,14 @@ const RIG_HOLD_STILL_M := 0.12
 ## How long a line stays up. Long enough to read twice, short enough that it is never a fixture.
 const MESSAGE_SECONDS := 6.0
 
+## The most the mouse's heading can turn between two movements and still be going round.
+const LASH_MAX_TURN_PER_MOVE := PI * 0.5
+
+## Lashing's own order, from the sim.
+const LASHING_NONE := 0
+const LASHING_HITCH := 1
+const LASHING_FULL := 2
+
 const SLIP_NONE := 0
 const SLIP_SAVED := 1
 const SLIP_FELL := 2
@@ -107,6 +115,22 @@ var _tap_landed := false
 var last_tap := {}
 ## Joints with a dog bent into them. Wasted material should be something you can look at.
 var bent_joints := {}
+
+## Lashing — VERB-005. A mode, like work: the rope is going round and nothing else is.
+var lashing := false
+var lash_joint := -1             ## the dog the new section is being lashed to
+var lash_rate := 0.0             ## turns a second, whatever the input method
+var lash_new_top := 0.0          ## where the section will top out if it holds
+## VERB-006: rotate, mash or hold. Every one becomes the same turn rate in the sim.
+const LASH_METHODS := ["rotate", "mash", "hold"]
+var lash_method := 0
+var _lash_spin := 0.0            ## signed radians the mouse has turned through this frame
+var _lash_heading := INF
+var _lash_signed := 0.0          ## smoothed signed turn rate; a back-and-forth wiggle cancels out
+var _lash_presses: Array[float] = []
+## Every section lashed, bottom to top: {top, lashing, slipping, joint}. A hitch walks; a full
+## lashing does not. CLIMB-001 reads this to make that consequence real.
+var sections: Array = []
 var drift_phase := 0.0
 
 var on_ladder := false
@@ -263,6 +287,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			jack.grab()
 		return
 
+	if lashing:
+		_lash_input(event)
+		return
+
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_E: _tap()
@@ -317,7 +345,7 @@ func _physics_process(dt: float) -> void:
 	if on_ladder and not within_reach:
 		_step_off("off the ladder")
 
-	if work_mode:
+	if work_mode or lashing:
 		velocity = Vector3.ZERO
 	elif on_ladder:
 		_climb(dt, ladder_world)
@@ -330,6 +358,7 @@ func _physics_process(dt: float) -> void:
 	_update_face()
 	_update_tap(dt)
 	_update_work(dt)
+	_update_lash(dt)
 	_animate()
 
 
@@ -392,6 +421,8 @@ func _fall_to_ground(why: String) -> void:
 	work_mode = false
 	drawing = false
 	_cancel_rig()
+	if lashing:
+		_abandon_lash("")
 	_shuffle = 0.0
 	_remount_block = REMOUNT_DELAY
 	_fell_from = 0.0
@@ -578,7 +609,7 @@ func _step_sim(dt: float) -> void:
 	# wind is a term in both the nerve drain and the wobble, so it was a difficulty dial the
 	# designer had and the game ignored.
 	jack.set_context(h, jack.wind_at(h), carrying_ladder,
-		work_mode or _slipping or rigging_to >= 0 or tapping > 0.0)
+		work_mode or _slipping or rigging_to >= 0 or tapping > 0.0 or lashing)
 	if foley != null:
 		foley.set_height(h)
 
@@ -921,20 +952,155 @@ func _give_hammer(skel: Skeleton3D) -> void:
 	grip.add_child(head)
 
 
+## R: start lashing the ladder you are carrying to the highest dog in the wall.
+##
+## It was a keypress that lashed the section instantly and perfectly — "Press E to work", an
+## interaction the player could not do better or worse, which the anti-pillars name. Now it is the
+## one continuous physical input in the game: you wrap the rope by going round.
 func _lash() -> void:
 	if not carrying_ladder:
 		_say("you are not carrying a ladder — go down to the cradle"
 			if ladders_at_base > 0 else "no ladder sections left")
+		return
+	if not on_ladder:
+		_say("you lash a ladder from the ladder")
 		return
 	var best: float = jack.highest_anchor_below(height_m() + 100.0)
 	var rise: float = jack.tuning_f("ladderLengthMetres", 5.0) - jack.tuning_f("ladderMinOverlapMetres", 1.0)
 	if best < 0.0 or best + 0.1 < ladder_top - rise:
 		_say("nothing to lash to — get a dog in above you")
 		return
-	ladder_top = minf(best + rise, chimney.height_m)
+	lashing = true
+	lash_joint = _joint_of_anchor_at(best)
+	lash_new_top = minf(best + rise, chimney.height_m)
+	lash_rate = 0.0
+	_lash_signed = 0.0
+	_lash_spin = 0.0
+	_lash_heading = INF
+	_lash_presses.clear()
+	jack.lash_begin()
+	chimney.set_ghost(ladder_top, lash_new_top)
+	_say("lashing — %s" % _lash_how())
+
+
+func _lash_how() -> String:
+	match LASH_METHODS[lash_method]:
+		"mash": return "tap the left button to wrap, R to tie off"
+		"hold": return "hold the left button to wrap, R to tie off"
+		_: return "hold the left button and go round in circles, R to tie off"
+
+
+func _lash_input(event: InputEvent) -> void:
+	var method: String = LASH_METHODS[lash_method]
+	if event is InputEventMouseMotion and method == "rotate" \
+			and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		lash_mouse(event.relative)
+	if event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT and method == "mash":
+			_lash_presses.append(_now)
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			_abandon_lash("you let the rope go")
+	if event is InputEventMouseButton and not event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT:
+		_lash_heading = INF
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_R: _tie_off()
+			KEY_L:
+				# VERB-006 acceptance 3: switching mid-lash does not corrupt the lashing. The rope
+				# already round the stile stays round it; only the way more goes on changes.
+				lash_method = (lash_method + 1) % LASH_METHODS.size()
+				_lash_heading = INF
+				_say("wrapping by %s — %s" % [LASH_METHODS[lash_method], _lash_how()])
+
+
+## One mouse movement while wrapping. The heading of the motion turns through a full circle for
+## every circle drawn, so the heading's change is the rope going round.
+##
+## Reversals are thrown away. A straight back-and-forth flips the heading by half a turn, and
+## `wrapf` maps *both* halves of that flip to -PI — so the first version counted every waggle as a
+## full turn in the same direction, and waving the mouse to and fro lashed a ladder faster than
+## drawing circles. A real circle turns the heading a few degrees a frame; nothing a hand does while
+## going round jumps by more than a right angle, so anything that does is not rotation.
+func lash_mouse(rel: Vector2) -> void:
+	if rel.length() <= 1.5:
+		return
+	var heading := rel.angle()
+	if _lash_heading != INF:
+		var turn := wrapf(heading - _lash_heading, -PI, PI)
+		if absf(turn) < LASH_MAX_TURN_PER_MOVE:
+			_lash_spin += turn
+	_lash_heading = heading
+
+
+func _update_lash(dt: float) -> void:
+	if not lashing:
+		return
+	var instant := 0.0
+	match LASH_METHODS[lash_method]:
+		"rotate":
+			instant = (_lash_spin / TAU) / maxf(dt, 0.0001)
+			_lash_spin = 0.0
+		"mash":
+			while not _lash_presses.is_empty() and _now - _lash_presses[0] > 1.0:
+				_lash_presses.pop_front()
+			instant = jack.lash_rate_from_mash(float(_lash_presses.size()))
+		"hold":
+			if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+				instant = jack.lash_rate_from_hold()
+	# Smoothed, and signed for the rotate case: going round either way is a turn, going back and
+	# forth is not.
+	_lash_signed = lerpf(_lash_signed, instant, clampf(dt * 6.0, 0.0, 1.0))
+	lash_rate = absf(_lash_signed)
+	jack.lash_step(dt, lash_rate)
+	if face != null:
+		var st: Dictionary = jack.lash_state()
+		face.set_lash(lash_joint, st["wraps"], st["laid"], st["tension"])
+
+
+func _tie_off() -> void:
+	var kind: int = jack.lash_tie_off()
+	var st: Dictionary = jack.lash_state()
+	if kind == LASHING_NONE:
+		_abandon_lash("%d turns will not hold a ladder — it takes %d" % [
+			st["wraps"], int(jack.tuning_f("lashWrapsQuickHitch", 3))])
+		return
+
+	lashing = false
+	chimney.set_ghost(0.0, 0.0)
+	ladder_top = lash_new_top
 	chimney.set_ladder_top(ladder_top)
 	carrying_ladder = false
-	_say("lashed — the ladder tops out at %.0fm. %d left in the cradle" % [ladder_top, ladders_at_base])
+	sections.append({"top": ladder_top, "lashing": kind, "slipping": st["slipping"],
+		"joint": lash_joint})
+	if face != null:
+		face.keep_lash(lash_joint, st["wraps"])
+		face.set_lash(-1, 0, 0.0, 0.0)
+	if foley != null:
+		foley.cue("seated", 0.7)
+
+	var what := "full lashing — it will not move" if kind == LASHING_FULL else (
+		"quick hitch — it will walk off the dog, a few cm a minute")
+	if st["slipping"]:
+		what = "tied off slack — the knot is slipping. Re-tie it before you trust it"
+	_say("%s. Tops out at %.0f m" % [what, ladder_top])
+
+
+func _abandon_lash(why: String) -> void:
+	lashing = false
+	chimney.set_ghost(0.0, 0.0)
+	if face != null:
+		face.set_lash(-1, 0, 0.0, 0.0)
+	_say(why)
+
+
+## The joint a seated dog is in, by the dog's height.
+func _joint_of_anchor_at(height: float) -> int:
+	for i in jack.anchor_count():
+		var a: Dictionary = jack.anchor_at(i)
+		if absf(float(a["height"]) - height) < 0.01:
+			return int(a.get("joint", -1))
+	return -1
 
 
 func _pick_up() -> void:

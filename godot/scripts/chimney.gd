@@ -23,6 +23,7 @@ var _base_r: float = 1.0
 var _top_r: float = 1.0
 var _ladder_top: float = 0.0
 var _ladders := MultiMeshInstance3D.new()
+var _ghost := MultiMeshInstance3D.new()
 var _dogs := MultiMeshInstance3D.new()
 
 # Not art direction — a legend. The level file says a band is ivy or a wind band, and until there
@@ -112,6 +113,12 @@ func build(jack: Jack) -> void:
 
 	_cradle()
 	_setup_multimesh(_ladders, Color(0.42, 0.30, 0.17))
+	# The section being lashed, held in place and not yet trusted: drawn translucent until it is tied.
+	_setup_multimesh(_ghost, Color(0.62, 0.50, 0.34))
+	var gm := _ghost.multimesh.mesh.material as StandardMaterial3D
+	gm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	gm.albedo_color.a = 0.45
+	add_child(_ghost)
 	_setup_multimesh(_dogs, Color(0.18, 0.17, 0.16))
 	add_child(_ladders)
 	add_child(_dogs)
@@ -279,6 +286,29 @@ func set_ladder_top(top: float) -> void:
 	_ladders.multimesh.instance_count = transforms.size()
 	for i in transforms.size():
 		_ladders.multimesh.set_instance_transform(i, transforms[i])
+
+
+## The section being lashed, from `from` to `to`, translucent. Zero length hides it.
+func set_ghost(from: float, to: float) -> void:
+	var mm := _ghost.multimesh
+	if mm == null:
+		return
+	if to <= from:
+		mm.instance_count = 0
+		return
+	var xs: Array[Transform3D] = []
+	var span := to - from
+	for side in [-RAIL_GAP * 0.5, RAIL_GAP * 0.5]:
+		xs.append(Transform3D(Basis().scaled(Vector3(RAIL_THICK, span, RAIL_THICK)),
+			face_point(from + span * 0.5) + Vector3(0, 0, side)))
+	var h := from + RUNG_GAP
+	while h < to:
+		xs.append(Transform3D(Basis().scaled(Vector3(RAIL_THICK * 0.8, RAIL_THICK * 0.8, RAIL_GAP)),
+			face_point(h)))
+		h += RUNG_GAP
+	mm.instance_count = xs.size()
+	for i in xs.size():
+		mm.set_instance_transform(i, xs[i])
 
 
 ## A dog standing proud of the brickwork, so you can count them on the way down.

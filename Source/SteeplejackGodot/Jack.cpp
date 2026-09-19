@@ -8,10 +8,12 @@
 #include "Slip.h"
 #include "Wind.h"
 #include "Verbs/Hammer.h"
+#include "Verbs/Lash.h"
 #include "Verbs/Tap.h"
 #include "Wobble.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <string>
 
@@ -123,6 +125,15 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("seat_anchor_joint", "id", "depth", "spall"),
 	                     &Jack::seat_anchor_joint);
 	ClassDB::bind_method(D_METHOD("spoil_joint", "id"), &Jack::spoil_joint);
+
+	ClassDB::bind_method(D_METHOD("lash_begin"), &Jack::lash_begin);
+	ClassDB::bind_method(D_METHOD("lash_step", "dt", "turns_per_second"), &Jack::lash_step);
+	ClassDB::bind_method(D_METHOD("lash_state"), &Jack::lash_state);
+	ClassDB::bind_method(D_METHOD("lash_tie_off"), &Jack::lash_tie_off);
+	ClassDB::bind_method(D_METHOD("lash_rate_from_mash", "presses_per_second"), &Jack::lash_rate_from_mash);
+	ClassDB::bind_method(D_METHOD("lash_rate_from_hold"), &Jack::lash_rate_from_hold);
+	ClassDB::bind_method(D_METHOD("lash_drift_cm_per_minute", "lashing"), &Jack::lash_drift_cm_per_minute);
+	ClassDB::bind_method(D_METHOD("lash_lay_rate", "turns_per_second"), &Jack::lash_lay_rate);
 
 	ClassDB::bind_method(D_METHOD("tap", "height", "wearing_gloves"), &Jack::tap);
 	ClassDB::bind_method(D_METHOD("strike", "height", "current_depth", "power", "angle_error_deg",
@@ -440,7 +451,11 @@ int32_t Jack::joint_id_at(double height) const
 	const float h = static_cast<float>(height);
 	const float u = s.height > 0.0f ? std::clamp(h / s.height, 0.0f, 1.0f) : 0.0f;
 	const float r = s.baseRadius + (s.topRadius - s.baseRadius) * u;
-	return grid->Nearest(sj::Vec3{-r, h, 0.0f}, 1.0f);   // literal: west is -X, see kClimbBearing
+	// Beside the ladder, not under it. The stiles are 0.44 m apart and the lashing runs from a stile
+	// out to a lug, so a dog on the ladder's centre line is one no hammer can reach and no rope can
+	// be tied to. 0.4 m round the face from the centre line, on the -Z side.
+	const float d = 0.4f / std::max(r, 0.1f);   // literal: metres beside the ladder, as radians
+	return grid->Nearest(sj::Vec3{-r * std::cos(d), h, -r * std::sin(d)}, 0.6f);   // literal: search
 }
 
 sj::Joint Jack::joint_at(double height) const
@@ -531,6 +546,54 @@ Dictionary Jack::strike_joint(int64_t id, double current_depth, double power,
 	return d;
 }
 
+void Jack::lash_begin() { lashing = sj::LashState{}; }
+
+void Jack::lash_step(double dt, double turns_per_second)
+{
+	if (!tuning) { return; }
+	sj::lash::Step(lashing, static_cast<float>(dt), static_cast<float>(turns_per_second), *tuning);
+}
+
+Dictionary Jack::lash_state() const
+{
+	Dictionary d;
+	d["wraps"] = static_cast<int64_t>(lashing.wraps);
+	d["tension"] = static_cast<double>(lashing.tension);
+	d["laid"] = static_cast<double>(lashing.laid);
+	d["tied"] = lashing.tied;
+	d["slipping"] = lashing.slipping;
+	return d;
+}
+
+int64_t Jack::lash_tie_off()
+{
+	if (!tuning) { return 0; }
+	return static_cast<int64_t>(sj::lash::TieOff(lashing, *tuning));
+}
+
+double Jack::lash_rate_from_mash(double presses_per_second) const
+{
+	return tuning ? static_cast<double>(
+		sj::lash::RateFromMash(static_cast<float>(presses_per_second), *tuning)) : 0.0;
+}
+
+double Jack::lash_rate_from_hold() const
+{
+	return tuning ? static_cast<double>(sj::lash::RateFromHold(*tuning)) : 0.0;
+}
+
+double Jack::lash_drift_cm_per_minute(int64_t lashing_kind) const
+{
+	return tuning ? static_cast<double>(sj::lash::DriftPerMinuteCm(
+		static_cast<sj::Lashing>(std::clamp<int64_t>(lashing_kind, 0, 2)), *tuning)) : 0.0;
+}
+
+double Jack::lash_lay_rate(double turns_per_second) const
+{
+	return tuning ? static_cast<double>(
+		sj::lash::LayRate(static_cast<float>(turns_per_second), *tuning)) : 0.0;
+}
+
 void Jack::spoil_joint(int64_t id)
 {
 	if (grid) { grid->SetOccupied(static_cast<int32_t>(id), true); }
@@ -613,6 +676,7 @@ Dictionary Jack::anchor_at(int64_t index) const
 	Dictionary d;
 	if (index < 0 || index >= static_cast<int64_t>(anchors.size())) { return d; }
 	const sj::Anchor& a = anchors[static_cast<size_t>(index)];
+	d["joint"] = static_cast<int64_t>(a.jointId);
 	d["rate"] = static_cast<int64_t>(a.rate);
 	d["rate_name"] = String(RateName(a.rate));
 	d["capacity_kn"] = static_cast<double>(a.capacityKN);

@@ -21,6 +21,8 @@
 #   work [depth]     start driving a dog into the joint he is pointing at
 #   draw             hammer raised, mid-draw
 #   strike           one blow, caught at contact
+#   lash <s> [rate]  carry a section and lash it, going round steadily for s seconds
+#   tieoff           tie the lashing off
 #   stance <0-4>     one hand / hooked leg / clipped / belted / chair
 #   strain <g> <n>   drained meters, to see the telegraphs
 #   slip             grip to nothing, so the slip window is open
@@ -151,6 +153,17 @@ func _run(cmd: String) -> void:
 			player.boom_length = a
 		"fov":
 			player.get_node("Boom/Camera").fov = a
+		"lash":
+			# Start lashing and turn at a steady rate for `a` seconds (b turns a second, default the
+			# ideal), through the real verb.
+			player.carrying_ladder = true
+			player._lash()
+			var rate: float = b if b > 0.0 else 1.0 / jack.tuning_f("lashSecondsPerWrapIdeal", 1.4)
+			for i in int(a * 60.0):
+				player._lash_spin += TAU * rate / 60.0
+				await physics_frame
+		"tieoff":
+			player._tie_off()
 		"wide":
 			# Keep the ordinary framing in work mode, to see the whole body rather than the joint.
 			player.set_meta("shot_wide", true)

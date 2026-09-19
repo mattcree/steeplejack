@@ -435,7 +435,7 @@ shot: godot-build godot-import
 ## fail: the scene never loads, the script never reaches its quit(), and the run just sits there.
 ## A gate that hangs is worse than a gate that fails, because nobody reads a hang as a result.
 godot-test: godot-build godot-import
-	@for t in test_ladder test_character test_slip test_stance test_audio test_face; do \
+	@for t in test_ladder test_character test_slip test_stance test_audio test_face test_lash_game; do \
 		timeout 120 $(GODOT) --path godot --headless --script res://scripts/$$t.gd; \
 		rc=$$?; \
 		if [ $$rc -eq 124 ]; then \

@@ -20,6 +20,7 @@
 #include "Rng.h"
 #include "Slip.h"
 #include "Wind.h"
+#include "Verbs/Lash.h"
 #include "Tuning.h"
 #include "Types.h"
 
@@ -156,6 +157,21 @@ public:
 	/** A dog bent into a joint spoils it: occupied, and holding nothing. */
 	void spoil_joint(int64_t id);
 
+	// --- lashing -------------------------------------------------------------------------------
+	// One lash in progress at a time, held here so the rope's state is the sim's and not a copy.
+	/** Start a fresh lashing. */
+	void lash_begin();
+	/** One step, at a turn rate. Every input method arrives here as the same number (VERB-006). */
+	void lash_step(double dt, double turns_per_second);
+	/** `{wraps, tension, laid, tied, slipping}` */
+	godot::Dictionary lash_state() const;
+	/** Tie off. 0 none, 1 hitch, 2 full — Lashing's own order. `slipping` is in lash_state(). */
+	int64_t lash_tie_off();
+	double lash_rate_from_mash(double presses_per_second) const;
+	double lash_rate_from_hold() const;
+	double lash_drift_cm_per_minute(int64_t lashing) const;
+	double lash_lay_rate(double turns_per_second) const;
+
 	// --- the verbs -----------------------------------------------------------------------------
 	/** Sound the brickwork. `{tier, tier_name, pip, confidence}`. */
 	godot::Dictionary tap(double height, bool wearing_gloves);
@@ -198,6 +214,7 @@ private:
 	std::unique_ptr<sj::JointGrid> grid;
 	/** What the player has learned by tapping, by joint id. Chalk marks are drawn from this. */
 	std::map<int32_t, int32_t> tapped;
+	sj::LashState lashing{};
 
 	std::unique_ptr<sj::Tuning> tuning;
 	std::unique_ptr<sj::LevelData> level;

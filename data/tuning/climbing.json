@@ -37,6 +37,11 @@
   "lashWrapsFull": 6,
   "lashSecondsPerWrapIdeal": 1.4,
   "lashHitchDriftCmPerMinute": 3.0,
+  "lashTensionRisePerSecond": 2.5,
+  "lashTensionDecayPerSecond": 0.6,
+  "lashTieOffMinTension": 0.45,
+  "lashMashTurnsPerPress": 0.25,
+  "lashHoldTurnsPerSecond": 0.55,
 
   "haulSpeedMetresPerSecond": 0.9,
   "haulSwingGainPerSpeed": 0.6,

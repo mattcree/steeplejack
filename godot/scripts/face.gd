@@ -62,6 +62,16 @@ var _bent: MultiMeshInstance3D
 ## Set by the player: joints with a dog bent into them.
 var bent_ids := {}
 
+## Rope round a dog's lug: {joint id: wraps} for finished lashings, plus the one going on now.
+var _kept_lashes := {}
+var _lash_id := -1
+var _lash_wraps := 0
+var _lash_laid := 0.0
+var _rope: MultiMeshInstance3D
+var _rope_live: MultiMeshInstance3D
+const ROPE := Color(0.64, 0.53, 0.35)
+const WRAP_PITCH := 0.024        ## height between turns of the coil
+
 
 func _ready() -> void:
 	# The tells. Each is a short stretch of bed joint, in the colour and width its condition gives
@@ -101,6 +111,17 @@ func _ready() -> void:
 	_work_dog.mesh = wd
 	_work_dog.visible = false
 	add_child(_work_dog)
+
+	# Rope: one torus per turn round the lug. Finished lashings in one bank, the one going on now in
+	# another, so the live coil can be rebuilt every frame without touching the rest of the stack.
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.030
+	torus.outer_radius = 0.046
+	torus.rings = 10
+	torus.ring_segments = 6
+	torus.material = _lit(ROPE, 0.95)
+	_rope = _wrap(torus)
+	_rope_live = _wrap(torus)
 
 	# A bent dog: the spike kinked, standing out of a joint it has spoiled.
 	_bent = _bank_box(Vector3(0.045, 0.045, 0.16), _lit(Color(0.30, 0.20, 0.14), 0.7))
@@ -149,6 +170,45 @@ func joint(id: int) -> Dictionary:
 	if _by_id.has(id):
 		return _by_id[id]
 	return jack.joint(id) if jack != null else {}
+
+
+## The lashing going on now: `wraps` turns and `laid` of the next round the dog at `id`.
+func set_lash(id: int, wraps: int, laid: float, _tension: float) -> void:
+	_lash_id = id
+	_lash_wraps = wraps
+	_lash_laid = laid
+	var xs: Array = []
+	if id >= 0:
+		var j := joint(id)
+		if not j.is_empty():
+			xs = _coil(j, wraps)
+			if laid > 0.02:
+				# The turn going on, growing round the lug as the rope is laid.
+				var t: Transform3D = _coil_turn(j, wraps)
+				xs.append(Transform3D(t.basis.scaled(Vector3(laid, 1.0, laid)), t.origin))
+	_fill(_rope_live, xs)
+
+
+## A finished lashing stays on the stack. You can count them, and a hitch looks like three turns.
+func keep_lash(id: int, wraps: int) -> void:
+	if id < 0:
+		return
+	_kept_lashes[id] = wraps
+	touch()
+
+
+func _coil(j: Dictionary, wraps: int) -> Array:
+	var xs: Array = []
+	for k in wraps:
+		xs.append(_coil_turn(j, k))
+	return xs
+
+
+func _coil_turn(j: Dictionary, k: int) -> Transform3D:
+	var n: Vector3 = j["normal"]
+	# Round the lug, which stands 0.21 m off the face, climbing up the lug turn by turn.
+	var origin: Vector3 = j["pos"] + n * 0.19 + Vector3.UP * (float(k) - 2.5) * WRAP_PITCH
+	return Transform3D(Basis(), origin)
 
 
 ## The dog going in: at `id`, `depth` of the way home. -1 hides it.
@@ -253,6 +313,13 @@ func _rebuild() -> void:
 	_fill(_dogs, dogs)
 	_fill(_lugs, lugs)
 	_fill(_bent, bent)
+
+	var rope: Array = []
+	for id in _kept_lashes:
+		var kj := joint(id)
+		if not kj.is_empty():
+			rope.append_array(_coil(kj, _kept_lashes[id]))
+	_fill(_rope, rope)
 
 	if target_id >= 0:
 		set_target(target_id)

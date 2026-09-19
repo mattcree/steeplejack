@@ -130,6 +130,9 @@ func _draw() -> void:
 	if player.rigging_to >= 0:
 		_draw_rig(jack)
 
+	if player.lashing:
+		_draw_lash(jack)
+
 	# Rule 8: every audio cue has a visual fallback. This one is not optional in a second way too —
 	# the fairness table makes the gust's 1.2 s warning the thing that separates a fair failure from
 	# a bug, and a warning only some players receive is not a warning.
@@ -150,7 +153,7 @@ func _draw() -> void:
 func _next_step() -> String:
 	if player.jack.slip_in_progress():
 		return ""
-	if player.rigging_to >= 0:
+	if player.rigging_to >= 0 or player.lashing:
 		return ""
 	if player.fall_reason != "":
 		return "Your stack is still up. Climb it again."
@@ -179,6 +182,8 @@ func _affordances() -> Array:
 		return [["SPACE", "grab", true, ""]]
 	if player.rigging_to >= 0:
 		return [[Q_KEY, "stop rigging", true, ""]]
+	if player.lashing:
+		return []
 	if player.work_mode:
 		return [
 			["mouse", "place the dog", true, ""],
@@ -332,6 +337,65 @@ func _draw_pip(jack: Jack) -> void:
 			_: v = exp(-u * 11.0) + (0.55 * exp(-(u - 0.3) * 7.0) if u > 0.3 else 0.0)   # rattle
 		env.append(base + Vector2(u * w, -v * 14.0))
 	draw_polyline(env, Color(c.r, c.g, c.b, a * 0.8), 2.0)
+
+
+## Lashing — VERB-005.
+##
+## A ring you go round, with the rope going on as you do. Six notches for six turns, with the hitch
+## and the full lashing marked, because the whole decision is "three and go, or six and trust it" and
+## the player cannot make it without seeing both. Tension is a second, thinner ring outside that
+## visibly bleeds away the moment they stop — which is the thing that teaches them not to.
+func _draw_lash(jack: Jack) -> void:
+	var st: Dictionary = jack.lash_state()
+	var wraps: int = st["wraps"]
+	var laid: float = st["laid"]
+	var tension: float = st["tension"]
+	var hitch := int(jack.tuning_f("lashWrapsQuickHitch", 3))
+	var full := int(jack.tuning_f("lashWrapsFull", 6))
+
+	var c := Vector2(size.x * 0.5, size.y * 0.40)
+	var r := 64.0
+
+	# The turn in progress, filling round the ring, from the top, the way a clock hand goes.
+	draw_arc(c, r, 0, TAU, 64, Color(0.9, 0.88, 0.84, 0.18), 6.0)
+	if laid > 0.0:
+		draw_arc(c, r, -PI * 0.5, -PI * 0.5 + TAU * laid, 48, Color(0.86, 0.72, 0.46, 0.95), 6.0)
+
+	# Tension, outside it. Bleeds away when you stop, and you can watch it go.
+	draw_arc(c, r + 14.0, -PI * 0.5, -PI * 0.5 + TAU * tension, 48,
+		Color(0.66, 0.78, 0.90, 0.55 + 0.4 * tension), 3.0)
+
+	# The count, and what it buys.
+	_centre("%d" % wraps, c.y + 12.0, Color(0.97, 0.95, 0.90, 0.95), 38)
+	var what := "not enough to hold"
+	if wraps >= full:
+		what = "full lashing"
+	elif wraps >= hitch:
+		what = "quick hitch — it will walk"
+	_centre(what, c.y + r + 42.0, Color(0.92, 0.88, 0.82, 0.88), 15)
+
+	# Notches for each turn, with the hitch and the full lashing marked out from the rest.
+	var y := c.y + r + 62.0
+	var step := 22.0
+	var x0 := c.x - step * float(full - 1) * 0.5
+	for k in full:
+		var p := Vector2(x0 + step * k, y)
+		var done := k < wraps
+		var col := Color(0.86, 0.72, 0.46, 0.95) if done else Color(0.9, 0.88, 0.84, 0.30)
+		var rr := 6.0 if (k + 1 == hitch or k + 1 == full) else 4.0
+		if done:
+			draw_circle(p, rr, col)
+		else:
+			draw_arc(p, rr, 0, TAU, 16, col, 1.5)
+
+	var method: String = player.LASH_METHODS[player.lash_method]
+	var how := "hold LMB and go round" if method == "rotate" else (
+		"tap LMB" if method == "mash" else "hold LMB")
+	_centre("%s   ·   [R] tie off   ·   [RMB] let go   ·   [L] %s" % [how, method],
+		y + 26.0, Color(0.80, 0.78, 0.74, 0.75), 13)
+	if tension < jack.tuning_f("lashTieOffMinTension", 0.45) and wraps >= hitch:
+		_centre("the rope is going slack — tie off now and the knot will slip", y + 46.0,
+			Color(0.95, 0.62, 0.40, 0.9), 13)
 
 
 ## Rigging a stance. Twenty seconds into a bosun's chair is a long time to stare at nothing.
