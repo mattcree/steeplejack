@@ -3,6 +3,7 @@
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include "JointGrid.h"
 #include "Rng.h"
 #include "Slip.h"
 #include "Wind.h"
@@ -111,6 +112,18 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("fall", "height"), &Jack::fall);
 	ClassDB::bind_method(D_METHOD("new_shift"), &Jack::new_shift);
 
+	ClassDB::bind_method(D_METHOD("climb_bearing"), &Jack::climb_bearing);
+	ClassDB::bind_method(D_METHOD("joint_count"), &Jack::joint_count);
+	ClassDB::bind_method(D_METHOD("joints_near", "height", "bearing_deg", "range"), &Jack::joints_near);
+	ClassDB::bind_method(D_METHOD("nearest_joint", "point", "max_range"), &Jack::nearest_joint);
+	ClassDB::bind_method(D_METHOD("joint", "id"), &Jack::joint);
+	ClassDB::bind_method(D_METHOD("tap_joint", "id", "wearing_gloves"), &Jack::tap_joint);
+	ClassDB::bind_method(D_METHOD("strike_joint", "id", "current_depth", "power", "angle_error_deg",
+	                              "tool_condition"), &Jack::strike_joint);
+	ClassDB::bind_method(D_METHOD("seat_anchor_joint", "id", "depth", "spall"),
+	                     &Jack::seat_anchor_joint);
+	ClassDB::bind_method(D_METHOD("spoil_joint", "id"), &Jack::spoil_joint);
+
 	ClassDB::bind_method(D_METHOD("tap", "height", "wearing_gloves"), &Jack::tap);
 	ClassDB::bind_method(D_METHOD("strike", "height", "current_depth", "power", "angle_error_deg",
 	                              "tool_condition"), &Jack::strike);
@@ -149,6 +162,11 @@ bool Jack::load(const String& tuning_dir, const String& level_path)
 		weather_rng = std::make_unique<sj::Rng>(
 			sj::Rng(level->Structure().weatherSeed).Fork(0x57494E44u));   // literal: 'WIND'
 		wind.Begin(level->Weather(), *weather_rng, *tuning);
+		// The face, from the level's own seed, on the grid's own fork — so nothing else in the sim
+		// drawing random numbers can move a single joint.
+		grid = std::make_unique<sj::JointGrid>(sj::JointGrid::Generate(
+			*level, sj::Rng(level->Structure().weatherSeed), *tuning, kClimbBearing));
+		tapped.clear();
 		slip = sj::SlipModel(slip.GetDifficulty());
 		outcome = sj::SlipOutcome::None;
 		grab_latched = false;
@@ -413,16 +431,129 @@ double Jack::wobble_deg(double gust) const
 		sj::WobbleAmplitudeDeg(meters, context, static_cast<float>(gust), *tuning));
 }
 
+int32_t Jack::joint_id_at(double height) const
+{
+	if (!grid || !level) { return -1; }
+	// The joint on the climbing line nearest this height. What the height-addressed verbs mean, and
+	// all they could ever have meant: before the grid, a height *was* a joint.
+	const sj::StructureSpec& s = level->Structure();
+	const float h = static_cast<float>(height);
+	const float u = s.height > 0.0f ? std::clamp(h / s.height, 0.0f, 1.0f) : 0.0f;
+	const float r = s.baseRadius + (s.topRadius - s.baseRadius) * u;
+	return grid->Nearest(sj::Vec3{-r, h, 0.0f}, 1.0f);   // literal: west is -X, see kClimbBearing
+}
+
 sj::Joint Jack::joint_at(double height) const
 {
-	sj::Joint j{};
-	j.height = static_cast<float>(height);
-	// Seeded from the height alone, to a centimetre. Tapping a joint and then driving into it must
-	// consult the same brickwork; re-rolling between the two would make the tap test a lie.
-	sj::Rng rng(static_cast<uint64_t>(height * 100.0) ^ 0x5D3Bu);
-	j.quality = rng.RangeFloat(0.2f, 0.95f);
-	if (tuning) { j.tier = sj::tap::TierOf(j.quality, *tuning); }
-	return j;
+	// Read from the grid, so the band decides the brickwork. This used to be a hash of the height
+	// with the band ignored, which made every band on every level play the same.
+	if (!grid) { return sj::Joint{}; }
+	return grid->ById(joint_id_at(height));
+}
+
+Dictionary Jack::joint_dict(int32_t id) const
+{
+	Dictionary d;
+	if (!grid || !tuning) { return d; }
+	const sj::Joint& j = grid->ById(id);
+	if (j.id < 0) { return d; }
+	d["id"] = static_cast<int64_t>(j.id);
+	d["pos"] = Vector3(j.pos.x, j.pos.y, j.pos.z);
+	d["normal"] = Vector3(j.normal.x, j.normal.y, j.normal.z);
+	d["height"] = static_cast<double>(j.height);
+	const float look = grid->Apparent(j.id);
+	d["look_q"] = static_cast<double>(look);
+	d["look"] = static_cast<int64_t>(sj::tap::TierOf(look, *tuning));
+	d["occupied"] = j.occupied;
+	const auto it = tapped.find(j.id);
+	d["tapped"] = static_cast<int64_t>(it == tapped.end() ? -1 : it->second);
+	return d;
+}
+
+Array Jack::joints_near(double height, double bearing_deg, double range) const
+{
+	Array out;
+	if (!grid) { return out; }
+	for (int32_t id : grid->Near(static_cast<float>(height), static_cast<float>(bearing_deg),
+	                             static_cast<float>(range)))
+	{
+		out.append(joint_dict(id));
+	}
+	return out;
+}
+
+int64_t Jack::nearest_joint(const Vector3& point, double max_range) const
+{
+	if (!grid) { return -1; }
+	return grid->Nearest(sj::Vec3{static_cast<float>(point.x), static_cast<float>(point.y),
+	                              static_cast<float>(point.z)},
+	                     static_cast<float>(max_range));
+}
+
+Dictionary Jack::joint(int64_t id) const
+{
+	return joint_dict(static_cast<int32_t>(id));
+}
+
+Dictionary Jack::tap_joint(int64_t id, bool wearing_gloves)
+{
+	Dictionary d;
+	if (!tuning || !grid) { return d; }
+	const sj::Joint& j = grid->ById(static_cast<int32_t>(id));
+	if (j.id < 0) { return d; }
+	const sj::TapResult r = sj::tap::Tap(j, *tuning, wearing_gloves);
+	// What the player learned, not what is true — with gloves those differ by design, and the
+	// chalk mark records the reading. See docs/01-gdd/15-working-the-face.md.
+	tapped[j.id] = static_cast<int32_t>(r.tier);
+	d["id"] = static_cast<int64_t>(j.id);
+	d["tier"] = static_cast<int64_t>(r.tier);
+	d["tier_name"] = String(TierName(r.tier));
+	d["confidence"] = static_cast<double>(r.confidence);
+	d["pip"] = static_cast<int64_t>(r.pipShape);
+	return d;
+}
+
+Dictionary Jack::strike_joint(int64_t id, double current_depth, double power,
+                              double angle_error_deg, double tool_condition)
+{
+	Dictionary d;
+	if (!tuning || !grid) { return d; }
+	const sj::StrikeResult r = sj::hammer::Strike(
+		grid->ById(static_cast<int32_t>(id)), static_cast<float>(current_depth),
+		static_cast<float>(power), static_cast<float>(angle_error_deg),
+		static_cast<float>(tool_condition), *tuning);
+	d["depth_gain"] = static_cast<double>(r.depthGain);
+	d["spalled"] = static_cast<double>(r.spalled);
+	d["bent"] = r.bent;
+	d["seated"] = r.seated;
+	d["quality"] = static_cast<double>(
+		sj::hammer::StrikeQuality(static_cast<float>(angle_error_deg), *tuning));
+	return d;
+}
+
+void Jack::spoil_joint(int64_t id)
+{
+	if (grid) { grid->SetOccupied(static_cast<int32_t>(id), true); }
+}
+
+Dictionary Jack::seat_anchor_joint(int64_t id, double depth, double spall)
+{
+	Dictionary d;
+	if (!tuning || !grid) { return d; }
+	const sj::Joint& j = grid->ById(static_cast<int32_t>(id));
+	if (j.id < 0) { return d; }
+	sj::Anchor a = sj::anchor::Make(j, static_cast<float>(depth), static_cast<float>(spall), *tuning);
+	a.jointId = j.id;
+	a.height = j.height;
+	anchors.push_back(a);
+	grid->SetOccupied(j.id, true);
+	d["rate"] = static_cast<int64_t>(a.rate);
+	d["rate_name"] = String(RateName(a.rate));
+	d["capacity_kn"] = static_cast<double>(a.capacityKN);
+	d["height"] = static_cast<double>(a.height);
+	d["id"] = static_cast<int64_t>(j.id);
+	d["pos"] = Vector3(j.pos.x, j.pos.y, j.pos.z);
+	return d;
 }
 
 Dictionary Jack::tap(double height, bool wearing_gloves)
@@ -464,9 +595,12 @@ Dictionary Jack::seat_anchor(double height, double depth, double spall)
 {
 	Dictionary d;
 	if (!tuning) { return d; }
-	const sj::Anchor a = sj::anchor::Make(joint_at(height), static_cast<float>(depth),
-	                                      static_cast<float>(spall), *tuning);
+	const int32_t jid = joint_id_at(height);
+	sj::Anchor a = sj::anchor::Make(joint_at(height), static_cast<float>(depth),
+	                                static_cast<float>(spall), *tuning);
+	a.jointId = jid;
 	anchors.push_back(a);
+	if (grid && jid >= 0) { grid->SetOccupied(jid, true); }
 	d["rate"] = static_cast<int64_t>(a.rate);
 	d["rate_name"] = String(RateName(a.rate));
 	d["capacity_kn"] = static_cast<double>(a.capacityKN);

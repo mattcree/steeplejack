@@ -16,6 +16,8 @@ const RAIL_GAP := 0.44
 const RUNG_GAP := 0.28
 const RAIL_THICK := 0.07
 
+const BRICK := preload("res://shaders/brick.gdshader")
+
 var height_m: float = 0.0
 var _base_r: float = 1.0
 var _top_r: float = 1.0
@@ -34,7 +36,7 @@ const BAND_COLOURS := {
 	# The MVP level's own four. They were all falling through to the default, so the grey box —
 	# the level the whole MVP test is run on — was one flat colour top to bottom and its four
 	# bands were invisible. The legend only works if it covers the levels being played.
-	"salt-bloom": Color(0.44, 0.42, 0.38),
+	"salt-bloom": Color(0.50, 0.37, 0.30),
 	"old-fixtures": Color(0.24, 0.20, 0.18),
 	"perished": Color(0.38, 0.32, 0.24),
 }
@@ -63,12 +65,15 @@ func build(jack: Jack) -> void:
 		mesh.top_radius = jack.radius_at(to)
 		mesh.bottom_radius = jack.radius_at(from)
 		mesh.height = to - from
-		mesh.radial_segments = 32
+		mesh.radial_segments = 64
 
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = _weathered(BAND_COLOURS.get(b["type"], Color(0.3, 0.26, 0.24)),
-			(from + to) * 0.5)
-		mat.roughness = 0.95
+		# Brick, courses and all, from the level's own jointGrid numbers. Weathering is done in the
+		# shader per pixel now rather than once per band, so soot fades up the stack instead of
+		# stepping at each band boundary.
+		var mat := ShaderMaterial.new()
+		mat.shader = BRICK
+		mat.set_shader_parameter("brick_colour", BAND_COLOURS.get(b["type"], Color(0.3, 0.26, 0.24)))
+		mat.set_shader_parameter("stack_height", height_m)
 		mesh.material = mat
 
 		var inst := MeshInstance3D.new()

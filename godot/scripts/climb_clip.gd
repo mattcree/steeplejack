@@ -69,12 +69,34 @@ const CHILD := {
 }
 
 
+## The working arm. He holds on with his left and works with his right, so these override the
+## right arm only and leave the rest of him on the ladder in the reach pose. Mannequiny faces +Z,
+## so his right is -X.
+const HAMMER_COCKED := {
+	"upperarm.r": Vector3(-0.62, 0.60, -0.50),
+	"lowerarm.r": Vector3(-0.30, 0.86, -0.40),
+}
+const HAMMER_RAISED := {
+	"upperarm.r": Vector3(-0.50, 0.84, -0.22),
+	"lowerarm.r": Vector3(-0.18, 0.70, -0.69),
+}
+const HAMMER_CONTACT := {
+	"upperarm.r": Vector3(-0.34, 0.06, 0.94),
+	"lowerarm.r": Vector3(-0.06, -0.06, 0.99),
+}
+## When in the tap the hammer lands. player.gd's TAP_CONTACT must agree, or the sound arrives
+## before or after the arm does.
+const TAP_CONTACT := 0.16
+const STRIKE_CONTACT := 0.10
+
+
 static func install(ap: AnimationPlayer, skel: Skeleton3D) -> void:
 	if ap.has_animation("climb"):
 		return
 
 	var reach := _solve(skel, 0)
 	var trail := _solve(skel, 1)
+	_install_hammer(ap, skel)
 
 	var a := Animation.new()
 	a.length = STRIDE_SECONDS
@@ -99,12 +121,72 @@ static func install(ap: AnimationPlayer, skel: Skeleton3D) -> void:
 	lib.add_animation(&"climb", a)
 
 
+## The three one-shot arm clips: a tap, a wind-up that holds, and a blow.
+##
+## Each key is the reach pose with the right arm overridden, solved the same way as the climb. The
+## tap is small and quick because the design wants it done hundreds of times; the blow has a real
+## wind-up and follow-through because camera and feel §3 says the hammer is the most-repeated
+## action in the game and asks for anticipation, a real arc and a hard contact.
+static func _install_hammer(ap: AnimationPlayer, skel: Skeleton3D) -> void:
+	var lib: AnimationLibrary = ap.get_animation_library(&"")
+	if lib == null:
+		lib = AnimationLibrary.new()
+		ap.add_animation_library(&"", lib)
+
+	var rest_arm := {}
+	for bone in HAMMER_COCKED:
+		rest_arm[bone] = AIM[bone][0]
+
+	lib.add_animation(&"tap", _one_shot(skel, [
+		[0.0, HAMMER_COCKED], [TAP_CONTACT, HAMMER_CONTACT], [0.42, rest_arm]]))
+	lib.add_animation(&"windup", _one_shot(skel, [
+		[0.0, rest_arm], [0.30, HAMMER_RAISED]]))
+	lib.add_animation(&"strike", _one_shot(skel, [
+		[0.0, HAMMER_RAISED], [STRIKE_CONTACT, HAMMER_CONTACT],
+		# The 2-frame hold on contact the feel spec asks for: the hammer stays on the dog for a
+		# moment before it comes away, which is most of what makes a blow read as heavy.
+		[STRIKE_CONTACT + 0.034, HAMMER_CONTACT], [0.50, rest_arm]]))
+
+
+## A non-looping clip from a list of [time, arm overrides] keys over the reach pose.
+static func _one_shot(skel: Skeleton3D, keys: Array) -> Animation:
+	var a := Animation.new()
+	a.length = keys[keys.size() - 1][0]
+	a.loop_mode = Animation.LOOP_NONE
+
+	var poses: Array = []
+	for k in keys:
+		var aims := {}
+		for bone in AIM:
+			aims[bone] = AIM[bone][0]
+		for bone in k[1]:
+			aims[bone] = k[1][bone]
+		poses.append(_solve_aims(skel, aims))
+
+	for bone in AIM:
+		if not poses[0].has(bone):
+			continue
+		var t := a.add_track(Animation.TYPE_ROTATION_3D)
+		a.track_set_path(t, "%s:%s" % [SKELETON, bone])
+		a.track_set_interpolation_type(t, Animation.INTERPOLATION_CUBIC)
+		for i in keys.size():
+			a.rotation_track_insert_key(t, keys[i][0], poses[i][bone])
+	return a
+
+
 ## Local rotations for every posed bone in pose `which` (0 reach, 1 trail).
 ##
 ## Walks the whole skeleton in order so that each bone's parent orientation is known by the time it
 ## is reached — that is the part a per-bone Euler table cannot do, and the reason the arms came out
 ## sideways when it was tried.
 static func _solve(skel: Skeleton3D, which: int) -> Dictionary:
+	var aims := {}
+	for bone in AIM:
+		aims[bone] = AIM[bone][which]
+	return _solve_aims(skel, aims)
+
+
+static func _solve_aims(skel: Skeleton3D, aims: Dictionary) -> Dictionary:
 	var out := {}
 	var model: Array[Basis] = []
 	model.resize(skel.get_bone_count())
@@ -116,13 +198,13 @@ static func _solve(skel: Skeleton3D, which: int) -> Dictionary:
 		var local := rest
 
 		var name := skel.get_bone_name(idx)
-		if AIM.has(name):
+		if aims.has(name):
 			var child := skel.find_bone(CHILD[name])
 			if child >= 0:
 				# Where this bone points when nothing is posed, in its own space.
 				var rest_dir: Vector3 = skel.get_bone_rest(child).origin.normalized()
 				# Where we want it to point, brought out of model space into the parent's.
-				var want: Vector3 = (parent_basis.inverse() * (AIM[name][which] as Vector3)).normalized()
+				var want: Vector3 = (parent_basis.inverse() * (aims[name] as Vector3).normalized()).normalized()
 				if rest_dir.length_squared() > 0.0 and want.length_squared() > 0.0:
 					local = Basis(Quaternion(rest_dir, want))
 					out[name] = local.get_rotation_quaternion()

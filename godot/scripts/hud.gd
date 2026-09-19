@@ -75,7 +75,9 @@ func _draw() -> void:
 	# His FEET, not the capsule's middle. `global_position.y` is his waist and reads 0.9 m high —
 	# the same off-by-a-body-height that the sim was fixed for and the HUD never was, so the number
 	# on screen disagreed with every number in the level file.
-	_label("%.0f m" % player.height_m(), Vector2(info_x, hand.y - 20), Color(0.94, 0.92, 0.88, 0.92))
+	# Floored at zero: standing on the ground printed "-0 m", and a negative height is the kind of
+	# small wrongness that makes a player stop trusting every other number on the screen.
+	_label("%.0f m" % maxf(player.height_m(), 0.0), Vector2(info_x, hand.y - 20), Color(0.94, 0.92, 0.88, 0.92))
 	if player.on_ladder:
 		var where: String = jack.stance_name()
 		var band: String = jack.band_type_at(player.height_m())

@@ -16,8 +16,11 @@
 #   climb <m>        on the ladder at that height, with stack lashed up to it
 #   dog <m>          a dog seated at that height, as if driven cleanly
 #   carry            a ladder on the shoulder and a full bag of dogs
-#   tap              sound the brickwork where he is
-#   work             into work mode, hammer up
+#   tap              sound the joint he is pointing at, through the real flow
+#   tapall [r]       sound every joint in reach (or r x reach), for a frame of the chalk
+#   work [depth]     start driving a dog into the joint he is pointing at
+#   draw             hammer raised, mid-draw
+#   strike           one blow, caught at contact
 #   stance <0-4>     one hand / hooked leg / clipped / belted / chair
 #   strain <g> <n>   drained meters, to see the telegraphs
 #   slip             grip to nothing, so the slip window is open
@@ -90,18 +93,45 @@ func _run(cmd: String) -> void:
 		"dog":
 			_lash_to(a)
 			jack.seat_anchor(a, 1.0, 0.0)
-			chimney.add_dog(a)
+			if player.face != null:
+				player.face.touch()
 		"carry":
 			player.carrying_ladder = true
 			player.dogs_carried = player.DOG_BAG
 		"tap":
+			# Through the real flow, so the frame shows what a player would see: the arm, the dust,
+			# the chalk. Taken just after contact unless a wait follows.
+			await _wait(2)
 			player._tap()
+			await _wait(int(ClimbClip.TAP_CONTACT * 60.0) + 2)
+		"tapall":
+			# Sound every joint in reach, as a player surveying a working position would. For a
+			# frame of the chalk marks.
+			await _wait(2)
+			for j in jack.joints_near(player.height_m(), jack.climb_bearing(),
+					jack.tuning_f("tapTestMaxRangeMetres", 2.5) * a if a > 0.0 else 1.2):
+				if not j["occupied"]:
+					jack.tap_joint(j["id"], false)
+			player.face.touch()
 		"work":
-			player.work_mode = true
-			player.work_height = player.height_m()
-			player.dog_depth = 0.35
+			await _wait(2)
+			player.dogs_carried = maxi(player.dogs_carried, 1)
+			player._toggle_work_mode()
+			player.dog_depth = a if a > 0.0 else 0.35
 			player.aim = Vector2(3.0, -2.0)
-			player.swing_power = 0.6
+		"draw":
+			# The hammer up and held, mid-draw.
+			player.drawing = true
+			player.swing_power = 0.7
+			if player.anim.has_animation("windup"):
+				player.anim.play("windup", 0.05)
+				player._playing = "windup"
+			await _wait(24)
+		"strike":
+			player.drawing = true
+			player.swing_power = 0.8
+			player._release_strike()
+			await _wait(int(ClimbClip.STRIKE_CONTACT * 60.0) + 1)
 		"stance":
 			jack.set_stance(int(a))
 		"strain":

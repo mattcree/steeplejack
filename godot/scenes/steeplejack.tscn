@@ -3,11 +3,12 @@
 ;
 ; Hand-written text, reviewable in a diff. That is why we are in this engine.
 
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://scripts/chimney.gd" id="1_chimney"]
 [ext_resource type="Script" path="res://scripts/town.gd" id="5_town"]
 [ext_resource type="Script" path="res://scripts/foley.gd" id="6_foley"]
+[ext_resource type="Script" path="res://scripts/face.gd" id="7_face"]
 [ext_resource type="Script" path="res://scripts/player.gd" id="2_player"]
 [ext_resource type="Script" path="res://scripts/hud.gd" id="3_hud"]
 [ext_resource type="PackedScene" path="res://assets/characters/mannequiny.glb" id="4_body"]
@@ -108,6 +109,11 @@ script = ExtResource("5_town")
 
 [node name="Chimney" type="Node3D" parent="."]
 script = ExtResource("1_chimney")
+
+; The joints within reach, drawn as what they look like. A sibling of the chimney rather than a
+; child, because chimney.gd frees its children whenever it rebuilds the stack.
+[node name="Face" type="Node3D" parent="."]
+script = ExtResource("7_face")
 
 ; Spawned well back. At 30 m a 70 m stack subtends 67 degrees and its top is off the top of the
 ; screen — the first thing the player sees is being told to climb something they cannot see the end

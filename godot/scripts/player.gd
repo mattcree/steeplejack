@@ -25,6 +25,15 @@ const TURN_RATE := 12.0
 ## feet slip forwards, raise it; if he moonwalks, lower it.
 const RUN_CLIP_SPEED := 4.6
 
+## How long a change of clip takes to blend in, in real seconds.
+const CLIP_BLEND := 0.22
+
+## When in the tap the hammer meets the brick. The result lands here, not on the keypress: a sound
+## that plays before the arm has moved is a sound from nowhere.
+const TAP_CONTACT := ClimbClip.TAP_CONTACT
+## How close to where you are looking a joint must be to be the one you are pointing at.
+const AIM_SLACK := 0.45
+
 const LADDER_REACH := 0.9        ## You are on a ladder when you can hold it.
 const BODY_OFF_LADDER := 0.40
 const MOUNT_HEIGHT := 1.6        ## You get on a ladder from the ground, not by brushing past it.
@@ -55,6 +64,8 @@ const SLIP_FELL := 2
 @onready var anim: AnimationPlayer = $Body/AnimationPlayer
 @onready var chimney: Chimney = get_node("../Chimney")
 @onready var foley: Foley = get_node_or_null("../Foley")
+@onready var face: Face = get_node_or_null("../Face")
+@onready var camera: Camera3D = $Boom/Camera
 
 var ladder_top := 5.0
 var carrying_ladder := false
@@ -75,6 +86,17 @@ var swing_power := 0.0
 var drawing := false
 var dog_depth := 0.0
 var work_height := 0.0
+var work_joint := -1             ## The joint the dog is going into. Everything in work mode acts on it.
+
+## The joint he is pointing at. Everything on the ladder acts on it — see 15-working-the-face.md.
+var target_id := -1
+var tapping := 0.0               ## Seconds of the tap action left. A tap is an action, not an event.
+var _tap_joint := -1
+var _tap_landed := false
+## The last tap's result, for the pip drawn at the joint. {id, pip, tier, at}.
+var last_tap := {}
+## Joints with a dog bent into them. Wasted material should be something you can look at.
+var bent_joints := {}
 var drift_phase := 0.0
 
 var on_ladder := false
@@ -87,6 +109,8 @@ var _shuffle := 0.0              ## How far sideways off the ladder line he has 
 var _remount_block := 0.0
 var _now := 0.0                  ## Seconds since the shift started. The HUD's clock, not the sim's.
 var _climb_rate := 0.0           ## Metres per second up the ladder this frame; drives the clip.
+var _blend_left := 0.0           ## Real seconds of clip blend still to run.
+var _kick := 0.0                 ## Camera impulse from a hammer blow, decaying.
 var rigging_to := -1             ## Stance being rigged, or -1. The HUD draws the ring.
 var rig_left := 0.0              ## Seconds of it still to do.
 var rig_total := 0.0
@@ -138,10 +162,13 @@ func _ready() -> void:
 		if anim.has_animation(clip):
 			anim.get_animation(clip).loop_mode = Animation.LOOP_LINEAR
 
-	# The model has no climb, and this is a game about climbing.
+	# The model has no climb, and this is a game about climbing. Nor a tap, nor a hammer blow.
 	var skel: Skeleton3D = body.get_node_or_null(ClimbClip.SKELETON)
 	if skel != null:
 		ClimbClip.install(anim, skel)
+		_give_hammer(skel)
+	if face != null:
+		face.jack = jack
 
 	_spawn = global_position
 	var town: Town = get_node_or_null("../Town")
@@ -233,6 +260,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			_toggle_work_mode()
 		elif event.button_index == MOUSE_BUTTON_LEFT and work_mode:
 			drawing = true
+			# The hammer goes up as the draw starts: anticipation, the first thing on the feel list.
+			if anim.has_animation("windup"):
+				anim.play("windup", 0.05)
+				anim.speed_scale = 1.0
+				_playing = "windup"
 	if event is InputEventMouseButton and not event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT and drawing:
 			_release_strike()
@@ -241,6 +273,10 @@ func _unhandled_input(event: InputEvent) -> void:
 func _physics_process(dt: float) -> void:
 	_now += dt
 	boom.rotation = Vector3(_pitch, _yaw, 0.0)
+	# The impact frame. Decays in a few frames; small enough never to move the aim.
+	_kick = move_toward(_kick, 0.0, dt * 0.12)
+	camera.h_offset = 0.65 + randf_range(-_kick, _kick)
+	camera.v_offset = randf_range(-_kick, _kick)
 
 	# Hanging by one hand. Nothing he does moves him and no verb is available; the only input that
 	# means anything is the grab, and _step_sim is what closes the window on it. Stepping the sim
@@ -279,6 +315,8 @@ func _physics_process(dt: float) -> void:
 	_step_sim(dt)
 	_read_slip()
 	_update_rig(dt)
+	_update_face()
+	_update_tap(dt)
 	_update_work(dt)
 	_animate()
 
@@ -464,6 +502,23 @@ func _animate() -> void:
 	# animation in it, so on the ladder he holds still rather than pretending — a run cycle on a
 	# ladder reads worse than stillness.
 	var want := "idle"
+	# A tap or a blow plays through to its end before the ladder takes him back.
+	if (_playing == "tap" or _playing == "strike") and anim.is_playing() \
+			and anim.current_animation == _playing:
+		return
+	# Holding the draw holds the hammer up. The wind-up clip ends in that pose and stays there.
+	if _playing == "windup" and drawing:
+		return
+	# In work mode between blows he holds the ladder and the dog; no climbing stride.
+	if work_mode and _playing != "climb":
+		if anim.has_animation("climb"):
+			anim.play("climb", CLIP_BLEND)
+			_playing = "climb"
+			_blend_left = CLIP_BLEND
+	if work_mode:
+		anim.speed_scale = 1.0 if _blend_left > 0.0 else 0.0
+		_blend_left = maxf(0.0, _blend_left - get_physics_process_delta_time())
+		return
 	if on_ladder:
 		want = "climb"
 	elif not is_on_floor():
@@ -471,10 +526,18 @@ func _animate() -> void:
 	elif speed > 0.6:
 		want = "run"
 	if want != _playing and anim.has_animation(want):
-		anim.play(want, 0.25)
+		anim.play(want, CLIP_BLEND)
 		_playing = want
+		_blend_left = CLIP_BLEND
 
-	if want == "climb":
+	# The blend into a clip runs at the clip's speed_scale, not in real time. So a climb stride
+	# slowed to a tenth for a man standing still turned a quarter-second blend out of idle into
+	# two and a half seconds, and he hung there with his arms out sideways in a pose neither clip
+	# contains. Full speed until the blend is done, then the ladder drives the stride.
+	_blend_left = maxf(0.0, _blend_left - get_physics_process_delta_time())
+	if want == "climb" and _blend_left > 0.0:
+		anim.speed_scale = 1.0
+	elif want == "climb":
 		# The cycle follows the ladder, not the clock: he reaches when he moves and holds the rung
 		# he is on when he does not. A climb cycle running while the player stands still is the
 		# ladder equivalent of feet skating.
@@ -503,7 +566,7 @@ func _step_sim(dt: float) -> void:
 	# wind is a term in both the nerve drain and the wobble, so it was a difficulty dial the
 	# designer had and the game ignored.
 	jack.set_context(h, jack.wind_at(h), carrying_ladder,
-		work_mode or _slipping or rigging_to >= 0)
+		work_mode or _slipping or rigging_to >= 0 or tapping > 0.0)
 	if foley != null:
 		foley.set_height(h)
 
@@ -527,19 +590,90 @@ func _step_sim(dt: float) -> void:
 
 # --- the verbs -----------------------------------------------------------------------------------
 
+## What he is pointing at, and the patch of wall around him.
+##
+## The target is the joint nearest where the camera is looking, and only one his hand can reach.
+## Not the best joint in reach: choosing is the skill, and the bracket is the same for every tier.
+func _update_face() -> void:
+	if face == null:
+		return
+	face.update_for(maxf(height_m(), 0.0))
+	if work_mode:
+		face.set_target(work_joint)
+		face.set_work(work_joint, dog_depth)
+		return
+	face.set_work(-1, 0.0)
+	target_id = _find_target() if on_ladder and not _slipping else -1
+	face.set_target(target_id)
+
+
+func _find_target() -> int:
+	var reach: float = jack.tuning_f("tapTestMaxRangeMetres", 2.5)
+	var hands := global_position + Vector3.UP * 0.55   # shoulder height; the origin is his middle
+	var from := camera.global_position
+	var q := PhysicsRayQueryParameters3D.create(from, from - camera.global_transform.basis.z * 14.0)
+	q.exclude = [get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	# Looking at the wall: the joint where you are looking. Looking away from it — at the view, say
+	# — the joint straight in front of his chest, so there is always something sensible to tap on a
+	# ladder and never a dead key.
+	var aim_at: Vector3 = hit["position"] if not hit.is_empty() else (
+		hands + (chimney.global_position - hands).normalized() * 0.6)
+	aim_at.y = clampf(aim_at.y, hands.y - reach, hands.y + reach)
+	var id: int = jack.nearest_joint(aim_at - chimney.global_position, AIM_SLACK)
+	if id < 0:
+		return -1
+	var j: Dictionary = face.joint(id)
+	if j.is_empty():
+		return -1
+	if ((j["pos"] as Vector3) + chimney.global_position).distance_to(hands) > reach:
+		return -1
+	return id
+
+
 func _tap() -> void:
 	if not on_ladder:
-		_say("you have to be on the ladder to sound the brickwork")
+		_say("you sound the brickwork from the ladder")
 		return
-	var r: Dictionary = jack.tap(height_m(), false)
-	tap_reading = r["tier_name"]
-	tap_pip = r["pip"]
-	tapped_at = height_m()
-	# The sound *is* the reading. The pip beside it is the visual fallback that rule 8 requires, and
-	# is what a player who cannot hear the difference reads instead — never the only channel.
-	if foley != null:
-		foley.tap(r["tier"])
-	_say("tapped: %s" % tap_reading)
+	if tapping > 0.0:
+		return
+	if target_id < 0:
+		_say("no joint in reach — look at the brickwork")
+		return
+	# A tap is an action, with an arm that moves and a moment it lands. The result arrives at
+	# contact, not on the keypress.
+	tapping = jack.tuning_f("tapTestSeconds", 0.8)
+	_tap_joint = target_id
+	_tap_landed = false
+	if anim.has_animation("tap"):
+		anim.play("tap", 0.06)
+		anim.speed_scale = 1.0
+		_playing = "tap"
+
+
+func _update_tap(dt: float) -> void:
+	if tapping <= 0.0:
+		return
+	var total: float = jack.tuning_f("tapTestSeconds", 0.8)
+	tapping -= dt
+	if not _tap_landed and total - tapping >= TAP_CONTACT:
+		_tap_landed = true
+		var r: Dictionary = jack.tap_joint(_tap_joint, false)
+		if r.is_empty():
+			return
+		tap_reading = r["tier_name"]
+		tap_pip = r["pip"]
+		tapped_at = height_m()
+		last_tap = {"id": _tap_joint, "pip": r["pip"], "tier": r["tier"], "at": _now}
+		# The sound *is* the reading. The pip and the chalk are the visual fallbacks rule 8
+		# requires — never the only channel, and never a colour.
+		if foley != null:
+			foley.tap(r["tier"])
+		_dust_at(_tap_joint, 6)
+		if face != null:
+			face.touch()
+	if tapping <= 0.0:
+		tapping = 0.0
 
 
 func _toggle_work_mode() -> void:
@@ -549,19 +683,26 @@ func _toggle_work_mode() -> void:
 		swing_power = 0.0
 		return
 	if not on_ladder:
-		_say("you have to be on the ladder")
+		_say("you drive a dog from the ladder")
 		return
-	if not has_tapped_here():
-		_say("sound the joint first — E")
+	if target_id < 0:
+		_say("no joint in reach — look at the brickwork")
 		return
 	if dogs_carried <= 0:
 		_say("no dogs in the bag")
 		return
+	# No "sound it first". Tapping is information you can buy for 0.8 s and some grip, and skipping
+	# it is a real choice — the fairness contract's second kind of failure is exactly "information
+	# you could have got for a known cost and chose not to", and MVP criterion 2 measures whether
+	# players *still choose* to tap at anchor #10. Forcing it deleted the choice both depend on.
 	work_mode = true
-	work_height = height_m()
+	work_joint = target_id
+	var j: Dictionary = face.joint(work_joint)
+	work_height = j.get("height", height_m())
 	dog_depth = 0.0
 	aim = Vector2.ZERO
-	_say("mouse places the dog, hold to draw, release to strike")
+	if jack.joint(work_joint).get("tapped", -1) < 0:
+		_say("you have not sounded this one")
 
 
 func _update_work(dt: float) -> void:
@@ -582,9 +723,19 @@ func _release_strike() -> void:
 	drawing = false
 	var swing_at_release := swing_power
 	var err := aim.length()
-	var r: Dictionary = jack.strike(work_height, dog_depth, swing_power, err, TOOL_CONDITION)
+	var r: Dictionary = jack.strike_joint(work_joint, dog_depth, swing_power, err, TOOL_CONDITION)
 	dog_depth = clampf(dog_depth + r["depth_gain"], 0.0, 1.0)
 	swing_power = 0.0
+
+	if anim.has_animation("strike"):
+		anim.play("strike", 0.04)
+		anim.speed_scale = 1.0
+		_playing = "strike"
+	_dust_at(work_joint, 4 + int(10.0 * swing_at_release))
+	# The hit, felt: a couple of pixels of camera kick, harder for a harder blow. Camera and feel
+	# §3 asks for 2-3 px; this is that, and nothing more — a shake that moves the aim would be a
+	# second, invisible wobble.
+	_kick = 0.012 * (0.4 + swing_at_release)
 
 	if foley != null:
 		# Pitched by how hard he swung, so a half-drawn blow sounds like one.
@@ -594,6 +745,12 @@ func _release_strike() -> void:
 		if foley != null:
 			foley.cue("bent")
 		dogs_carried -= 1
+		# It stays in the wall, bent, and the joint is spoiled — it cannot take another.
+		bent_joints[work_joint] = true
+		jack.spoil_joint(work_joint)
+		if face != null:
+			face.bent_ids[work_joint] = true
+			face.touch()
 		_say("bent it. %d dogs left" % dogs_carried)
 		work_mode = false
 		return
@@ -601,13 +758,80 @@ func _release_strike() -> void:
 	if dog_depth >= jack.seat_depth():
 		if foley != null:
 			foley.cue("seated")
-		var a: Dictionary = jack.seat_anchor(work_height, dog_depth, r["spalled"])
+		var a: Dictionary = jack.seat_anchor_joint(work_joint, dog_depth, r["spalled"])
 		dogs_carried -= 1
-		chimney.add_dog(work_height)
-		_say("dog seated at %.0fm — %s, %.1f kN" % [work_height, a["rate_name"], a["capacity_kn"]])
+		if face != null:
+			face.touch()
+		_say("dog seated — %s, %.1f kN" % [a["rate_name"], a["capacity_kn"]])
 		work_mode = false
-	else:
-		_say("%.0f%% in" % (dog_depth * 100.0))
+
+
+## A puff of mortar dust at a joint.
+func _dust_at(id: int, amount: int) -> void:
+	if face == null or id < 0:
+		return
+	var j: Dictionary = face.joint(id)
+	if j.is_empty():
+		return
+	var p := CPUParticles3D.new()
+	p.one_shot = true
+	p.amount = maxi(amount * 2, 6)
+	p.lifetime = 0.9
+	p.explosiveness = 0.95
+	p.direction = j["normal"]
+	p.spread = 55.0
+	p.initial_velocity_min = 0.25
+	p.initial_velocity_max = 0.9
+	p.gravity = Vector3(0, -1.2, 0)
+	p.scale_amount_min = 0.03
+	p.scale_amount_max = 0.08
+	var m := SphereMesh.new()
+	m.radius = 0.5
+	m.height = 1.0
+	m.radial_segments = 6
+	m.rings = 3
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.72, 0.67, 0.58)
+	mat.roughness = 1.0
+	m.material = mat
+	p.mesh = m
+	get_parent().add_child(p)
+	p.global_position = (j["pos"] as Vector3) + chimney.global_position + (j["normal"] as Vector3) * 0.03
+	p.emitting = true
+	get_tree().create_timer(1.5).timeout.connect(p.queue_free)
+
+
+## A hammer in his right hand. He was tapping and driving with nothing in it.
+func _give_hammer(skel: Skeleton3D) -> void:
+	var grip := BoneAttachment3D.new()
+	grip.bone_name = "hand.r"
+	skel.add_child(grip)
+
+	var iron := StandardMaterial3D.new()
+	iron.albedo_color = Color(0.22, 0.22, 0.23)
+	iron.metallic = 0.6
+	iron.roughness = 0.45
+	var ash := StandardMaterial3D.new()
+	ash.albedo_color = Color(0.55, 0.40, 0.24)
+	ash.roughness = 0.8
+
+	var handle := MeshInstance3D.new()
+	var hm := CylinderMesh.new()
+	hm.top_radius = 0.014
+	hm.bottom_radius = 0.016
+	hm.height = 0.32
+	hm.material = ash
+	handle.mesh = hm
+	handle.position = Vector3(0.0, 0.12, 0.0)
+	grip.add_child(handle)
+
+	var head := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.12, 0.045, 0.045)
+	bm.material = iron
+	head.mesh = bm
+	head.position = Vector3(0.03, 0.27, 0.0)
+	grip.add_child(head)
 
 
 func _lash() -> void:
@@ -722,6 +946,11 @@ func has_lashable_anchor() -> bool:
 	var best: float = jack.highest_anchor_below(height_m() + 100.0)
 	var rise: float = jack.tuning_f("ladderLengthMetres", 5.0) - jack.tuning_f("ladderMinOverlapMetres", 1.0)
 	return best >= 0.0 and best + 0.1 >= ladder_top - rise
+
+
+## Whether the joint he is pointing at has been sounded.
+func target_tapped() -> bool:
+	return target_id >= 0 and jack.joint(target_id).get("tapped", -1) >= 0
 
 
 func has_tapped_here() -> bool:

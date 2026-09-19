@@ -14,6 +14,7 @@
 #include <godot_cpp/variant/dictionary.hpp>
 
 #include "Anchor.h"
+#include "JointGrid.h"
 #include "Level.h"
 #include "Meters.h"
 #include "Rng.h"
@@ -22,6 +23,7 @@
 #include "Tuning.h"
 #include "Types.h"
 
+#include <map>
 #include <memory>
 #include <vector>
 
@@ -125,6 +127,35 @@ public:
 	 */
 	void new_shift();
 
+	// --- the face ------------------------------------------------------------------------------
+	// Every joint the player can see, read, tap and drive into comes from the grid, by id. Before
+	// the grid a joint was a hash of the height and the level's bands were ignored; see
+	// JointGrid.h. What the renderer draws is exactly what the sim thinks the wall is.
+
+	/** Degrees clockwise from north that the ladder climbs. chimney.gd's FACE (-X) is 270. */
+	double climb_bearing() const { return kClimbBearing; }
+	int64_t joint_count() const { return grid ? grid->Count() : 0; }
+	/**
+	 * Every joint within `range` of the face at this height and bearing.
+	 * Each is `{id, pos, normal, height, look, look_q, occupied, tapped}`: `look` is the tier the
+	 * joint *appears* to be (the visual tell, which lies a little), `tapped` is the tier the player
+	 * learned by tapping it, or -1. The true tier is deliberately not here.
+	 */
+	godot::Array joints_near(double height, double bearing_deg, double range) const;
+	/** The unoccupied joint nearest a world point, within `max_range`, or -1. */
+	int64_t nearest_joint(const godot::Vector3& point, double max_range) const;
+	godot::Dictionary joint(int64_t id) const;
+
+	/** Tap a joint by id. `{tier, tier_name, pip, confidence, id}`. Remembers what was learned. */
+	godot::Dictionary tap_joint(int64_t id, bool wearing_gloves);
+	/** One hammer blow at a joint by id. */
+	godot::Dictionary strike_joint(int64_t id, double current_depth, double power,
+	                               double angle_error_deg, double tool_condition);
+	/** Seat a dog in a joint by id; it is occupied from then on. */
+	godot::Dictionary seat_anchor_joint(int64_t id, double depth, double spall);
+	/** A dog bent into a joint spoils it: occupied, and holding nothing. */
+	void spoil_joint(int64_t id);
+
 	// --- the verbs -----------------------------------------------------------------------------
 	/** Sound the brickwork. `{tier, tier_name, pip, confidence}`. */
 	godot::Dictionary tap(double height, bool wearing_gloves);
@@ -159,6 +190,14 @@ private:
 	 * answer were re-rolled between reading it and acting on it.
 	 */
 	sj::Joint joint_at(double height) const;
+	int32_t joint_id_at(double height) const;
+	godot::Dictionary joint_dict(int32_t id) const;
+
+	static constexpr float kClimbBearing = 270.0f;   // west, chimney.gd's FACE
+
+	std::unique_ptr<sj::JointGrid> grid;
+	/** What the player has learned by tapping, by joint id. Chalk marks are drawn from this. */
+	std::map<int32_t, int32_t> tapped;
 
 	std::unique_ptr<sj::Tuning> tuning;
 	std::unique_ptr<sj::LevelData> level;
