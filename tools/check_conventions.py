@@ -169,9 +169,36 @@ def check_tuning_keys():
                                       f"data/tuning/*.json")
 
 
+# --- rule 19: wobble is computed in one place --------------------------------
+# METER-003: "This is the only place wobble may be computed." A verb that wants a different wobble
+# takes a multiplier on WobbleAmplitudeDeg's answer; it does not read the wobble tuning and build
+# its own. Reading any *Wobble* tuning key is what building your own looks like, so that is the
+# check. Deliberately narrow: calling WobbleAmplitudeDeg anywhere is fine.
+WOBBLE_HOME = os.path.join("Source", "SteeplejackSim", "Private", "Wobble.cpp")
+WOBBLE_KEY = re.compile(r'\.Get[FIB]\(\s*"[^"]*[Ww]obble[^"]*"')
+
+
+def check_wobble_home():
+    if not os.path.isdir(SIM):
+        return
+    for dirpath, _, files in os.walk(SIM):
+        for fn in files:
+            if not fn.endswith(SIM_EXTS):
+                continue
+            rel = os.path.relpath(os.path.join(dirpath, fn), ROOT)
+            if rel == WOBBLE_HOME:
+                continue
+            for i, line in enumerate(open(os.path.join(dirpath, fn), encoding="utf-8"), 1):
+                if WOBBLE_KEY.search(line.split("//")[0]):
+                    errors.append(f"{rel}:{i}: wobble tuning read outside Wobble.cpp — call "
+                                  f"WobbleAmplitudeDeg and scale its answer instead "
+                                  f"(docs/06-workflow/04-enforced-conventions.md rule 19)")
+
+
 def main():
     check_sim_purity()
     check_tuning_keys()
+    check_wobble_home()
     check_likeness()
     for e in errors:
         print(f"\033[31merror\033[0m {e}")

@@ -4,7 +4,7 @@ title: Wobble — the one number every verb reads
 milestone: M1
 discipline: [ENG]
 estimate_days: 0.5
-status: ready
+status: blocked
 assignee: null
 depends_on: [METER-002]
 owns:
@@ -48,7 +48,36 @@ Do not add per-verb wobble behaviour here. Verbs scale the result.
 <!-- Filled in by the implementer before building, if estimate_days > 1. -->
 
 ## Blocked
-<!-- Only if blocked. Question / what I tried / options / recommendation. -->
+**Question:** acceptance 3 says wobble "reaches 6x base at zero grip, zero nerve, one-handed, in a
+gust". The tuning gives **13.1x**: stance 1.6 (oneHand) × nerve 3.0 × grip 2.0 = 9.6x, plus a full
+gust's 3.5° on a 1° base. Which number is the design?
+
+**What I found:** the GDD formula (`03-meters-grip-nerve.md`, the wobble block) is grip ×2 at zero
+and nerve ×3 at zero, and 2 × 3 is exactly 6. So "6x" looks like it was worked out from those two
+factors alone, before a stance multiplier above 1.0 and a gust were in the data. Two smaller
+mismatches are in the same place:
+
+- The GDD multiplies a gust in (`* windGust(t)`). The code adds it, so a gust on steady hands
+  shoves you without scaling your nerves. Acceptance 1 says "product".
+- The GDD ramps nerve continuously. The code steps it in bands.
+
+The code follows `meters.json` and the comments in `Wobble.cpp`. The spec and the data disagree,
+not the code and the data.
+
+**Options:**
+
+1. Keep the data and restate acceptance 3 as "the product of each factor's worst". Also restate
+   acceptance 1 as "product, with the gust added".
+2. Retune to hit 6x. For example, oneHand 1.0 and gustWobbleDegrees 0. That removes both the
+   stance's effect on aim and the gust's.
+
+**Recommendation:** option 1. test_hammer.cpp already asserts the property the design actually
+needs ("at its worst it exceeds the hammer's angle tolerance — that is the point"), and 6x would
+not exceed it by much.
+
+**Done meanwhile:** convention rule 19 (acceptance 4) with its two tests, and
+`tests/unit/test_wobble.cpp` covering acceptance 1, 2 and 5 against the current data. Nothing is
+waiting on the answer except one test for acceptance 3.
 
 ## Outcome
 <!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->

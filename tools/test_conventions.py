@@ -73,6 +73,17 @@ def main() -> int:
     case("std::vector allowed", HEADER + "std::vector<int> F();" + FOOTER,
          must_flag=None, must_not_flag="")
 
+    print("rule 19 — wobble is computed in Wobble.cpp and nowhere else")
+    case("own wobble caught", HEADER + "class Tuning { public: float GetF(const char*) const; };\n"
+         "float F(const Tuning& t) { return t.GetF(\"baseWobbleDegrees\") * 2.0f; }" + FOOTER,
+         must_flag="wobble tuning read outside Wobble.cpp")
+    case("calling the one wobble allowed", HEADER +
+         "struct Meters; struct MeterContext; class Tuning;\n"
+         "float WobbleAmplitudeDeg(const Meters&, const MeterContext&, float, const Tuning&);\n"
+         "float F(const Meters& m, const MeterContext& c, const Tuning& t) "
+         "{ return WobbleAmplitudeDeg(m, c, 0.0f, t) * 2.0f; }" + FOOTER,
+         must_flag=None, must_not_flag="")
+
     print("rule 2 — no ambient RNG, no mutable statics")
     case("rand() caught", HEADER + "int F() { return rand(); }" + FOOTER, must_flag="ambient RNG")
     case("mt19937 caught", HEADER + "void F() { std::mt19937 g; (void)g; }" + FOOTER,

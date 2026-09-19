@@ -27,6 +27,7 @@ Run them all: `make check-conventions`
 | 16 | **No real person's name anywhere in the repo** | `tools/check_conventions.py:likeness` | [IP policy](../05-legal/ip-and-likeness.md) |
 | 17 | C++ compiles clean at `-Wall -Wextra -Werror -Wconversion` | the CMake build | |
 | 18 | No gameplay decision in a Blueprint, and no ticking Blueprint | review + `tools/check_blueprints.py` | Blueprints are binary and unreviewable |
+| 19 | Wobble tuning is read only in `Wobble.cpp`; everything else calls `WobbleAmplitudeDeg` | `tools/check_conventions.py:wobble_home` | METER-003 — two wobbles tell the player two stories about the same hands |
 
 Rules 1–4 and 16 are the ones that exist specifically because agents will otherwise break them
 confidently and silently.
