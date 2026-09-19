@@ -1,0 +1,55 @@
+{
+  "_comment": [
+    "Sound design as numbers. Every cue in this game is synthesised from this file at load, because",
+    "a .wav is a binary asset and binary assets are the half of this project agents cannot author or",
+    "review — see ADR-0006 and the ownership table in AGENTS.md. A tap sound written as an envelope",
+    "is a tap sound that can be diffed, tuned in a pull request, and argued about.",
+    "",
+    "Deliberately NOT under data/tuning/. Tuning::LoadAll reads every file there and stamps the lot",
+    "into the hash that ADR-0003 writes into replays, so putting sound design in it would mean",
+    "re-recording every replay because somebody brightened a hammer.",
+    "",
+    "The four taps are a mechanic, not a garnish: 02-climbing-system.md requires them to be",
+    "distinguishable on laptop speakers, in mono, at low volume, and to differ on the attack and",
+    "decay envelope rather than on timbre alone. The decayMs figures are that document's own."
+  ],
+
+  "sampleRate": 22050,
+
+  "taps": {
+    "sound":    { "decayMs": 120, "transient": 1.00, "partials": [1450, 2270, 3140],
+                  "lowpassHz": 9000, "noise": 0.22, "rattle": 0.0 },
+    "fair":     { "decayMs": 200, "transient": 0.55, "partials": [820, 1310, 1870],
+                  "lowpassHz": 5200, "noise": 0.30, "rattle": 0.0 },
+    "perished": { "decayMs": 400, "transient": 0.10, "partials": [298, 471],
+                  "lowpassHz": 1100, "noise": 0.48, "rattle": 0.0 },
+    "cracked":  { "decayMs": 260, "transient": 0.85, "partials": [635, 988],
+                  "lowpassHz": 4200, "noise": 0.55, "rattle": 0.80,
+                  "rattleDelayMs": 40, "rattleHz": 118 }
+  },
+
+  "hammer": {
+    "decayMs": 90, "transient": 1.0, "partials": [190, 430, 2600],
+    "lowpassHz": 6000, "noise": 0.5, "rattle": 0.0
+  },
+  "bent": {
+    "decayMs": 520, "transient": 0.7, "partials": [740, 1120],
+    "lowpassHz": 5000, "noise": 0.25, "rattle": 0.35,
+    "rattleDelayMs": 30, "rattleHz": 47
+  },
+  "seated": {
+    "decayMs": 340, "transient": 0.9, "partials": [1180, 1770, 2360],
+    "lowpassHz": 8000, "noise": 0.15, "rattle": 0.0
+  },
+
+  "wind": {
+    "loopSeconds": 4.0,
+    "lowpassHz": 620,
+    "gustHz": 0.21,
+    "gustDepth": 0.55,
+    "_comment": "A filtered noise bed. Its level is the height mix: AUD-003 wants the ground to go quiet and the wind to take over as you climb, because that is most of what altitude sounds like.",
+    "groundDb": -34.0,
+    "topDb": -11.0,
+    "refHeightM": 60.0
+  }
+}

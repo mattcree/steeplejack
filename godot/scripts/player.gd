@@ -54,6 +54,7 @@ const SLIP_FELL := 2
 @onready var body: Node3D = $Body
 @onready var anim: AnimationPlayer = $Body/AnimationPlayer
 @onready var chimney: Chimney = get_node("../Chimney")
+@onready var foley: Foley = get_node_or_null("../Foley")
 
 var ladder_top := 5.0
 var carrying_ladder := false
@@ -484,6 +485,8 @@ func _step_sim(dt: float) -> void:
 	# as work_mode alone, grip recovered through the whole 900 ms — so the meter that had just run
 	# out was visibly refilling while the player scrambled for the key.
 	jack.set_context(h, 9.0, carrying_ladder, work_mode or _slipping or rigging_to >= 0)
+	if foley != null:
+		foley.set_height(h)
 	jack.set_exposure(2 if _slipping else (1 if on_ladder else 0))   # Hanging, Ladder, Platform
 	jack.step(dt)
 
@@ -505,6 +508,10 @@ func _tap() -> void:
 	tap_reading = r["tier_name"]
 	tap_pip = r["pip"]
 	tapped_at = height_m()
+	# The sound *is* the reading. The pip beside it is the visual fallback that rule 8 requires, and
+	# is what a player who cannot hear the difference reads instead — never the only channel.
+	if foley != null:
+		foley.tap(r["tier"])
 	_say("tapped: %s" % tap_reading)
 
 
@@ -544,18 +551,27 @@ func _update_work(dt: float) -> void:
 
 func _release_strike() -> void:
 	drawing = false
+	var swing_at_release := swing_power
 	var err := aim.length()
 	var r: Dictionary = jack.strike(work_height, dog_depth, swing_power, err, TOOL_CONDITION)
 	dog_depth = clampf(dog_depth + r["depth_gain"], 0.0, 1.0)
 	swing_power = 0.0
 
+	if foley != null:
+		# Pitched by how hard he swung, so a half-drawn blow sounds like one.
+		foley.cue("hammer", 0.85 + 0.3 * (1.0 - swing_at_release))
+
 	if r["bent"]:
+		if foley != null:
+			foley.cue("bent")
 		dogs_carried -= 1
 		_say("bent it. %d dogs left" % dogs_carried)
 		work_mode = false
 		return
 
 	if dog_depth >= jack.seat_depth():
+		if foley != null:
+			foley.cue("seated")
 		var a: Dictionary = jack.seat_anchor(work_height, dog_depth, r["spalled"])
 		dogs_carried -= 1
 		chimney.add_dog(work_height)
