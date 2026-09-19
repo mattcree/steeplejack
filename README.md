@@ -26,18 +26,66 @@ down with your gear.
 
 ## Status
 
-**Pre-production.** No engine code yet. The design is complete enough to build M0–M2 without further
-design input, and M0 + M1 are broken down into 51 self-contained work items in
-[`tasks/`](tasks/).
+**M1, the MVP ascent — playable.** The Grey Box (55 m, four bands) can be climbed from the field to
+the top with every verb the MVP asks for, in Godot 4.7 over the engine-free sim
+([ADR-0006](docs/03-tech/adr/0006-move-to-godot.md)). Grey-box art, a stand-in character, audio
+synthesised from envelopes. See [what is and is not in](#what-is-in-the-build).
 
 ```bash
-make ready       # 6 tasks are claimable today
-make board       # 51 tasks, ~94 ideal days to the M1 gate
-make critical TARGET=PT-001
+make godot-run                      # play it, in a window. Builds first.
+make godot-run LEVEL=01-back-yard   # the 12 m tutorial stack instead
+make shot                           # a screenshot, headless. See AGENTS.md for posing him.
+make check                          # the sim's rules, ~1 s, no engine
+make godot-test                     # the real scene, driven and asserted on, ~3 min
 ```
 
-See [`docs/04-production/roadmap.md`](docs/04-production/roadmap.md) and
-[`docs/06-workflow/00-agent-workflow.md`](docs/06-workflow/00-agent-workflow.md).
+## How to play
+
+**Get to the top. You can only climb as high as you have built.**
+
+Walk to the **cradle** at the foot of the stack (the timber and the brazier) and take a ladder
+section and a bag of dogs. Climb the standing ladder. Look at the brickwork: the joint you are
+pointing at is outlined. **Sound it** to hear what it is worth, **drive a dog** into it, and **lash**
+the section you are carrying to that dog. Climb what you built. Again.
+
+| Key | On the ground | On the ladder |
+|---|---|---|
+| **WASD** | walk | W/S climb, A/D shuffle off sideways |
+| **mouse** | look | look — and pick the joint you point at |
+| **F** | take a ladder and dogs, at the cradle | |
+| **E** | | tap the joint: listen, and chalk goes on the wall |
+| **right mouse** | | drive a dog into it (right mouse again to back out) |
+| &nbsp;&nbsp;**hold / release left mouse** | | draw the hammer / strike. The ring is your margin. |
+| **R** | | lash the section you carry to your top dog — then **hold left mouse and go round in circles**; **R** again to tie off. 3 turns is a hitch that walks; 6 is a full lashing. **L** changes the input: circles, tapping, or holding |
+| **G** | | lash a gin wheel to a dog in reach; **G** by it to haul a section up from the cradle — **hold W**, mouse against the swing |
+| **Q** | | a better stance: leg hooked, clipped on, belted, the chair. Better stances take longer to rig |
+| **T** | | brew up — needs both hands, so belt on first |
+| **C** / hold **V** | | a cigarette (costs you the top of your nerve for the shift) / look at the view |
+| **space** | jump | let go. When grip runs out and a hand comes off, **space** is the grab |
+| **Esc** | release the mouse | |
+
+**Grip** (the fast arc) drains while a hand is off the ladder — working, tapping, lashing, hauling —
+and comes back when you hold on. At zero a hand comes off. **Nerve** (the slow arc) drains with
+height and wind, and at zero you cannot make yourself climb. A stance, a brew, the view, or going down
+gets it back.
+
+**The span table is the game.** Dogs more than 4 m apart and the section flexes; more than 6 m and it
+sways and hits its dogs harder; more than 8 m and it bows and fails in eight seconds under you. A dog
+in bad mortar holds its share of you — until something above it lets go.
+
+## What is in the build
+
+Everything on the MVP's list except where noted: the joint grid from each band's own distribution,
+with a visual tell that narrows a joint to about two tiers and a tap that settles it; the hammer's
+three axes; lashing by rotation; the gin wheel's pendulum; the ladder stack with spans, flex,
+buckling, load sharing and cascading failure; grip, nerve and wobble; all five stances; the slip-save,
+the fall and resume-at-stack; wind and gusts with the 1.2 s tell; the climbing, working, hauling, top
+and fall cameras; the HUD; fog and a town silhouette; the four tap sounds, the hammer, the wind and the
+height mix.
+
+**Not yet:** hand IK onto the rungs (CLIMB-005); the stack saved to disk (CLIMB-006); the old-fixtures
+band's dogs already in the wall (LVL-001); rope, boot and breathing foley (AUD-004); an options screen
+for the accessibility toggles that exist (A11Y-001); the character (ART-020). Each is a task.
 
 ## The three pillars
 
@@ -49,13 +97,10 @@ See [`docs/04-production/roadmap.md`](docs/04-production/roadmap.md) and
 ## Quick start
 
 ```bash
-# The gameplay layer. No Unreal required — ~20 seconds.
-make check                 # conventions, data, task graph, links, sim build + tests
-make ready                 # what you can pick up right now
-
-# The game. Needs Unreal 5.8 and UE_ROOT set.
-make build-game
-make editor
+make check                 # the sim: conventions, data, task graph, links, build, tests. ~1 s.
+make godot-run             # the game. Needs Godot 4.7 at ~/.local/bin/godot; builds the sim into it.
+make godot-test            # the game, headless, every verb driven and asserted on
+make shot CMDS="climb 20"  # a rendered frame of him 20 m up. Needs xvfb-run.
 ```
 
 **Unreal Engine 5.8**, with the gameplay layer split into `SteeplejackSim` — plain C++20 with no

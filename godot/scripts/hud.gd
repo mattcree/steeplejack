@@ -171,22 +171,36 @@ func _next_step() -> String:
 	# A section failing under him owns the screen. Advice about lashing is noise while it goes.
 	if player.stack_info.get("buckling", false):
 		return ""
-	if player.fall_reason != "":
-		return "Your stack is still up. Climb it again."
 	if player.work_mode:
 		return "Line the dog up, then hold the left button to draw — release to strike."
-	if player.at_cradle() and (not player.carrying_ladder or player.dogs_carried == 0):
-		return "Take a ladder and fill the dog bag.  [F]"
+
+	# --- on the ground: the order of things ---------------------------------------------------------
+	# Walking to the stack with nothing in your hands is walking there to come back, so the first
+	# line sends him to the cradle, and only then to the ladder.
 	if not player.on_ladder:
-		return "Walk to the foot of the stack and climb on."
+		if player.at_cradle() and (not player.carrying_ladder or player.dogs_carried == 0):
+			return "Take a ladder and fill the dog bag.  [F]"
+		if not player.carrying_ladder and player.dogs_carried == 0 and player.ladders_at_base > 0:
+			return ("Your stack is still up. Take a ladder from the cradle and climb it again."
+				if player.fall_reason != "" else
+				"Walk to the cradle at the foot of the stack — the timber by the fire.")
+		return "Climb on — the standing ladder at the foot of the stack."
+
+	# --- on the ladder --------------------------------------------------------------------------------
 	if player.has_lashable_anchor() and player.carrying_ladder:
-		return "Lash the ladder to that dog, then climb it.  [R]"
+		return "Lash the ladder to your top dog [R] — then hold the left button and go round."
 	if player.has_lashable_anchor() and not player.carrying_ladder:
-		return "Nothing to lash — climb down to the cradle for a ladder."
+		return ("Haul a section up to it [G]." if player.gin_joint >= 0
+			else "A dog to lash to, and no ladder: rig a gin wheel on it [G], or fetch one from the cradle.")
 	if player.dogs_carried == 0:
-		return "Bag is empty. Climb down to the cradle for more dogs."
+		return "Bag is empty. Haul some up [G], or climb down to the cradle."
+	# Where the next dog goes is the thing a new player gets wrong: near the top of what is built,
+	# as high as he can reach, so the next section goes as high as it can. A dog at his feet on the
+	# first rung is a dog that buys nothing.
+	if player.height_m() < player.ladder_top - 1.2:
+		return "Climb to the top of what you've built — the next dog goes as high as you can reach."
 	if player.target_id < 0:
-		return "Look at the brickwork to pick a joint."
+		return "Look up at the brickwork above you to pick a joint."
 	if not player.target_tapped():
 		return "Tap it to hear what it is worth [E] — or trust your eye and drive a dog [right mouse]."
 	return "Drive a dog into that joint, or look for a better one.  [right mouse]"

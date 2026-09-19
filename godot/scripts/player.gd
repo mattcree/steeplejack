@@ -1607,6 +1607,9 @@ func _lash() -> void:
 	if best < 0.0 or best + 0.1 < ladder_top - rise:
 		_say("nothing to lash to — get a dog in above you")
 		return
+	if best + rise <= ladder_top + 0.5:
+		_say("that dog is too low — a section lashed there reaches no higher. Drive one near the top")
+		return
 	lashing = true
 	lash_joint = _joint_of_anchor_at(best)
 	lash_new_top = minf(best + rise, chimney.height_m)
@@ -1846,10 +1849,13 @@ func at_cradle() -> bool:
 	return height_m() < 2.0 and flat.length() < chimney.radius_at(0.0) + CRADLE_RADIUS
 
 
+## A dog that a section lashed to would take higher than the ladder already goes. One that would
+## not is not worth lashing to — a new player drives a dog at his feet, lashes, and the ladder goes
+## no higher, having spent a section on nothing.
 func has_lashable_anchor() -> bool:
 	var best: float = jack.highest_anchor_below(height_m() + 100.0)
-	var rise: float = jack.tuning_f("ladderLengthMetres", 5.0) - jack.tuning_f("ladderMinOverlapMetres", 1.0)
-	return best >= 0.0 and best + 0.1 >= ladder_top - rise
+	var rise: float = _rise()
+	return best >= 0.0 and best + 0.1 >= ladder_top - rise and best + rise > ladder_top + 0.5
 
 
 ## Whether the joint he is pointing at has been sounded.

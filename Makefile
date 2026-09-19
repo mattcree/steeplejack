@@ -390,7 +390,7 @@ godot-editor: godot-import
 
 # Run the game in a window. Builds first, so a fresh clone is one command away from playing.
 godot-run: godot-build godot-import
-	@$(GODOT) --path godot
+	@$(GODOT) --path godot $(if $(LEVEL),-- --level $(LEVEL),)
 
 # Run a script headlessly against the project — the Godot equivalent of `make ue-py`, and the
 # way anything gets verified without a human watching.
