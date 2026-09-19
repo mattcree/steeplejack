@@ -65,6 +65,14 @@ var bent_ids := {}
 var pulled_ids := {}
 var _scars: MultiMeshInstance3D
 
+## Anchor pips — UI-001. One at every dog on the stack, in the world rather than on the screen, so
+## the player reads what he is hanging from by looking down at it. Shape and word, never colour
+## alone, and a fixed size on screen so the pip on a dog twenty metres below is as legible as the
+## one at his hand. The shapes are the tap pip's: a ring is sound, a square fair, a triangle poor.
+var _pips := {}                  ## anchor index -> Label3D
+var _pip_sig := ""
+const PIP_TEXT := ["✕ pulled", "▲ poor", "■ fair", "● sound"]
+
 ## Rope round a dog's lug: {joint id: wraps} for finished lashings, plus the one going on now.
 var _kept_lashes := {}
 var _lash_id := -1
@@ -156,6 +164,7 @@ func under_ladder(j: Dictionary) -> bool:
 func update_for(height: float) -> void:
 	if jack == null:
 		return
+	update_pips()
 	if not _dirty and absf(height - _built_at) < REBUILD_EVERY:
 		return
 	_built_at = height
@@ -165,6 +174,47 @@ func update_for(height: float) -> void:
 	for j in _joints:
 		_by_id[j["id"]] = j
 	_rebuild()
+
+
+## Every dog on the stack gets a pip. Rebuilt only when a dog is added or one pulls.
+func update_pips() -> void:
+	if jack == null:
+		return
+	var sig := ""
+	for i in jack.anchor_count():
+		var a: Dictionary = jack.anchor_at(i)
+		sig += "%d:%d:%s;" % [i, int(a["rate"]), str(a.get("failed", false))]
+	if sig == _pip_sig:
+		return
+	_pip_sig = sig
+	for i in jack.anchor_count():
+		var a: Dictionary = jack.anchor_at(i)
+		var jid: int = int(a.get("joint", -1))
+		var j := joint(jid) if jid >= 0 else {}
+		if j.is_empty():
+			continue
+		var label: Label3D = _pips.get(i)
+		if label == null:
+			label = Label3D.new()
+			label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			label.fixed_size = true
+			label.pixel_size = 0.0011
+			label.font_size = 30
+			label.outline_size = 10
+			label.outline_modulate = Color(0.05, 0.04, 0.03, 0.85)
+			label.no_depth_test = false
+			label.render_priority = 5
+			add_child(label)
+			_pips[i] = label
+		var failed: bool = a.get("failed", false)
+		var rate: int = 0 if failed else clampi(int(a["rate"]), 0, 3)
+		label.text = PIP_TEXT[rate]
+		# Chalk for the sound ones, a warning for the rest, a flare for the pulled. The words and
+		# the shapes carry it; the colour is only a help.
+		label.modulate = [Color(0.98, 0.45, 0.32), Color(0.96, 0.72, 0.40),
+			Color(0.90, 0.88, 0.80), CHALK][rate]
+		var n: Vector3 = j["normal"]
+		label.global_position = (j["pos"] as Vector3) + n * 0.45 + Vector3.UP * 0.18
 
 
 ## Something on the face changed — a tap, a dog. Redraw on the next update.
