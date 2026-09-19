@@ -1,4 +1,5 @@
-# Unreal
+# Unreal build output, from before ADR-0006. The folders can be deleted; these lines stop them
+# showing up in the meantime.
 Binaries/
 DerivedDataCache/
 Intermediate/
@@ -15,7 +16,7 @@ Saved/
 build/
 cmake-build-*/
 
-# Per-machine Makefile overrides (UE_ROOT and the like). See the Makefile header.
+# Per-machine Makefile overrides.
 Makefile.local
 
 # Misc

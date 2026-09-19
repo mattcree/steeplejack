@@ -40,13 +40,6 @@
 
 #include <cstdint>
 
-// Symbol visibility at the UE boundary — the same stopgap Tuning.h carries, and the second time
-// this has been needed. UBT builds SteeplejackSim with -fvisibility-ms-compat, so a class's
-// out-of-line members are hidden and SteeplejackGame will not link against them. UE's own
-// STEEPLEJACKSIM_API macro cannot be used: it expands to DLLEXPORT, which lives in an Unreal
-// header this module must never include (ADR-0004). CORE-015 replaces both copies with one
-// Export.h; the guard means having both is harmless until it lands.
-
 namespace sj {
 
 class SJ_API SimClock

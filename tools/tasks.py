@@ -8,7 +8,7 @@ parallel agents never conflict on a shared board. The board is computed, never s
   tasks.py board      status overview
   tasks.py ready      tasks whose dependencies are all done
   tasks.py waves      dependency-ordered execution waves
-  tasks.py editor     tasks needing a human in the Unreal editor
+  tasks.py editor     tasks needing a human at an editor (art, animation)
   tasks.py human      ALL work a human must do (editor, recording, playtests)
   tasks.py critical   longest dependency chain by estimate days [TARGET]
   tasks.py stale      in_progress tasks with an empty Outcome
@@ -27,6 +27,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TASK_DIR = os.path.join(ROOT, "tasks")
 
 STATUSES = ["draft", "ready", "claimed", "in_progress", "blocked", "review", "done", "cut"]
+# A dependency in one of these no longer holds anything up: finished, or never going to happen.
+RESOLVED = ("done", "cut")
 DISCIPLINES = ["ENG", "DES", "ART", "AUD", "TECH-ART", "PROD"]
 REQUIRED = ["id", "title", "milestone", "discipline", "estimate_days", "status",
             "depends_on", "owns", "verify", "editor_required"]
@@ -180,7 +182,7 @@ def cmd_validate(tasks):
         # actually being worked while a dependency is unfinished is a real problem.
         if t.get("status") in ("claimed", "in_progress"):
             for dep in t.get("depends_on") or []:
-                if by_id.get(dep, {}).get("status") != "done":
+                if by_id.get(dep, {}).get("status") not in RESOLVED:
                     warnings.append(
                         f"{fid}: {t['status']} but dependency {dep} is "
                         f"{by_id.get(dep, {}).get('status', 'missing')}")
@@ -263,7 +265,7 @@ def cmd_board(tasks):
 
 
 def is_human(t) -> bool:
-    """Work an agent cannot do: the Unreal editor, a recording booth, a playtest room."""
+    """Work an agent cannot do: an art or animation editor, a recording booth, a playtest room."""
     return bool(t.get("editor_required")) or bool(t.get("human_required"))
 
 
@@ -274,7 +276,8 @@ def ready_tasks(tasks, human=None):
     for t in tasks:
         if t["status"] not in ("ready", "draft"):
             continue
-        if not all(by_id.get(d, {}).get("status") == "done" for d in (t.get("depends_on") or [])):
+        # A cut dependency is work that will never happen, so nothing waits for it.
+        if not all(by_id.get(d, {}).get("status") in RESOLVED for d in (t.get("depends_on") or [])):
             continue
         if human is not None and is_human(t) != human:
             continue
@@ -304,7 +307,7 @@ def cmd_ready(tasks):
 
     if human:
         print(f"\n{C['bold']}{C['blu']}NEEDS A HUMAN ({len(human)}){C['off']}  "
-              f"{C['dim']}— Unreal editor, a recording, or a room full of testers{C['off']}")
+              f"{C['dim']}— an art tool, a recording, or a room full of testers{C['off']}")
         _print_rows(human)
         days = sum(float(t.get("estimate_days") or 0) for t in human)
         print(f"  {C['dim']}{days:.1f} ideal days queued for one human. This is risk R8's "
@@ -412,7 +415,7 @@ def cmd_editor(tasks):
         print("editor queue is empty")
         return 0
     days = sum(float(t.get("estimate_days") or 0) for t in q)
-    print(f"{C['bold']}{len(q)} task(s) need a human in the Unreal editor · "
+    print(f"{C['bold']}{len(q)} task(s) need a human at an editor · "
           f"{days:.1f} ideal days{C['off']}\n")
     for t in sorted(q, key=lambda x: x["id"]):
         print(f"  {t['id']:<12} {t['title'][:56]:<58}{t['estimate_days']}d  [{t['status']}]")

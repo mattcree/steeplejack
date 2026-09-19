@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Validate level and tuning data.
 
-Runs without Unreal and without a compiler, in about a second, so it can sit in a pre-commit hook.
+Runs without an engine and without a compiler, in about a second, so it can sit in a pre-commit hook.
 Checks the JSON Schema plus the design rules that a schema cannot express —
 notably the Ascent Beat Rule, which exists to defend against risk R1.
 """

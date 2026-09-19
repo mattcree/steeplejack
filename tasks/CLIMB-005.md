@@ -21,6 +21,8 @@ editor_required: true
 risk: R2
 ---
 
+> **2026-09-19:** Unreal is removed from the project. This need does not depend on the engine, so the task stays open, but its `owns:` paths and any Unreal specifics predate ADR-0006. Retarget them to `godot/` before starting.
+
 ## Goal
 Hands and feet contact real rung positions on procedurally placed, flexing ladders.
 

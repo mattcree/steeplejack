@@ -9,7 +9,7 @@ Run them all: `make check-conventions`
 
 | # | Rule | Enforced by | Rationale |
 |---|---|---|---|
-| 1 | No Unreal headers or types in `SteeplejackSim` | `tools/check_conventions.py:sim_purity` | [ADR-0004](../03-tech/adr/0004-engine-change-to-unreal.md) — it must build standalone |
+| 1 | No engine headers or types (Godot or Unreal) in `SteeplejackSim` | `tools/check_conventions.py:sim_purity` | [ADR-0006](../03-tech/adr/0006-move-to-godot.md) — it must build standalone |
 | 2 | No ambient RNG (`rand`, `mt19937`) or mutable statics in `SteeplejackSim` | same | determinism, and therefore replay |
 | 3 | No clocks, no stdout in `SteeplejackSim` | same | time is a `float dt` parameter |
 | 4 | No unexplained numeric literals in `SteeplejackSim` | same | tuning is data, not code |
@@ -26,7 +26,7 @@ Run them all: `make check-conventions`
 | 15 | No broken internal doc links | `tools/check_links.py` | |
 | 16 | **No real person's name anywhere in the repo** | `tools/check_conventions.py:likeness` | [IP policy](../05-legal/ip-and-likeness.md) |
 | 17 | C++ compiles clean at `-Wall -Wextra -Werror -Wconversion` | the CMake build | |
-| 18 | No gameplay decision in a Blueprint, and no ticking Blueprint | review + `tools/check_blueprints.py` | Blueprints are binary and unreviewable |
+| 18 | ~~No gameplay decision in a Blueprint~~ — retired 2026-09-19 with Unreal. Its successor, "no game rule in GDScript", is enforced by review | — | there are no Blueprints |
 | 19 | Wobble tuning is read only in `Wobble.cpp`; everything else calls `WobbleAmplitudeDeg` | `tools/check_conventions.py:wobble_home` | METER-003 — two wobbles tell the player two stories about the same hands |
 
 Rules 1–4 and 16 are the ones that exist specifically because agents will otherwise break them

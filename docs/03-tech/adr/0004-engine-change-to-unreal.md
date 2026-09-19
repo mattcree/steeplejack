@@ -1,6 +1,6 @@
 # ADR-0004 — Move to Unreal Engine 5
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0006](0006-move-to-godot.md); Unreal removed from the repository 2026-09-19
 - **Date:** 2026-09-16
 - **Supersedes:** [ADR-0001](0001-engine-choice.md)
 - **Decision:** Unreal Engine 5.5+, with the simulation layer as a **UE-independent C++ module**

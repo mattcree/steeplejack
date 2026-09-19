@@ -4,7 +4,7 @@ title: Disable AndroidFileServer so Config/DefaultEngine.ini can be committed
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.25
-status: ready
+status: cut
 assignee: null
 depends_on: [CORE-012]
 owns:
@@ -76,4 +76,4 @@ something to render. This task only makes the file committable.
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**Cut, 2026-09-19: Unreal is removed from the project** (ADR-0006, then the removal itself). This task was about an Unreal engine .ini setting, and there is nothing left for it to act on.

@@ -1,6 +1,6 @@
 # tests/
 
-doctest, compiled into `sim_tests` by the standalone CMake build. **No Unreal required.**
+doctest, compiled into `sim_tests` by the standalone CMake build. **No engine required.**
 
 ```bash
 make test-unit                 # everything, ~20s

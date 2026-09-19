@@ -4,7 +4,7 @@ title: The packaged game target does not compile — exceptions are disabled out
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.25
-status: blocked
+status: cut
 assignee: null
 depends_on: [CORE-007, CORE-014, CORE-015, TOOL-001]
 owns:
@@ -108,4 +108,4 @@ Do not package a shipping build or set up cooking — this is about compiling, n
 <!-- Filled in by the implementer before building, if estimate_days > 1. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**Cut, 2026-09-19: Unreal is removed from the project** (ADR-0006, then the removal itself). This task was about compiling the packaged Unreal game target, and there is nothing left for it to act on.

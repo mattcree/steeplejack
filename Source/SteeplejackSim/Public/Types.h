@@ -24,8 +24,8 @@ namespace sj {
 
 struct Vec2 { float x, y; };
 
-// Ours, deliberately not FVector. SteeplejackSim builds standalone under CMake with no
-// Unreal present; the conversion to engine types happens once, at the UE boundary.
+// Ours, deliberately no engine's vector. SteeplejackSim builds standalone under CMake with no
+// engine present; the conversion to Godot's types happens once, in Source/SteeplejackGodot.
 struct Vec3 { float x, y, z; };
 
 // The sim steps at a fixed 60 Hz regardless of frame rate — see ADR-0003. Render

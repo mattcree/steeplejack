@@ -24,8 +24,8 @@ You will be given a task ID, e.g. `CORE-003`. That is your entire brief.
 
 ## Hard rules
 
-- **`Source/SteeplejackSim/` must compile standalone under CMake with no Unreal present.** No
-  Unreal headers, no `FVector`/`TArray`/`UObject`/`FMath`, no `.generated.h`, no `std::chrono`,
+- **`Source/SteeplejackSim/` must compile standalone under CMake with no engine present.** No
+  Godot or Unreal headers or types, no `std::chrono`,
   no `rand()`, no mutable statics, no `printf`. `make check-conventions` enforces this.
 - **No numeric literals in `SteeplejackSim`.** Constants come from `data/tuning/*.json`. A genuine
   exception is annotated `// literal: <reason>`.
@@ -37,7 +37,7 @@ You will be given a task ID, e.g. `CORE-003`. That is your entire brief.
 ## When to stop and escalate
 
 Never guess about game design, tuning targets, whether a failure needs a telegraph, whether code
-belongs in `SteeplejackSim` or `SteeplejackGame`, or scope.
+belongs in `SteeplejackSim` or `godot/`, or scope.
 
 Set `status: blocked`, fill in `## Blocked` with **the question / what you tried / the options /
 your recommendation**, append a row to `BLOCKED.md`, commit, and report that you are blocked.

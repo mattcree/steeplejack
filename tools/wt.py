@@ -173,7 +173,7 @@ def cmd_start(tid: str) -> int:
             "`make ready` lists what you can claim.")
     if task_field(tid, "human_required") == "true" or \
        task_field(tid, "editor_required") == "true":
-        die(f"{tid} needs a human (Unreal editor, a recording, or a room of testers).",
+        die(f"{tid} needs a human (an art tool, a recording, or a room of testers).",
             "`make human-queue` lists these. Agents cannot complete them.")
 
     wt, br = worktree_for(tid), branch_for(tid)

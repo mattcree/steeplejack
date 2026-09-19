@@ -63,16 +63,6 @@
           }
         ]
       }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .claude/hooks/start_mcp.sh"
-          }
-        ]
-      }
     ]
   }
 }

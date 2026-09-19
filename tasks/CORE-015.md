@@ -4,7 +4,7 @@ title: Symbol visibility at the UE boundary — make it a convention, not a per-
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.5
-status: ready
+status: cut
 assignee: null
 depends_on: [CORE-007, CORE-011, CORE-014]
 owns:
@@ -118,4 +118,4 @@ constraint, not an obstacle to route around. Do not change the sim/game split.
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**Cut, 2026-09-19: Unreal is removed from the project** (ADR-0006, then the removal itself). This task was about symbol visibility at the Unreal module boundary, and there is nothing left for it to act on.

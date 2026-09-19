@@ -13,7 +13,8 @@ and the cross-tool standard. Everything below is a summary of it — if the two 
 make ready                   # what you can claim (agent-claimable vs. needs-a-human)
 make wt-start ID=CORE-003    # isolated worktree, branch pushed immediately
 make wip                     # commit + push. The panic button. Run it constantly.
-make check                   # the gate. ~1s. Needs cmake/ninja/g++, NOT Unreal.
+make check                   # the gate. ~1s. Needs cmake/ninja/g++, no engine.
+make run                     # play it (Godot)
 ```
 
 Pick a task from **AGENT-CLAIMABLE**. Open `tasks/<ID>.md`. It is self-contained — read it and the
@@ -31,8 +32,8 @@ You never merge. The integrator runs `make land ID=<task>`. See
 
 ## The four things that get a PR rejected
 
-1. An Unreal include or type in `Source/SteeplejackSim/` — it must build standalone under CMake
-   with no engine present. That is what keeps this project agent-executable.
+1. An engine include or type (Godot or Unreal) in `Source/SteeplejackSim/` — it must build
+   standalone under CMake with no engine present. That is what keeps this project agent-executable.
 2. A numeric literal in `SteeplejackSim` that belongs in `data/tuning/*.json`.
 3. Files changed outside your task's `owns:` without declaring them.
 4. A real person's name, anywhere, including commit messages.
@@ -42,7 +43,7 @@ You never merge. The integrator runs `make land ID=<task>`. See
 ## Never guess about
 
 Game design, tuning targets, whether a failure needs a telegraph, whether code belongs in
-`SteeplejackSim` or `SteeplejackGame`, or scope. Set `status: blocked`, fill in `## Blocked` with
+`SteeplejackSim` or `godot/`, or scope. Set `status: blocked`, fill in `## Blocked` with
 the question and your recommendation, add a line to [`BLOCKED.md`](BLOCKED.md), and pick up another
 task. Do not invent an answer.
 
@@ -57,6 +58,6 @@ Guess freely about naming, file layout inside your owned paths, test structure, 
 | Starting a run | [`docs/06-workflow/06-launch.md`](docs/06-workflow/06-launch.md) |
 | Parallel work and merging | [`docs/06-workflow/07-integration.md`](docs/06-workflow/07-integration.md) |
 | Every C++ signature, fixed in advance | [`docs/03-tech/interfaces.md`](docs/03-tech/interfaces.md) |
-| Why the engine is what it is | [`docs/03-tech/adr/0004-engine-change-to-unreal.md`](docs/03-tech/adr/0004-engine-change-to-unreal.md) |
+| Why the engine is what it is | [`docs/03-tech/adr/0006-move-to-godot.md`](docs/03-tech/adr/0006-move-to-godot.md) (Unreal is gone) |
 | What the game is | [`docs/00-vision.md`](docs/00-vision.md) |
 | Questions waiting on a human | [`BLOCKED.md`](BLOCKED.md) |

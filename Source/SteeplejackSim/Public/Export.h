@@ -1,20 +1,15 @@
 #pragma once
 
-// SJ_API — symbol visibility at the UE boundary.
+// SJ_API — symbol visibility, for when SteeplejackSim is built as a shared library.
 //
-// UBT builds SteeplejackSim as its own shared library with `-fvisibility-ms-compat`, which hides a
-// class's out-of-line members and a namespace's free functions unless they are explicitly
-// exported. SteeplejackGame then fails to link against them, and it fails at the *link* step with
-// "undefined symbol", long after every other gate has gone green — `make check` cannot see this at
-// all, because the CMake build has no module boundary to cross.
+// Built with hidden visibility, a shared library hides a class's out-of-line members and a
+// namespace's free functions unless they are exported, and whatever links against it fails at the
+// *link* step with "undefined symbol" — which `make check` cannot see, because the CMake build has
+// no library boundary to cross. This was learned under Unreal, which built the sim that way; the
+// Godot binding links it too, and the macro costs nothing. It is the plain compiler attribute, so
+// it needs no engine header.
 //
-// UE's own answer is the UBT-generated STEEPLEJACKSIM_API macro. It cannot be used here: it
-// expands to DLLEXPORT, which is defined in an Unreal header, and rule 1 forbids Unreal headers
-// anywhere under this module (ADR-0004). So: the plain compiler attribute, which needs no engine
-// header and expands to nothing when the compiler has no such thing. The standalone CMake build is
-// unaffected either way.
-//
-// Mark anything SteeplejackGame may call: classes with out-of-line members, and free functions.
+// Mark anything the binding may call: classes with out-of-line members, and free functions.
 // Header-only aggregates like those in Types.h neither need it nor should have it.
 //
 // Known gap: MSVC has no visibility attribute — Windows needs dllexport when building the module

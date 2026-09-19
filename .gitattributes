@@ -1,20 +1,13 @@
 # Text
 *.h       text eol=lf
 *.cpp     text eol=lf
-*.cs      text eol=lf
 *.json    text eol=lf
 *.md      text eol=lf
 *.py      text eol=lf
 *.txt     text eol=lf
 *.replay  text eol=lf
-*.uproject text eol=lf
 
-# Unreal content is binary and must go through Git LFS from the first asset.
-# See docs/03-tech/performance-budget.md — Content/ is capped at 25 GB.
-*.uasset  filter=lfs diff=lfs merge=lfs -text
-*.umap    filter=lfs diff=lfs merge=lfs -text
-*.ubulk   filter=lfs diff=lfs merge=lfs -text
-*.uexp    filter=lfs diff=lfs merge=lfs -text
+# Binary assets go through Git LFS from the first one.
 *.png     filter=lfs diff=lfs merge=lfs -text
 *.tga     filter=lfs diff=lfs merge=lfs -text
 *.exr     filter=lfs diff=lfs merge=lfs -text

@@ -5,8 +5,9 @@ See docs/06-workflow/04-enforced-conventions.md. Every check here exists because
 the alternative is a sentence in a document that nobody re-reads.
 
 The sim purity rules (1-3) are not style: SteeplejackSim must compile standalone
-under CMake with no Unreal installed, because that is what keeps the gameplay
-layer testable in 20 seconds and editable by agents. See ADR-0004.
+under CMake with no engine installed, because that is what keeps the gameplay
+layer testable in seconds and editable by agents. The Godot game (ADR-0006)
+links it; it must never link the other way.
 """
 from __future__ import annotations
 
@@ -22,11 +23,14 @@ SIM_EXTS = (".h", ".cpp", ".hpp", ".inl")
 errors: list[str] = []
 
 # --- rule 1-3: sim/ purity ---------------------------------------------------
-# Rules 1-3. SteeplejackSim must build standalone under CMake with no Unreal present
-# (ADR-0004). Every pattern here would break that.
+# Rules 1-3. SteeplejackSim must build standalone under CMake with no engine present.
+# Every pattern here would break that. The Unreal patterns outlived Unreal (ADR-0006) because
+# they cost nothing and an old snippet pasted from the history is exactly how one comes back.
 FORBIDDEN_IN_SIM = [
     (r"#include\s+[\"<](Core|Engine|GameFramework|UObject|CoreMinimal|Kismet|Chaos|Niagara)",
-     "SteeplejackSim must not include Unreal headers — it builds standalone (ADR-0004)"),
+     "SteeplejackSim must not include Unreal headers — it builds standalone with no engine"),
+    (r"#include\s+[\"<](godot_cpp|godot/)",
+     "SteeplejackSim must not include Godot headers — the engine binding lives in Source/SteeplejackGodot"),
     (r"\b(FVector|FVector2D|FRotator|FTransform|FString|FName|FText|TArray|TMap|TSet|"
      r"TSharedPtr|TWeakObjectPtr|UObject|AActor|UClass|UPROPERTY|UFUNCTION|UCLASS|USTRUCT|"
      r"FMath|UE_LOG|GEngine|GWorld|FQuat|TObjectPtr)\b",

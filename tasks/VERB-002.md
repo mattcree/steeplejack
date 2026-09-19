@@ -4,7 +4,7 @@ title: Reticle tap pip (audio-to-visual fallback)
 milestone: M1
 discipline: [ENG]
 estimate_days: 1
-status: ready
+status: cut
 assignee: null
 depends_on: [VERB-001, AUD-001]
 owns:
@@ -46,4 +46,4 @@ Do not build the full cue registry — that is A11Y-002 at M2. Register this one
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**Cut, 2026-09-19: Unreal is removed from the project.** The Unreal implementation this task describes will not be built. The feature exists in the Godot game instead: godot/scripts/hud.gd draws the tap pip at the joint. **That version has not been checked against the acceptance criteria above.** If they still matter, they belong in a new task written against the Godot files.

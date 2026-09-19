@@ -2,8 +2,9 @@
 """Line-coverage gate for SteeplejackSim.
 
 docs/06-workflow/03-verification.md: SteeplejackSim must hold >= 90% line coverage.
-SteeplejackGame and Content/ are deliberately NOT gated — they are presentation and
-their correctness is visual. That asymmetry is the point of the module split.
+The Godot layer (godot/, Source/SteeplejackGodot) is deliberately NOT gated — it is
+presentation, checked by make godot-test and by looking at frames. That asymmetry is the
+point of the module split.
 
 Uses gcov/llvm-cov via a separate instrumented build so the normal build stays fast.
 

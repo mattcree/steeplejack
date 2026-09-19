@@ -50,8 +50,8 @@ VERIFIED_STATUSES = ("review", "done")
 FILE_SHAPED = re.compile(r"^test[_-]|\.cpp$", re.I)
 
 # `verify:` is prose as often as it is a command, so match the invocation rather
-# than assuming the whole line is shell. Only `test-unit` runs the doctest binary;
-# `test-automation` runs inside Unreal and cannot be checked from here.
+# than assuming the whole line is shell. Only `test-unit` runs the doctest binary.
+# (`test-automation` was Unreal's and is gone; old task files may still name it.)
 UNIT_FILTER = re.compile(r"make\s+test-unit\b[^\n]*?\bFILTER=(\S+)")
 OTHER_FILTER = re.compile(r"make\s+(test-automation|test-levels|test-replay|test-determinism)"
                           r"\b[^\n]*?\bFILTER=(\S+)")

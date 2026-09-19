@@ -1,13 +1,15 @@
 # SteeplejackSim — the pure simulation layer
 
-**Plain C++20. No Unreal. This module must compile standalone under CMake with no engine
+**Plain C++20. No engine. This module must compile standalone under CMake with no engine
 installed.** That is not a style preference — it is what keeps the gameplay layer testable in
-~20 seconds and editable by agents. See [ADR-0004](../../docs/03-tech/adr/0004-engine-change-to-unreal.md).
+seconds and editable by agents. The Godot game loads it through `Source/SteeplejackGodot`; see
+[ADR-0006](../../docs/03-tech/adr/0006-move-to-godot.md).
 
 ## Forbidden here (CI-enforced)
 
-- Unreal headers: `CoreMinimal.h`, `Engine/*`, `GameFramework/*`, `Chaos/*`, …
-- Unreal types: `FVector`, `TArray`, `FString`, `UObject`, `FMath`, `UE_LOG`, `.generated.h`
+- Engine headers: `godot_cpp/*`, and Unreal's (`CoreMinimal.h`, `Engine/*`, …) — Unreal is gone,
+  the check stays
+- Engine types: `FVector`, `TArray`, `FString`, `UObject`, `FMath`, `UE_LOG`, `.generated.h`
 - Ambient randomness: `rand()`, `std::random_device`, `std::mt19937` — take an `sj::Rng&`
 - Clocks: `std::chrono`, `time()` — time is an explicit `float dt`
 - stdout: `printf`, `std::cout` — return values, don't log
@@ -17,7 +19,7 @@ installed.** That is not a style preference — it is what keeps the gameplay la
 
 `make check-conventions` fails the build on all of these.
 
-## Build and test without Unreal
+## Build and test without an engine
 
 ```bash
 make test-unit                 # cmake configure + build + doctest, ~20s

@@ -18,6 +18,8 @@ editor_required: false
 risk: null
 ---
 
+> **2026-09-19:** Unreal is removed from the project. This need does not depend on the engine, so the task stays open, but its `owns:` paths and any Unreal specifics predate ADR-0006. Retarget them to `godot/` before starting.
+
 ## Goal
 Git LFS configured and enforced before the first binary asset lands, plus a nightly size gate.
 

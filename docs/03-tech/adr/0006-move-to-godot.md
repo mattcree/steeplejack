@@ -113,3 +113,21 @@ answers.
 
 Lower than last time and for the same reason: the sim is the game and it has never moved. If Godot
 turns out to be the wrong call, what is lost is a presentation layer measured in days.
+
+## Note — 2026-09-19, Unreal removed
+
+The Unreal side was kept in the repository after this decision, and it cost more than keeping it
+was worth. A session-start hook launched a headless Unreal editor for its MCP tools on every session
+and every resume. The editor grew to 33 GB. Two sessions starting close together launched two of
+them, and the machine ran out of memory and the kernel killed one.
+
+So it is gone: `Source/SteeplejackGame/`, `Content/`, `Config/`, `Steeplejack.uproject`, the editor
+tools, the MCP hook and `.mcp.json`, and every Unreal target in the Makefile. `make run` now plays
+the Godot game. Unreal-only tasks are `cut`, each with a line saying why and, where the feature
+exists in Godot, where. Convention rule 1 now also forbids Godot headers in `SteeplejackSim`, and
+rule 18 (Blueprints) is retired.
+
+Docs under `docs/03-tech/` other than the ADRs still describe the Unreal architecture in places
+(the module table, performance budgets for Nanite and Lumen, save paths). Where they disagree with
+this ADR and `AGENTS.md`, those two win.
+

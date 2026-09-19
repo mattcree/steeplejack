@@ -1,13 +1,13 @@
 # Standalone build of SteeplejackSim and its tests.
 #
-# This exists so the gameplay layer can be built and tested WITHOUT Unreal installed —
-# about 20 seconds in CI instead of a 40 GB engine download. It is what keeps the layer
-# agents own fast to iterate on. See docs/03-tech/adr/0004-engine-change-to-unreal.md.
+# This exists so the gameplay layer can be built and tested with no engine installed, in
+# seconds. It is what keeps the layer agents own fast to iterate on. The Godot game links the
+# same sources through Source/SteeplejackGodot (ADR-0006).
 #
 #   make check        # conventions, data, task graph, links, build, tests
 #   make test-unit    # just the build and tests
 #
-# If this build breaks, SteeplejackSim has probably acquired an Unreal dependency and
+# If this build breaks, SteeplejackSim has probably acquired an engine dependency and
 # tools/check_conventions.py should have caught it. Fix the dependency, not this file.
 
 cmake_minimum_required(VERSION 3.20)

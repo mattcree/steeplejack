@@ -64,6 +64,10 @@ def main() -> int:
     case("std header allowed", HEADER + "int F() { return 0; }" + FOOTER,
          must_flag=None, must_not_flag="")
 
+    print("rule 1 — no Godot headers either")
+    case("godot_cpp header caught", HEADER + '#include <godot_cpp/classes/node.hpp>' + FOOTER,
+         must_flag="Godot headers")
+
     print("rule 1 — no Unreal types")
     case("FVector caught", HEADER + "float F(const FVector& v) { return v.X; }" + FOOTER,
          must_flag="Unreal types")

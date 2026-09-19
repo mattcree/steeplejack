@@ -1,7 +1,7 @@
 // Harness smoke test.
 //
 // This file deliberately tests NOTHING about the game. It exists to prove that the
-// standalone toolchain works end to end — that SteeplejackSim compiles with no Unreal
+// standalone toolchain works end to end — that SteeplejackSim compiles with no engine
 // present, that doctest links, that the test binary runs, and that CI can see a failure.
 //
 // Delete this file once CORE-003 lands a real module with real tests. Until then it is
@@ -36,10 +36,10 @@ TEST_CASE("Harness: the toolchain is C++17")
     }
 }
 
-TEST_CASE("Harness: fixed-width types are available without Unreal")
+TEST_CASE("Harness: fixed-width types are available without an engine")
 {
     // SteeplejackSim uses int32_t/uint8_t rather than int32/uint8 precisely because
-    // it must not depend on Unreal's type aliases. See ADR-0004.
+    // it must not depend on any engine's type aliases. See ADR-0006.
     const std::int32_t  a = -1;
     const std::uint8_t  b = 255u;
     CHECK(a < 0);

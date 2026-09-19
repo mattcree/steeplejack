@@ -4,7 +4,7 @@ title: Ladder stack rendering and flex (ISM + material custom data)
 milestone: M1
 discipline: [TECH-ART, ENG]
 estimate_days: 2
-status: ready
+status: cut
 assignee: null
 depends_on: [CLIMB-001]
 owns:
@@ -51,4 +51,4 @@ No breakage animation on buckle (a later VFX task). No ladder condition visuals.
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**Cut, 2026-09-19: Unreal is removed from the project.** The Unreal implementation this task describes will not be built. The feature exists in the Godot game instead: godot/scripts/chimney.gd draws the ladder stack, including the bow of an over-long section. **That version has not been checked against the acceptance criteria above.** If they still matter, they belong in a new task written against the Godot files.

@@ -4,7 +4,7 @@ title: Procedural chimney builder (Nanite)
 milestone: M0
 discipline: [ENG, TECH-ART]
 estimate_days: 3
-status: ready
+status: cut
 assignee: null
 depends_on: [CORE-008]
 owns:
@@ -56,4 +56,4 @@ The brick material is ART-010. Pre-fracture is FELL-007 (M4). The topping cell g
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**Cut, 2026-09-19: Unreal is removed from the project.** The Unreal implementation this task describes will not be built. The feature exists in the Godot game instead: godot/scripts/chimney.gd and shaders/brick.gdshader build the chimney. **That version has not been checked against the acceptance criteria above.** If they still matter, they belong in a new task written against the Godot files.

@@ -107,15 +107,16 @@ needs someone who did not build it to climb it twice.
 
 ```bash
 make check                 # the sim: conventions, data, task graph, links, build, tests. ~1 s.
-make godot-run             # the game. Needs Godot 4.7 at ~/.local/bin/godot; builds the sim into it.
+make run                   # the game. Needs Godot 4.7 at ~/.local/bin/godot; builds the sim into it.
 make godot-test            # the game, headless, every verb driven and asserted on
 make shot CMDS="climb 20"  # a rendered frame of him 20 m up. Needs xvfb-run.
 ```
 
-**Unreal Engine 5.8**, with the gameplay layer split into `SteeplejackSim` — plain C++20 with no
-Unreal dependency, which builds standalone under CMake so it can be tested in seconds without the
-engine. See [`ADR-0004`](docs/03-tech/adr/0004-engine-change-to-unreal.md), which supersedes
-[`ADR-0001`](docs/03-tech/adr/0001-engine-choice.md) (Godot).
+**Godot 4**, with the gameplay layer split into `SteeplejackSim`: plain C++20 with no engine
+dependency, which builds standalone under CMake so it can be tested in seconds, and which the game
+loads as a GDExtension. See [`ADR-0006`](docs/03-tech/adr/0006-move-to-godot.md). The project spent
+a while on Unreal ([`ADR-0004`](docs/03-tech/adr/0004-engine-change-to-unreal.md)); that is over,
+and the Unreal code is gone from the repository.
 
 Every design document in `docs/01-gdd/` and `docs/02-levels/` is engine-agnostic and survived that
 change untouched. That was the point.

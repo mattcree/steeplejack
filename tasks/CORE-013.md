@@ -4,7 +4,7 @@ title: Editor frame budget on an empty map
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.25
-status: ready
+status: cut
 assignee: null
 depends_on: [CORE-001]
 owns:
@@ -92,4 +92,4 @@ before there is anything to render would be guesswork. No CI automation; that is
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**Cut, 2026-09-19: Unreal is removed from the project** (ADR-0006, then the removal itself). This task was about the Unreal editor's frame budget, and there is nothing left for it to act on.

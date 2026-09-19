@@ -4,7 +4,7 @@ title: Self-hosted Unreal runner and the engine CI job
 milestone: M0
 discipline: [ENG, PROD]
 estimate_days: 2
-status: ready
+status: cut
 assignee: null
 depends_on: [CORE-001]
 owns:
@@ -52,4 +52,4 @@ No perf or screenshot jobs — nightly, at M6.
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**Cut, 2026-09-19: Unreal is removed from the project** (ADR-0006, then the removal itself). This task was about a self-hosted Unreal CI runner, and there is nothing left for it to act on.

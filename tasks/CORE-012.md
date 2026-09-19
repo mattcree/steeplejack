@@ -4,7 +4,7 @@ title: Decide whether Config/ is version-controlled
 milestone: M0
 discipline: [ENG]
 estimate_days: 0.25
-status: in_progress
+status: cut
 assignee: agent
 depends_on: [CORE-001]
 owns:
@@ -145,3 +145,5 @@ values with nowhere to live until this is resolved.
 
 - **CORE-018** — disable `AndroidFileServer`, commit `DefaultEngine.ini`, drop the ignore rule.
 - `docs/03-tech/architecture.md#repository-layout` needs a `Config/` row (CORE-011 owns it).
+
+**Cut, 2026-09-19: Unreal is removed from the project** (ADR-0006, then the removal itself). This task was about whether Unreal's Config/ is version-controlled, and there is nothing left for it to act on.

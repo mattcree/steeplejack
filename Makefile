@@ -4,27 +4,9 @@
 
 PY      ?= python3
 CMAKE   ?= cmake
-# Where Unreal 5.8 lives. You should not have to set this.
-#
-# Order: whatever is already in your environment or on the command line, then Makefile.local
-# (gitignored — put `UE_ROOT = /path/to/UE_5.8` there if yours is somewhere unusual), then the
-# places it is normally installed. `make ue-root` prints what was found.
--include Makefile.local
-UE_ROOT ?= $(firstword $(wildcard \
-             $(HOME)/UnrealEngine/UE_5.8 \
-             $(HOME)/UnrealEngine/UE_5.8.2 \
-             /opt/UnrealEngine/UE_5.8 \
-             /usr/local/UnrealEngine/UE_5.8))
-UE      ?= $(UE_ROOT)/Engine/Binaries/Linux/UnrealEditor-Cmd
-UE_EDITOR ?= $(UE_ROOT)/Engine/Binaries/Linux/UnrealEditor
 BUILD   ?= build
 FILTER  ?=
 comma   := ,
-
-# `make play` knobs. MAP is what to open; PLAY_CMDS is what to do once it is open.
-MAP       ?= /Game/Maps/ShotTest
-PLAY_CMDS ?= shot showui
-PLAY_SECS ?= 180
 
 .DEFAULT_GOAL := help
 
@@ -33,8 +15,8 @@ PLAY_SECS ?= 180
 ## check: the local gate — must stay under 60 seconds, forever
 check: check-conventions validate check-links test-unit
 
-## ci: everything CI runs without Unreal installed (gates 1-8)
-ci: check check-verify test-tools check-blueprints test-levels test-replay test-determinism
+## ci: everything CI runs (gates 1-8)
+ci: check check-verify test-tools test-levels test-replay test-determinism
 
 # ---------------------------------------------------------------- fast (no engine, no cmake)
 
@@ -59,10 +41,6 @@ test-tools:
 check-verify: build-sim
 	@$(PY) tools/check_verify.py
 
-## check-blueprints: rule 18 — Blueprints are glue only
-check-blueprints:
-	@$(PY) tools/check_blueprints.py
-
 ## validate: level + tuning data, and the task graph
 validate: validate-data validate-tasks
 
@@ -77,9 +55,9 @@ validate-tasks:
 check-links:
 	@$(PY) tools/check_links.py
 
-# ---------------------------------------------------------------- sim (cmake, NO Unreal needed)
-# This is the whole point of ADR-0004's module split: the layer that holds all the
-# gameplay logic builds and tests in ~20 seconds with no engine installed.
+# ---------------------------------------------------------------- sim (cmake, no engine)
+# The layer that holds all the gameplay logic builds and tests in seconds with no engine
+# installed. The Godot game links the same library.
 
 ## configure: configure the standalone sim build
 configure:
@@ -150,133 +128,6 @@ test-perf: build-sim
 test-coverage:
 	@$(PY) tools/coverage.py
 
-# ---------------------------------------------------------------- engine (needs UE_ROOT)
-
-## ue-root: print the Unreal install this Makefile will use
-ue-root:
-	@if [ -n "$(UE_ROOT)" ]; then echo "UE_ROOT = $(UE_ROOT)"; \
-	else echo "no Unreal found. Put 'UE_ROOT = /path/to/UE_5.8' in Makefile.local, or pass UE_ROOT=..."; exit 1; fi
-
-# Unreal holds an exclusive lock on the project. A previous editor still running makes the next
-# run exit silently having done nothing, which looks exactly like a script that did not work.
-# Every editor target kills stragglers first. Learned the hard way.
-ue-kill:
-	@pkill -x UnrealEditor 2>/dev/null || true
-	@pkill -x UnrealEditor-Cmd 2>/dev/null || true
-	@for i in 1 2 3 4 5 6 7 8 9 10; do pgrep -f "Binaries/Linux/UnrealEditor" >/dev/null 2>&1 || break; sleep 1; done
-
-## ue-py: run a python script in the editor, headless.  make ue-py SCRIPT=tools/editor/foo.py
-ue-py: ue-kill
-	@test -n "$(UE_ROOT)" || (echo "no Unreal found — see \`make ue-root\`" && exit 1)
-	@test -n "$(SCRIPT)" || (echo "usage: make ue-py SCRIPT=tools/editor/foo.py" && exit 1)
-	@timeout 900 $(UE) $(PWD)/Steeplejack.uproject -run=pythonscript \
-	  -script=$(PWD)/$(SCRIPT) -unattended -nosplash -NoSound >/dev/null 2>&1 || true
-	@grep -E "^\[.*LogPython: (Error: )?SJ" Saved/Logs/Steeplejack.log | sed 's/.*LogPython: //' || \
-	  echo "  no SJ* output — see Saved/Logs/Steeplejack.log"
-
-## mcp: start a long-lived editor with the MCP server, in the background
-##   This is the one that changes how the project is worked on. UE 5.8 ships Epic's experimental
-##   Model Context Protocol plugin: an MCP server inside the editor process. With it up, an agent
-##   queries and drives a RUNNING editor over http://127.0.0.1:$(MCP_PORT)$(MCP_PATH) instead of
-##   cold-starting one per change -- which costs a shader compile every time and was most of the
-##   friction in this project's first night.
-##
-##   .mcp.json points Claude Code at it. Restart Claude Code once after `make mcp` to pick it up.
-MCP_PORT ?= 8000
-MCP_PATH ?= /mcp
-
-mcp: build-game ue-kill
-	@mkdir -p Saved/Logs
-	@nohup $(UE_EDITOR) $(PWD)/Steeplejack.uproject $(MAP) \
-		-RenderOffscreen -nosplash -NoSound > Saved/Logs/mcp-editor.log 2>&1 &
-	@printf "  starting editor"
-	@for i in $$(seq 1 60); do \
-		if ss -ltn 2>/dev/null | grep -q ":$(MCP_PORT)"; then echo; \
-		  echo "  MCP up on http://127.0.0.1:$(MCP_PORT)$(MCP_PATH)"; \
-		  grep -E "SJTOOLS" Saved/Logs/Steeplejack.log 2>/dev/null | tail -1; exit 0; fi; \
-		printf "."; sleep 2; \
-	done; \
-	echo; echo "  MCP did not come up — see Saved/Logs/mcp-editor.log"; exit 1
-
-## mcp-status: is the editor up and serving tools?
-mcp-status:
-	@ss -ltn 2>/dev/null | grep -q ":$(MCP_PORT)" \
-		&& echo "  MCP listening on 127.0.0.1:$(MCP_PORT)$(MCP_PATH)" \
-		|| (echo "  not running — \`make mcp\`"; exit 1)
-	@$(PY) tools/mcp_call.py list_toolsets 2>/dev/null || true
-
-## mcp-stop: shut the editor down
-mcp-stop: ue-kill
-	@echo "  editor stopped"
-
-## materials: build the band material (run once; build-map needs it)
-materials:
-	@$(MAKE) --no-print-directory ue-py SCRIPT=tools/editor/make_materials.py
-
-## build-map: (re)generate the test map from tools/editor/build_test_map.py
-##   Removes the .umap first: LevelEditorSubsystem.new_level() returns False if the asset exists,
-##   and the save that follows then reports success while writing nothing.
-build-map:
-	@rm -f Content/Maps/ShotTest.umap
-	@$(MAKE) --no-print-directory ue-py SCRIPT=tools/editor/build_test_map.py
-
-## play: build, run the game headless, and write a screenshot you can actually look at
-##   The one that matters. If you changed something visual and have not looked at a frame,
-##   you have not finished. Writes Saved/Screenshots/LinuxEditor/*.png.
-play: build-game
-	@rm -f Saved/Screenshots/LinuxEditor/*.png
-	@timeout $(PLAY_SECS) $(UE_EDITOR) $(PWD)/Steeplejack.uproject $(MAP) -game -RenderOffscreen \
-	  -unattended -nosplash -NoSound -windowed -ResX=1280 -ResY=720 \
-	  -ExecCmds="$(PLAY_CMDS)" >/dev/null 2>&1 || true
-	@$(MAKE) --no-print-directory ue-kill
-	@ls -1 Saved/Screenshots/LinuxEditor/*.png 2>/dev/null \
-	  && echo "  ^ open these" \
-	  || (echo "  no screenshot — see Saved/Logs/Steeplejack.log"; exit 1)
-
-## build-game: compile the UE game module
-# A build must always produce the binary that the next run loads. If an editor is live — and the
-# session-start MCP hook keeps one live — UBT quietly falls back to a *hot-reload* build: it writes
-# libUnrealEditor-SteeplejackGame-0001.so and leaves the base .so untouched, so `make play` then
-# launches yesterday's code and reports success. Kill the editor first and sweep the numbered
-# leftovers, so "it built" and "it ran" cannot disagree. Restart the live editor with `make mcp`.
-build-game: ue-kill
-	@rm -f Binaries/Linux/libUnrealEditor-SteeplejackGame-[0-9][0-9][0-9][0-9].so \
-	       Binaries/Linux/libUnrealEditor-SteeplejackSim-[0-9][0-9][0-9][0-9].so
-	@test -n "$(UE_ROOT)" || (echo "no Unreal 5.8 found. Put 'UE_ROOT = /path/to/UE_5.8' in Makefile.local (gitignored), or pass UE_ROOT=... — \`make ue-root\` shows what was detected" && exit 1)
-	@$(UE_ROOT)/Engine/Build/BatchFiles/Linux/Build.sh SteeplejackEditor Linux Development \
-		-project=$(PWD)/Steeplejack.uproject
-
-## test-automation: in-engine tests — the sim running inside Unreal, and the actors built from data
-##   These are NOT a second copy of `make check`. They test what only the engine can tell you:
-##   that the sim links and behaves inside UE, and that an actor built from a level file contains
-##   the geometry that file describes.
-test-automation: build-game ue-kill
-	@timeout 600 $(UE) $(PWD)/Steeplejack.uproject \
-		-ExecCmds="Automation RunTests Steeplejack; Quit" \
-		-unattended -nullrhi -nosplash -NoSound >/dev/null 2>&1 || true
-	@$(MAKE) --no-print-directory ue-kill
-	@grep -E "LogAutomationController.*(Test Completed|Success|Fail)" Saved/Logs/Steeplejack.log \
-		| sed 's/.*LogAutomationController: //' | tail -20 || true
-	@if grep -qE "LogAutomationController.*Fail" Saved/Logs/Steeplejack.log; then \
-		echo "  FAILED — see Saved/Logs/Steeplejack.log"; exit 1; \
-	fi
-
-## perf-capture: frame-time capture on the three reference scenes (nightly)
-perf-capture:
-	@$(PY) tools/perf_capture.py
-
-## run: play the game in a window, on your screen, with a keyboard
-##   This is the one you want. `make play` is the headless one: it renders a frame to a PNG and
-##   exits, which is what CI and an agent need and is no use to a human.
-run: build-game ue-kill
-	@echo "  opening $(MAP) — close the window or press Esc to quit"
-	@$(UE_EDITOR) $(PWD)/Steeplejack.uproject $(MAP) -game \
-		-windowed -ResX=1600 -ResY=900 -NoSound
-
-## editor: open the Unreal editor on the test map
-editor: build-game ue-kill
-	@$(UE_EDITOR) $(PWD)/Steeplejack.uproject $(MAP)
-
 # ---------------------------------------------------------------- parallel work
 # Parallel generation, sequential merging. See docs/06-workflow/07-integration.md
 
@@ -322,7 +173,7 @@ waves:
 critical:
 	@$(PY) tools/tasks.py critical $(TARGET)
 
-## editor-queue: tasks that need a human in the Unreal editor
+## editor-queue: tasks that need a human at an editor
 editor-queue:
 	@$(PY) tools/tasks.py editor
 
@@ -357,10 +208,9 @@ help:
 
 .PHONY: check ci check-conventions validate validate-data validate-tasks check-links \
         configure build-sim test-unit test-levels test-replay test-determinism test-perf \
-        test-coverage build-game test-automation perf-capture editor \
+        test-coverage \
         board ready waves critical editor-queue human-queue stale graph new-task \
-        test-tools check-verify check-blueprints install-hooks help watch ue-root \
-        play run build-map materials ue-py ue-kill mcp mcp-status mcp-stop \
+        test-tools check-verify install-hooks help watch run \
         wt-start wip wt-status land wt-drop doctor
 
 # ---------------------------------------------------------------- Godot
@@ -388,12 +238,14 @@ godot-build: godot-deps
 godot-editor: godot-import
 	@$(GODOT) --path godot --editor
 
-# Run the game in a window. Builds first, so a fresh clone is one command away from playing.
+## run: play the game in a window. Builds first, so a fresh clone is one command away from playing.
+run: godot-run
+
 godot-run: godot-build godot-import
 	@$(GODOT) --path godot $(if $(LEVEL),-- --level $(LEVEL),)
 
-# Run a script headlessly against the project — the Godot equivalent of `make ue-py`, and the
-# way anything gets verified without a human watching.
+# Run a script headlessly against the project — the way anything gets verified without a human
+# watching.
 #   make godot-script SCRIPT=res://scripts/prove_sim.gd
 # A project Godot has never opened has no .godot/ and therefore no registered extensions, and the
 # only symptom is "Identifier not declared" from GDScript. Import first, every time; it is fast
@@ -408,7 +260,7 @@ godot-script: godot-import
 # The playable build's own regression tests. Godot cannot render headlessly, so these drive nodes
 # directly and assert on state — no substitute for playing it, but a substitute for shipping the
 # same bug twice.
-## shot: pose the jack and photograph him — the Godot answer to `make play`
+## shot: pose the jack and photograph him
 ##
 ## Godot's --headless has no renderer at all. Under a virtual X display it renders fine, software
 ## rasterised, a few seconds a frame. Before this, every visual change in this engine was shipped
