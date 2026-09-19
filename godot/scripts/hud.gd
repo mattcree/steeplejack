@@ -103,8 +103,8 @@ func _draw() -> void:
 		_label(player.span_warning, Vector2(info_x, hand.y + 42), col, 13)
 
 	# --- what you can do, and what is stopping you ----------------------------------------------
-	var next_step := _next_step()
-	_centre(next_step, size.y - 96, Color(0.95, 0.93, 0.88, 0.90))
+	_draw_steps()
+	_draw_markers()
 
 	var rows := _affordances()
 	var row_y := size.y - 44 - 17 * (rows.size() - 1)
@@ -220,6 +220,132 @@ func _next_step() -> String:
 	if not player.target_tapped():
 		return "Tap it to hear what it is worth [E] — or trust your eye and drive a dog [right mouse]."
 	return "Drive a dog into that joint, or look for a better one.  [right mouse]"
+
+
+## The loop, as a list: what gets the next section up, what is done, and what is next.
+##
+## The first person to play it could not see the order of things — "how do I get the next ladder
+## up?" — because the only guidance was one line of advice at a time. The list is the same state
+## that line reads, laid out whole: every section goes up the same four steps, and the one to do
+## now is the bright one, with the advice for it underneath.
+const STEPS := [
+	"Get a ladder section",
+	"Climb to the top of the ladder",
+	"Drive a dog into the marked band above the top",
+	"Lash the section to that dog",
+]
+
+
+func _step_state() -> Array:
+	var has_section: bool = player.carrying_ladder or player.lashing
+	var dog_in: bool = player.has_lashable_anchor()
+	var at_top_of_ladder: bool = player.on_ladder and player.height_m() >= player.ladder_top - 1.3
+	var done := [has_section, at_top_of_ladder or dog_in, dog_in, false]
+	# The dog can come before the section: drive it, then haul the section up to it. So a missing
+	# section is the step to do whenever it is missing and the dog is in.
+	var current := 3
+	if not has_section and (dog_in or not player.on_ladder or player.dogs_carried == 0):
+		current = 0
+	elif not done[1] and not dog_in:
+		current = 1
+	elif not dog_in:
+		current = 2
+	return [done, current]
+
+
+func _draw_steps() -> void:
+	if player.at_top or player.falling or player.fade_in > 0.3 or player.options_open:
+		return
+	if player.jack.slip_in_progress() or player.stack_info.get("buckling", false):
+		return
+	var state := _step_state()
+	var done: Array = state[0]
+	var current: int = state[1]
+	var built: int = player.jack.stack_sections().size()
+	var total: int = built + int(player.ladders_at_base) + (1 if player.carrying_ladder else 0)
+	var x := 28.0
+	var y := size.y * 0.26
+	_label("NEXT SECTION   %d of %d up" % [built, total], Vector2(x, y), Color(0.95, 0.93, 0.88, 0.85), 13)
+	y += 22.0
+	for i in STEPS.size():
+		var now: bool = i == current
+		var mark := "✓" if done[i] and not now else ("▶" if now else "·")
+		var col := Color(0.98, 0.96, 0.90, 0.98) if now else (
+			Color(0.70, 0.78, 0.66, 0.80) if done[i] else Color(0.72, 0.70, 0.66, 0.60))
+		_label("%s  %d. %s" % [mark, i + 1, STEPS[i]], Vector2(x, y), col, 15 if now else 13)
+		y += 22.0 if now else 19.0
+		if now:
+			# The advice line, but only where it is about this step: the old single-line guidance
+			# runs a step ahead in places, and advice about tapping under "climb to the top" was
+			# exactly the confusion this list is here to end.
+			var detail := _next_step()
+			if i == 1:
+				detail = "Climb up what you've built  [W]" if player.on_ladder else detail
+			if detail != "":
+				_label(detail, Vector2(x + 24.0, y - 2.0), Color(0.92, 0.84, 0.62, 0.95), 13)
+				y += 20.0
+			if i == 3 and not player.lashing:
+				_label("the new section stands on your ladder; the rope ties it to the dog",
+					Vector2(x + 24.0, y - 2.0), Color(0.80, 0.78, 0.74, 0.75), 12)
+				y += 18.0
+
+
+## Pointers in the world for the step in hand: the cradle when the job is on the ground, the dog to
+## lash to, the dog to hang the gin wheel on, and a label on the band where the next dog goes.
+func _draw_markers() -> void:
+	if player.at_top or player.falling or player.fade_in > 0.3 or player.options_open:
+		return
+	if player.jack.slip_in_progress() or player.lashing or player.hauling or player.work_mode:
+		return
+	var state := _step_state()
+	var current: int = state[1]
+	var t: float = player._now
+	var pulse := 0.6 + 0.4 * sin(t * 4.0)
+	var chalk := Color(0.863, 0.910, 0.941, 0.95 * pulse)
+
+	if not player.on_ladder and current == 0 and not player.at_cradle():
+		_pointer(player.chimney.cradle_point() + Vector3.UP * 1.4, "the cradle — ladders and dogs  [F]", chalk)
+	elif not player.on_ladder and player.carrying_ladder and player.dogs_carried > 0:
+		var foot: Vector3 = player.chimney.global_position + player.chimney.face_point(1.2)
+		_pointer(foot, "the ladder — climb  [W]", chalk)
+
+	if player.on_ladder:
+		var jid: int = player.lash_dog_joint()
+		if jid >= 0 and player.carrying_ladder:
+			_ring_at_joint(jid, "lash here  [R]", chalk)
+		elif jid >= 0 and not player.carrying_ladder:
+			_ring_at_joint(jid, "rig the gin wheel here  [G], then haul a section up", chalk)
+		elif current == 2:
+			var band: Vector2 = player.next_dog_band()
+			if band.y > band.x:
+				var mid: Vector3 = player.chimney.global_position + player.chimney.face_point((band.x + band.y) * 0.5)
+				_pointer(mid + (player.chimney.global_position - mid).normalized() * 0.2,
+					"next dog goes in this band", chalk, false)
+
+
+func _pointer(world: Vector3, text: String, col: Color, arrow := true) -> void:
+	if player.camera.is_position_behind(world):
+		return
+	var at: Vector2 = player.camera.unproject_position(world)
+	at.x = clampf(at.x, 80.0, size.x - 80.0)
+	at.y = clampf(at.y, 60.0, size.y - 140.0)
+	if arrow:
+		var tip := at
+		draw_colored_polygon(PackedVector2Array([tip, tip + Vector2(-10, -16), tip + Vector2(10, -16)]), col)
+		at.y -= 22.0
+	var w := _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+	_label(text, Vector2(at.x - w * 0.5, at.y - 4.0), col, 14)
+
+
+func _ring_at_joint(jid: int, text: String, col: Color) -> void:
+	var on = _on_screen(jid)
+	if on == null:
+		return
+	var at: Vector2 = on
+	var r: float = 16.0 + 3.0 * sin(float(player._now) * 4.0)
+	draw_arc(at, r, 0, TAU, 32, col, 2.5)
+	draw_arc(at, r + 7.0, 0, TAU, 32, Color(col.r, col.g, col.b, col.a * 0.4), 1.5)
+	_label(text, at + Vector2(r + 12.0, 5.0), col, 14)
 
 
 ## [key, verb, available, why-not]
@@ -671,6 +797,12 @@ func _draw_lash(jack: Jack) -> void:
 	var c := Vector2(size.x * 0.5, size.y * 0.40)
 	var r := 64.0
 
+	# What is going on, in words: the new section is stood on the old one, and the rope is what
+	# holds it to the dog. Without this the ring and the count were a minigame about nothing.
+	_centre("Roping the new section to the dog", c.y - r - 52.0, Color(0.97, 0.95, 0.90, 0.95), 18)
+	_centre("each circle of the mouse is one turn of rope round the dog and the ladder",
+		c.y - r - 30.0, Color(0.86, 0.84, 0.80, 0.85), 13)
+
 	# The turn in progress, filling round the ring, from the top, the way a clock hand goes.
 	draw_arc(c, r, 0, TAU, 64, Color(0.9, 0.88, 0.84, 0.18), 6.0)
 	if laid > 0.0:
@@ -682,11 +814,11 @@ func _draw_lash(jack: Jack) -> void:
 
 	# The count, and what it buys.
 	_centre("%d" % wraps, c.y + 12.0, Color(0.97, 0.95, 0.90, 0.95), 38)
-	var what := "not enough to hold"
+	var what := "not enough to hold yet — %d turns makes a hitch" % hitch
 	if wraps >= full:
-		what = "full lashing"
+		what = "full lashing — solid. Tie it off [R]"
 	elif wraps >= hitch:
-		what = "quick hitch — it will walk"
+		what = "quick hitch — it holds, but creeps. %d turns is solid" % full
 	_centre(what, c.y + r + 42.0, Color(0.92, 0.88, 0.82, 0.88), 15)
 
 	# Notches for each turn, with the hitch and the full lashing marked out from the rest.

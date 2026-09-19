@@ -15,6 +15,7 @@
 #
 #   climb <m>        on the ladder at that height, with stack lashed up to it at 4 m spans
 #   dog <m> [lash]   a dog seated and lashed at that height (lash 1 hitch, 2 full)
+#   seat <m>         a dog driven in at that height, nothing lashed to it yet
 #   carry            a ladder on the shoulder and a full bag of dogs
 #   tap              sound the joint he is pointing at, through the real flow
 #   tapall [r]       sound every joint in reach (or r x reach), for a frame of the chalk
@@ -108,6 +109,13 @@ func _run(cmd: String) -> void:
 			_lash_to(a)
 			var d: Dictionary = jack.seat_anchor(a, 1.0, 0.0)
 			jack.stack_lash(float(d.get("height", a)), int(b) if b > 0.0 else 2)
+			if player.face != null:
+				player.face.touch()
+		"seat":
+			# A dog driven in at that height and nothing lashed to it yet: the moment before a lash.
+			var jid: int = jack.nearest_joint(chimney.face_point(a) + chimney.global_position + Vector3(0, 0, 0.45), 1.0)
+			if jid >= 0:
+				jack.seat_anchor_joint(jid, 1.0, 0.0)
 			if player.face != null:
 				player.face.touch()
 		"carry":

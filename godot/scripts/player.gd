@@ -729,6 +729,7 @@ func _physics_process(dt: float) -> void:
 	_animate()
 	_update_lean(dt)
 	_update_grip(dt)
+	_update_guides()
 	_update_gear()
 	_update_checkpoint(dt)
 
@@ -2183,6 +2184,51 @@ func _pick_up() -> void:
 		ladders_at_base -= 1
 		took = true
 	_say(("ladder on your shoulder, %d dogs in the bag" % dogs_carried) if took else "nothing left to take")
+
+
+## Where the next dog should go: from 2.5 m above the last dog (less buys too little height) to a
+## 6 m span or as high as he can reach standing at the top, whichever is lower — and high enough
+## that a section lashed there reaches above the ladder he has. Vector2(lo, hi); hi <= lo is none.
+func next_dog_band() -> Vector2:
+	var last: float = maxf(jack.stack_top(), 0.0)
+	var reach: float = jack.tuning_f("tapTestMaxRangeMetres", 2.5)
+	var shoulder: float = jack.tuning_f("climberShoulderAboveFeetMetres", 1.45)
+	var lo: float = maxf(last + 2.5, ladder_top - _rise() + 0.5)
+	var hi: float = minf(last + jack.tuning_f("spanWarnMetres", 6.0), ladder_top + shoulder + reach * 0.8)
+	return Vector2(lo, hi)
+
+
+## The joint of the dog a section would be lashed to right now, or -1.
+func lash_dog_joint() -> int:
+	var h: float = _lash_dog_height()
+	return _joint_of_anchor_at(h) if h >= 0.0 else -1
+
+
+var _guide_ghost := Vector2.ZERO
+
+
+## The highlights in the world, from the state of the loop: the chalked band where the next dog
+## goes, while that is the job; and, once a dog is in and he has a section, the section itself,
+## ghosted where it will stand. Lashing draws its own ghost, so this steps aside while he lashes.
+func _update_guides() -> void:
+	if chimney == null or jack == null:
+		return
+	var climbing := on_ladder and not falling and not at_top
+	var band := Vector2.ZERO
+	if climbing and not work_mode and not lashing and not hauling and dogs_carried > 0 \
+			and not has_lashable_anchor():
+		band = next_dog_band()
+	chimney.set_target_band(band.x, band.y)
+	if lashing:
+		_guide_ghost = Vector2.ZERO
+		return
+	var ghost := Vector2.ZERO
+	if climbing and carrying_ladder and has_lashable_anchor():
+		var dog: float = _lash_dog_height()
+		ghost = Vector2(ladder_top, minf(dog + _rise(), chimney.height_m))
+	if ghost != _guide_ghost:
+		_guide_ghost = ghost
+		chimney.set_ghost(ghost.x, ghost.y)
 
 
 ## Hands and feet on the rungs. The hammer hand lets go to tap, strike, lash or haul, and while a

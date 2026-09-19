@@ -337,6 +337,77 @@ func bow_at(h: float) -> Vector3:
 	return _bow_at(h)
 
 
+## Where the cradle is, in the world: for the marker that points a player at it.
+func cradle_point() -> Vector3:
+	return global_position + FACE * (_base_r + 4.5)
+
+
+## The stretch of wall where the next dog should go, drawn on the brick as a chalked band: a faint
+## wash between two chalk lines, round the face either side of the ladder. `hi <= lo` hides it.
+##
+## The one thing a new player could not work out was where to put the next dog. The rules were all
+## there — a span of 3 to 6 m above the last dog, within reach, high enough that the new section
+## gains height — and none of it was on the wall. Now it is.
+var _band: MeshInstance3D
+var _band_lo := -1.0
+var _band_hi := -1.0
+const BAND_HALF_ARC_M := 0.9   ## how far round the face the band reaches, each side of the ladder
+const BAND_PROUD := 0.012      ## off the brick, so it does not fight the brick shader for depth
+
+
+func set_target_band(lo: float, hi: float) -> void:
+	if absf(lo - _band_lo) < 0.02 and absf(hi - _band_hi) < 0.02:
+		return
+	_band_lo = lo
+	_band_hi = hi
+	if _band == null:
+		_band = MeshInstance3D.new()
+		_band.name = "TargetBand"
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		m.vertex_color_use_as_albedo = true
+		_band.material_override = m
+		_band.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_band)
+	if hi <= lo:
+		_band.visible = false
+		return
+	_band.visible = true
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var wash := Color(0.863, 0.910, 0.941, 0.06)   # a faint wash: at 0.13 it read as a white slab
+	var line := Color(0.863, 0.910, 0.941, 0.85)
+	_band_strip(st, lo, hi, wash)
+	for h in [lo, hi]:
+		_band_strip(st, h - 0.012, h + 0.012, line)
+	_band.mesh = st.commit()
+
+
+## One horizontal strip of the wall's surface from `lo` to `hi`, round the face either side of it.
+func _band_strip(st: SurfaceTool, lo: float, hi: float, col: Color) -> void:
+	var steps := 16
+	for i in steps:
+		var a0 := _band_angle(i, steps, lo)
+		var a1 := _band_angle(i + 1, steps, lo)
+		var pts := [_band_point(a0, lo), _band_point(a1, lo), _band_point(a1, hi), _band_point(a0, hi)]
+		for idx in [0, 1, 2, 0, 2, 3]:
+			st.set_color(col)
+			st.add_vertex(pts[idx])
+
+
+func _band_angle(i: int, steps: int, h: float) -> float:
+	var arc := BAND_HALF_ARC_M / maxf(radius_at(h), 0.1)
+	return lerpf(-arc, arc, float(i) / steps)
+
+
+func _band_point(angle: float, h: float) -> Vector3:
+	var r := radius_at(h) + BAND_PROUD
+	var face := FACE.rotated(Vector3.UP, angle)
+	return face * r + Vector3(0, h, 0)
+
+
 ## The section being lashed, from `from` to `to`, translucent. Zero length hides it.
 func set_ghost(from: float, to: float) -> void:
 	var mm := _ghost.multimesh
