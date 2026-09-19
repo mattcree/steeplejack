@@ -28,6 +28,7 @@ Run them all: `make check-conventions`
 | 17 | C++ compiles clean at `-Wall -Wextra -Werror -Wconversion` | the CMake build | |
 | 18 | ~~No gameplay decision in a Blueprint~~ — retired 2026-09-19 with Unreal. Its successor, "no game rule in GDScript", is enforced by review | — | there are no Blueprints |
 | 19 | Wobble tuning is read only in `Wobble.cpp`; everything else calls `WobbleAmplitudeDeg` | `tools/check_conventions.py:wobble_home` | METER-003 — two wobbles tell the player two stories about the same hands |
+| 20 | Nothing on screen pulses faster than 3 Hz: a literal `sin(clock * rate)` rate over 6π rad/s | `tools/check_conventions.py:pulse_rate` | [accessibility](../01-gdd/14-accessibility.md) — flashing is a seizure risk; rates built from expressions are left to review |
 
 Rules 1–4 and 16 are the ones that exist specifically because agents will otherwise break them
 confidently and silently.

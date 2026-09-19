@@ -39,6 +39,29 @@ def run_checker(snippet: str) -> str:
             os.remove(path)
 
 
+def run_checker_gd(snippet: str) -> str:
+    """The same, for a GDScript file in godot/scripts."""
+    path = os.path.join(ROOT, "godot", "scripts", "_ConventionTest.gd")
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(snippet)
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_conventions.py")],
+                           cwd=ROOT, capture_output=True, text=True, timeout=120)
+        return r.stdout + r.stderr
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def case_gd(name: str, snippet: str, *, flagged_expected: bool):
+    out = run_checker_gd(snippet)
+    flagged = "_ConventionTest.gd" in out
+    if flagged != flagged_expected:
+        failures.append(f"{name}: expected {'a violation' if flagged_expected else 'no violation'}\n"
+                        f"      got: {out.strip()[:200]}")
+    print(f"  {'ok  ' if flagged == flagged_expected else 'FAIL'} {name}")
+
+
 def case(name: str, snippet: str, *, must_flag: str | None, must_not_flag: str | None = None):
     out = run_checker(snippet)
     flagged = "_ConventionTest.cpp" in out
@@ -87,6 +110,12 @@ def main() -> int:
          "float F(const Meters& m, const MeterContext& c, const Tuning& t) "
          "{ return WobbleAmplitudeDeg(m, c, 0.0f, t) * 2.0f; }" + FOOTER,
          must_flag=None, must_not_flag="")
+
+    print("rule 20 — nothing pulses faster than 3 Hz")
+    case_gd("a 5 Hz pulse caught", "func f(now: float) -> float:\n\treturn sin(now * 31.4)\n",
+            flagged_expected=True)
+    case_gd("a 1 Hz pulse allowed", "func f(now: float) -> float:\n\treturn sin(now * 6.28)\n",
+            flagged_expected=False)
 
     print("rule 2 — no ambient RNG, no mutable statics")
     case("rand() caught", HEADER + "int F() { return rand(); }" + FOOTER, must_flag="ambient RNG")

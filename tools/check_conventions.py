@@ -199,10 +199,37 @@ def check_wobble_home():
                                   f"(docs/06-workflow/04-enforced-conventions.md rule 19)")
 
 
+# --- rule 20: nothing on screen pulses faster than 3 Hz -----------------------
+# 14-accessibility.md: "No flashing above 3 Hz anywhere." Every pulse in the game is a sin() of a
+# clock times a rate, so a literal rate over 6π rad/s is a flash over 3 Hz. A rate built from an
+# expression cannot be judged here and is left to review; this catches the plain case, which is
+# the one that gets typed. foley.gd is exempt: it synthesises audio, where 3 Hz means nothing.
+GODOT_SCRIPTS = os.path.join(ROOT, "godot", "scripts")
+PULSE = re.compile(r"\bsin\(\s*[\w.]*?\b(now|_now|time|t|age|elapsed)\b\s*\*\s*(\d+(?:\.\d+)?)")
+MAX_RAD_PER_S = 6.0 * 3.14159265   # 3 Hz
+
+
+def check_pulse_rate():
+    if not os.path.isdir(GODOT_SCRIPTS):
+        return
+    for fn in sorted(os.listdir(GODOT_SCRIPTS)):
+        if not fn.endswith(".gd") or fn == "foley.gd":
+            continue
+        rel = os.path.relpath(os.path.join(GODOT_SCRIPTS, fn), ROOT)
+        for i, line in enumerate(open(os.path.join(GODOT_SCRIPTS, fn), encoding="utf-8"), 1):
+            for m in PULSE.finditer(line.split("#")[0]):
+                rate = float(m.group(2))
+                if rate > MAX_RAD_PER_S:
+                    errors.append(f"{rel}:{i}: a pulse at {rate} rad/s is {rate / 6.2832:.1f} Hz — "
+                                  f"nothing may flash above 3 Hz "
+                                  f"(docs/06-workflow/04-enforced-conventions.md rule 20)")
+
+
 def main():
     check_sim_purity()
     check_tuning_keys()
     check_wobble_home()
+    check_pulse_rate()
     check_likeness()
     for e in errors:
         print(f"\033[31merror\033[0m {e}")
