@@ -95,7 +95,7 @@ func _draw() -> void:
 	# Only once there is something to span *from*. With no dogs driven, the span is measured from
 	# the ground and reads "62.0 m span — about to buckle" at the top of a ladder that is lashed all
 	# the way down. True, useless, and permanently on screen in alarm red.
-	if player.span_warning != "" and jack.anchor_count() > 0:
+	if player.span_warning != "" and jack.anchor_count() > 0 and not player.at_top:
 		var buckle: bool = player.span_warning.contains("buckle")
 		var col := Color(0.95, 0.30, 0.22, 0.6 + 0.4 * sin(now * 7.0)) if buckle else Color(0.92, 0.70, 0.35, 0.9)
 		_label(player.span_warning, Vector2(info_x, hand.y + 42), col, 13)
@@ -135,6 +135,9 @@ func _draw() -> void:
 
 	_draw_stack_warnings()
 	_draw_fuse()
+	_draw_recovery(jack, hand)
+	if player.at_top:
+		_draw_top()
 
 	# Rule 8: every audio cue has a visual fallback. This one is not optional in a second way too —
 	# the fairness table makes the gust's 1.2 s warning the thing that separates a fair failure from
@@ -148,12 +151,14 @@ func _draw() -> void:
 
 	# There is no objective marker because the objective is the top and you can see it. But you
 	# cannot see the *rule*, so it is said once and then never again.
-	if player._now < 14.0:
+	if player._now < 14.0 and not player.at_top:
 		_centre("Climb the stack. You can only go as high as you have built.",
 			size.y * 0.14, Color(0.92, 0.90, 0.86, 0.85 * _ease((14.0 - player._now) / 3.0)))
 
 
 func _next_step() -> String:
+	if player.at_top or player.recovering != player.REC_NONE:
+		return ""
 	if player.jack.slip_in_progress():
 		return ""
 	if player.rigging_to >= 0 or player.lashing:
@@ -184,6 +189,8 @@ func _next_step() -> String:
 
 ## [key, verb, available, why-not]
 func _affordances() -> Array:
+	if player.at_top:
+		return []
 	if player.jack.slip_in_progress():
 		return [["SPACE", "grab", true, ""]]
 	if player.rigging_to >= 0:
@@ -214,7 +221,14 @@ func _affordances() -> Array:
 		["R", "lash the next ladder", player.has_lashable_anchor() and player.carrying_ladder,
 			"you are not carrying one" if not player.carrying_ladder else "needs a dog seated above you"],
 		[Q_KEY, _next_stance_label(), true, ""],
+		["T", "brew up", jack_free_hands(),
+			"you need both hands — belt on first"],
+		["C / V", "a cigarette  ·  look at the view (hold)", true, ""],
 	]
+
+
+func jack_free_hands() -> bool:
+	return player.jack.get_stance() >= 3
 
 
 ## What Q costs and what it buys, spelled out before it is pressed rather than after.
@@ -343,6 +357,54 @@ func _draw_pip(jack: Jack) -> void:
 			_: v = exp(-u * 11.0) + (0.55 * exp(-(u - 0.3) * 7.0) if u > 0.3 else 0.0)   # rattle
 		env.append(base + Vector2(u * w, -v * 14.0))
 	draw_polyline(env, Color(c.r, c.g, c.b, a * 0.8), 2.0)
+
+
+## Getting nerve back: a ring round the nerve arc filling as it comes, with what it is.
+func _draw_recovery(jack: Jack, hand: Vector2) -> void:
+	if player.recovering == player.REC_NONE:
+		return
+	var p: float = jack.recover_progress()
+	var names := {1: "brewing up", 2: "a cigarette", 3: "looking at the view"}
+	draw_arc(hand, NERVE_R + 10.0, -PI * 0.5, -PI * 0.5 + TAU * p, 48,
+		Color(0.72, 0.84, 0.95, 0.9), 3.0)
+	_label(names.get(player.recovering, ""), Vector2(HAND.x - 30, hand.y - NERVE_R - 22),
+		Color(0.80, 0.88, 0.96, 0.9), 13)
+	# The brew's line, as a subtitle. Said once, at the start, and left up while the tea lasts.
+	if player.recovering == player.REC_TEA and player.tea_line != "":
+		_centre("\u201c%s\u201d" % player.tea_line, size.y * 0.78, Color(0.95, 0.93, 0.88, 0.9), 17)
+
+
+## The top. The HUD steps back and the climb is summed up, once.
+##
+## This is the player's own answer to what the MVP playtest is asking: did they still tap at the
+## tenth dog (the taps), did they take the risky span (the long spans), did the verbs have a curve
+## (the ratings). Shown plainly, as facts about their climb, with no score attached — a score would
+## turn a climb into a grade.
+func _draw_top() -> void:
+	var s: Dictionary = player.top_summary
+	var age: float = player._now - player.top_since
+	var a := clampf((age - 1.5) / 1.5, 0.0, 1.0)   # after the camera has had its moment
+	if a <= 0.0 or s.is_empty():
+		return
+	var y := size.y * 0.16
+	_centre("The top.", y, Color(0.97, 0.95, 0.90, 0.95 * a), 34)
+	var mins := int(float(s["seconds"])) / 60
+	var secs := int(float(s["seconds"])) % 60
+	_centre("%.0f m   ·   %d:%02d" % [float(s["height"]), mins, secs], y + 36.0,
+		Color(0.90, 0.88, 0.84, 0.85 * a), 16)
+	var b := clampf((age - 3.0) / 1.5, 0.0, 1.0)
+	var lines := [
+		"%d dogs — %d sound, %d fair, %d poor%s" % [s["dogs"], s["sound"], s["fair"], s["poor"],
+			(", %d bent" % s["bent"]) if int(s["bent"]) > 0 else ""],
+		"%d joints sounded   ·   %d long span%s taken" % [s["taps"], s["long_spans"],
+			"" if int(s["long_spans"]) == 1 else "s"],
+		"%d sections   ·   %d quick hitch%s" % [s["sections"], s["hitches"],
+			"" if int(s["hitches"]) == 1 else "es"],
+	]
+	for i in lines.size():
+		_centre(lines[i], y + 76.0 + 22.0 * i, Color(0.86, 0.84, 0.80, 0.8 * b), 14)
+	_centre("[S] back over the edge   ·   [V] look at the view", y + 160.0,
+		Color(0.78, 0.76, 0.72, 0.6 * b), 13)
 
 
 ## The stack's warnings. The fairness table: "Ladder buckled — fair, because the span was over 8 m

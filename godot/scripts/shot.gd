@@ -23,6 +23,8 @@
 #   strike           one blow, caught at contact
 #   lash <s> [rate]  carry a section and lash it, going round steadily for s seconds
 #   tieoff           tie the lashing off
+#   top              all the way up, and onto the cap
+#   tea              belt on and brew up
 #   stance <0-4>     one hand / hooked leg / clipped / belted / chair
 #   strain <g> <n>   drained meters, to see the telegraphs
 #   slip             grip to nothing, so the slip window is open
@@ -167,6 +169,18 @@ func _run(cmd: String) -> void:
 				await physics_frame
 		"tieoff":
 			player._tie_off()
+		"top":
+			# All the way up, through the real arrival: ladder to the cap, and step off onto it.
+			_lash_to(chimney.height_m)
+			player.ladder_top = chimney.height_m
+			chimney.set_ladder_top(chimney.height_m)
+			_put_on_ladder(chimney.height_m - 0.7)
+			player._arrive_at_top()
+			player._cam_yaw = player._yaw
+			player._cam_pitch = player._pitch
+		"tea":
+			jack.set_stance(3)
+			player._recover(player.REC_TEA)
 		"wide":
 			# Keep the ordinary framing in work mode, to see the whole body rather than the joint.
 			player.set_meta("shot_wide", true)

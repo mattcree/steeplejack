@@ -173,7 +173,9 @@ func _cap() -> void:
 	flue.material = dark
 	var hole := MeshInstance3D.new()
 	hole.mesh = flue
-	hole.position = Vector3(0, height_m + 0.6, 0)
+	# Its top a hair above the cap's, so the hole is what you see from the rim. Level with it, the
+	# cap's own top face covered the flue and the stack had no hole in it.
+	hole.position = Vector3(0, height_m + 0.275 + 0.55 * 3 + 0.275 - 1.5 + 0.01, 0)
 	add_child(hole)
 
 

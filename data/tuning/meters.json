@@ -64,7 +64,9 @@
     "teaAmount": 40.0, "teaSeconds": 12.0,
     "cigaretteAmount": 18.0, "cigaretteSeconds": 6.0, "cigaretteMaxNervePenalty": -5.0,
     "descendBelow20mPerSecond": 1.5,
-    "viewAmount": 12.0, "viewSeconds": 8.0
+    "descendBelowMetres": 20.0,
+    "viewAmount": 12.0, "viewSeconds": 8.0,
+    "viewAboveMetres": 20.0
   },
 
   "baseWobbleDegrees": 1.0,

@@ -17,6 +17,7 @@
 #include "JointGrid.h"
 #include "Level.h"
 #include "Meters.h"
+#include "Recovery.h"
 #include "Rng.h"
 #include "Slip.h"
 #include "Stack.h"
@@ -82,6 +83,15 @@ public:
 	/** A named fright. Unknown events are refused rather than silently ignored. */
 	bool shock(const godot::String& event);
 	double wobble_deg(double gust) const;
+
+	// --- getting your nerve back — METER-004 ----------------------------------------------------
+	/** On a staging or the top: nerve comes back on its own. */
+	void set_on_platform(bool on) { on_platform = on; }
+	/** 1 tea, 2 cigarette, 3 view. Returns why not, or "" if it has started. */
+	godot::String recover_start(int action, bool both_hands_free, bool facing_out);
+	void recover_interrupt();
+	int64_t recover_action() const { return static_cast<int64_t>(recovery.action); }
+	double recover_progress() const;
 
 	// --- the weather ---------------------------------------------------------------------------
 	// Driven by `step`, from the level file's own weather block. The game layer asks what the wind
@@ -252,6 +262,9 @@ private:
 	sj::WindModel wind{};
 	/** The weather's own substream, forked once, so adding a subsystem cannot shift its values. */
 	std::unique_ptr<sj::Rng> weather_rng;
+
+	sj::RecoveryState recovery{};
+	bool on_platform{false};
 
 	sj::SlipModel slip{};
 	sj::SlipOutcome outcome{sj::SlipOutcome::None};

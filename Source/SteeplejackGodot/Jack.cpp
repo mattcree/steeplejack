@@ -4,6 +4,7 @@
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include "JointGrid.h"
+#include "Recovery.h"
 #include "Rng.h"
 #include "Slip.h"
 #include "Stack.h"
@@ -97,6 +98,13 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("seconds_of_work_left"), &Jack::seconds_of_work_left);
 	ClassDB::bind_method(D_METHOD("shock", "event"), &Jack::shock);
 	ClassDB::bind_method(D_METHOD("wobble_deg", "gust"), &Jack::wobble_deg);
+
+	ClassDB::bind_method(D_METHOD("set_on_platform", "on"), &Jack::set_on_platform);
+	ClassDB::bind_method(D_METHOD("recover_start", "action", "both_hands_free", "facing_out"),
+	                     &Jack::recover_start);
+	ClassDB::bind_method(D_METHOD("recover_interrupt"), &Jack::recover_interrupt);
+	ClassDB::bind_method(D_METHOD("recover_action"), &Jack::recover_action);
+	ClassDB::bind_method(D_METHOD("recover_progress"), &Jack::recover_progress);
 
 	ClassDB::bind_method(D_METHOD("wind_at", "height"), &Jack::wind_at);
 	ClassDB::bind_method(D_METHOD("gust_tell"), &Jack::gust_tell);
@@ -290,6 +298,10 @@ void Jack::step(double dt)
 	}
 	sj::grip::Step(meters, d, context, *tuning);
 	sj::nerve::Step(meters, d, context, *tuning);
+	// Getting it back: where you are, and whatever you are doing about it.
+	meters.nerve = std::clamp(
+		meters.nerve + sj::recover::PassiveRate(context, on_platform, *tuning) * d, 0.0f, meters.nerveMax);
+	(void)sj::recover::Step(recovery, meters, d, *tuning);
 
 	// Grip reaching zero is a slip, and the slip opens and closes here rather than in GDScript.
 	// Both halves in one place is the only way the window cannot be left open by a script that
@@ -360,6 +372,23 @@ bool Jack::level_has_gusts() const { return level && level->Weather().hasGusts; 
 double Jack::gust_tell_progress() const
 {
 	return tuning ? static_cast<double>(wind.TellProgress(*tuning)) : 0.0;
+}
+
+String Jack::recover_start(int action, bool both_hands_free, bool facing_out)
+{
+	if (!tuning) { return String("no tuning"); }
+	const sj::Recovery a = static_cast<sj::Recovery>(std::clamp(action, 0, 3));
+	const sj::Refusal r = sj::recover::CanStart(a, meters, context, both_hands_free, facing_out, *tuning);
+	if (!r.ok()) { return String(std::string(r.why).c_str()); }
+	sj::recover::Begin(recovery, a, meters, *tuning);
+	return String();
+}
+
+void Jack::recover_interrupt() { sj::recover::Interrupt(recovery); }
+
+double Jack::recover_progress() const
+{
+	return tuning ? static_cast<double>(sj::recover::Progress(recovery, *tuning)) : 0.0;
 }
 
 void Jack::set_difficulty(int difficulty)

@@ -29,6 +29,7 @@ const BOOM_LENGTH := 4.0
 const BOOM_SIDE := 0.65
 const WORK_BOOM_LENGTH := 1.4        ## 11-camera-controls-feel.md, "pulls in to 1.4 m"
 const WORK_BOOM_SIDE := 0.55
+const TOP_BOOM_LENGTH := 4.0         ## 11-camera-controls-feel.md, "pulls out to 4 m"
 ## How fast the camera settles on a new framing. Quick enough to be there before the first blow.
 const CAMERA_SETTLE := 7.0
 
@@ -137,6 +138,38 @@ var stack_info := {}
 var fuse: Array = []
 ## The standing ladder at the foot, before anything is lashed.
 const STANDING_TOP := 5.0
+
+## Recovery — METER-004. Mirrors the sim's action so the HUD and the camera can follow it.
+const REC_NONE := 0
+const REC_TEA := 1
+const REC_CIG := 2
+const REC_VIEW := 3
+var recovering := REC_NONE
+var tea_line := ""
+## What he says over a brew. The GDD: "the character says something". Same few, every time, in
+## turn — it becomes a comfort, which is the design's word for it.
+const TEA_LINES := [
+	"Right. That's better.",
+	"Wind's getting up.",
+	"Not a bad view, this.",
+	"Somebody's had a go at that joint and made a mess of it.",
+	"Nearly there. Nearly.",
+]
+var _tea_count := 0
+
+## The top — MVP criterion 1: "the top means something". Once per ascent.
+var at_top := false
+var top_reached := false
+var top_summary := {}            ## what the climb added up to, for the card
+var top_since := 0.0
+const TOP_REACH := 0.6           ## this close to the top of the stack, with ladder to it, and you are there
+const TOP_FOV_WIDEN := 10.0      ## 11-camera-controls-feel.md: "wide FOV" at the top
+var _base_fov := 72.0
+## Every tap the player made, and every span they took. The MVP playtest measures both — criterion 2
+## asks whether they still tap at anchor 10, criterion 4 whether they take the risky span — and the
+## top is where a player sees their own answer.
+var taps_made := 0
+var long_spans := 0
 var drift_phase := 0.0
 
 var on_ladder := false
@@ -150,6 +183,9 @@ var _remount_block := 0.0
 var _now := 0.0                  ## Seconds since the shift started. The HUD's clock, not the sim's.
 var _climb_rate := 0.0           ## Metres per second up the ladder this frame; drives the clip.
 var _blend_left := 0.0           ## Real seconds of clip blend still to run.
+## Stands in for W/S when non-zero. A headless test cannot press a key, and a test of "frozen stops
+## you climbing" that cannot press the climb key passes whether the rule works or not.
+var climb_input := 0.0
 var _kick := 0.0                 ## Camera impulse from a hammer blow, decaying.
 var _cam_yaw := 0.0              ## Where the camera actually is, easing towards where it wants to be.
 var _cam_pitch := -0.1
@@ -215,6 +251,7 @@ func _ready() -> void:
 		face.jack = jack
 
 	_spawn = global_position
+	_base_fov = camera.fov
 	var town: Town = get_node_or_null("../Town")
 	if town != null:
 		town.build(jack.level_name())
@@ -303,6 +340,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_R: _lash()
 			KEY_F: _pick_up()
 			KEY_Q: _cycle_stance()
+			KEY_T: _recover(REC_TEA)
+			KEY_C: _recover(REC_CIG)
+			KEY_V: _recover(REC_VIEW)
 			KEY_SPACE: _space()
 
 	if event is InputEventMouseButton and event.pressed:
@@ -351,7 +391,9 @@ func _physics_process(dt: float) -> void:
 	if on_ladder and not within_reach:
 		_step_off("off the ladder")
 
-	if work_mode or lashing:
+	if at_top:
+		_on_top(dt)
+	elif work_mode or lashing:
 		velocity = Vector3.ZERO
 	elif on_ladder:
 		_climb(dt, ladder_world)
@@ -366,6 +408,7 @@ func _physics_process(dt: float) -> void:
 	_update_work(dt)
 	_update_lash(dt)
 	_update_stack(dt)
+	_update_recovery()
 	_animate()
 
 
@@ -451,12 +494,28 @@ func _fall_to_ground(why: String) -> void:
 func _climb(dt: float, ladder_world: Vector3) -> void:
 	velocity = Vector3.ZERO
 	var up := _key(KEY_W) - _key(KEY_S)
+	if climb_input != 0.0:
+		up = climb_input
 	var side := _key(KEY_D) - _key(KEY_A)
+
+	# Frozen: 03-meters-grip-nerve.md, "you cannot move up. You can only descend, or recover nerve
+	# in place." Nerve never kills you; it stops you, at the height it gave out, and the only ways
+	# on are down or a brew.
+	if up > 0.0 and jack.frozen():
+		up = 0.0
+		if message_ttl() <= 0.0:
+			_say("frozen — you can't make yourself go up. Get your nerve back, or go down")
 
 	var rate: float = (jack.tuning_f("climbSpeedMetresPerSecond", 1.6) if up >= 0.0
 		else jack.tuning_f("slideSpeedMetresPerSecond", 2.4))
 	var before := height_m()
 	set_height_m(clampf(before + up * rate * dt, 0.0, ladder_top))
+
+	# Up the last rung onto the cap, if the ladder goes that far.
+	if up > 0.0 and ladder_top >= chimney.height_m - 0.1 \
+			and height_m() >= chimney.height_m - TOP_REACH:
+		_arrive_at_top()
+		return
 	_climb_rate = (height_m() - before) / maxf(dt, 0.0001)
 
 	# Working yourself sideways off the stile. This has to accumulate: the first version recomputed
@@ -631,6 +690,7 @@ func _step_sim(dt: float) -> void:
 	jack.set_context(h, jack.wind_at(h), carrying_ladder,
 		work_mode or _slipping or rigging_to >= 0 or tapping > 0.0 or lashing)
 	if foley != null:
+		foley.duck(recovering == REC_TEA, dt)
 		foley.set_height(h)
 
 	# The 1.2 second warning, once per gust. The fairness table allows a gust to blow you off only
@@ -641,6 +701,7 @@ func _step_sim(dt: float) -> void:
 			foley.cue("gustTell")
 	_gust_told = telling
 	jack.set_exposure(2 if _slipping else (1 if on_ladder else 0))   # Hanging, Ladder, Platform
+	jack.set_on_platform(at_top)
 	jack.step(dt)
 
 	# The span you are standing on: from the highest dog below you to where you are. The entire risk
@@ -744,6 +805,7 @@ func _update_tap(dt: float) -> void:
 		tap_pip = r["pip"]
 		tapped_at = height_m()
 		last_tap = {"id": _tap_joint, "pip": r["pip"], "tier": r["tier"], "at": _now}
+		taps_made += 1
 		# The sound *is* the reading. The pip and the chalk are the visual fallbacks rule 8
 		# requires — never the only channel, and never a colour.
 		if foley != null:
@@ -880,7 +942,28 @@ func _update_camera(dt: float) -> void:
 			var right := boom.global_transform.basis.x
 			side = WORK_BOOM_SIDE * (1.0 if right.dot(joint_at - global_position) >= 0.0 else -1.0)
 
-	var k := clampf(dt * CAMERA_SETTLE, 0.0, 1.0)
+	# The top: pulls out to 4 m, drops to eye level, widens. And slowly — this is the one camera move
+	# in the game that is allowed to take its time, because the player has earned the view and
+	# nothing is asking them to do anything.
+	# The brew: the camera settles to a slow fixed framing outward, over the town. The one camera in
+	# the game that is allowed to take its time alongside the top, because it is a rest.
+	if recovering == REC_TEA and not at_top:
+		var away := global_position - chimney.global_position
+		away.y = 0.0
+		away = away.normalized()
+		yaw = atan2(-away.x, -away.z) + 0.35
+		pitch = -0.12
+		length = 3.2
+
+	var fov := _base_fov
+	if at_top:
+		length = TOP_BOOM_LENGTH
+		fov = _base_fov + TOP_FOV_WIDEN
+		side = 0.0
+	camera.fov = lerpf(camera.fov, fov, clampf(dt * 1.2, 0.0, 1.0))
+
+	var slow: bool = at_top or recovering == REC_TEA
+	var k := clampf(dt * (CAMERA_SETTLE * 0.25 if slow else CAMERA_SETTLE), 0.0, 1.0)
 	_cam_yaw = lerp_angle(_cam_yaw, yaw, k)
 	_cam_pitch = lerpf(_cam_pitch, pitch, k)
 	boom.rotation = Vector3(_cam_pitch, _cam_yaw, 0.0)
@@ -902,6 +985,130 @@ func _aim_hammer_at(id: int) -> void:
 	if j.is_empty():
 		return
 	ClimbClip.aim_hammer(anim, skel, (j["pos"] as Vector3) + chimney.global_position)
+
+
+## T, C, V: get your nerve back. Refused with the reason when it cannot start.
+func _recover(what: int) -> void:
+	if recovering != REC_NONE:
+		jack.recover_interrupt()
+		recovering = REC_NONE
+		return
+	if not on_ladder and not at_top:
+		_say("you get your nerve back up there, not on the ground")
+		return
+	# Both hands free: a belt round the stack, the chair, or standing on the top.
+	var hands_free: bool = at_top or jack.get_stance() >= 3
+	var why: String = jack.recover_start(what, hands_free, _facing_out())
+	if why != "":
+		_say(why)
+		return
+	recovering = what
+	match what:
+		REC_TEA:
+			tea_line = TEA_LINES[_tea_count % TEA_LINES.size()]
+			_tea_count += 1
+			_say("")
+		REC_CIG:
+			_say("a cigarette — five off your nerve for the rest of the shift")
+		REC_VIEW:
+			_say("")
+
+
+func _update_recovery() -> void:
+	if recovering == REC_NONE:
+		return
+	# Finished, in the sim.
+	if jack.recover_action() == REC_NONE:
+		recovering = REC_NONE
+		tea_line = ""
+		return
+	# Anything else he does breaks it off. It keeps what it had given.
+	var moving: bool = absf(_climb_rate) > 0.01 or work_mode or lashing or _slipping or tapping > 0.0
+	var view_let_go: bool = recovering == REC_VIEW and not Input.is_key_pressed(KEY_V) \
+		and DisplayServer.get_name() != "headless"
+	if moving or view_let_go:
+		jack.recover_interrupt()
+		recovering = REC_NONE
+		tea_line = ""
+
+
+## Whether the camera is looking away from the stack — out, at the view.
+func _facing_out() -> bool:
+	var fwd := -camera.global_transform.basis.z
+	fwd.y = 0.0
+	var away := global_position - chimney.global_position
+	away.y = 0.0
+	if fwd.length() < 0.01 or away.length() < 0.01:
+		return false
+	return fwd.normalized().dot(away.normalized()) > 0.3
+
+
+## He is up. Onto the cap, turned to face out over the town, and the camera goes wide.
+##
+## The first time, the climb is summed up on screen — dogs by rating, the long spans taken, the time
+## — because that is the player's own answer to the questions the MVP playtest is asking them, and
+## the top is the one moment they will read it. After that it is just the view.
+func _arrive_at_top() -> void:
+	at_top = true
+	on_ladder = false
+	top_since = _now
+	work_mode = false
+	_cancel_rig()
+	if lashing:
+		_abandon_lash("")
+	# Standing on the oversail, a little in from the edge, facing away from the stack's axis.
+	var out := global_position - chimney.global_position
+	out.y = 0.0
+	out = out.normalized()
+	var r: float = chimney.radius_at(chimney.height_m)
+	global_position = chimney.global_position + out * (r * 1.05) \
+		+ Vector3.UP * (chimney.height_m + 2.2 + CAPSULE_HALF)
+	body.rotation.y = _face(out)
+	velocity = Vector3.ZERO
+	# The camera behind him and looking the way he is: out, over the town.
+	_yaw = atan2(-out.x, -out.z)
+	_pitch = -0.06
+
+	if not top_reached:
+		top_reached = true
+		top_summary = _summarise_climb()
+		jack.shock("startle")   # the wind at the top, first time; it is supposed to catch you
+		_say("")
+
+
+func _on_top(dt: float) -> void:
+	velocity = Vector3.ZERO
+	if _key(KEY_S) > 0.0:
+		# Back over the edge and onto the ladder.
+		at_top = false
+		var out := global_position - chimney.global_position
+		out.y = 0.0
+		var foot: Vector3 = chimney.global_position + chimney.face_point(chimney.height_m - 1.0)
+		var fo := foot - chimney.global_position
+		fo.y = 0.0
+		global_position = foot + fo.normalized() * BODY_OFF_LADDER
+		set_height_m(minf(ladder_top, chimney.height_m) - 1.0)
+		on_ladder = true
+		_remount_block = 0.0
+		_say("back over the edge")
+
+
+func _summarise_climb() -> Dictionary:
+	var by_rate := [0, 0, 0, 0]   # failed, poor, fair, sound
+	for i in jack.anchor_count():
+		var a: Dictionary = jack.anchor_at(i)
+		by_rate[clampi(int(a["rate"]), 0, 3)] += 1
+	return {
+		"height": chimney.height_m,
+		"seconds": _now,
+		"dogs": jack.anchor_count(),
+		"sound": by_rate[3], "fair": by_rate[2], "poor": by_rate[1], "failed": by_rate[0],
+		"bent": bent_joints.size(),
+		"taps": taps_made,
+		"long_spans": long_spans,
+		"sections": sections.size(),
+		"hitches": sections.filter(func(x): return x["lashing"] == LASHING_HITCH).size(),
+	}
 
 
 ## The stack — CLIMB-001 and 002. Where a decision made ten minutes ago comes due.
@@ -1162,7 +1369,10 @@ func _tie_off() -> void:
 	sections.append({"top": ladder_top, "lashing": kind, "slipping": st["slipping"],
 		"joint": lash_joint})
 	var dog_h: float = face.joint(lash_joint).get("height", ladder_top) if face != null else ladder_top
-	jack.stack_lash(_anchor_height_of_joint(lash_joint, dog_h), kind)
+	var sec: int = jack.stack_lash(_anchor_height_of_joint(lash_joint, dog_h), kind)
+	if sec >= 0 and float(jack.stack_section_at(dog_h - 0.01).get("span", 0.0)) > \
+			jack.tuning_f("spanSoftMetres", 4.0):
+		long_spans += 1
 	if face != null:
 		face.keep_lash(lash_joint, st["wraps"])
 		face.set_lash(-1, 0, 0.0, 0.0)

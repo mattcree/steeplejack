@@ -101,7 +101,13 @@ func set_height(metres: float) -> void:
 		return
 	var w: Dictionary = _spec["wind"]
 	var t: float = clampf(metres / maxf(w["refHeightM"], 1.0), 0.0, 1.0)
-	_wind_player.volume_db = lerpf(w["groundDb"], w["topDb"], t)
+	_wind_player.volume_db = lerpf(w["groundDb"], w["topDb"], t) - _duck
+
+
+## Over a brew the wind drops. METER-004: "the camera settles, the wind noise drops".
+var _duck := 0.0
+func duck(on: bool, dt: float) -> void:
+	_duck = move_toward(_duck, 10.0 if on else 0.0, dt * 8.0)
 
 
 func _play(stream: AudioStreamWAV, pitch: float = 1.0) -> void:
