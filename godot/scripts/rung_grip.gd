@@ -17,7 +17,7 @@ class_name RungGrip
 extends Node
 
 const HAND_ABOVE_FEET := [1.78, 1.50]   ## each pair's hand rung, above the feet: staggered a rung apart so the pairs alternate
-const FOOT_ABOVE_FEET := [0.22, 0.50]   ## and its foot rung. Where a relaxed body holds them; see _step on the stretch when climbing fast
+const FOOT_ABOVE_FEET := [0.16, 0.44]   ## and its foot rung, a rung apart. A leg is 0.84 m: lower than 0.15 it cannot reach, higher than this it jack-knifes
 const HAND_SPREAD := 0.15               ## off the ladder's centre line, along the rung
 const FOOT_SPREAD := 0.12
 const HAND_PROUD := 0.035               ## the wrist sits a little in front of the rung it grips
@@ -25,9 +25,13 @@ const FOOT_LIFT := 0.06                 ## the ankle sits above the rung the sol
 const HAND_ON_WALL_ABOVE_FEET := 1.55   ## at the head of the ladder, where a hand goes on the brick
 const WALL_PALM := 0.06                 ## the wrist, off the face of the brick
 const MIN_ANKLE_ABOVE_FEET := 0.20     ## the lowest a straight leg puts the ankle, plus a little bend
-const MAX_DROP := 0.35                  ## the most the drawn body settles at the head of the ladder
+const HIPS_ABOVE_RUNG := 0.76           ## hips over the rung he stands on: a leg is 0.84, so nearly straight
+const HIP_ABOVE_FEET := 0.95            ## the rig's hips, above its feet
+const MAX_DROP := 0.40                  ## the body never settles further than this below the capsule
+const MAX_RISE := 0.16                  ## nor further above it than half a rung                  ## the most the drawn body settles at the head of the ladder
 const STEP_SECONDS := 0.16               ## one reach, rung to rung
 const STEP_ARC := 0.10                  ## how far off the ladder a moving limb swings
+const DROP_RATE := 1.2                  ## metres a second the body settles towards its stance
 const FADE_RATE := 10.0                 ## how fast a limb takes hold or lets go, per second
 
 # Limbs: 0 hand.l, 1 hand.r, 2 foot.l, 3 foot.r. Pairs: A = hand.l + foot.r, B = hand.r + foot.l.
@@ -53,6 +57,7 @@ var _moving := -1                   ## the pair in the air, or -1
 var _step_t := 0.0
 var _grip := [0.0, 0.0, 0.0, 0.0]   ## IK influence per limb, eased
 var _was_on := false
+var _drop := 0.0                    ## how far below the capsule the drawn body sits
 
 
 func setup(p: Node3D, c: Node3D, skel: Skeleton3D) -> void:
@@ -81,6 +86,11 @@ func setup(p: Node3D, c: Node3D, skel: Skeleton3D) -> void:
 		_ik.append(ik)
 		_target.append(target)
 		_pole.append(pole)
+	# Last on the skeleton, so it turns the hands and feet after the IK has placed them.
+	var orient := RungOrient.new()
+	orient.name = "RungOrient"
+	orient.grip = self
+	skeleton.add_child(orient)
 
 
 ## Where on the ladder a limb holds a given rung, in the world.
@@ -125,16 +135,26 @@ func _top_rung() -> int:
 ## and at the top the capsule stands level with the last rung, so without this the feet hung
 ## short of the only rung there is. Drawing only: the game's height and reach are unchanged.
 func body_drop() -> float:
-	if not _was_on:
-		return 0.0
-	var top_h: float = _top_rung() * chimney.RUNG_GAP
-	var lowest := top_h + FOOT_LIFT - MIN_ANKLE_ABOVE_FEET
-	return clampf(float(player.call("height_m")) - lowest, 0.0, MAX_DROP)
+	return _drop
 
 
-## The feet the grip works from: the drawn body's, settled at the top.
+## Where the drawn body should sit: HIPS_ABOVE_RUNG over the rung his weight is on.
+##
+## The rungs are the ladder's and do not move, so the body has to. Fixing the body to the capsule
+## instead left the bearing leg folded to half its length — a permanent squat — because which rung
+## he was standing on shifted by up to half a rung as he climbed. Now the lower foot's rung sets
+## his height, which is also what makes him rise as he pushes up on it: the step is the climb.
+func _wanted_drop() -> float:
+	var lower := 2 if _rung[2] <= _rung[3] else 3
+	var rung_h: float = maxf(_rung[lower], 0) * chimney.RUNG_GAP
+	var want_feet := rung_h + FOOT_LIFT + HIPS_ABOVE_RUNG - HIP_ABOVE_FEET
+	return clampf(float(player.call("height_m")) - want_feet, -MAX_RISE, MAX_DROP)
+
+
+## The feet the grip measures its rungs from: the capsule's, never the drawn body's — the drawn
+## body is placed from the rungs, so measuring the rungs from it would chase its own tail.
 func _feet() -> float:
-	return float(player.call("height_m")) - body_drop()
+	return float(player.call("height_m"))
 
 
 ## Whether a limb is on the wall rather than a rung.
@@ -157,6 +177,10 @@ func update(dt: float, on_ladder: bool, holding: Array) -> void:
 
 	if on_ladder:
 		_step(dt, feet, float(player.get("_climb_rate")))
+		# Eased, so he rises with the push rather than snapping when a foot takes a new rung.
+		_drop = move_toward(_drop, _wanted_drop(), dt * DROP_RATE)
+	else:
+		_drop = 0.0
 
 	for i in 4:
 		var want: float = 1.0 if on_ladder and holding[i] else 0.0
@@ -213,10 +237,13 @@ func _place(limb: int, _dt: float) -> void:
 	var along: Vector3 = Vector3(0, 0, 1) * float(SIDE[limb])
 	var root: Vector3 = skeleton.global_transform * skeleton.get_bone_global_pose(
 		skeleton.find_bone(CHAINS[limb][0])).origin
+	# Well off the limb's own line, or the bend has no plane to happen in and the joint flips to
+	# whichever side it likes: that is what put his knees out sideways and his elbows behind him.
+	# An elbow goes down, out and back from the shoulder; a knee goes towards the ladder.
 	if limb < 2:
-		_pole[limb].global_position = root + along * 0.25 + out * 0.05 - Vector3.UP * 0.8
+		_pole[limb].global_position = root + along * 0.55 + out * 0.45 - Vector3.UP * 0.35
 	else:
-		_pole[limb].global_position = root - out * 0.3 + along * 0.04 - Vector3.UP * 0.6
+		_pole[limb].global_position = root - out * 0.5 + along * 0.2 - Vector3.UP * 0.15
 
 
 ## For tests: the world position a limb's target is at, and whether that limb is mid-reach.
