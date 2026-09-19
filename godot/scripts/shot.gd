@@ -143,10 +143,17 @@ func _run(cmd: String) -> void:
 		"cam":
 			player._yaw = deg_to_rad(a)
 			player._pitch = deg_to_rad(b)
+			player._cam_yaw = player._yaw
+			player._cam_pitch = player._pitch
 		"boom":
 			player.get_node("Boom").spring_length = a
+			# Hold it: the camera eases towards its own framing every frame.
+			player.boom_length = a
 		"fov":
 			player.get_node("Boom/Camera").fov = a
+		"wide":
+			# Keep the ordinary framing in work mode, to see the whole body rather than the joint.
+			player.set_meta("shot_wide", true)
 		"wait":
 			await _wait(int(a * 60.0))
 		"shot":

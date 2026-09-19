@@ -25,14 +25,24 @@ const TURN_RATE := 12.0
 ## feet slip forwards, raise it; if he moonwalks, lower it.
 const RUN_CLIP_SPEED := 4.6
 
+const BOOM_LENGTH := 4.0
+const BOOM_SIDE := 0.65
+const WORK_BOOM_LENGTH := 1.4        ## 11-camera-controls-feel.md, "pulls in to 1.4 m"
+const WORK_BOOM_SIDE := 0.55
+## How fast the camera settles on a new framing. Quick enough to be there before the first blow.
+const CAMERA_SETTLE := 7.0
+
 ## How long a change of clip takes to blend in, in real seconds.
 const CLIP_BLEND := 0.22
 
 ## When in the tap the hammer meets the brick. The result lands here, not on the keypress: a sound
 ## that plays before the arm has moved is a sound from nowhere.
 const TAP_CONTACT := ClimbClip.TAP_CONTACT
-## How close to where you are looking a joint must be to be the one you are pointing at.
-const AIM_SLACK := 0.45
+## How close to where you are looking a joint must be to be the one you are pointing at. Wide
+## enough that looking straight up the ladder — which is where the camera naturally sits — still
+## finds a joint beside the stiles: the ones under the ladder are not offered, so the nearest
+## usable joint to the ladder's centre line is 0.3-0.5 m off it.
+const AIM_SLACK := 0.8
 
 const LADDER_REACH := 0.9        ## You are on a ladder when you can hold it.
 const BODY_OFF_LADDER := 0.40
@@ -111,6 +121,10 @@ var _now := 0.0                  ## Seconds since the shift started. The HUD's c
 var _climb_rate := 0.0           ## Metres per second up the ladder this frame; drives the clip.
 var _blend_left := 0.0           ## Real seconds of clip blend still to run.
 var _kick := 0.0                 ## Camera impulse from a hammer blow, decaying.
+var _cam_yaw := 0.0              ## Where the camera actually is, easing towards where it wants to be.
+var _cam_pitch := -0.1
+var _cam_side := BOOM_SIDE
+var boom_length := BOOM_LENGTH   ## Where the camera sits when not working. A var so a shot can set it.
 var rigging_to := -1             ## Stance being rigged, or -1. The HUD draws the ring.
 var rig_left := 0.0              ## Seconds of it still to do.
 var rig_total := 0.0
@@ -214,6 +228,8 @@ func _look_at_stack() -> void:
 	# the horizon it is simply off the top of the screen, which is what the first frame of this game
 	# looked like.
 	_pitch = clampf(atan2(chimney.height_m, to.length()) * 0.42, 0.0, 0.7)
+	_cam_yaw = _yaw
+	_cam_pitch = _pitch
 	body.rotation.y = _face(to.normalized())
 
 
@@ -272,11 +288,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _physics_process(dt: float) -> void:
 	_now += dt
-	boom.rotation = Vector3(_pitch, _yaw, 0.0)
-	# The impact frame. Decays in a few frames; small enough never to move the aim.
-	_kick = move_toward(_kick, 0.0, dt * 0.12)
-	camera.h_offset = 0.65 + randf_range(-_kick, _kick)
-	camera.v_offset = randf_range(-_kick, _kick)
+	_update_camera(dt)
 
 	# Hanging by one hand. Nothing he does moves him and no verb is available; the only input that
 	# means anything is the grab, and _step_sim is what closes the window on it. Stepping the sim
@@ -620,7 +632,18 @@ func _find_target() -> int:
 	var aim_at: Vector3 = hit["position"] if not hit.is_empty() else (
 		hands + (chimney.global_position - hands).normalized() * 0.6)
 	aim_at.y = clampf(aim_at.y, hands.y - reach, hands.y + reach)
-	var id: int = jack.nearest_joint(aim_at - chimney.global_position, AIM_SLACK)
+	# The nearest usable joint to where you are looking. Not simply the nearest: a joint under the
+	# ladder is nearest surprisingly often, because the ladder goes up exactly where you look.
+	var best := -1
+	var best_d := AIM_SLACK
+	for j in face._joints:
+		if j["occupied"] or face.under_ladder(j):
+			continue
+		var d: float = ((j["pos"] as Vector3) + chimney.global_position).distance_to(aim_at)
+		if d < best_d:
+			best_d = d
+			best = j["id"]
+	var id := best
 	if id < 0:
 		return -1
 	var j: Dictionary = face.joint(id)
@@ -645,6 +668,7 @@ func _tap() -> void:
 	tapping = jack.tuning_f("tapTestSeconds", 0.8)
 	_tap_joint = target_id
 	_tap_landed = false
+	_aim_hammer_at(target_id)
 	if anim.has_animation("tap"):
 		anim.play("tap", 0.06)
 		anim.speed_scale = 1.0
@@ -697,6 +721,7 @@ func _toggle_work_mode() -> void:
 	# players *still choose* to tap at anchor #10. Forcing it deleted the choice both depend on.
 	work_mode = true
 	work_joint = target_id
+	_aim_hammer_at(work_joint)
 	var j: Dictionary = face.joint(work_joint)
 	work_height = j.get("height", height_m())
 	dog_depth = 0.0
@@ -721,9 +746,15 @@ func _update_work(dt: float) -> void:
 
 func _release_strike() -> void:
 	drawing = false
+	if work_joint < 0:
+		work_mode = false
+		return
 	var swing_at_release := swing_power
 	var err := aim.length()
 	var r: Dictionary = jack.strike_joint(work_joint, dog_depth, swing_power, err, TOOL_CONDITION)
+	if r.is_empty():
+		work_mode = false
+		return
 	dog_depth = clampf(dog_depth + r["depth_gain"], 0.0, 1.0)
 	swing_power = 0.0
 
@@ -759,11 +790,63 @@ func _release_strike() -> void:
 		if foley != null:
 			foley.cue("seated")
 		var a: Dictionary = jack.seat_anchor_joint(work_joint, dog_depth, r["spalled"])
+		if a.is_empty():
+			work_mode = false
+			return
 		dogs_carried -= 1
 		if face != null:
 			face.touch()
 		_say("dog seated — %s, %.1f kN" % [a["rate_name"], a["capacity_kn"]])
 		work_mode = false
+
+
+## The camera. Third person, over the right shoulder; in work mode, in close on the joint.
+##
+## 11-camera-controls-feel.md: "Working (one-handed verbs): pulls in to 1.4 m, focuses the hands."
+## Without it the jack's own back hid the hammer, the dog and the joint — the three things the verb
+## is about. The move happens on entering the verb and is held, never during it: camera rule 1 is
+## "never auto-rotate while the player is mid-verb", and the mouse is steering the hammer by then.
+func _update_camera(dt: float) -> void:
+	var yaw := _yaw
+	var pitch := _pitch
+	var length := boom_length
+	var side := BOOM_SIDE
+
+	if work_mode and work_joint >= 0 and face != null and not has_meta("shot_wide"):
+		var j: Dictionary = face.joint(work_joint)
+		if not j.is_empty():
+			var joint_at: Vector3 = (j["pos"] as Vector3) + chimney.global_position
+			var d: Vector3 = joint_at - boom.global_position
+			yaw = atan2(-d.x, -d.z)
+			pitch = atan2(d.y, Vector2(d.x, d.z).length())
+			length = WORK_BOOM_LENGTH
+			# Over whichever shoulder the joint is on, so his body is never between the lens and
+			# the dog.
+			var right := boom.global_transform.basis.x
+			side = WORK_BOOM_SIDE * (1.0 if right.dot(joint_at - global_position) >= 0.0 else -1.0)
+
+	var k := clampf(dt * CAMERA_SETTLE, 0.0, 1.0)
+	_cam_yaw = lerp_angle(_cam_yaw, yaw, k)
+	_cam_pitch = lerpf(_cam_pitch, pitch, k)
+	boom.rotation = Vector3(_cam_pitch, _cam_yaw, 0.0)
+	boom.spring_length = lerpf(boom.spring_length, length, k)
+	_cam_side = lerpf(_cam_side, side, k)
+
+	# The impact frame. Decays in a few frames; small enough never to move the aim.
+	_kick = move_toward(_kick, 0.0, dt * 0.12)
+	camera.h_offset = _cam_side + randf_range(-_kick, _kick)
+	camera.v_offset = randf_range(-_kick, _kick)
+
+
+## Point the hammer clips at a joint, so the blow lands where the player chose.
+func _aim_hammer_at(id: int) -> void:
+	var skel: Skeleton3D = body.get_node_or_null(ClimbClip.SKELETON)
+	if skel == null or face == null or id < 0:
+		return
+	var j: Dictionary = face.joint(id)
+	if j.is_empty():
+		return
+	ClimbClip.aim_hammer(anim, skel, (j["pos"] as Vector3) + chimney.global_position)
 
 
 ## A puff of mortar dust at a joint.
@@ -815,22 +898,26 @@ func _give_hammer(skel: Skeleton3D) -> void:
 	ash.albedo_color = Color(0.55, 0.40, 0.24)
 	ash.roughness = 0.8
 
+	# A club hammer, not a tack hammer. It has to read at 4 m against brick and a ladder, and the
+	# first one — a 12 cm head on a 3 cm handle, true to a jack's tapping hammer — was lost in both.
+	# The steel is lighter than it would be for the same reason: it has to separate from the stack.
+	iron.albedo_color = Color(0.46, 0.47, 0.50)
 	var handle := MeshInstance3D.new()
 	var hm := CylinderMesh.new()
-	hm.top_radius = 0.014
-	hm.bottom_radius = 0.016
-	hm.height = 0.32
+	hm.top_radius = 0.018
+	hm.bottom_radius = 0.022
+	hm.height = 0.36
 	hm.material = ash
 	handle.mesh = hm
-	handle.position = Vector3(0.0, 0.12, 0.0)
+	handle.position = Vector3(0.0, 0.13, 0.0)
 	grip.add_child(handle)
 
 	var head := MeshInstance3D.new()
 	var bm := BoxMesh.new()
-	bm.size = Vector3(0.12, 0.045, 0.045)
+	bm.size = Vector3(0.17, 0.065, 0.065)
 	bm.material = iron
 	head.mesh = bm
-	head.position = Vector3(0.03, 0.27, 0.0)
+	head.position = Vector3(0.03, 0.30, 0.0)
 	grip.add_child(head)
 
 

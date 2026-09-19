@@ -18,6 +18,8 @@ const NERVE_R := 56.0
 const FADE_ABOVE := 85.0
 const REST_ALPHA := 0.22
 const Q_KEY := "Q"
+## VERB-002: the pip is visible for 0.6 s after a tap, then gone.
+const PIP_SECONDS := 0.6
 
 @onready var player: Node = get_node("../Player")
 
@@ -123,6 +125,8 @@ func _draw() -> void:
 	if player.work_mode:
 		_draw_work(jack)
 
+	_draw_pip(jack)
+
 	if player.rigging_to >= 0:
 		_draw_rig(jack)
 
@@ -162,9 +166,11 @@ func _next_step() -> String:
 		return "Nothing to lash — climb down to the cradle for a ladder."
 	if player.dogs_carried == 0:
 		return "Bag is empty. Climb down to the cradle for more dogs."
-	if player.tap_pip < 0 or absf(player.tapped_at - player.global_position.y) >= 1.5:
-		return "Sound the brickwork to hear what the joint is worth.  [E]"
-	return "Drive a dog into that joint.  [right mouse]"
+	if player.target_id < 0:
+		return "Look at the brickwork to pick a joint."
+	if not player.target_tapped():
+		return "Tap it to hear what it is worth [E] — or trust your eye and drive a dog [right mouse]."
+	return "Drive a dog into that joint, or look for a better one.  [right mouse]"
 
 
 ## [key, verb, available, why-not]
@@ -186,12 +192,14 @@ func _affordances() -> Array:
 			["F", "take a ladder and dogs", player.at_cradle(), "only at the cradle, at the foot of the stack"],
 			[Q_KEY, "stance — rig it on the stack", false, "you rig a stance up there, not down here"],
 		]
-	var tapped: bool = player.tap_pip >= 0 and absf(player.tapped_at - player.height_m()) < 1.5
+	var has_target: bool = player.target_id >= 0
+	var sounded: bool = player.target_tapped()
 	return [
 		["W/S", "climb", true, ""],
-		["E", "sound the brickwork", true, ""],
-		["RMB", "dog in", tapped and player.dogs_carried > 0,
-			"sound the joint first" if not tapped else "no dogs left"],
+		["E", "sound this joint" if not sounded else "sound it again", has_target,
+			"no joint in reach — look at the brickwork"],
+		["RMB", "drive a dog into it", has_target and player.dogs_carried > 0,
+			"no joint in reach" if not has_target else "no dogs in the bag"],
 		["R", "lash the next ladder", player.has_lashable_anchor() and player.carrying_ladder,
 			"you are not carrying one" if not player.carrying_ladder else "needs a dog seated above you"],
 		[Q_KEY, _next_stance_label(), true, ""],
@@ -217,7 +225,11 @@ func _next_stance_label() -> String:
 
 
 func _draw_work(jack: Jack) -> void:
-	var eye := Vector2(size.x * 0.5, size.y * 0.44)
+	# Centred on the joint the dog is going into, not the middle of the screen. The reticle was
+	# attached to nothing, so the player aimed at a circle and the dog went wherever he happened to
+	# be standing.
+	var on = _on_screen(player.work_joint)
+	var eye: Vector2 = on if on != null else Vector2(size.x * 0.5, size.y * 0.44)
 	var px_per_deg := 10.0
 	var tolerance: float = jack.tuning_f("hammerMaxAngleErrorDegrees", 12.0) * px_per_deg
 
@@ -251,6 +263,75 @@ func _draw_work(jack: Jack) -> void:
 		var urgency := clampf(1.0 - left / 12.0, 0.0, 1.0)
 		_centre("%.0f s of grip left in this stance" % ceilf(left), bar.y + 40,
 			Color(0.92, 0.72 - 0.4 * urgency, 0.35 - 0.2 * urgency, 0.75 + 0.25 * urgency), 13)
+
+
+## Where a joint is on screen, or null if it is behind the camera.
+func _on_screen(id: int):
+	if id < 0 or player.face == null:
+		return null
+	var j: Dictionary = player.face.joint(id)
+	if j.is_empty():
+		return null
+	var world: Vector3 = (j["pos"] as Vector3) + player.chimney.global_position
+	if player.camera.is_position_behind(world):
+		return null
+	return player.camera.unproject_position(world)
+
+
+## The tap pip — VERB-002. Drawn **at the joint that was tapped**, not in a panel, for 0.6 s.
+##
+## Four shapes, from the sim, never colours: a ring for sound, a square for fair, a triangle for
+## perished, a broken cross for cracked. Under it, the envelope of the sound that just played —
+## a short spike for a ring, a long low hump for a thud, a spike and a second burst for a rattle —
+## so a player who can hear learns to connect the shape to the sound, and one who cannot gets the
+## same information the sound carried. The rattle's second event is drawn as a second event.
+func _draw_pip(jack: Jack) -> void:
+	var t: Dictionary = player.last_tap
+	if t.is_empty():
+		return
+	var age: float = player._now - float(t["at"])
+	if age > PIP_SECONDS:
+		return
+	var at = _on_screen(int(t["id"]))
+	if at == null:
+		return
+	var a := 1.0 - _ease(age / PIP_SECONDS) * 0.9
+	var c := Color(0.96, 0.97, 0.99, a)
+	var shadow := Color(0, 0, 0, a * 0.55)
+	var centre: Vector2 = (at as Vector2) + Vector2(0, -64)
+	var r := 11.0
+
+	for pass_col in [shadow, c]:
+		var o := Vector2(1.5, 1.5) if pass_col == shadow else Vector2.ZERO
+		match int(t["pip"]):
+			0:   # sound: a ring
+				draw_arc(centre + o, r, 0, TAU, 28, pass_col, 3.0)
+			1:   # fair: a square
+				draw_rect(Rect2(centre + o - Vector2(r, r), Vector2(r, r) * 2.0), pass_col, false, 3.0)
+			2:   # perished: a triangle
+				var tri := PackedVector2Array([centre + o + Vector2(0, -r * 1.1),
+					centre + o + Vector2(r * 1.05, r * 0.8), centre + o + Vector2(-r * 1.05, r * 0.8),
+					centre + o + Vector2(0, -r * 1.1)])
+				draw_polyline(tri, pass_col, 3.0)
+			_:   # cracked: a broken cross
+				draw_line(centre + o + Vector2(-r, -r), centre + o + Vector2(-2, -2), pass_col, 3.0)
+				draw_line(centre + o + Vector2(3, 3), centre + o + Vector2(r, r), pass_col, 3.0)
+				draw_line(centre + o + Vector2(r, -r), centre + o + Vector2(-r, r), pass_col, 3.0)
+
+	# The envelope, underneath.
+	var env := PackedVector2Array()
+	var w := 46.0
+	var base := centre + Vector2(-w * 0.5, 30)
+	for i in 24:
+		var u := float(i) / 23.0
+		var v := 0.0
+		match int(t["pip"]):
+			0: v = exp(-u * 9.0)                       # ring: sharp, short
+			1: v = 0.75 * exp(-u * 5.0)                # knock: softer, longer
+			2: v = 0.45 * exp(-u * 2.2) * minf(u * 8.0, 1.0)   # thud: no transient, long
+			_: v = exp(-u * 11.0) + (0.55 * exp(-(u - 0.3) * 7.0) if u > 0.3 else 0.0)   # rattle
+		env.append(base + Vector2(u * w, -v * 14.0))
+	draw_polyline(env, Color(c.r, c.g, c.b, a * 0.8), 2.0)
 
 
 ## Rigging a stance. Twenty seconds into a bosun's chair is a long time to stare at nothing.

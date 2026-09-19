@@ -148,6 +148,51 @@ static func _install_hammer(ap: AnimationPlayer, skel: Skeleton3D) -> void:
 		[STRIKE_CONTACT + 0.034, HAMMER_CONTACT], [0.50, rest_arm]]))
 
 
+## Rebuild the tap, wind-up and blow so the hammer lands on `target` — a point in the world.
+##
+## A fixed strike points wherever the clip was authored, and the joint he chose is somewhere else,
+## so the hammer came down on nothing near it and the tap did not visibly *land*. The contact pose
+## is solved per action instead: the arm reaches along the line from his shoulder to the joint.
+## Cheap — a dozen bones, once per tap — and it is still an AnimationPlayer playing a whole clip.
+static func aim_hammer(ap: AnimationPlayer, skel: Skeleton3D, target: Vector3) -> void:
+	var shoulder_idx := skel.find_bone("upperarm.r")
+	if shoulder_idx < 0:
+		return
+	var shoulder: Vector3 = skel.global_transform * skel.get_bone_global_pose(shoulder_idx).origin
+	# Into the skeleton's own space, which is the space the aim table is written in.
+	var to: Vector3 = (skel.global_transform.basis.inverse() * (target - shoulder)).normalized()
+	# The forearm points a little further down the line than the upper arm, so the elbow is bent
+	# and the hammer face — which is past the hand — is what arrives at the joint.
+	var contact := {
+		"upperarm.r": (to + Vector3(0.0, 0.18, 0.0)).normalized(),
+		"lowerarm.r": (to + Vector3(0.0, -0.10, 0.0)).normalized(),
+	}
+	# Cocked back along the same line, so the swing travels towards the joint rather than across.
+	var cocked := {
+		"upperarm.r": (Vector3(to.x * 0.4, 0.75, -0.55)).normalized(),
+		"lowerarm.r": (Vector3(to.x * 0.3, 0.85, -0.45)).normalized(),
+	}
+	var raised := {
+		"upperarm.r": (Vector3(to.x * 0.4, 0.90, -0.30)).normalized(),
+		"lowerarm.r": (Vector3(to.x * 0.2, 0.70, -0.70)).normalized(),
+	}
+	var rest_arm := {}
+	for bone in HAMMER_COCKED:
+		rest_arm[bone] = AIM[bone][0]
+
+	var lib: AnimationLibrary = ap.get_animation_library(&"")
+	for name in [&"tap", &"windup", &"strike"]:
+		if lib.has_animation(name):
+			lib.remove_animation(name)
+	lib.add_animation(&"tap", _one_shot(skel, [
+		[0.0, cocked], [TAP_CONTACT, contact], [0.42, rest_arm]]))
+	lib.add_animation(&"windup", _one_shot(skel, [
+		[0.0, rest_arm], [0.30, raised]]))
+	lib.add_animation(&"strike", _one_shot(skel, [
+		[0.0, raised], [STRIKE_CONTACT, contact],
+		[STRIKE_CONTACT + 0.034, contact], [0.50, rest_arm]]))
+
+
 ## A non-looping clip from a list of [time, arm overrides] keys over the reach pose.
 static func _one_shot(skel: Skeleton3D, keys: Array) -> Animation:
 	var a := Animation.new()

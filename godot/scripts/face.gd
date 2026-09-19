@@ -106,6 +106,25 @@ func _ready() -> void:
 	_bent = _bank_box(Vector3(0.045, 0.045, 0.16), _lit(Color(0.30, 0.20, 0.14), 0.7))
 
 
+## Joints closer than this to the ladder's centre line are under it. The stiles are 0.44 m apart
+## and a hammer cannot reach past them, and a dog there would be one the ladder cannot be lashed to
+## — the lashing runs from a stile out to a lug beside it.
+const UNDER_LADDER := 0.30
+
+
+## Whether a joint is hidden behind the ladder.
+func under_ladder(j: Dictionary) -> bool:
+	if jack == null:
+		return false
+	var n: Vector3 = j["normal"]
+	# How far round the face from the climbing line, in metres: the chord between this joint's
+	# normal and the ladder's, times the radius. Near enough for 30 cm.
+	var b: float = deg_to_rad(jack.climb_bearing())
+	var ladder_n := Vector3(sin(b), 0.0, -cos(b))
+	var r: float = Vector2(j["pos"].x, j["pos"].z).length()
+	return n.distance_to(ladder_n) * r < UNDER_LADDER
+
+
 ## Rebuild if he has moved far enough, or the face changed.
 func update_for(height: float) -> void:
 	if jack == null:
@@ -187,6 +206,8 @@ func _rebuild() -> void:
 	var bent: Array = []
 
 	for j in _joints:
+		if under_ladder(j) and not j["occupied"]:
+			continue   # hidden by the ladder, and not a joint anyone can use
 		var seen: int = j["look"]
 		if j["occupied"] and bent_ids.has(j["id"]):
 			bent.append(_on_face(j, Vector2(0.02, -0.03), 0.07, deg_to_rad(38.0)))
