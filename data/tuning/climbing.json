@@ -53,5 +53,7 @@
   "slipSaveCooldownSeconds": 60.0,
   "slipSaveGripFraction": 0.15,
 
-  "jointQualityTierBounds": { "cracked": 0.14, "perished": 0.39, "fair": 0.69 }
+  "jointQualityTierBounds": { "cracked": 0.14, "perished": 0.39, "fair": 0.69 },
+
+  "jointTellNoise": 0.15
 }

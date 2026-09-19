@@ -132,6 +132,23 @@ LevelData LevelData::Parse(const std::string& json, const std::string& origin)
                 band.perished = Number(q, "perished");
                 band.cracked = Number(q, "cracked");
             }
+            if (b.Has("params") && b.At("params").Type() == JsonValue::Kind::Object)
+            {
+                const JsonValue& pr = b.At("params");
+                band.visualReadReliability = Number(pr, "visualReadReliability", 1.0f);
+                band.soundJointClustering = Number(pr, "soundJointClustering", 0.0f);
+                auto heights = [&](std::string_view key, std::vector<float>& out) {
+                    if (pr.Has(key) && pr.At(key).Type() == JsonValue::Kind::Array)
+                    {
+                        for (const JsonValue& h : pr.At(key).Elements())
+                        {
+                            out.push_back(static_cast<float>(h.AsNumber()));
+                        }
+                    }
+                };
+                heights("forcePerishedAt", band.forcePerishedAt);
+                heights("forceCrackedAt", band.forceCrackedAt);
+            }
             level.bands_.push_back(std::move(band));
         }
     }

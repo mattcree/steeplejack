@@ -36,6 +36,19 @@ struct BandSpec
     // because a band that sums to 1.35 is a band that is silently 35% more generous than written.
     float sound{}, fair{}, perished{}, cracked{};
 
+    // The band's mechanical params, from `params` in the level file. Defaulted to "a plain band",
+    // so a band that does not mention one behaves like every other band on that axis.
+    //
+    // How much of a joint's truth survives into how it looks. 1 is the default read; 0 is the Grey
+    // Box's salt-bloom band, where the bloom covers everything and only the tap test works.
+    float visualReadReliability{1.0f};
+    // 0 scatters sound joints at random; towards 1 they gather into patches, so that finding one is
+    // a clue to where the next is. The Grey Box's perished band uses it to reward reading the face.
+    float soundJointClustering{0.0f};
+    // Authored joints, as heights. Placed on the climbing line, because the only reason to author a
+    // joint is to put it where the player is certain to meet it — level 1's cracked joint at 7 m.
+    std::vector<float> forcePerishedAt, forceCrackedAt;
+
     float Span() const noexcept { return to - from; }
     bool  Contains(float height) const noexcept { return height >= from && height < to; }
 };
