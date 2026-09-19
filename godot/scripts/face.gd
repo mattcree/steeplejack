@@ -24,6 +24,8 @@ extends Node3D
 const WINDOW := 3.2
 ## Move this far and the patch is rebuilt.
 const REBUILD_EVERY := 0.25
+## An old fixture's tag shows within this many metres of him, above or below.
+const FIXTURE_PIP_METRES := 3.0
 ## Marks sit this far proud of the face so they do not fight the brick shader for the same depth.
 const PROUD := 0.006
 
@@ -101,7 +103,7 @@ func _ready() -> void:
 
 	# Salt bloom round a perished-looking joint: the white crust that is the classic sign of mortar
 	# that has been wet for decades.
-	_bloom = _bank(Vector2(0.36, 0.16), _soft(Color(0.90, 0.89, 0.84, 0.42)))
+	_bloom = _bank(Vector2(0.46, 0.22), _crust())
 	# A hairline running out of a cracked-looking joint into the brick either side.
 	_crack = _bank(Vector2(0.30, 0.005), _lit(Color(0.07, 0.06, 0.06)))
 
@@ -178,6 +180,13 @@ func update_for(height: float) -> void:
 	if jack == null:
 		return
 	update_pips()
+	# Old fixtures are labelled only as he comes up to them. Nine "? unrated" tags stacked up the
+	# band were legible from the yard and said nothing but "clutter"; his own dogs stay labelled all
+	# the way down, because they are what he is hanging from.
+	for i in _pips:
+		var label: Label3D = _pips[i]
+		if label.has_meta("fixture_at"):
+			label.visible = absf(float(label.get_meta("fixture_at")) - height) < FIXTURE_PIP_METRES
 	if not _dirty and absf(height - _built_at) < REBUILD_EVERY:
 		return
 	_built_at = height
@@ -231,6 +240,12 @@ func update_pips() -> void:
 		if a.get("fixture", false) and not failed:
 			label.text = "? unrated"
 			label.modulate = Color(0.86, 0.66, 0.48)
+			label.set_meta("fixture_at", float(a["height"]))
+			label.font_size = 20   # someone else's dog: a note, not a headline
+		elif label.has_meta("fixture_at"):
+			label.remove_meta("fixture_at")
+			label.font_size = 30
+			label.visible = true
 		var n: Vector3 = j["normal"]
 		label.global_position = (j["pos"] as Vector3) + n * 0.45 + Vector3.UP * 0.18
 
@@ -482,6 +497,42 @@ func _soft(col: Color) -> Material:
 	m.albedo_color = col
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.roughness = 1.0
+	return m
+
+
+## Salt bloom. It was a flat 42% white rectangle, and from the ladder it read as a paper label
+## stuck on the brick — which is to say it read as UI, and the whole point of a tell is that it is
+## the wall. So: a crust, thick at the joint and thinning into speckle, with a ragged edge, so that
+## the only thing it can be mistaken for is efflorescence.
+func _crust() -> Material:
+	var sh := Shader.new()
+	sh.code = """
+shader_type spatial;
+render_mode unshaded, cull_disabled, depth_draw_never;
+uniform vec3 salt = vec3(0.90, 0.89, 0.84);
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) {
+	vec2 i = floor(p), f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+}
+varying vec2 seed;
+void vertex() {
+	// Different on every joint: the instance's own position seeds the pattern.
+	vec3 at = (MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+	seed = at.xz * 3.1 + vec2(at.y * 1.7, at.y * 2.3);
+}
+void fragment() {
+	vec2 c = (UV - 0.5) * vec2(1.0, 2.1);
+	float n = noise(UV * vec2(9.0, 4.5) + seed) * 0.6 + noise(UV * vec2(27.0, 13.0) + seed.yx) * 0.4;
+	float body = 1.0 - smoothstep(0.08, 0.5, length(c) + (n - 0.5) * 0.35);
+	float speck = step(0.62, noise(UV * vec2(46.0, 22.0) + seed * 2.0));
+	ALBEDO = salt * (0.85 + 0.15 * n);
+	ALPHA = clamp(body * (0.35 + 0.5 * n) + speck * body * 0.35, 0.0, 0.85);
+}
+"""
+	var m := ShaderMaterial.new()
+	m.shader = sh
 	return m
 
 

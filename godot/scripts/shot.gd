@@ -231,6 +231,7 @@ func _put_on_ladder(height: float) -> void:
 	player.on_ladder = true
 	player._shuffle = 0.0
 	player._remount_block = 0.0
+	player.face_the_wall()
 
 
 ## Work him down to a grip and nerve. `nerve < 0` means don't wait for nerve.

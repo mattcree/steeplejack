@@ -18,6 +18,8 @@ const FRICTION := 14.0
 const GRAVITY := 22.0
 const JUMP_SPEED := 6.0
 const MOUSE_SENS := 0.0025
+const WALL_FOLLOW_DELAY := 1.5   ## seconds after the mouse last moved before the ladder view squares up
+const WALL_FOLLOW_RATE := 1.2    ## how fast it does, per second — a drift, not a snap
 const TURN_RATE := 12.0
 
 ## The stride of the run clip, in metres per second. Playback is scaled by how fast he is actually
@@ -25,7 +27,7 @@ const TURN_RATE := 12.0
 ## feet slip forwards, raise it; if he moonwalks, lower it.
 const RUN_CLIP_SPEED := 4.6
 
-const BOOM_LENGTH := 4.0
+const BOOM_LENGTH := 3.0
 const BOOM_SIDE := 0.65
 const WORK_BOOM_LENGTH := 1.4        ## 11-camera-controls-feel.md, "pulls in to 1.4 m"
 const WORK_BOOM_SIDE := 0.55
@@ -180,6 +182,7 @@ var drift_phase := 0.0
 
 var on_ladder := false
 var _yaw := 0.0
+var _mouse_at := -100.0          ## When the player last turned the view; the ladder camera waits for them.
 var _pitch := -0.1
 var _spawn := Vector3.ZERO
 var _fell_from := 0.0
@@ -327,6 +330,40 @@ func _level_id() -> String:
 	return "00-greybox"
 
 
+## Square the view up to the wall in front of him, looking a little up.
+##
+## On a round stack "in front" changes as he climbs, and the first frames rendered from the ladder
+## were edge-on: the camera kept the yaw it had in the yard, the ladder sat on the chimney's
+## silhouette, and the joint he was pointing at was a sliver of brick against the sky. Nothing on
+## the wall can be read at that angle, and reading the wall is the game.
+func face_the_wall() -> void:
+	var to := chimney.global_position - global_position
+	to.y = 0.0
+	if to.length() < 0.01:
+		return
+	_yaw = atan2(-to.x, -to.z)
+	_pitch = 0.12
+
+
+## While he climbs with the view left alone, it drifts back square to the wall. Not while he is
+## steering it — a camera that fights the mouse is worse than an edge-on one — and never mid-verb,
+## which is camera rule 1: this is only called from the plain climb.
+func _follow_wall(dt: float) -> void:
+	if _now - _mouse_at < WALL_FOLLOW_DELAY:
+		return
+	# Only while he is moving on the ladder. Stopped, he may be studying a joint round to the side,
+	# and pulling the view off it would be taking the choice out of his hands.
+	if climb_input == 0.0 and _key(KEY_W) - _key(KEY_S) == 0.0:
+		return
+	var to := chimney.global_position - global_position
+	to.y = 0.0
+	if to.length() < 0.01:
+		return
+	var want := atan2(-to.x, -to.z)
+	var k := clampf(dt * WALL_FOLLOW_RATE, 0.0, 1.0)
+	_yaw = lerp_angle(_yaw, want, k)
+
+
 func _look_at_stack() -> void:
 	var to := chimney.global_position - global_position
 	to.y = 0.0
@@ -355,6 +392,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			# The camera orbits; the body does not turn with it. The body turns to face where it is
 			# going, which is most of what makes a third-person character look like it has weight.
 			_yaw -= event.relative.x * MOUSE_SENS
+			_mouse_at = _now
 			# Down to 77 degrees: steep enough to pick a joint at your own feet. At 69 the lowest
 			# joint a climber could point at was level with his boots, and the next dog for a
 			# rigid span is often lower than that.
@@ -442,6 +480,7 @@ func _physics_process(dt: float) -> void:
 		on_ladder = true
 		_shuffle = 0.0
 		_say("on the ladder")
+		face_the_wall()
 	if on_ladder and not within_reach:
 		_step_off("off the ladder")
 
@@ -453,6 +492,7 @@ func _physics_process(dt: float) -> void:
 		velocity = Vector3.ZERO
 	elif on_ladder:
 		_climb(dt, ladder_world)
+		_follow_wall(dt)
 	else:
 		_walk(dt)
 
@@ -683,7 +723,7 @@ func _let_go() -> void:
 	var h := height_m()
 	_step_off("you let go" if h > KILLING_FALL else "off the ladder")
 	if h > KILLING_FALL:
-		jack.shock("nearMiss")
+		jack.shock("startle")   # "nearMiss" was never a shock the tuning knew; it logged an error and did nothing
 
 
 func _fall(metres: float) -> void:

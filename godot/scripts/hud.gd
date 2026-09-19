@@ -124,6 +124,8 @@ func _draw() -> void:
 
 	if player.work_mode:
 		_draw_work(jack)
+	else:
+		_draw_target_caption()
 
 	_draw_pip(jack)
 
@@ -344,6 +346,72 @@ func _on_screen(id: int):
 	if player.camera.is_position_behind(world):
 		return null
 	return player.camera.unproject_position(world)
+
+
+## What the joint he is pointing at looks like, and what his chalk says about it, beside the joint.
+##
+## The wall's tells are drawn on the brick — salt bloom, cracks, a clean line — but a new player
+## has no way to know that the white crust *means* anything. So the caption names what the eye is
+## seeing, in the words a jack would use, and says "looks": the tell is only as reliable as the
+## band's visualReadReliability, and the caption must not promise more than the brick does. The
+## second line is the chalk, which is the player's own knowledge, bought with a tap.
+##
+## Words, not colours, for the same reason the pip is shapes: the tier cannot live in a hue.
+const LOOKS := ["cracked across — looks unsafe",
+	"salt bloom — the mortar looks perished",
+	"weathered mortar — looks fair",
+	"clean, hard mortar — looks sound"]
+const HEARD := ["chalked: it rattled — cracked", "chalked: a dead thud — perished",
+	"chalked: a knock — fair", "chalked: it rang — sound"]
+
+
+func _draw_target_caption() -> void:
+	if not player.on_ladder or player.target_id < 0 or player.lashing or player.hauling:
+		return
+	var on = _on_screen(player.target_id)
+	if on == null:
+		return
+	var j: Dictionary = player.face.joint(player.target_id)
+	if j.is_empty():
+		return
+	var at: Vector2 = on
+	# Corners round the joint, big enough to find at a glance: the 3D bracket on the brick is the
+	# precise one, this is the one that says "here" from across the screen.
+	var half := Vector2(30, 13)
+	var pulse := 0.75 + 0.25 * sin(player._now * 5.0)
+	var col := Color(0.863, 0.910, 0.941, 0.95 * pulse)
+	for sx in [-1.0, 1.0]:
+		for sy in [-1.0, 1.0]:
+			var c := at + Vector2(half.x * sx, half.y * sy)
+			draw_line(c, c - Vector2(9.0 * sx, 0), col, 2.0)
+			draw_line(c, c - Vector2(0, 7.0 * sy), col, 2.0)
+
+	var lines: Array = []
+	var seen: int = int(j.get("look", -1))
+	if seen >= 0 and seen < LOOKS.size():
+		lines.append(LOOKS[seen])
+	var heard: int = int(j.get("tapped", -1))
+	lines.append(HEARD[heard] if heard >= 0 and heard < HEARD.size() else "not sounded yet — [E] to tap it")
+	var span: float = player.target_span()
+	if span > 0.0:
+		lines.append("a dog here: %.1f m above your last" % span)
+
+	# On the side of the joint away from him, so it never sits on his head — and off the screen
+	# edge, back the other way.
+	var widest := 0.0
+	for l in lines:
+		widest = maxf(widest, _font.get_string_size(l, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x)
+	var him: Vector2 = player.camera.unproject_position(player.global_position + Vector3.UP * 1.0)
+	var right := at.x >= him.x
+	var x := at.x + half.x + 12.0 if right else at.x - half.x - 12.0 - widest
+	if x + widest > size.x - 12.0:
+		x = at.x - half.x - 12.0 - widest
+	elif x < 12.0:
+		x = at.x + half.x + 12.0
+	var y := at.y - 4.0
+	for i in lines.size():
+		var c2 := Color(0.95, 0.93, 0.88, 0.92) if i != 1 or heard >= 0 else Color(0.80, 0.78, 0.74, 0.8)
+		_label(lines[i], Vector2(x, y + 16.0 * i), c2, 13)
 
 
 ## The tap pip — VERB-002. Drawn **at the joint that was tapped**, not in a panel, for 0.6 s.
