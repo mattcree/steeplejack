@@ -1,6 +1,6 @@
 # The climb, built as a clip rather than poked into bones every frame.
 #
-# Mannequiny ships idle, run, fall and some fighting, and no climb — and this is a game about
+# The character (tools/blender/build_character.py) ships idle, run and air_jump, and no climb — and this is a game about
 # climbing. A man on a ladder with his arms at his sides and his feet in mid-air was the single
 # thing that made the build read as broken no matter what else was right.
 #
@@ -24,7 +24,7 @@
 # the target. That needs the parent's posed orientation, so bones are solved down the chain in
 # skeleton order, which is already parent-first.
 #
-# Mannequiny faces **+Z**, and he faces the brickwork, so "into the wall" is +Z and "up" is +Y.
+# The character faces **+Z**, and he faces the brickwork, so "into the wall" is +Z and "up" is +Y.
 
 class_name ClimbClip
 
@@ -70,7 +70,7 @@ const CHILD := {
 
 
 ## The working arm. He holds on with his left and works with his right, so these override the
-## right arm only and leave the rest of him on the ladder in the reach pose. Mannequiny faces +Z,
+## right arm only and leave the rest of him on the ladder in the reach pose. The character faces +Z,
 ## so his right is -X.
 const HAMMER_COCKED := {
 	"upperarm.r": Vector3(-0.62, 0.60, -0.50),

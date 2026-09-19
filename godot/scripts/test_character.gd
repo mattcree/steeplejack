@@ -34,7 +34,7 @@ func _init() -> void:
 	for dir in [Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(0, 0, -1), Vector3(-1, 0, 0)]:
 		body.rotation.y = player._face(dir)
 		await process_frame
-		# Mannequiny is modelled facing +Z, so its forward is the basis' +Z column.
+		# The character is modelled facing +Z, so its forward is the basis' +Z column.
 		var forward: Vector3 = body.global_transform.basis.z.normalized()
 		_check(forward.dot(dir) > 0.95,
 			"facing %s points him that way (got %s)" % [str(dir), str(forward.snapped(Vector3.ONE * 0.01))])

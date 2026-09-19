@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://drnm2nq14p0vd"
-path="res://.godot/imported/mannequiny.glb-1134f3771b696a410ee4c303da82c867.scn"
+uid="uid://bbbmraefrw1c"
+path="res://.godot/imported/steeplejack.glb-7b07121910693f28e763cc60b325d92e.scn"
 
 [deps]
 
-source_file="res://assets/characters/mannequiny.glb"
-dest_files=["res://.godot/imported/mannequiny.glb-1134f3771b696a410ee4c303da82c867.scn"]
+source_file="res://assets/characters/steeplejack.glb"
+dest_files=["res://.godot/imported/steeplejack.glb-7b07121910693f28e763cc60b325d92e.scn"]
 
 [params]
 

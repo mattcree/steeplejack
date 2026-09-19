@@ -40,7 +40,7 @@ steeplejack/
 │   ├── scripts/                   ← player, chimney, face, hud, town, foley, climb_clip, settings
 │   │                                 + test_*.gd (headless suites) and shot.gd (rendered frames)
 │   ├── shaders/brick.gdshader
-│   └── assets/characters/         ← the one imported model (binary; not yet in LFS — CORE-010)
+│   └── assets/characters/         ← steeplejack.glb, built by tools/blender/build_character.py
 │
 ├── data/
 │   ├── tuning/*.json              ← ALL balance numbers. Hashed into every replay.
@@ -66,9 +66,10 @@ steeplejack/
 | `Source/SteeplejackGodot/`, `godot/` | **agents** | text C++, GDScript, text scenes | ✅ `make godot-test`; frames with `make shot` |
 | `godot/assets/` | **humans** | binary (LFS pending, CORE-010) | ❌ visual review only |
 
-Almost everything is text an agent can author and review. The exceptions are the character model and
-any recorded audio, and the project prefers what can be generated: the town is built from a seed, the
-chimney from its level file, and the foley from envelopes.
+Almost everything is text an agent can author and review, including the character: his model, rig and
+clips are a Blender script (`tools/blender/build_character.py`, `make character`), and the `.glb` is
+its output. The project prefers what can be generated: the town is built from a seed, the chimney
+from its level file, the foley from envelopes and the man from primitives.
 
 ## The frame
 

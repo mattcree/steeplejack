@@ -37,7 +37,7 @@ not exist yet.
 | The chimney | one mesh per band | tapered cylinders + `brick.gdshader` |
 | The town | 4 draw calls | three MultiMeshes, two props, per-bank materials |
 | Audio | a handful of voices | every cue synthesised once at load from `data/audio/foley.json` |
-| Binary assets on disk | small | one character model; LFS pending (CORE-010) |
+| The character | ≤ 10k triangles | about 5,700, 21 bones, 3 clips — from `make character` |
 
 ## The two spikes (design intent; neither exists yet)
 

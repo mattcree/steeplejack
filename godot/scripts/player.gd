@@ -31,7 +31,7 @@ const TURN_RATE := 12.0
 ## The stride of the run clip, in metres per second. Playback is scaled by how fast he is actually
 ## travelling, so his feet keep up with the ground instead of skating over it. Eyeballed — if the
 ## feet slip forwards, raise it; if he moonwalks, lower it.
-const RUN_CLIP_SPEED := 4.6
+const RUN_CLIP_SPEED := 2.37        ## m/s the run clip covers: RUN_STRIDE_M / its length, in tools/blender/build_character.py
 
 const BOOM_LENGTH := 3.0
 const BOOM_SIDE := 0.65
@@ -979,7 +979,7 @@ func _update_fall(dt: float) -> void:
 
 ## The yaw that points the model along `dir`.
 ##
-## Mannequiny is modelled facing +Z, while a Godot node's forward is -Z. Everything that turns him
+## The character is modelled facing +Z, while a Godot node's forward is -Z. Everything that turns him
 ## goes through here so that offset is stated once, rather than being wrong in two places — which is
 ## what it was: he ran backwards facing the camera, and faced away from the wall on the ladder.
 func _face(dir: Vector3) -> float:

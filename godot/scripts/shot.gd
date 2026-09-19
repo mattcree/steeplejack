@@ -32,6 +32,7 @@
 #   strain <g> <n>   drained meters, to see the telegraphs
 #   slip             grip to nothing, so the slip window is open
 #   options          the F1 motion options overlay, open
+#   walkfor <s>      walk forward for s seconds — mid-stride
 #   climbfor <s>     hold W for s seconds (negative for S) — mid-climb, hands moving
 #   cam <yaw> <pit>  aim the camera, degrees
 #   boom <m>         how far back the camera sits
@@ -156,6 +157,11 @@ func _run(cmd: String) -> void:
 			await _drain_to(0.0, -1.0)
 		"options":
 			player.options_open = true
+		"walkfor":
+			# Walk forward for `a` seconds, to catch the run cycle mid-stride.
+			player.walk_input = Vector2(0.0, 1.0)
+			await _wait(int(absf(a) * 60.0))
+			player.walk_input = Vector2.ZERO
 		"climbfor":
 			# Hold W for `a` seconds (negative: S), to catch him mid-climb, hands moving rung to rung.
 			player.climb_input = signf(a) if a != 0.0 else 1.0

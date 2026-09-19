@@ -233,7 +233,7 @@ help:
         configure build-sim test-unit test-levels test-replay test-determinism test-perf \
         test-coverage \
         board ready waves critical editor-queue human-queue stale graph new-task \
-        test-tools check-verify install-hooks help watch run replay-regression record test-replay-format \
+        test-tools check-verify install-hooks help watch run replay-regression record test-replay-format character \
         wt-start wip wt-status land wt-drop doctor
 
 # ---------------------------------------------------------------- Godot
@@ -303,6 +303,16 @@ shot: godot-build godot-import
 		$(GODOT) --path godot --audio-driver Dummy --resolution $(SHOT_RES) --fixed-fps 60 --script res://scripts/shot.gd -- $(CMDS) \
 		$(if $(LEVEL),--level $(LEVEL),) \
 		2>&1 | grep -vE "^(WARNING|MESA|Note:|     at:)" || true
+
+## character: rebuild the steeplejack — model, rig and clips — from tools/blender/build_character.py
+##   Blender is run headless; the script is the source and the .glb is its output. Commit both.
+BLENDER ?= $(or $(shell command -v blender 2>/dev/null),flatpak run org.blender.Blender)
+character:
+	@out=$$($(BLENDER) --background --factory-startup --python $(PWD)/tools/blender/build_character.py \
+		-- $(PWD)/godot/assets/characters/steeplejack.glb 2>&1); \
+		echo "$$out" | grep -E "STEEPLEJACK|Error|Traceback"; \
+		echo "$$out" | grep -q "STEEPLEJACK: wrote" || (echo "  character build failed — see Blender's output above"; exit 1)
+	@$(GODOT) --path godot --headless --import >/dev/null 2>&1 || true
 
 ## ascent-sheet: the whole climb, one frame every 30 s of game time, into build/ascent-sheet/
 ##

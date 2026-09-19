@@ -11,7 +11,7 @@
 [ext_resource type="Script" path="res://scripts/face.gd" id="7_face"]
 [ext_resource type="Script" path="res://scripts/player.gd" id="2_player"]
 [ext_resource type="Script" path="res://scripts/hud.gd" id="3_hud"]
-[ext_resource type="PackedScene" path="res://assets/characters/mannequiny.glb" id="4_body"]
+[ext_resource type="PackedScene" path="res://assets/characters/steeplejack.glb" id="4_body"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 sky_top_color = Color(0.478, 0.588, 0.675, 1)

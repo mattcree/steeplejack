@@ -214,9 +214,13 @@ scope expansion.
 [`interfaces.md`](docs/03-tech/interfaces.md) *first*, then the implementation tasks. Never change a
 signature while someone is implementing against it.
 
-**A binary asset** (a model, a texture, a recorded sound) is human-owned and goes through Git LFS.
-Agents brief it; they do not author it. Prefer what can be generated or described in text — the
-foley is synthesised from `data/audio/foley.json` for exactly this reason.
+**A model or an animation** is built by a Blender script under `tools/blender/`, run headless
+(`make character`), never modelled by hand in an editor. The script is the source and is reviewed
+like code; the `.glb` it writes is committed beside it. The steeplejack himself is built this way.
+
+**Other binary assets** (a texture, a recorded sound) are human-owned and go through Git LFS. Prefer
+what can be generated or described in text — the foley is synthesised from `data/audio/foley.json`
+for exactly this reason.
 
 ## Things that get a PR rejected
 
