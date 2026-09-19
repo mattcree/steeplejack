@@ -53,11 +53,38 @@ jobs:
       - name: Unit and property tests
         run: build/sim_tests
 
-      - name: Level, replay and determinism gates
-        run: make test-levels test-replay test-determinism
+      - name: Level, replay-format and determinism gates
+        run: make test-levels test-replay-format test-determinism
 
       - name: Sim step budget (< 0.5 ms)
         run: make test-perf
 
       - name: Coverage gate (>= 90% of SteeplejackSim)
         run: python3 tools/coverage.py
+
+  # The game itself, headless: every verb driven and asserted on, a bot that climbs the Grey Box to
+  # the top, and that climb compared with its recording. Godot is one binary and runs headless, so
+  # a GitHub-hosted runner is enough. The version must match the one godot-cpp's API is built for.
+  godot:
+    runs-on: ubuntu-latest
+    needs: sim
+    env:
+      GODOT_VERSION: 4.7.2
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: false }
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build g++-13 unzip
+      - name: Install Godot
+        run: |
+          curl -sSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          mkdir -p ~/.local/bin
+          mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" ~/.local/bin/godot
+          ~/.local/bin/godot --version
+      - name: Every verb, and the climb to the top
+        run: make godot-test
+      - name: The climb matches its recording
+        run: make replay-regression
+

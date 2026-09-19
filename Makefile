@@ -115,9 +115,12 @@ test-levels: build-sim validate-data
 ## test-replay: the replay format round-trips, and the Grey Box climb matches its recording
 ##   The second half needs Godot. Without it, it says so and fails — a regression gate that
 ##   quietly does not run is the thing this project keeps finding and removing.
-test-replay: build-sim
-	$(call gate,*Replay*,replay format,CORE-006)
+test-replay: test-replay-format
 	@$(MAKE) --no-print-directory replay-regression
+
+## test-replay-format: just the replay format's round trip — no Godot, so CI's sim job can run it
+test-replay-format: build-sim
+	$(call gate,*Replay*,replay format,CORE-006)
 
 replay-regression: godot-build godot-import
 	@out=$$(timeout 300 $(GODOT) --path godot --headless --fixed-fps 60 \
@@ -230,7 +233,7 @@ help:
         configure build-sim test-unit test-levels test-replay test-determinism test-perf \
         test-coverage \
         board ready waves critical editor-queue human-queue stale graph new-task \
-        test-tools check-verify install-hooks help watch run replay-regression record \
+        test-tools check-verify install-hooks help watch run replay-regression record test-replay-format \
         wt-start wip wt-status land wt-drop doctor
 
 # ---------------------------------------------------------------- Godot
