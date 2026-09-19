@@ -345,6 +345,11 @@ godot-test: godot-build godot-import
 			exit $$rc; \
 		fi; \
 	done
+	@# The mouse coming back after leaving the window needs a real window, so a virtual display.
+	@command -v xvfb-run >/dev/null || (echo "godot-test needs xvfb-run for test_mouse (package xorg-x11-server-Xvfb / xvfb)" && exit 1)
+	@out=$$(timeout 120 xvfb-run -a $(GODOT) --path godot --audio-driver Dummy \
+		--script res://scripts/test_mouse.gd 2>&1); rc=$$?; \
+		echo "$$out" | grep -E "MOUSE|FAIL|SCRIPT ERROR" || true; exit $$rc
 	@# The whole game, played: cradle to cap with the real verbs. Unpaced (--fixed-fps), so fifteen
 	@# minutes of game time takes under a minute; still bounded, for the same reason as above.
 	@timeout 300 $(GODOT) --path godot --headless --fixed-fps 60 --script res://scripts/test_ascent.gd \

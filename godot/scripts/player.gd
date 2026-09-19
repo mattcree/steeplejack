@@ -238,6 +238,8 @@ const FALL_BLACK_HOLD := 1.4
 ## The motion options — A11Y-001. Real ones in the game, in-memory defaults in a test.
 var settings: GameSettings
 var _bob_phase := 0.0
+## Whether the player wants the mouse captured. Esc is the only thing that says no.
+var mouse_wanted := true
 var options_open := false        ## the motion options overlay, on F1
 var options_row := 0
 
@@ -354,8 +356,7 @@ func _ready() -> void:
 	chimney.set_ladder_top(ladder_top)
 	# Only when there is a window to capture it in. A headless server has no mouse, and asking for
 	# one there hangs the process with no output at all, which is a miserable thing to debug.
-	if DisplayServer.get_name() != "headless":
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_capture_mouse(true)
 	if message.begins_with("Your stack") or message.begins_with("Last time"):
 		pass   # the checkpoint's news is the more useful first line
 	else:
@@ -514,6 +515,27 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_PREDELETE:
 		if jack != null:
 			_write_checkpoint()
+	# Back in the window: take the mouse again, unless he let it go on purpose with Esc. Leaving
+	# the window (alt-tab, a click outside) drops the capture, and nothing ever took it back —
+	# mouse-look stayed dead until someone thought to press Esc twice.
+	if what == NOTIFICATION_APPLICATION_FOCUS_IN and mouse_wanted:
+		_capture_mouse.call_deferred(true)
+
+
+## The mouse: captured for looking, free for everything else. `mouse_wanted` is what the player
+## chose — only Esc sets it false — so losing focus never counts as choosing.
+func _capture_mouse(on: bool) -> void:
+	mouse_wanted = on
+	# Only when there is a window to capture it in. A headless server has no mouse, and asking for
+	# one there hangs the process with no output at all, which is a miserable thing to debug.
+	if DisplayServer.get_name() == "headless":
+		return
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if on else Input.MOUSE_MODE_VISIBLE
+
+
+## Whether the mouse is actually steering the view right now.
+func mouse_captured() -> bool:
+	return Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 
 
 ## Square the view up to the wall in front of him, looking a little up.
@@ -570,6 +592,15 @@ func _look_at_stack() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _options_input(event):
 		return
+	# A click in the window with the mouse free takes it back. The click is spent on that, so it
+	# does not also start a hammer draw — except in a slip, where a click is the grab and must
+	# count, whatever else it does.
+	if event is InputEventMouseButton and event.pressed and not mouse_captured() \
+			and DisplayServer.get_name() != "headless":
+		_capture_mouse(true)
+		if not jack.slip_in_progress():
+			get_viewport().set_input_as_handled()
+			return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if work_mode:
 			# In work mode the mouse stops steering your head and starts steering the hammer. That
@@ -584,8 +615,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_pitch = clampf(_pitch - event.relative.y * MOUSE_SENS, _pitch_floor(), 0.6)
 
 	if event.is_action_pressed("ui_cancel"):
-		Input.mouse_mode = (Input.MOUSE_MODE_VISIBLE
-			if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED else Input.MOUSE_MODE_CAPTURED)
+		_capture_mouse(not mouse_captured())
 
 	# The grab is latched in the sim rather than polled in _physics_process, because a key that
 	# goes down and up between two physics frames is still a grab the player made, and losing that

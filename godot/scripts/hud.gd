@@ -141,6 +141,10 @@ func _draw() -> void:
 
 	if player.options_open:
 		_draw_options()
+	elif not player.mouse_captured() and DisplayServer.get_name() != "headless" \
+			and not player.falling and player.fade_in <= 0.0:
+		# Never silently dead: with the mouse out of the window the view does not move, so say why.
+		_centre("click to look around", size.y * 0.5 + 60.0, Color(0.95, 0.93, 0.88, 0.85), 16)
 
 	if player.hauling:
 		_draw_haul()
