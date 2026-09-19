@@ -4,7 +4,7 @@ title: Intent recorder and replay playback
 milestone: M0
 discipline: [ENG]
 estimate_days: 2
-status: ready
+status: review
 assignee: null
 depends_on: [CORE-005, CORE-003]
 owns:
@@ -52,4 +52,38 @@ Do not build the regression harness that asserts invoices — that is TEST-002, 
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**What changed:** `Intent.h`, `Recorder.h`/`.cpp` and `Replay.h`/`.cpp` implement the
+interface in `interfaces.md`, plus `RequireTuning` and `ReplayError` (documented there).
+`tests/replay/test_replay_roundtrip.cpp` has one test per acceptance criterion, plus three more:
+order inside a tick survives the encoding, every float comes back to the bit, and malformed files
+are refused. The run it records drives real sim code (grip, nerve, hammer strikes on four joints)
+and compares a hash of that state on every one of 3,600 ticks. It also compares the intents
+themselves, so an intent that happened to have no effect cannot drop out unnoticed.
+`make test-replay` and `make test-determinism` now find tests, where before they printed "no such
+tests yet".
+
+**Decisions made:**
+
+- The file format was designed for size. Rows are delta-ticked. Trailing fields at their defaults
+  are left off. Consecutive ticks with the same intent in the same slot are one row with a repeat
+  count, so a held climb key is one row, not 240. The slot (the intent's index within its tick)
+  is packed with the kind as slot × 32 + kind. Without it, the run-length encoding would lose the
+  order inside a tick, and Look-then-Climb is a different tick from Climb-then-Look.
+- The seed is written as a string, because a uint64 does not survive a JSON number.
+- Floats are written shortest-round-trip, and each one is checked on the way out. The reader
+  parses doubles and narrows them, and if the shortest float spelling double-rounds, the double
+  spelling is written instead.
+
+**Surprises:**
+
+- −0.0 == 0.0. "Leave defaults off" first dropped a recorded −0.0, and the replay read +0.0. It
+  was caught by the every-float test. Defaults and run extension now compare bits.
+- Acceptance 4 is closer than expected. A minute with a fresh full-precision mouse delta on 80%
+  of ticks, close to a worst case, is about 99 KB. A real mouse prints shorter. If it ever needs
+  margin, quantise Look to the mouse's own counts at the input layer; that is a semantic change,
+  not a format one.
+
+**Follow-ups:** nothing records yet. The Godot layer has to emit intents (a `Recorder` in the
+binding, fed from `player.gd`'s verbs) and have a replay driver. That is the start of TEST-002,
+which also needs the verbs to accept intents rather than read keys, and the
+`climb_input`/`walk_input`/`aim_override` seams in `player.gd` are the first step toward that.

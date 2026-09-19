@@ -203,8 +203,16 @@ public:
     const std::string& TuningHash() const noexcept;
     const IntentBuffer& IntentsAt(int32_t tick) const noexcept;   // empty, no allocation
     int32_t LengthTicks() const noexcept;
+    void RequireTuning(const std::string& currentHash) const;   // throws ReplayError naming both
 };
+
+class ReplayError : public std::runtime_error { using runtime_error::runtime_error; };
 ```
+
+*Added in CORE-006:* `RequireTuning` and `ReplayError`. Acceptance 3 needs a replay to refuse
+the wrong tuning loudly, and the sketch above had nowhere to say so. `FromJson` throws
+`ReplayError` for a file it cannot read whole, and `JsonError` for one that is not JSON. The file
+format is documented at the top of `Recorder.cpp`.
 
 Intents are **semantic, not input events** — `HammerRelease(power, angleError)`, never `MouseUp`.
 That keeps replays stable across input remapping and accessibility settings.
