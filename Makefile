@@ -429,6 +429,19 @@ shot: godot-build godot-import
 		$(if $(LEVEL),--level $(LEVEL),) \
 		2>&1 | grep -vE "^(WARNING|MESA|Note:|     at:)" || true
 
+## ascent-sheet: the whole climb, one frame every 30 s of game time, into build/ascent-sheet/
+##
+## The ascent bot under a virtual display. Small frames, because every one of the ~50,000 steps
+## is rendered in software; this takes tens of minutes, not seconds.
+SHEET_RES ?= 640x360
+ascent-sheet: godot-build godot-import
+	@command -v xvfb-run >/dev/null || (echo "ascent-sheet needs xvfb-run" && exit 1)
+	@rm -rf $(BUILD)/ascent-sheet && mkdir -p $(BUILD)/ascent-sheet
+	@timeout 3600 xvfb-run -a -s "-screen 0 $(SHEET_RES)x24" \
+		$(GODOT) --path godot --resolution $(SHEET_RES) --fixed-fps 60 --script res://scripts/ascent_sheet.gd \
+		2>&1 | grep -vE "^(WARNING|MESA|Note:|     at:)" || true
+	@echo "  $$(ls $(BUILD)/ascent-sheet | wc -l) frames in $(BUILD)/ascent-sheet/"
+
 ## godot-test: drive the real scene headlessly and assert on state
 ##
 ## Bounded, because a parse error in any .gd file makes one of these hang for ever rather than
