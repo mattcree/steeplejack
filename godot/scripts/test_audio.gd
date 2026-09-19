@@ -150,6 +150,29 @@ func _init() -> void:
 			"and is faded at both ends, so the loop point does not click (%.3f, %.3f)"
 				% [w[0], w[w.size() - 1]])
 
+	# --- levels: nothing plays at full scale ------------------------------------------------------
+	# The synthesis clamps to +-1.0, so a cue with no level set plays as loud as the game can make
+	# it. Every one-shot did, and it was the first thing a player said about the sound.
+	var master: float = foley.level("master")
+	_check(master < 0.0, "the mix has headroom (master %.1f dB)" % master)
+	for cue in ["taps", "hammer", "bent", "seated", "rung", "creak", "thump", "gustTell"]:
+		_check(foley.level(cue) < -5.0, "%s plays below full scale (%.1f dB)" % [cue, foley.level(cue)])
+	_check(foley.level("rung") < foley.level("hammer"), "a boot on a rung is quieter than a hammer blow")
+
+	# The player's volume moves everything, the wind bed included.
+	foley.set_volume(1.0)
+	foley.set_height(40.0)
+	var loud: float = foley.wind_player_db()
+	foley.set_volume(0.5)
+	var half: float = foley.wind_player_db()
+	_check(absf((loud - half) - 6.0) < 0.6, "half volume is 6 dB down on the wind (%.1f -> %.1f)" % [loud, half])
+	foley.tap(0)
+	_check(absf(foley.last_played_db() - (foley.level("taps") + master + linear_to_db(0.5))) < 0.1,
+		"and a tap plays at its level under it (%.1f dB)" % foley.last_played_db())
+	foley.set_volume(0.0)
+	_check(foley.wind_player_db() < -60.0, "volume off is silence")
+	foley.set_volume(0.7)
+
 	_done()
 
 

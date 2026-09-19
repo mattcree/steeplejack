@@ -62,7 +62,7 @@ the section you are carrying to that dog. Climb what you built. Again.
 | **T** | | brew up — needs both hands, so belt on first |
 | **C** / hold **V** | | a cigarette (costs you the top of your nerve for the shift) / look at the view |
 | **space** | jump | let go. When grip runs out and a hand comes off, **space** is the grab |
-| **F1** | motion and vertigo options — sway, head bob, FOV, look-down, shake, the fall | same |
+| **F1** | options — volume, and motion and vertigo: sway, head bob, FOV, look-down, shake, the fall | same |
 | **Esc** | release the mouse | |
 
 **Grip** (the fast arc) drains while a hand is off the ladder — working, tapping, lashing, hauling —

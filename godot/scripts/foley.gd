@@ -33,6 +33,9 @@ var _spec := {}
 var _taps: Array[AudioStreamWAV] = []
 var _one_shot := {}
 var _wind: AudioStreamWAV
+var _master_db := 0.0            ## the mix's own headroom, from foley.json
+var _volume_db := 0.0            ## the player's volume setting, 0 dB at full
+var _last_played_db := 0.0       ## what the last one-shot played at; for the tests
 
 var _breath: AudioStreamWAV
 var _slide: AudioStreamWAV
@@ -71,7 +74,8 @@ func _ready() -> void:
 
 	_wind_player = AudioStreamPlayer.new()
 	_wind_player.stream = _wind
-	_wind_player.volume_db = _spec["wind"]["groundDb"]
+	_master_db = level("master")
+	_wind_player.volume_db = _spec["wind"]["groundDb"] + _master_db + _volume_db
 	add_child(_wind_player)
 	_wind_player.play()
 
@@ -105,12 +109,12 @@ func _load() -> Dictionary:
 ## Sound the brickwork. `tier` is JointTier: 0 cracked .. 3 sound.
 func tap(tier: int) -> void:
 	if tier >= 0 and tier < _taps.size():
-		_play(_taps[tier])
+		_play(_taps[tier], 1.0, level("taps"))
 
 
 func cue(name: String, pitch: float = 1.0) -> void:
 	if _one_shot.has(name):
-		_play(_one_shot[name], pitch)
+		_play(_one_shot[name], pitch, level(name))
 
 
 ## The height mix — AUD-003. The ground goes quiet and the wind takes over, which is most of what
@@ -120,7 +124,17 @@ func set_height(metres: float) -> void:
 		return
 	var w: Dictionary = _spec["wind"]
 	var t: float = clampf(metres / maxf(w["refHeightM"], 1.0), 0.0, 1.0)
-	_wind_player.volume_db = lerpf(w["groundDb"], w["topDb"], t) - _duck
+	_wind_at_db = lerpf(w["groundDb"], w["topDb"], t)
+	_wind_player.volume_db = _wind_at_db + _master_db + _volume_db - _duck
+
+
+var _wind_at_db := -80.0         ## the wind's height mix, before master and volume
+
+
+## Re-apply the master and the player's volume to everything that is already playing.
+func _mix() -> void:
+	if _wind_player != null:
+		_wind_player.volume_db = _wind_at_db + _master_db + _volume_db - _duck
 
 
 ## His breathing, by nerve band: 0 calm .. 3 worst. Faster and louder as it goes. Silent on the
@@ -132,7 +146,7 @@ func set_breath(band: int, audible: bool) -> void:
 	var k := clampi(band, 0, 3)
 	_breath_player.pitch_scale = float(b["ratePerBand"][k])
 	var want: float = float(b["dbPerBand"][k]) if audible else -80.0
-	_breath_player.volume_db = lerpf(_breath_player.volume_db, want, 0.05)
+	_breath_player.volume_db = lerpf(_breath_player.volume_db, want + _master_db + _volume_db, 0.05)
 
 
 ## The slide down, by how fast he is going: 0 still .. 1 flat out.
@@ -140,7 +154,8 @@ func set_slide(amount: float) -> void:
 	if _slide_player == null:
 		return
 	var a := clampf(amount, 0.0, 1.0)
-	_slide_player.volume_db = lerpf(-60.0, float(_spec["slide"]["maxDb"]), sqrt(a)) if a > 0.02 else -80.0
+	_slide_player.volume_db = (lerpf(-60.0, float(_spec["slide"]["maxDb"]), sqrt(a))
+		+ _master_db + _volume_db) if a > 0.02 else -80.0
 	_slide_player.pitch_scale = 0.8 + 0.5 * a
 
 
@@ -150,14 +165,32 @@ func duck(on: bool, dt: float) -> void:
 	_duck = move_toward(_duck, 10.0 if on else 0.0, dt * 8.0)
 
 
-func _play(stream: AudioStreamWAV, pitch: float = 1.0) -> void:
+## Play a cue at its own level. Every one-shot used to play at 0 dB — the synthesis clamps to
+## +-1.0, so a boot on a rung was as loud as the game could make it, and the first person to hear
+## it said so. `levels` in foley.json sets each cue's place in the mix, under the player's volume.
+func _play(stream: AudioStreamWAV, pitch: float = 1.0, level_db: float = 0.0) -> void:
 	if _players.is_empty():
 		return
 	var p: AudioStreamPlayer = _players[_next]
 	_next = (_next + 1) % _players.size()
 	p.stream = stream
 	p.pitch_scale = pitch
+	p.volume_db = level_db + _master_db + _volume_db
+	_last_played_db = p.volume_db
 	p.play()
+
+
+## The level of a named cue, from foley.json.
+func level(name: String) -> float:
+	var levels: Dictionary = _spec.get("levels", {})
+	return float(levels.get(name, 0.0))
+
+
+## The player's own volume, 0..1, from the options (A11Y-001). Applied on top of every level.
+func set_volume(fraction: float) -> void:
+	var f := clampf(fraction, 0.0, 1.0)
+	_volume_db = -80.0 if f <= 0.001 else linear_to_db(f)
+	_mix()
 
 
 # --- synthesis -------------------------------------------------------------------------------------
@@ -384,6 +417,15 @@ func slide_stream() -> AudioStreamWAV:
 
 func breath_rate() -> float:
 	return _breath_player.pitch_scale if _breath_player != null else 0.0
+
+
+## For tests: the wind player's level right now, and the level the last one-shot played at.
+func wind_player_db() -> float:
+	return _wind_player.volume_db if _wind_player != null else -80.0
+
+
+func last_played_db() -> float:
+	return _last_played_db
 
 
 func wind_stream() -> AudioStreamWAV:

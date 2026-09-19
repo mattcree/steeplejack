@@ -408,6 +408,8 @@ func _options_input(event: InputEvent) -> bool:
 
 ## The options, applied now — acceptance 4 is "without a restart".
 func _apply_settings() -> void:
+	if foley != null:
+		foley.set_volume(float(settings.get_value("volume")))
 	_base_fov = float(settings.get_value("fov"))
 	camera.fov = _base_fov
 	_pitch = clampf(_pitch, _pitch_floor(), 0.6)

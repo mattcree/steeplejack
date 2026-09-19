@@ -23,6 +23,7 @@ const ROWS := [
 	["reduce_look_down", "Reduce look-down", "bool", false],
 	["screen_shake", "Screen shake", "range", 1.0, 0.0, 1.0, 0.25],
 	["fall_camera", "Fall camera", "choice", "cinematic", ["cinematic", "minimal"]],
+	["volume", "Volume", "range", 0.7, 0.0, 1.0, 0.1],
 ]
 
 var _values := {}
@@ -71,6 +72,8 @@ func shown(key: String) -> String:
 	match key:
 		"fov":
 			return "%d°" % int(v)
+		"volume":
+			return "off" if float(v) <= 0.001 else "%d%%" % int(round(float(v) * 100.0))
 		"screen_shake":
 			return "%d%%" % int(round(float(v) * 100.0))
 	if v is bool:
