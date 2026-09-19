@@ -1136,16 +1136,18 @@ func _update_face() -> void:
 	face.set_target(target_id)
 
 
-func _find_target() -> int:
+## Where on the wall he is looking, held within his reach. What every "this one" in the game means:
+## the joint to tap or drive, and the dog to lash to.
+func _look_point() -> Vector3:
 	var reach: float = jack.tuning_f("tapTestMaxRangeMetres", 2.5)
 	var hands := shoulders()
 	var from := camera.global_position
 	var q := PhysicsRayQueryParameters3D.create(from, from - camera.global_transform.basis.z * 14.0)
 	q.exclude = [get_rid()]
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
-	# Looking at the wall: the joint where you are looking. Looking away from it — at the view, say
-	# — the joint straight in front of his chest, so there is always something sensible to tap on a
-	# ladder and never a dead key.
+	# Looking at the wall: the point where you are looking. Looking away from it — at the view, say
+	# — the wall straight in front of his chest, so there is always something sensible to act on and
+	# never a dead key.
 	var aim_at: Vector3 = hit["position"] if not hit.is_empty() else (
 		hands + (chimney.global_position - hands).normalized() * 0.6)
 	# A test that plays says where it is looking directly. Only the mouse-to-ray step is skipped —
@@ -1153,6 +1155,13 @@ func _find_target() -> int:
 	if aim_override.is_finite():
 		aim_at = aim_override
 	aim_at.y = clampf(aim_at.y, hands.y - reach, hands.y + reach)
+	return aim_at
+
+
+func _find_target() -> int:
+	var reach: float = jack.tuning_f("tapTestMaxRangeMetres", 2.5)
+	var hands := shoulders()
+	var aim_at := _look_point()
 	# The nearest usable joint to where you are looking. Not simply the nearest: a joint under the
 	# ladder is nearest surprisingly often, because the ladder goes up exactly where you look.
 	var best := -1
@@ -1333,6 +1342,10 @@ func _release_strike() -> void:
 			# it happens, before anything is hung off it. "Failed, 0.0 kN" was accurate and did not
 			# say the one thing that matters — lash to this and the ladder comes down.
 			_say("the joint is cracked — the dog went in but will hold nothing. Do not lash to it.")
+		elif int(a.get("rate_unspalled", a["rate"])) > int(a["rate"]):
+			# The why, when it is the player's own doing: the joint was better than the dog now in it.
+			_say("dog seated — %s, %.1f kN. You split the brick driving it; it would have been %s." % [
+				a["rate_name"], a["capacity_kn"], a["rate_unspalled_name"]])
 		else:
 			_say("dog seated — %s, %.1f kN" % [a["rate_name"], a["capacity_kn"]])
 		work_mode = false
@@ -1655,7 +1668,7 @@ func _gin_wheel() -> void:
 	if not on_ladder:
 		_say("you rig a gin wheel from the ladder")
 		return
-	var near_wheel: bool = gin_joint >= 0 and absf(height_m() + 0.55 - gin_height) < GIN_REACH
+	var near_wheel: bool = gin_joint >= 0 and absf(shoulders().y - gin_height) < GIN_REACH
 	if gin_joint < 0 or (not near_wheel and _top_dog_in_reach() >= 0):
 		var jid := _top_dog_in_reach()
 		if jid < 0:
@@ -1686,7 +1699,7 @@ func _gin_wheel() -> void:
 func _top_dog_in_reach() -> int:
 	var best := -1
 	var best_h := -1.0
-	var hands := height_m() + 0.55
+	var hands := shoulders().y
 	for i in jack.anchor_count():
 		var a: Dictionary = jack.anchor_at(i)
 		if a.get("failed", false):
@@ -1949,11 +1962,17 @@ func _lash() -> void:
 		return
 	var best: float = _lash_dog_height()
 	var rise: float = jack.tuning_f("ladderLengthMetres", 5.0) - jack.tuning_f("ladderMinOverlapMetres", 1.0)
-	if best < 0.0 or best + 0.1 < ladder_top - rise:
-		_say("nothing to lash to — get a dog in above you, within reach")
-		return
-	if best + rise <= ladder_top + 0.5:
-		_say("that dog is too low — a section lashed there reaches no higher. Drive one near the top")
+	if best < 0.0:
+		# Say which of the two it is: no dog in reach at all, or only ones too low to gain height.
+		var hands := shoulders().y
+		var reach: float = jack.tuning_f("tapTestMaxRangeMetres", 2.5)
+		var any_in_reach := false
+		for i in range(1, jack.anchor_count()):
+			var a: Dictionary = jack.anchor_at(i)
+			if not a.get("failed", false) and absf(float(a["height"]) - hands) <= reach:
+				any_in_reach = true
+		_say("that dog is too low — a section lashed there reaches no higher. Drive one near the top"
+			if any_in_reach else "nothing to lash to — get a dog in above you, within reach")
 		return
 	lashing = true
 	lash_joint = _joint_of_anchor_at(best)
@@ -2262,7 +2281,8 @@ func _cycle_stance() -> void:
 	if rig_total <= 0.0:
 		_finish_rig()
 		return
-	_say("rigging %s — %.1f s" % [jack.stance_name_of(want), rig_total])
+	# No message: the rigging panel says what is being rigged and counts it down. Saying it here as
+	# well put the same words on the screen twice.
 
 
 func _cancel_rig() -> void:
@@ -2314,23 +2334,42 @@ func has_lashable_anchor() -> bool:
 	return best >= 0.0 and best + 0.1 >= ladder_top - rise and best + rise > ladder_top + 0.5
 
 
-## The highest intact dog he can get a rope round: within reach of his hands.
+## The dog a section would be lashed to: of the dogs his hand can reach that would take the ladder
+## higher, the one he is looking at.
 ##
-## It was the highest dog *anywhere*, which was harmless while every dog was one he had driven —
-## and stopped being harmless the moment the old fixtures put dogs in the wall at 30-42 m. Standing
-## at 5 m, R lashed a section to a fixture thirty-seven metres above him and the ladder jumped to
-## 45.8 m. A lashing is a rope tied by hand, so the dog has to be where his hand is. Found by
-## test_ascent, the test that plays the whole climb.
+## It was the highest dog in reach, and before that the highest dog anywhere. "Anywhere" lashed a
+## section at 5 m to a fixture 37 m up. "Highest in reach" was quieter and just as wrong: once reach
+## was measured from his shoulders (not his knees, as it had been by mistake), the highest dog was
+## often an old fixture above the one he had just driven, and the rope went round a rusted,
+## unrated dog at a seven-metre span he never chose. The ascent test ran out of route because of it.
+## A lash is a choice like a tap or a blow, so it is made the same way — by looking.
+##
+## His own dogs are skipped when they rated Failed: he was told, in words, not to lash to them. An
+## old fixture is never skipped on its rating, because he cannot know it — skipping it would tell
+## him.
 func _lash_dog_height() -> float:
-	var hands := height_m() + 0.55
+	var hands := shoulders().y
 	var reach: float = jack.tuning_f("tapTestMaxRangeMetres", 2.5)
+	var rise := _rise()
+	var look := _look_point()
 	var best := -1.0
+	var best_d := INF
 	for i in jack.anchor_count():
 		var a: Dictionary = jack.anchor_at(i)
-		if a.get("failed", false) or int(a.get("rate", 0)) == 0:
+		if a.get("failed", false):
+			continue
+		if not a.get("fixture", false) and int(a.get("rate", 0)) == 0:
 			continue
 		var h: float = a["height"]
-		if absf(h - hands) <= reach and h > best:
+		if absf(h - hands) > reach or h + rise <= ladder_top + 0.5 or h + 0.1 < ladder_top - rise:
+			continue
+		var jid := int(a.get("joint", -1))
+		var at: Vector3 = (face.joint(jid)["pos"] as Vector3) + chimney.global_position \
+			if face != null and jid >= 0 and not face.joint(jid).is_empty() \
+			else Vector3(look.x, h, look.z)
+		var d := at.distance_to(look)
+		if d < best_d:
+			best_d = d
 			best = h
 	return best
 

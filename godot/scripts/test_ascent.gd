@@ -265,7 +265,13 @@ func _lash() -> bool:
 		return false
 	await _rig_stance(3)
 	await _wait(int(2.0 * 60.0))   # let grip come back
+	# Look at the dog it just drove, as a player does: the lash goes to the dog you are looking at,
+	# and the old fixtures are dogs too.
+	var own := _newest_own_dog()
+	if own >= 0:
+		_aim_at((player.face.joint(own)["pos"] as Vector3) + chimney.global_position)
 	player._lash()
+	player.aim_override = Vector3.INF
 	if not player.lashing:
 		return false
 	var ideal: float = 1.0 / jack.tuning_f("lashSecondsPerWrapIdeal", 1.4)
@@ -286,7 +292,7 @@ func _lash() -> bool:
 ## Rig the gin wheel on the top dog and haul a section and dogs up, steering against the swing.
 func _haul() -> bool:
 	await _rig_stance(3)
-	if player.gin_joint < 0 or absf(player.height_m() + 0.55 - player.gin_height) >= player.GIN_REACH:
+	if player.gin_joint < 0 or absf(player.shoulders().y - player.gin_height) >= player.GIN_REACH:
 		player.gin_joint = -1
 		player._gin_wheel()
 	if player.gin_joint < 0:
@@ -311,6 +317,15 @@ func _haul() -> bool:
 			await _rig_stance(0)
 			return true
 	return false
+
+
+## The joint of the last dog it drove itself — not an old fixture.
+func _newest_own_dog() -> int:
+	for i in range(jack.anchor_count() - 1, 0, -1):
+		var a: Dictionary = jack.anchor_at(i)
+		if not a.get("fixture", false) and not a.get("failed", false):
+			return int(a.get("joint", -1))
+	return -1
 
 
 func _rig_stance(stance: int) -> void:

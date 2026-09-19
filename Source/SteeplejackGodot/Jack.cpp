@@ -799,6 +799,11 @@ Dictionary Jack::seat_anchor_joint(int64_t id, double depth, double spall)
 	grid->SetOccupied(j.id, true);
 	d["rate"] = static_cast<int64_t>(a.rate);
 	d["rate_name"] = String(RateName(a.rate));
+	// What the same dog would have rated with the brick unbroken: when it is better, the spalling
+	// is why this one is not, and the player should be told that rather than left to guess.
+	const sj::AnchorRate clean = sj::anchor::Rate(j, static_cast<float>(depth), 0.0f, *tuning);
+	d["rate_unspalled"] = static_cast<int64_t>(clean);
+	d["rate_unspalled_name"] = String(RateName(clean));
 	d["capacity_kn"] = static_cast<double>(a.capacityKN);
 	d["height"] = static_cast<double>(a.height);
 	d["id"] = static_cast<int64_t>(j.id);

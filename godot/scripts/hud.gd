@@ -263,7 +263,7 @@ func _affordances() -> Array:
 func _gin_label() -> String:
 	if player.gin_joint < 0:
 		return "rig the gin wheel on a dog in reach"
-	if absf(player.height_m() + 0.55 - player.gin_height) < player.GIN_REACH:
+	if absf(player.shoulders().y - player.gin_height) < player.GIN_REACH:
 		return "haul a section up" if not player.carrying_ladder else "haul (lash the one you have first)"
 	return "move the gin wheel up to a dog in reach"
 

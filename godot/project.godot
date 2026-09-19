@@ -10,6 +10,19 @@ config/description="A game about climbing tall things and taking them down."
 run/main_scene="res://scenes/steeplejack.tscn"
 config/features=PackedStringArray("4.4", "Forward Plus")
 
+[display]
+
+; The HUD is drawn in fixed pixel sizes for a 1600x900 screen. Scaling the 2D canvas from that base
+; keeps it the same size relative to the picture in any window: at 640x360 it had collided with
+; itself, and on a 4K screen it would be postage stamps. `expand` keeps every edge anchored rather
+; than letterboxing. The window opens at 1280x720, which fits a laptop.
+window/size/viewport_width=1600
+window/size/viewport_height=900
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
 [rendering]
 
 renderer/rendering_method="forward_plus"
