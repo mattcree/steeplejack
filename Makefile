@@ -300,7 +300,7 @@ SHOT_RES ?= 1600x900
 shot: godot-build godot-import
 	@command -v xvfb-run >/dev/null || (echo "shot needs xvfb-run (package xorg-x11-server-Xvfb)" && exit 1)
 	@timeout 600 xvfb-run -a -s "-screen 0 $(SHOT_RES)x24" \
-		$(GODOT) --path godot --resolution $(SHOT_RES) --fixed-fps 60 --script res://scripts/shot.gd -- $(CMDS) \
+		$(GODOT) --path godot --audio-driver Dummy --resolution $(SHOT_RES) --fixed-fps 60 --script res://scripts/shot.gd -- $(CMDS) \
 		$(if $(LEVEL),--level $(LEVEL),) \
 		2>&1 | grep -vE "^(WARNING|MESA|Note:|     at:)" || true
 
@@ -313,7 +313,7 @@ ascent-sheet: godot-build godot-import
 	@command -v xvfb-run >/dev/null || (echo "ascent-sheet needs xvfb-run" && exit 1)
 	@rm -rf $(BUILD)/ascent-sheet && mkdir -p $(BUILD)/ascent-sheet
 	@timeout 3600 xvfb-run -a -s "-screen 0 $(SHEET_RES)x24" \
-		$(GODOT) --path godot --resolution $(SHEET_RES) --fixed-fps 60 --script res://scripts/ascent_sheet.gd \
+		$(GODOT) --path godot --audio-driver Dummy --resolution $(SHEET_RES) --fixed-fps 60 --script res://scripts/ascent_sheet.gd \
 		2>&1 | grep -vE "^(WARNING|MESA|Note:|     at:)" || true
 	@echo "  $$(ls $(BUILD)/ascent-sheet | wc -l) frames in $(BUILD)/ascent-sheet/"
 
