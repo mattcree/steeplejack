@@ -61,8 +61,9 @@ is in `godot/scripts/player.gd`. So:
   - grip and nerve at the end
 - **`data/replays/00-greybox-expert.replay`** is that outcome, as JSON.
 
-Declared deviations: the script instead of `regression.cpp`, and a Godot dependency. CI's sim
-job has no Godot, so this half of `make test-replay` runs locally.
+Declared deviations: the script instead of `regression.cpp`, and a Godot dependency. CI runs it
+in the `godot` job (`make replay-regression`); the recording made locally matched on GitHub's runner
+the first time, so the climb is deterministic across machines.
 
 1. `make test-replay` runs the sim's replay-format tests and then this comparison, and passes.
 2. and 3. Checked by hand. With `tapTestSeconds` 0.8 → 2.0 it fails with

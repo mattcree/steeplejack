@@ -17,9 +17,9 @@ Cheapest and fastest first. Everything above a rung only runs if the rungs below
 | 4 | Sim build (**no engine needed**) | `make build-sim` | ~20 s | pre-commit, CI |
 | 5 | Sim unit + property tests | `make test-unit` | ~10 s | pre-commit, CI |
 | 6 | Level validation (schema + beat rule + reachability) | `make test-levels` | ~10 s | CI |
-| 7 | Replay: the format's round trip, then the recorded Grey Box climb | `make test-replay` | ~40 s | CI (format); locally (climb — needs Godot) |
+| 7 | Replay: the format's round trip, then the recorded Grey Box climb | `make test-replay` | ~40 s | CI (the format in `sim`, the climb in `godot`) |
 | 8 | Determinism + the sim-step budget | `make test-determinism test-perf` | ~5 s | CI |
-| 9 | The game, headless: every verb, and a bot that climbs to the top | `make godot-test` | ~3 min | locally (needs Godot) |
+| 9 | The game, headless: every verb, and a bot that climbs to the top | `make godot-test` | ~3 min | CI (`godot` job) |
 | 10 | The game, rendered: posed frames, and a whole climb as a contact sheet | `make shot`, `make ascent-sheet` | s / ~20 min | locally, and **look at them** |
 | 11 | Frame-time capture on real GPUs | — | — | **does not exist yet** |
 | 12 | **Human playtest** | see the playtest plan | hours | per milestone |
@@ -58,8 +58,8 @@ nothing — a task claiming it was verified by a command that ran zero tests. Fi
 unwritten modules are listed as pending, not failures. It runs in `make ci`.
 
 **Rungs 1–8 need neither an engine nor a GPU** (except the recorded climb in 7). They cover all of
-the gameplay rules and run on a GitHub-hosted runner in under two minutes. Rungs 9–10 need Godot and
-run locally; CI has no Godot yet.
+the gameplay rules and run on a GitHub-hosted runner in under two minutes. Rung 9 needs Godot, and CI's
+`godot` job installs it; rung 10 renders, and is for looking at.
 
 `make check` runs 1–5. That's your local gate and it must stay under **60 seconds**, forever. If it
 creeps past that, people stop running it, and then rungs 1–5 stop being real.
@@ -128,14 +128,16 @@ branch; never skippable for a PR, because CI runs the same gates.
 
 ## CI
 
-`.github/workflows/ci.yml`. Two job groups:
+`.github/workflows/ci.yml`. Three jobs:
 
 - **fast** (no engine, no compiler): conventions, data validation, task graph, doc links. Under 30
   seconds, and it is the gate that catches most agent mistakes.
 - **sim** (no engine): CMake build plus the whole doctest suite — unit, property, level, replay,
   determinism, step budget. Under two minutes on a GitHub-hosted runner.
-There is no Godot job yet. `make godot-test` and the recorded climb in `make test-replay` run
-locally; adding Godot to CI (it is a single binary, and runs headless) is the obvious next step.
+- **godot** (the official Godot 4.7.2 build, headless): the GDExtension build, `make godot-test`
+  — every verb, and the bot that climbs the Grey Box to the top — and the climb against its
+  recording. About ten minutes. The recording made on a developer machine matched on GitHub's
+  runner the first time, so the climb is deterministic across machines, not only on one.
 
 **A red `sim` job is the most urgent thing in the repo**, because the sim holds every gameplay
 decision.
