@@ -27,11 +27,17 @@ var _dogs := MultiMeshInstance3D.new()
 # are real materials the stack is striped by band type so you can see the data by looking at it.
 const BAND_COLOURS := {
 	"plain": Color(0.29, 0.16, 0.11),
-	"ivy": Color(0.12, 0.18, 0.09),
-	"existing-band": Color(0.15, 0.12, 0.11),
-	"wind-band": Color(0.46, 0.39, 0.32),
+	"ivy": Color(0.13, 0.17, 0.10),
+	"existing-band": Color(0.16, 0.13, 0.12),
+	"wind-band": Color(0.34, 0.25, 0.19),
 	"internal": Color(0.20, 0.20, 0.22),
 }
+
+## Weathering, top to bottom. The level file carries `sootTo` and `bleachFrom` and nothing read
+## them, so the stack was one flat colour per band and looked like a cardboard tube. Soot at the
+## foot and sun-bleach at the head is most of what makes brickwork read as brickwork from 60 m.
+const SOOT_TINT := Color(0.09, 0.08, 0.07)
+const BLEACH_TINT := Color(0.62, 0.58, 0.52)
 
 
 func build(jack: Jack) -> void:
@@ -54,7 +60,8 @@ func build(jack: Jack) -> void:
 		mesh.radial_segments = 32
 
 		var mat := StandardMaterial3D.new()
-		mat.albedo_color = BAND_COLOURS.get(b["type"], Color(0.3, 0.26, 0.24))
+		mat.albedo_color = _weathered(BAND_COLOURS.get(b["type"], Color(0.3, 0.26, 0.24)),
+			(from + to) * 0.5)
 		mat.roughness = 0.95
 		mesh.material = mat
 
@@ -62,6 +69,8 @@ func build(jack: Jack) -> void:
 		inst.mesh = mesh
 		inst.position = Vector3(0, (from + to) * 0.5, 0)
 		add_child(inst)
+
+	_cap()
 
 	# Collision. The stack was mesh only, which meant it was scenery rather than a thing: you could
 	# walk into it, and letting go of the ladder dropped you straight through seventy metres of
@@ -90,11 +99,59 @@ func build(jack: Jack) -> void:
 			col.position = Vector3(0, (lo + hi) * 0.5, 0)
 			solid.add_child(col)
 
+	_cradle()
 	_setup_multimesh(_ladders, Color(0.42, 0.30, 0.17))
 	_setup_multimesh(_dogs, Color(0.18, 0.17, 0.16))
 	add_child(_ladders)
 	add_child(_dogs)
 	set_ladder_top(_ladder_top)
+
+
+## Sooted at the foot, bleached at the head, per the level's weathering block.
+func _weathered(base: Color, h: float) -> Color:
+	var t: float = clampf(h / maxf(height_m, 1.0), 0.0, 1.0)
+	var soot: float = clampf(1.0 - t / 0.25, 0.0, 1.0)
+	var bleach: float = clampf((t - 0.75) / 0.25, 0.0, 1.0)
+	return base.lerp(SOOT_TINT, soot * 0.7).lerp(BLEACH_TINT, bleach * 0.35)
+
+
+## The corbelled oversail: the flared collar every mill chimney has at the top.
+##
+## Without it the stack simply stopped, as a flat disc, and the top of a seventy metre climb looked
+## like a mesh that had run out. The top is the thing the whole game is about arriving at.
+func _cap() -> void:
+	var r: float = radius_at(height_m)
+	var courses := 4
+	for i in courses:
+		var flare: float = 1.0 + 0.10 * float(i + 1)
+		var mesh := CylinderMesh.new()
+		mesh.top_radius = r * flare
+		mesh.bottom_radius = r * (flare - 0.10)
+		mesh.height = 0.55
+		mesh.radial_segments = 32
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = _weathered(BAND_COLOURS["plain"], height_m).lightened(0.06)
+		mat.roughness = 0.9
+		mesh.material = mat
+		var inst := MeshInstance3D.new()
+		inst.mesh = mesh
+		inst.position = Vector3(0, height_m + 0.275 + 0.55 * i, 0)
+		add_child(inst)
+
+	# And the flue. A chimney with a solid top is a post.
+	var flue := CylinderMesh.new()
+	flue.top_radius = r * 0.62
+	flue.bottom_radius = r * 0.62
+	flue.height = 3.0
+	flue.radial_segments = 24
+	var dark := StandardMaterial3D.new()
+	dark.albedo_color = Color(0.03, 0.03, 0.03)
+	dark.roughness = 1.0
+	flue.material = dark
+	var hole := MeshInstance3D.new()
+	hole.mesh = flue
+	hole.position = Vector3(0, height_m + 0.6, 0)
+	add_child(hole)
 
 
 func _setup_multimesh(node: MultiMeshInstance3D, colour: Color) -> void:
@@ -109,6 +166,65 @@ func _setup_multimesh(node: MultiMeshInstance3D, colour: Color) -> void:
 	mm.mesh = box
 	mm.instance_count = 0
 	node.multimesh = mm
+
+
+## The cradle: the stack of materials at the foot, and the one place you can pick anything up.
+##
+## The HUD has been saying "the materials are in the cradle at the foot of the stack" since the verb
+## existed, and there was nothing there to see. An affordance the player is told about and cannot
+## point at is worse than one that is never mentioned — they go looking for it, find bare ground,
+## and conclude the game is broken rather than that they are standing in the right place.
+func _cradle() -> void:
+	var at := FACE * (_base_r + 4.5)
+	var node := Node3D.new()
+	node.name = "Cradle"
+	node.position = at
+	add_child(node)
+
+	var timber := StandardMaterial3D.new()
+	timber.albedo_color = Color(0.42, 0.30, 0.17)
+	timber.roughness = 0.92
+
+	# Spare ladder sections, stacked flat. The pile is the level's ladder allowance made visible.
+	for i in 5:
+		var m := BoxMesh.new()
+		m.size = Vector3(0.44, 0.09, 5.0)
+		m.material = timber
+		var inst := MeshInstance3D.new()
+		inst.mesh = m
+		inst.position = Vector3(0.0, 0.05 + 0.10 * i, 0.0)
+		inst.rotation.y = deg_to_rad(4.0 * i)
+		node.add_child(inst)
+
+	# The dog crate, and a brazier, because a jack's pitch has a fire on it.
+	var iron := StandardMaterial3D.new()
+	iron.albedo_color = Color(0.18, 0.17, 0.16)
+	iron.roughness = 0.75
+
+	var crate := BoxMesh.new()
+	crate.size = Vector3(1.1, 0.5, 0.8)
+	crate.material = iron
+	var c := MeshInstance3D.new()
+	c.mesh = crate
+	c.position = Vector3(1.4, 0.25, 1.6)
+	node.add_child(c)
+
+	var pot := CylinderMesh.new()
+	pot.top_radius = 0.34
+	pot.bottom_radius = 0.26
+	pot.height = 0.7
+	pot.material = iron
+	var b := MeshInstance3D.new()
+	b.mesh = pot
+	b.position = Vector3(-1.5, 0.35, 1.2)
+	node.add_child(b)
+
+	var glow := OmniLight3D.new()
+	glow.position = Vector3(-1.5, 0.75, 1.2)
+	glow.light_color = Color(1.0, 0.62, 0.28)
+	glow.light_energy = 3.0
+	glow.omni_range = 7.0
+	node.add_child(glow)
 
 
 ## Where the ladder sits at a height, in local space.

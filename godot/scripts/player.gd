@@ -38,6 +38,9 @@ const CRADLE_RADIUS := 8.0
 const TOOL_CONDITION := 0.85
 
 ## What the sim's last step decided about the slip. Mirrors sj::SlipOutcome.
+## How long a line stays up. Long enough to read twice, short enough that it is never a fixture.
+const MESSAGE_SECONDS := 6.0
+
 const SLIP_NONE := 0
 const SLIP_SAVED := 1
 const SLIP_FELL := 2
@@ -58,6 +61,7 @@ var tap_reading := ""
 var tap_pip := -1
 var tapped_at := -100.0
 var message := ""
+var message_at := 0.0         ## When it was said. A line that never expires is a line that lies.
 var span_warning := ""
 
 var work_mode := false
@@ -76,8 +80,27 @@ var _fell_from := 0.0
 var _playing := ""
 var _shuffle := 0.0              ## How far sideways off the ladder line he has worked himself.
 var _remount_block := 0.0
+var _now := 0.0                  ## Seconds since the shift started. The HUD's clock, not the sim's.
+var _climb_rate := 0.0           ## Metres per second up the ladder this frame; drives the clip.
 var _slipping := false           ## Mirrors the sim, so the rising edge can be acted on once.
 var fall_reason := ""            ## The one sentence the player must be able to say themselves.
+
+
+## Say something, and remember when. See `message_ttl`.
+func _say(what: String) -> void:
+	message = what
+	message_at = _now
+
+
+## How much life is left in the current message, 1 down to 0.
+##
+## The opening line — "walk to the foot of the stack" — was still on screen sixty metres up, because
+## nothing ever cleared it. A stale instruction is worse than none: the player reads it, looks for
+## what it describes, and cannot find it.
+func message_ttl() -> float:
+	if message == "":
+		return 0.0
+	return clampf(1.0 - (_now - message_at) / MESSAGE_SECONDS, 0.0, 1.0)
 
 
 func height_m() -> float:
@@ -102,16 +125,47 @@ func _ready() -> void:
 		if anim.has_animation(clip):
 			anim.get_animation(clip).loop_mode = Animation.LOOP_LINEAR
 
+	# The model has no climb, and this is a game about climbing.
+	var skel: Skeleton3D = body.get_node_or_null(ClimbClip.SKELETON)
+	if skel != null:
+		ClimbClip.install(anim, skel)
+
 	_spawn = global_position
+	var town: Town = get_node_or_null("../Town")
+	if town != null:
+		town.build(jack.level_name())
 	chimney.build(jack)
+	# After the build, not before: the chimney's height is zero until then, so aiming at the top of
+	# it aimed at the ground and the opening shot came out flat and pointed at a field.
+	_look_at_stack()
 	chimney.set_ladder_top(ladder_top)
 	# Only when there is a window to capture it in. A headless server has no mouse, and asking for
 	# one there hangs the process with no output at all, which is a miserable thing to debug.
 	if DisplayServer.get_name() != "headless":
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	message = "%s. Walk to the foot of the stack." % jack.level_name()
+	_say("%s. Walk to the foot of the stack." % jack.level_name())
 	print("steeplejack: %s — %.0f m, %d bands, tuning %s" % [
 		jack.level_name(), jack.total_height(), jack.band_count(), jack.tuning_hash().substr(0, 12)])
+
+
+## Point the camera at the stack, and tilt up enough to see the top of it.
+##
+## He used to spawn looking wherever the scene file happened to leave him, which was at an empty
+## field with the chimney off to one side. The first frame of a game about climbing something tall
+## has one job.
+func _look_at_stack() -> void:
+	var to := chimney.global_position - global_position
+	to.y = 0.0
+	if to.length() < 0.01:
+		return
+	# The boom's forward is -Z, so this is the yaw that puts the stack in front of it.
+	_yaw = atan2(-to.x, -to.z)
+	# Aim between the foot and the top rather than at either. The camera's vertical half-angle is
+	# about 36 degrees, and the top of a 70 m stack seen from 70 m out is 45 degrees up — level with
+	# the horizon it is simply off the top of the screen, which is what the first frame of this game
+	# looked like.
+	_pitch = clampf(atan2(chimney.height_m, to.length()) * 0.42, 0.0, 0.7)
+	body.rotation.y = _face(to.normalized())
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -163,6 +217,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(dt: float) -> void:
+	_now += dt
 	boom.rotation = Vector3(_pitch, _yaw, 0.0)
 
 	# Hanging by one hand. Nothing he does moves him and no verb is available; the only input that
@@ -188,7 +243,7 @@ func _physics_process(dt: float) -> void:
 			and _remount_block <= 0.0):
 		on_ladder = true
 		_shuffle = 0.0
-		message = "on the ladder"
+		_say("on the ladder")
 	if on_ladder and not within_reach:
 		_step_off("off the ladder")
 
@@ -216,14 +271,14 @@ func _read_slip() -> void:
 		work_mode = false
 		drawing = false
 		swing_power = 0.0
-		message = ""
+		_say("")
 	_slipping = now_slipping
 
 	match jack.last_slip_outcome():
 		SLIP_SAVED:
 			# Hanging one-handed with almost nothing left. The nerve cost is the real one, and it
 			# is what makes the next dog measurably harder.
-			message = "caught it. Hanging one-handed — get your other hand back on."
+			_say("caught it. Hanging one-handed — get your other hand back on.")
 			fall_reason = ""
 		SLIP_FELL:
 			_came_off()
@@ -242,8 +297,8 @@ func _came_off() -> void:
 	if r.get("caught", false):
 		# The line held. You are still on the stack, three seconds of clipping on well spent.
 		fall_reason = ""
-		message = "the line held — %.1f kN on a dog rated %.1f kN. Get back on." % [
-			r["shock_kn"], r["capacity_kn"]]
+		_say("the line held — %.1f kN on a dog rated %.1f kN. Get back on." % [
+			r["shock_kn"], r["capacity_kn"]])
 		return
 
 	_fall_to_ground("the dog let go: %.1f kN of shock load on one rated %.1f kN." % [
@@ -255,7 +310,7 @@ func _came_off() -> void:
 ## climb what you already built.
 func _fall_to_ground(why: String) -> void:
 	fall_reason = why
-	message = "%s You come back the next day — your stack is still up there." % why
+	_say("%s You come back the next day — your stack is still up there." % why)
 	jack.new_shift()
 	global_position = _spawn
 	velocity = Vector3.ZERO
@@ -275,7 +330,9 @@ func _climb(dt: float, ladder_world: Vector3) -> void:
 
 	var rate: float = (jack.tuning_f("climbSpeedMetresPerSecond", 1.6) if up >= 0.0
 		else jack.tuning_f("slideSpeedMetresPerSecond", 2.4))
-	set_height_m(clampf(height_m() + up * rate * dt, 0.0, ladder_top))
+	var before := height_m()
+	set_height_m(clampf(before + up * rate * dt, 0.0, ladder_top))
+	_climb_rate = (height_m() - before) / maxf(dt, 0.0001)
 
 	# Working yourself sideways off the stile. This has to accumulate: the first version recomputed
 	# the offset from the key every frame, so it never got further than one step and you could never
@@ -346,7 +403,7 @@ func _step_off(why: String) -> void:
 	_shuffle = 0.0
 	_remount_block = REMOUNT_DELAY
 	_fell_from = height_m()
-	message = why
+	_say(why)
 
 
 func _let_go() -> void:
@@ -382,13 +439,23 @@ func _animate() -> void:
 	# animation in it, so on the ladder he holds still rather than pretending — a run cycle on a
 	# ladder reads worse than stillness.
 	var want := "idle"
-	if not on_ladder and not is_on_floor():
+	if on_ladder:
+		want = "climb"
+	elif not is_on_floor():
 		want = "air_jump"
-	elif not on_ladder and speed > 0.6:
+	elif speed > 0.6:
 		want = "run"
 	if want != _playing and anim.has_animation(want):
-		anim.play(want, 0.2)
+		anim.play(want, 0.25)
 		_playing = want
+
+	if want == "climb":
+		# The cycle follows the ladder, not the clock: he reaches when he moves and holds the rung
+		# he is on when he does not. A climb cycle running while the player stands still is the
+		# ladder equivalent of feet skating.
+		var climb_speed: float = jack.tuning_f("climbSpeedMetresPerSecond", 1.6)
+		var scale := clampf(absf(_climb_rate) / maxf(climb_speed, 0.01), 0.0, 2.0)
+		anim.speed_scale = -scale if _climb_rate < -0.01 else scale
 
 
 func _key(k: Key) -> float:
@@ -416,13 +483,13 @@ func _step_sim(dt: float) -> void:
 
 func _tap() -> void:
 	if not on_ladder:
-		message = "you have to be on the ladder to sound the brickwork"
+		_say("you have to be on the ladder to sound the brickwork")
 		return
 	var r: Dictionary = jack.tap(height_m(), false)
 	tap_reading = r["tier_name"]
 	tap_pip = r["pip"]
 	tapped_at = height_m()
-	message = "tapped: %s" % tap_reading
+	_say("tapped: %s" % tap_reading)
 
 
 func _toggle_work_mode() -> void:
@@ -432,19 +499,19 @@ func _toggle_work_mode() -> void:
 		swing_power = 0.0
 		return
 	if not on_ladder:
-		message = "you have to be on the ladder"
+		_say("you have to be on the ladder")
 		return
 	if not has_tapped_here():
-		message = "sound the joint first — E"
+		_say("sound the joint first — E")
 		return
 	if dogs_carried <= 0:
-		message = "no dogs in the bag"
+		_say("no dogs in the bag")
 		return
 	work_mode = true
 	work_height = height_m()
 	dog_depth = 0.0
 	aim = Vector2.ZERO
-	message = "mouse places the dog, hold to draw, release to strike"
+	_say("mouse places the dog, hold to draw, release to strike")
 
 
 func _update_work(dt: float) -> void:
@@ -468,7 +535,7 @@ func _release_strike() -> void:
 
 	if r["bent"]:
 		dogs_carried -= 1
-		message = "bent it. %d dogs left" % dogs_carried
+		_say("bent it. %d dogs left" % dogs_carried)
 		work_mode = false
 		return
 
@@ -476,31 +543,31 @@ func _release_strike() -> void:
 		var a: Dictionary = jack.seat_anchor(work_height, dog_depth, r["spalled"])
 		dogs_carried -= 1
 		chimney.add_dog(work_height)
-		message = "dog seated at %.0fm — %s, %.1f kN" % [work_height, a["rate_name"], a["capacity_kn"]]
+		_say("dog seated at %.0fm — %s, %.1f kN" % [work_height, a["rate_name"], a["capacity_kn"]])
 		work_mode = false
 	else:
-		message = "%.0f%% in" % (dog_depth * 100.0)
+		_say("%.0f%% in" % (dog_depth * 100.0))
 
 
 func _lash() -> void:
 	if not carrying_ladder:
-		message = ("you are not carrying a ladder — go down to the cradle"
+		_say("you are not carrying a ladder — go down to the cradle"
 			if ladders_at_base > 0 else "no ladder sections left")
 		return
 	var best: float = jack.highest_anchor_below(height_m() + 100.0)
 	var rise: float = jack.tuning_f("ladderLengthMetres", 5.0) - jack.tuning_f("ladderMinOverlapMetres", 1.0)
 	if best < 0.0 or best + 0.1 < ladder_top - rise:
-		message = "nothing to lash to — get a dog in above you"
+		_say("nothing to lash to — get a dog in above you")
 		return
 	ladder_top = minf(best + rise, chimney.height_m)
 	chimney.set_ladder_top(ladder_top)
 	carrying_ladder = false
-	message = "lashed — the ladder tops out at %.0fm. %d left in the cradle" % [ladder_top, ladders_at_base]
+	_say("lashed — the ladder tops out at %.0fm. %d left in the cradle" % [ladder_top, ladders_at_base])
 
 
 func _pick_up() -> void:
 	if not at_cradle():
-		message = "the materials are in the cradle at the foot of the stack"
+		_say("the materials are in the cradle at the foot of the stack")
 		return
 	var took := false
 	while dogs_carried < DOG_BAG and dogs_at_base > 0:
@@ -511,12 +578,12 @@ func _pick_up() -> void:
 		carrying_ladder = true
 		ladders_at_base -= 1
 		took = true
-	message = ("ladder on your shoulder, %d dogs in the bag" % dogs_carried) if took else "nothing left to take"
+	_say(("ladder on your shoulder, %d dogs in the bag" % dogs_carried) if took else "nothing left to take")
 
 
 func _cycle_stance() -> void:
 	jack.set_stance((jack.get_stance() + 1) % 5)
-	message = jack.stance_name()
+	_say(jack.stance_name())
 
 
 # --- what the HUD asks ---------------------------------------------------------------------------

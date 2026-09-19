@@ -64,17 +64,20 @@ func _draw() -> void:
 	_arc(hand, GRIP_R, grip / 100.0, 4.0, grip_col)
 	_arc(hand, NERVE_R * breath, nerve / nerve_max, 3.0, Color(0.42, 0.58, 0.78, nerve_a))
 
-	if now < 30.0:
-		var a := _ease((30.0 - now) / 5.0) * 0.55
+	if player._now < 30.0:
+		var a := _ease((30.0 - player._now) / 5.0) * 0.55
 		_label("grip", Vector2(HAND.x - 20, hand.y + GRIP_R + 14), Color(0.86, 0.74, 0.42, a))
 		_label("nerve", Vector2(HAND.x + 30, hand.y + NERVE_R + 14), Color(0.42, 0.58, 0.78, a))
 
 	# --- where you are ---------------------------------------------------------------------------
 	var info_x := HAND.x + NERVE_R + 26
-	_label("%.0f m" % player.global_position.y, Vector2(info_x, hand.y - 20), Color(0.94, 0.92, 0.88, 0.92))
+	# His FEET, not the capsule's middle. `global_position.y` is his waist and reads 0.9 m high —
+	# the same off-by-a-body-height that the sim was fixed for and the HUD never was, so the number
+	# on screen disagreed with every number in the level file.
+	_label("%.0f m" % player.height_m(), Vector2(info_x, hand.y - 20), Color(0.94, 0.92, 0.88, 0.92))
 	if player.on_ladder:
 		var where: String = jack.stance_name()
-		var band: String = jack.band_type_at(player.global_position.y)
+		var band: String = jack.band_type_at(player.height_m())
 		if band != "":
 			where += "  ·  " + band
 		_label(where, Vector2(info_x, hand.y), Color(0.80, 0.78, 0.74, 0.70), 13)
@@ -84,7 +87,10 @@ func _draw() -> void:
 		player.dogs_carried, player.ladder_top]
 	_label(stock, Vector2(info_x, hand.y + 22), Color(0.78, 0.76, 0.72, 0.85), 13)
 
-	if player.span_warning != "":
+	# Only once there is something to span *from*. With no dogs driven, the span is measured from
+	# the ground and reads "62.0 m span — about to buckle" at the top of a ladder that is lashed all
+	# the way down. True, useless, and permanently on screen in alarm red.
+	if player.span_warning != "" and jack.anchor_count() > 0:
 		var buckle: bool = player.span_warning.contains("buckle")
 		var col := Color(0.95, 0.30, 0.22, 0.6 + 0.4 * sin(now * 7.0)) if buckle else Color(0.92, 0.70, 0.35, 0.9)
 		_label(player.span_warning, Vector2(info_x, hand.y + 42), col, 13)
@@ -104,8 +110,12 @@ func _draw() -> void:
 		_label(text, Vector2(size.x - w - 28, row_y), col, 13)
 		row_y += 17
 
-	if player.message != "":
-		_centre(player.message, size.y * 0.70, Color(0.90, 0.88, 0.84, 0.88))
+	# The transient line fades out rather than sitting there for ever. Two permanent instructions
+	# saying different things — one at the top, one in the middle — is how the player learns to stop
+	# reading either.
+	var ttl: float = player.message_ttl()
+	if ttl > 0.0:
+		_centre(player.message, size.y * 0.66, Color(0.94, 0.91, 0.86, 0.92 * _ease(ttl * 3.0)))
 
 	if player.work_mode:
 		_draw_work(jack)
@@ -116,9 +126,9 @@ func _draw() -> void:
 
 	# There is no objective marker because the objective is the top and you can see it. But you
 	# cannot see the *rule*, so it is said once and then never again.
-	if now < 14.0:
+	if player._now < 14.0:
 		_centre("Climb the stack. You can only go as high as you have built.",
-			size.y * 0.14, Color(0.92, 0.90, 0.86, 0.85 * _ease((14.0 - now) / 3.0)))
+			size.y * 0.14, Color(0.92, 0.90, 0.86, 0.85 * _ease((14.0 - player._now) / 3.0)))
 
 
 func _next_step() -> String:

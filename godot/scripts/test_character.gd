@@ -46,6 +46,40 @@ func _init() -> void:
 	var forward_before: Vector3 = body.global_transform.basis.z
 	_check(forward_before.length() > 0.9, "the body has a real orientation to begin with")
 
+	# The climb clip. The model ships without one and this game is about climbing; a man standing
+	# to attention beside a ladder is what the build looked like before it existed.
+	_check(anim.has_animation("climb"), "a climb clip was built for a model that has none")
+	if anim.has_animation("climb"):
+		var climb: Animation = anim.get_animation("climb")
+		_check(climb.loop_mode == Animation.LOOP_LINEAR, "and it loops")
+		_check(climb.get_track_count() >= 8,
+			"and it poses both arms and both legs (%d tracks)" % climb.get_track_count())
+
+		# The part that silently breaks: the clip exists, has tracks, and every key is the rest
+		# pose, so it plays and nothing moves. Assert the arms actually go somewhere different
+		# between the two halves of the stride.
+		var moved := 0
+		for t in climb.get_track_count():
+			if climb.track_get_type(t) != Animation.TYPE_ROTATION_3D:
+				continue
+			var a0: Quaternion = climb.rotation_track_interpolate(t, 0.0)
+			var a1: Quaternion = climb.rotation_track_interpolate(t, climb.length * 0.5)
+			if a0.angle_to(a1) > deg_to_rad(10.0):
+				moved += 1
+		_check(moved >= 6, "and half a stride actually moves %d of its bones" % moved)
+
+		# The pose has to be a *climb*: the reaching hand must end up above the shoulder. Without
+		# this the first attempt passed every check above with both arms stuck out sideways.
+		var skel: Skeleton3D = body.get_node(ClimbClip.SKELETON)
+		anim.play("climb")
+		anim.seek(0.0, true)
+		await process_frame
+		var shoulder: int = skel.find_bone("upperarm.l")
+		var hand: int = skel.find_bone("hand.l")
+		var up: float = (skel.get_bone_global_pose(hand).origin.y
+			- skel.get_bone_global_pose(shoulder).origin.y)
+		_check(up > 0.1, "and the reaching hand is above its shoulder (%.2f m)" % up)
+
 	print("CHARACTER: %s" % ("ok" if failures == 0 else "%d failure(s)" % failures))
 	quit(0 if failures == 0 else 1)
 

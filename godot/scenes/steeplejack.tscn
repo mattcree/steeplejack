@@ -3,19 +3,23 @@
 ;
 ; Hand-written text, reviewable in a diff. That is why we are in this engine.
 
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/chimney.gd" id="1_chimney"]
+[ext_resource type="Script" path="res://scripts/town.gd" id="5_town"]
 [ext_resource type="Script" path="res://scripts/player.gd" id="2_player"]
 [ext_resource type="Script" path="res://scripts/hud.gd" id="3_hud"]
 [ext_resource type="PackedScene" path="res://assets/characters/mannequiny.glb" id="4_body"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
-sky_top_color = Color(0.25, 0.42, 0.66, 1)
-sky_horizon_color = Color(0.72, 0.73, 0.71, 1)
-ground_bottom_color = Color(0.28, 0.27, 0.25, 1)
-ground_horizon_color = Color(0.72, 0.73, 0.71, 1)
-sun_angle_max = 12.0
+sky_top_color = Color(0.478, 0.588, 0.675, 1)
+sky_horizon_color = Color(0.784, 0.769, 0.733, 1)
+sky_curve = 0.18
+ground_bottom_color = Color(0.157, 0.165, 0.145, 1)
+ground_horizon_color = Color(0.404, 0.412, 0.376, 1)
+ground_curve = 0.25
+sun_angle_max = 24.0
+sun_curve = 0.12
 
 [sub_resource type="Sky" id="Sky"]
 sky_material = SubResource("SkyMat")
@@ -24,17 +28,30 @@ sky_material = SubResource("SkyMat")
 background_mode = 2
 sky = SubResource("Sky")
 ambient_light_source = 3
-ambient_light_energy = 0.6
+ambient_light_energy = 0.45
 tonemap_mode = 3
-tonemap_white = 6.0
+tonemap_white = 2.2
 ssao_enabled = true
+ssao_radius = 2.0
+ssao_intensity = 1.6
+ssil_enabled = true
+sdfgi_enabled = false
 fog_enabled = true
-fog_light_color = Color(0.74, 0.76, 0.78, 1)
-fog_density = 0.0015
-fog_sky_affect = 0.4
+fog_light_color = Color(0.725, 0.788, 0.831, 1)
+fog_light_energy = 1.1
+fog_sun_scatter = 0.12
+fog_density = 0.0
+fog_aerial_perspective = 0.35
+fog_sky_affect = 0.25
+fog_height = -20.0
+fog_height_density = 0.006
+fog_depth_enabled = true
+fog_depth_begin = 25.0
+fog_depth_end = 850.0
+fog_depth_curve = 1.0
 adjustment_enabled = true
-adjustment_contrast = 1.05
-adjustment_saturation = 1.05
+adjustment_contrast = 1.08
+adjustment_saturation = 0.92
 
 [sub_resource type="CapsuleShape3D" id="Capsule"]
 radius = 0.34
@@ -42,8 +59,15 @@ height = 1.8
 
 [sub_resource type="WorldBoundaryShape3D" id="GroundShape"]
 
+[sub_resource type="StandardMaterial3D" id="GroundMat"]
+albedo_color = Color(0.243, 0.255, 0.216, 1)
+roughness = 1.0
+specular_mode = 3
+
 [sub_resource type="PlaneMesh" id="GroundMesh"]
-size = Vector2(600, 600)
+size = Vector2(4000, 4000)
+subdivide_width = 8
+subdivide_depth = 8
 
 [node name="Steeplejack" type="Node3D"]
 
@@ -52,24 +76,38 @@ environment = SubResource("Env")
 
 [node name="Sun" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.77, 0.43, -0.47, 0, 0.74, 0.67, 0.64, -0.52, 0.57, 0, 60, 0)
-light_energy = 2.2
+light_energy = 1.5
 light_color = Color(1, 0.94, 0.85, 1)
 shadow_enabled = true
-directional_shadow_max_distance = 220.0
+shadow_opacity = 0.82
+light_angular_distance = 1.4
+directional_shadow_mode = 2
+directional_shadow_split_1 = 0.06
+directional_shadow_split_2 = 0.18
+directional_shadow_split_3 = 0.45
+directional_shadow_blend_splits = true
+directional_shadow_max_distance = 320.0
 
 [node name="Ground" type="StaticBody3D" parent="."]
 
 [node name="Mesh" type="MeshInstance3D" parent="Ground"]
 mesh = SubResource("GroundMesh")
+material_override = SubResource("GroundMat")
 
 [node name="Collision" type="CollisionShape3D" parent="Ground"]
 shape = SubResource("GroundShape")
 
+[node name="Town" type="Node3D" parent="."]
+script = ExtResource("5_town")
+
 [node name="Chimney" type="Node3D" parent="."]
 script = ExtResource("1_chimney")
 
+; Spawned well back. At 30 m a 70 m stack subtends 67 degrees and its top is off the top of the
+; screen — the first thing the player sees is being told to climb something they cannot see the end
+; of. From 70 m out it fits in frame, and walking in is the establishing shot.
 [node name="Player" type="CharacterBody3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -26, 1, 14)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -62, 1, 34)
 script = ExtResource("2_player")
 
 [node name="Shape" type="CollisionShape3D" parent="Player"]
