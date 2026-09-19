@@ -156,13 +156,9 @@ func _ready() -> void:
 	_bent = _bank_box(Vector3(0.045, 0.045, 0.16), _lit(Color(0.30, 0.20, 0.14), 0.7))
 
 
-## Joints closer than this to the ladder's centre line are under it. The stiles are 0.44 m apart
-## and a hammer cannot reach past them, and a dog there would be one the ladder cannot be lashed to
-## — the lashing runs from a stile out to a lug beside it.
-const UNDER_LADDER := 0.30
-
-
-## Whether a joint is hidden behind the ladder.
+## Whether a joint is hidden behind the ladder: closer than `ladderCoversMetres` to its centre line.
+## The stiles are 0.44 m apart and a hammer cannot reach past them, and a dog there would be one the
+## ladder cannot be lashed to — the lashing runs from a stile out to a lug beside it.
 func under_ladder(j: Dictionary) -> bool:
 	if jack == null:
 		return false
@@ -172,7 +168,8 @@ func under_ladder(j: Dictionary) -> bool:
 	var b: float = deg_to_rad(jack.climb_bearing())
 	var ladder_n := Vector3(sin(b), 0.0, -cos(b))
 	var r: float = Vector2(j["pos"].x, j["pos"].z).length()
-	return n.distance_to(ladder_n) * r < UNDER_LADDER
+	# ladderCoversMetres: the same width the reachability gate leaves out.
+	return n.distance_to(ladder_n) * r < jack.tuning_f("ladderCoversMetres", 0.30)
 
 
 ## Rebuild if he has moved far enough, or the face changed.

@@ -84,5 +84,10 @@ existence here. A higher dog's next window reaches at least as high, so nothing 
 do is lost. Reach is checked from every stance on the section, not just the top, because a joint
 the span allows may only be reachable standing lower.
 
-**The geometry keys duplicate numbers that `player.gd` and `face.gd` still hard-code.** If one
-side changes, the other will not follow. Follow-up: have the game read the same keys.
+The game reads the same keys: `player.gd`'s targeting and lean work from `shoulders()`
+(`climberShoulderAboveFeetMetres`), and `face.gd`'s `under_ladder` uses `ladderCoversMetres`.
+The gate and the game cannot drift apart on what "in reach" means. `climberWallStandoffMetres`
+is still the sum of two scene constants (LADDER_STANDOFF + BODY_OFF_LADDER), because it places
+geometry rather than deciding anything.
+
+**Follow-ups:** none.

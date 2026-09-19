@@ -18,7 +18,6 @@ const FRICTION := 14.0
 const GRAVITY := 22.0
 const JUMP_SPEED := 6.0
 const MOUSE_SENS := 0.0025
-const SHOULDER_HEIGHT := 0.55   ## above his origin, which is his middle, not his feet
 const ARM_REACH := 0.85          ## shoulder to hammer face
 const LEAN_MAX := 0.75           ## the most he shifts on the rungs to get there
 const LEAN_RATE := 14.0          ## fast enough to arrive before the tap's contact at 0.16 s
@@ -277,6 +276,14 @@ func message_ttl() -> float:
 	if message == "":
 		return 0.0
 	return clampf(1.0 - (_now - message_at) / MESSAGE_SECONDS, 0.0, 1.0)
+
+
+## Where his hands work from: his shoulders, `climberShoulderAboveFeetMetres` above his feet. The
+## same number the reachability gate (CORE-009) proves levels with, so a joint the gate counts as
+## in reach is one the player can actually target.
+func shoulders() -> Vector3:
+	return Vector3(global_position.x, height_m() + jack.tuning_f("climberShoulderAboveFeetMetres", 1.45),
+		global_position.z)
 
 
 func height_m() -> float:
@@ -988,7 +995,7 @@ func _update_lean(dt: float) -> void:
 		var j: Dictionary = face.joint(jid)
 		if not j.is_empty():
 			var at: Vector3 = (j["pos"] as Vector3) + chimney.global_position
-			var shoulder := global_position + Vector3.UP * SHOULDER_HEIGHT
+			var shoulder := shoulders()
 			var need := at - shoulder
 			# Never into the wall or away from it: along the face and up or down only.
 			var n: Vector3 = j["normal"]
@@ -1131,7 +1138,7 @@ func _update_face() -> void:
 
 func _find_target() -> int:
 	var reach: float = jack.tuning_f("tapTestMaxRangeMetres", 2.5)
-	var hands := global_position + Vector3.UP * 0.55   # shoulder height; the origin is his middle
+	var hands := shoulders()
 	var from := camera.global_position
 	var q := PhysicsRayQueryParameters3D.create(from, from - camera.global_transform.basis.z * 14.0)
 	q.exclude = [get_rid()]
