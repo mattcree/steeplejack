@@ -15,28 +15,42 @@ namespace anchor {
 
 AnchorRate Rate(const Joint& joint, float depth, float spall, const Tuning& t) noexcept
 {
-    // A dog that is not seated holds nothing, however good the joint was.
-    if (depth < t.GetF("dogSeatDepthFraction"))
+    // A cracked joint holds nothing, at any depth (acceptance 2). This is checked on the joint
+    // itself, before anything else: the depth bonus below used to lift a cracked joint's score
+    // into the perished band, so a dog in a crack rated Poor and held a kilonewton it should never
+    // have held — a failure with no honest telegraph, because the pip said Poor.
+    if (tap::TierOf(std::clamp(joint.quality, 0.0f, 1.0f), t) == JointTier::Cracked)
     {
         return AnchorRate::Failed;
     }
 
     // Start from the joint, then take away what you damaged getting in. This is why soft mortar is
     // a trap: it seats fast, and the spalling you caused on the way is exactly what downgrades it.
+    const float seat = t.GetF("dogSeatDepthFraction");
     float score = std::clamp(joint.quality, 0.0f, 1.0f) - std::clamp(spall, 0.0f, 1.0f);
 
     // Depth past the minimum is worth something, but cannot rescue a bad joint.
-    score += (depth - t.GetF("dogSeatDepthFraction")) * 0.5f;   // literal: half weight, not tuned
-
-    const JointTier tier = tap::TierOf(std::clamp(score, 0.0f, 1.0f), t);
-    switch (tier)
+    if (depth >= seat)
     {
-    case JointTier::Sound:    return AnchorRate::Sound;
-    case JointTier::Fair:     return AnchorRate::Fair;
-    case JointTier::Perished: return AnchorRate::Poor;
-    case JointTier::Cracked:  return AnchorRate::Failed;
+        score += (depth - seat) * 0.5f;   // literal: half weight, not tuned
     }
-    return AnchorRate::Failed;
+
+    AnchorRate rate = AnchorRate::Failed;
+    switch (tap::TierOf(std::clamp(score, 0.0f, 1.0f), t))
+    {
+    case JointTier::Sound:    rate = AnchorRate::Sound; break;
+    case JointTier::Fair:     rate = AnchorRate::Fair; break;
+    case JointTier::Perished: rate = AnchorRate::Poor; break;
+    case JointTier::Cracked:  rate = AnchorRate::Failed; break;
+    }
+
+    // Not driven home: one tier below what the joint would allow (acceptance 3). The game only
+    // rates a dog once it is seated, so this is the contract for anything else that asks.
+    if (depth < seat && rate != AnchorRate::Failed)
+    {
+        rate = static_cast<AnchorRate>(static_cast<int>(rate) - 1);
+    }
+    return rate;
 }
 
 float CapacityKN(AnchorRate rate, const Tuning& t) noexcept

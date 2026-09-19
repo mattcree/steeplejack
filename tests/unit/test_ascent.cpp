@@ -94,11 +94,14 @@ TEST_CASE("Tap: gloves cost resolution, and they err in the dangerous direction"
           sj::tap::Tap(Perished, Tune(), false).confidence);
 }
 
-TEST_CASE("Anchor: a dog that is not seated holds nothing, however good the joint")
+TEST_CASE("Anchor: a dog not driven home rates below what its joint allows")
 {
+    // This used to assert "not seated holds nothing" — the opposite of VERB-004's acceptance 3,
+    // which says one tier lower. The acceptance is the spec; test_anchor.cpp covers it by tier.
+    // The game only rates a dog once it is seated, so no play ever hit the difference.
     const float Seat = Tune().GetF("dogSeatDepthFraction");
-    CHECK(sj::anchor::Rate(OfQuality(0.95f), Seat - 0.01f, 0.0f, Tune()) == AnchorRate::Failed);
-    CHECK(sj::anchor::Rate(OfQuality(0.95f), Seat, 0.0f, Tune()) != AnchorRate::Failed);
+    CHECK(sj::anchor::Rate(OfQuality(0.95f), Seat - 0.01f, 0.0f, Tune()) <
+          sj::anchor::Rate(OfQuality(0.95f), Seat, 0.0f, Tune()));
 }
 
 TEST_CASE("Anchor: soft mortar is a trap — it seats fast and rates badly")

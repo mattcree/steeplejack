@@ -4,7 +4,7 @@ title: Anchor rating and capacity
 milestone: M1
 discipline: [ENG]
 estimate_days: 1.5
-status: ready
+status: review
 assignee: null
 depends_on: [VERB-003]
 owns:
@@ -56,4 +56,25 @@ Load distribution and cascade are CLIMB-002. HUD pips are UI-001.
 <!-- Only if blocked. Question / what I tried / options / recommendation. -->
 
 ## Outcome
-<!-- Filled in at handoff: what changed, decisions made, surprises, follow-ups. -->
+**What changed:** `Anchor.h`/`Anchor.cpp` were built earlier with the tap test. This handoff
+adds `tests/unit/test_anchor.cpp`, one test per criterion, and fixes the two criteria the code
+got wrong:
+
+- **Acceptance 2 was violated, and it was a gameplay bug.** Depth past the seat added a bonus to
+  the score *before* the tier was chosen, so every cracked joint, even mid-band, rated **Poor**
+  at full depth. A dog driven into a crack held 1 kN it should never have held, and the pip said
+  Poor, so a player could trust it. Now a cracked joint is Failed before anything else is looked
+  at. In the game, seating a dog there says "the joint is cracked — the dog went in but will hold
+  nothing. Do not lash to it." instead of "Failed, 0.0 kN".
+- **Acceptance 3 was contradicted.** The code, and an older test in `test_ascent.cpp`, said an
+  unseated dog "holds nothing". The acceptance says one tier lower. The acceptance is the spec,
+  so the code and the old test now follow it. The game only rates a dog once it is seated, so
+  no play ever reached this.
+
+Acceptance 1: all four ratings, plus the spalled-brick path. **The bent-dog path is not a
+rating:** a strike that bends gains no depth and cannot be the blow that seats (tested). The game
+then spoils the joint instead of rating anything. Acceptance 6 is `OldFixtures`: the same level
+and seed give the same fixtures, and a different seed moves the rust. The interface's
+`rate_free_fixture` became `OldFixtures` plus `Make` on the fixture's joint.
+
+**Follow-ups:** none.

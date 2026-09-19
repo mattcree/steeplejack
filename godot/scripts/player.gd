@@ -1315,7 +1315,13 @@ func _release_strike() -> void:
 		dogs_carried -= 1
 		if face != null:
 			face.touch()
-		_say("dog seated — %s, %.1f kN" % [a["rate_name"], a["capacity_kn"]])
+		if int(a["rate"]) == 0:
+			# The fairness contract's telegraph for the worst outcome: said in words, at the moment
+			# it happens, before anything is hung off it. "Failed, 0.0 kN" was accurate and did not
+			# say the one thing that matters — lash to this and the ladder comes down.
+			_say("the joint is cracked — the dog went in but will hold nothing. Do not lash to it.")
+		else:
+			_say("dog seated — %s, %.1f kN" % [a["rate_name"], a["capacity_kn"]])
 		work_mode = false
 
 
