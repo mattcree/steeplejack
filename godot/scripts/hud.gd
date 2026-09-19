@@ -120,9 +120,9 @@ func _draw() -> void:
 	# reading either.
 	var ttl: float = player.message_ttl()
 	if ttl > 0.0:
-		# High, in the sky over the stack. At two-thirds down it landed on his back in every
+		# At the top edge, clear of him and of the warnings. At two-thirds down it landed on his back in every
 		# ladder frame, and in work mode on the joint he was hammering.
-		_centre(player.message, size.y * 0.22, Color(0.94, 0.91, 0.86, 0.92 * _ease(ttl * 3.0)), 16)
+		_centre(player.message, size.y * 0.075, Color(0.94, 0.91, 0.86, 0.92 * _ease(ttl * 3.0)), 16)
 
 	if player.work_mode:
 		_draw_work(jack)

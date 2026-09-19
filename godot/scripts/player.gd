@@ -22,6 +22,7 @@ const SHOULDER_HEIGHT := 0.55   ## above his origin, which is his middle, not hi
 const ARM_REACH := 0.85          ## shoulder to hammer face
 const LEAN_MAX := 0.75           ## the most he shifts on the rungs to get there
 const LEAN_RATE := 14.0          ## fast enough to arrive before the tap's contact at 0.16 s
+const RAIL_HALF := 0.22          ## half the gap between the stiles; chimney.gd's RAIL_GAP / 2
 const WALL_FOLLOW_DELAY := 1.5   ## seconds after the mouse last moved before the ladder view squares up
 const WALL_FOLLOW_RATE := 1.2    ## how fast it does, per second — a drift, not a snap
 const TURN_RATE := 12.0
@@ -186,6 +187,7 @@ var drift_phase := 0.0
 
 var on_ladder := false
 var _yaw := 0.0
+var _gear: Node3D                ## the stance, made visible: clip line, belt, chair
 var _body_base := Vector3.ZERO   ## the body's resting place under the player; the lean is added to it
 var _lean := Vector3.ZERO        ## world-space shift towards the joint being tapped or worked
 var _mouse_at := -100.0          ## When the player last turned the view; the ladder camera waits for them.
@@ -520,6 +522,7 @@ func _physics_process(dt: float) -> void:
 		_carried_ladder.visible = carrying_ladder and not lashing
 	_animate()
 	_update_lean(dt)
+	_update_gear()
 
 
 ## What the sim decided about the slip on the step that just ran.
@@ -1917,6 +1920,114 @@ func _pick_up() -> void:
 		ladders_at_base -= 1
 		took = true
 	_say(("ladder on your shoulder, %d dogs in the bag" % dogs_carried) if took else "nothing left to take")
+
+
+## The stance, where you can see it. Q used to change a word in the corner of the HUD and nothing
+## on the man — belted and one-handed looked identical, so the one decision the climbing system is
+## built on had no picture. Now: a clip line from his harness to the rung above (clipped), a belt
+## round him and both stiles (belted), a bosun's chair under him on two falls (chair). While he is
+## rigging, the gear for the stance he is rigging to pays out with the progress, so the 20 s a
+## chair takes is 20 s of rope going on rather than 20 s of a ring filling.
+func _update_gear() -> void:
+	if _gear == null:
+		_gear = _build_gear()
+	var stance: int = jack.get_stance()
+	var shown := stance
+	var part := 1.0
+	if rigging_to >= 0 and rig_total > 0.0:
+		shown = rigging_to
+		part = clampf(1.0 - rig_left / rig_total, 0.05, 1.0)
+	var on := on_ladder and not falling and not at_top
+	var waist := global_position + _lean + Vector3.UP * 0.05
+	var h := height_m()
+	var base: Vector3 = chimney.global_position
+	var side := Vector3(0, 0, RAIL_HALF)
+	# To the stile at his right shoulder, not the rung straight above: from behind, a line up the
+	# middle of him is hidden by him.
+	var rung_above: Vector3 = base + chimney.face_point(h + 1.3) + side * 1.15
+	var stile_l: Vector3 = base + chimney.face_point(h + 0.9) - side
+	var stile_r: Vector3 = base + chimney.face_point(h + 0.9) + side
+
+	var clip := on and shown >= 2
+	_gear.get_node("Clip").visible = clip
+	if clip:
+		_rope_between(_gear.get_node("Clip"), waist, waist.lerp(rung_above, part))
+	var belt := on and shown >= 3
+	_gear.get_node("BeltL").visible = belt
+	_gear.get_node("BeltR").visible = belt
+	if belt:
+		var reach := part if shown == 3 else 1.0
+		_rope_between(_gear.get_node("BeltL"), waist, waist.lerp(stile_l, reach))
+		_rope_between(_gear.get_node("BeltR"), waist, waist.lerp(stile_r, reach))
+	var chair := on and shown >= 4
+	for n in ["Seat", "FallL", "FallR"]:
+		_gear.get_node(n).visible = chair
+	if chair:
+		var seat_at := global_position + _lean - Vector3.UP * 0.35 + (global_position - base).normalized() * 0.05
+		var seat: Node3D = _gear.get_node("Seat")
+		seat.global_position = seat_at
+		seat.global_basis = Basis.looking_at(-_wall_out(), Vector3.UP)
+		var top_l: Vector3 = base + chimney.face_point(h + 1.9) - side
+		var top_r: Vector3 = base + chimney.face_point(h + 1.9) + side
+		var seat_l := seat_at - side * 1.1
+		var seat_r := seat_at + side * 1.1
+		_rope_between(_gear.get_node("FallL"), seat_l, seat_l.lerp(top_l, part))
+		_rope_between(_gear.get_node("FallR"), seat_r, seat_r.lerp(top_r, part))
+
+
+func _wall_out() -> Vector3:
+	var out := global_position - chimney.global_position
+	out.y = 0.0
+	return out.normalized() if out.length() > 0.01 else Vector3.FORWARD
+
+
+func _build_gear() -> Node3D:
+	var g := Node3D.new()
+	g.name = "StanceGear"
+	get_parent().add_child(g)
+	var hemp := StandardMaterial3D.new()
+	hemp.albedo_color = Color(0.64, 0.53, 0.35)
+	hemp.roughness = 0.95
+	var webbing := StandardMaterial3D.new()
+	webbing.albedo_color = Color(0.30, 0.26, 0.20)
+	webbing.roughness = 0.9
+	var wood := StandardMaterial3D.new()
+	wood.albedo_color = Color(0.46, 0.33, 0.19)
+	for spec in [["Clip", 0.014, hemp], ["BeltL", 0.022, webbing], ["BeltR", 0.022, webbing],
+			["FallL", 0.013, hemp], ["FallR", 0.013, hemp]]:
+		var mi := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = spec[1]
+		cm.bottom_radius = spec[1]
+		cm.height = 1.0
+		cm.radial_segments = 6
+		cm.material = spec[2]
+		mi.mesh = cm
+		mi.name = spec[0]
+		mi.visible = false
+		g.add_child(mi)
+	var seat := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.52, 0.04, 0.22)
+	bm.material = wood
+	seat.mesh = bm
+	seat.name = "Seat"
+	seat.visible = false
+	g.add_child(seat)
+	return g
+
+
+## A unit-height cylinder stretched and turned to run from `a` to `b`.
+func _rope_between(mi: Node3D, a: Vector3, b: Vector3) -> void:
+	var d := b - a
+	var len := d.length()
+	if len < 0.01:
+		mi.visible = false
+		return
+	var y := d / len
+	var x := y.cross(Vector3.UP if absf(y.y) < 0.95 else Vector3.RIGHT).normalized()
+	var z := x.cross(y)
+	mi.global_transform = Transform3D(Basis(x, y * len, z), (a + b) * 0.5)
 
 
 ## Q asks for the next stance up the table. Getting there takes the time the table says.

@@ -13,7 +13,7 @@
 # The vocabulary is deliberately the same as the one AGENTS.md documents for the old engine, so the
 # commands in that file still mean what they say.
 #
-#   climb <m>        on the ladder at that height, with stack lashed up to it
+#   climb <m>        on the ladder at that height, with stack lashed up to it at 4 m spans
 #   dog <m> [lash]   a dog seated and lashed at that height (lash 1 hitch, 2 full)
 #   carry            a ladder on the shoulder and a full bag of dogs
 #   tap              sound the joint he is pointing at, through the real flow
@@ -95,11 +95,13 @@ func _run(cmd: String) -> void:
 
 	match verb:
 		"climb":
+			_fill_stack_to(a - 1.0)
 			_lash_to(a)
 			_put_on_ladder(a)
 		"dog":
 			# Driven and lashed: the ladder goes up to it, and the stack knows about the section, so
 			# a long span between two `dog`s is a long span that can buckle.
+			_fill_stack_to(a - 3.0)
 			_lash_to(a)
 			var d: Dictionary = jack.seat_anchor(a, 1.0, 0.0)
 			jack.stack_lash(float(d.get("height", a)), int(b) if b > 0.0 else 2)
@@ -217,6 +219,19 @@ func _run(cmd: String) -> void:
 # --- posing ---------------------------------------------------------------------------------------
 
 ## Lash the stack up to a height, so he can be there at all — you climb only what you have built.
+## Rigid 4 m spans up to `height`, the way a careful jack would have built it. Without them
+## `climb 20` stood him on one twenty-metre section: every frame at height carried a buckle
+## warning, and any shot that waited long enough ended with him on the ground.
+func _fill_stack_to(height: float) -> void:
+	var h: float = maxf(jack.stack_top(), 0.0) + 4.0
+	while h <= height:
+		var d: Dictionary = jack.seat_anchor(h, 1.0, 0.0)
+		jack.stack_lash(float(d.get("height", h)), 2)
+		h = float(d.get("height", h)) + 4.0
+	if player.face != null:
+		player.face.touch()
+
+
 func _lash_to(height: float) -> void:
 	player.ladder_top = maxf(player.ladder_top, minf(height + 2.0, chimney.height_m))
 	chimney.set_ladder_top(player.ladder_top)
