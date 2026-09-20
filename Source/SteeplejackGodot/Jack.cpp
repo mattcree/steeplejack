@@ -208,6 +208,9 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("career_reachable_stars", "job_ids"),
 	                     &Jack::career_reachable_stars);
 	ClassDB::bind_method(D_METHOD("career_injured"), &Jack::career_injured);
+	ClassDB::bind_method(D_METHOD("career_stripped", "job_id"), &Jack::career_stripped);
+	ClassDB::bind_method(D_METHOD("career_mark_stripped", "job_id"), &Jack::career_mark_stripped);
+	ClassDB::bind_method(D_METHOD("level_archetype"), &Jack::level_archetype);
 	ClassDB::bind_method(D_METHOD("career_done", "job_id"), &Jack::career_done);
 	ClassDB::bind_method(D_METHOD("career_settle", "job_id", "fee_gbp", "peg_bearing_deg",
 	                               "height_removed_m", "surveyed", "packing_quality"),
@@ -1409,6 +1412,21 @@ int64_t Jack::career_reachable_stars(const Array& job_ids) const
 		}
 	}
 	return static_cast<int64_t>(career.StarsAfter(extra, *tuning));
+}
+
+bool Jack::career_stripped(const String& job_id) const
+{
+	return career.Stripped(job_id.utf8().get_data());
+}
+
+void Jack::career_mark_stripped(const String& job_id)
+{
+	career.MarkStripped(job_id.utf8().get_data());
+}
+
+String Jack::level_archetype() const
+{
+	return level ? String(level->Archetype().c_str()) : String("");
 }
 
 int64_t Jack::career_injured()

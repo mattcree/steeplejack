@@ -53,6 +53,34 @@ func _init() -> void:
 	_check(world._aimed_cell().is_empty(), "from where you cannot reach the brickwork")
 	world._at = was
 
+	# --- Act 2 first: you do not cut into a chimney that still has its bands on --------------------
+	# The gate is on the player's action rather than on the sim, because the sim's job is the
+	# statics and this is a rule about the order of a day's work. Which means the bot has to press
+	# the button rather than call gob_cut — on a chimney of its own, since pressing it successfully
+	# takes a brick out and everything after this assumes an untouched ring.
+	var unstripped: Node = load("res://scenes/felling.tscn").instantiate()
+	unstripped.career_path = "user://test-unstripped.json"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(unstripped.career_path))
+	root.add_child(unstripped)
+	await physics_frame
+	_check(not unstripped._authored["strip_out"].is_empty(), "Waterside authors a strip-out")
+	_check(not unstripped._stripped, "and it has not been done")
+	unstripped._at = unstripped._on_bearing(unstripped._peg,
+		float(unstripped.jack.structure().get("base_radius", 3.2)) + 3.0)
+	unstripped._cut()
+	_check(float(unstripped.jack.gob_state().get("cut_arc", 0.0)) == 0.0,
+		"so the bar will not go in — not a brick out of her")
+	unstripped.jack.career_mark_stripped("06-waterside")
+	unstripped._stripped = true
+	unstripped._cut()
+	_check(float(unstripped.jack.gob_state().get("cut_arc", 0.0)) > 0.0,
+		"stripped, and now she cuts")
+	unstripped.queue_free()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://test-unstripped.json"))
+
+	# The chimney the rest of this test works on has been stripped off-screen.
+	world._stripped = true
+
 	# --- a prop will not go in in front of the cut ------------------------------------------------
 	var seg := _seg_at(ring, peg)
 	_check(not jack.gob_prop(seg), "a prop will not stand where nothing has been cut")

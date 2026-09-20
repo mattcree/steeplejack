@@ -244,6 +244,26 @@ TEST_CASE("Career: getting hurt costs you, whatever the job did")
     CHECK(c.Done("06-waterside"));
 }
 
+TEST_CASE("Career: the strip-out is remembered, because you only do it once")
+{
+    Career c;
+    CHECK_FALSE(c.Stripped("06-waterside"));
+    c.MarkStripped("06-waterside");
+    CHECK(c.Stripped("06-waterside"));
+    CHECK_FALSE(c.Stripped("07-kershaws-yard"));
+    c.MarkStripped("06-waterside");   // twice is once
+    CHECK(c.Stripped("06-waterside"));
+
+    // And it survives the tin: you do not re-climb a chimney because your gob went wrong.
+    const Career back = Career::FromJson(c.ToJson(), "career.json");
+    CHECK(back.Stripped("06-waterside"));
+    CHECK_FALSE(back.Stripped("07-kershaws-yard"));
+
+    // A failed felling does not un-strip it either.
+    c.Settle("06-waterside", 1100.0f, Catastrophe(), Tune());
+    CHECK(c.Stripped("06-waterside"));
+}
+
 TEST_CASE("Career: it round-trips through text a person could read")
 {
     Career c;

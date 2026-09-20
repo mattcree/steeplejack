@@ -64,6 +64,19 @@ bool Career::Done(const std::string& levelId) const noexcept
     return false;
 }
 
+bool Career::Stripped(const std::string& levelId) const noexcept
+{
+    return std::find(stripped_.begin(), stripped_.end(), levelId) != stripped_.end();
+}
+
+void Career::MarkStripped(const std::string& levelId)
+{
+    if (!Stripped(levelId))
+    {
+        stripped_.push_back(levelId);
+    }
+}
+
 float Career::BestErrorDegrees(const std::string& levelId) const noexcept
 {
     float best = -1.0f;
@@ -168,7 +181,12 @@ std::string Career::ToJson() const
             << ", \"error\": " << j.errorDegrees << ", \"failed\": " << (j.failed ? "true" : "false")
             << "}";
     }
-    out << (jobs_.empty() ? "" : "\n  ") << "]\n}\n";
+    out << (jobs_.empty() ? "" : "\n  ") << "],\n  \"stripped\": [";
+    for (std::size_t i = 0; i < stripped_.size(); ++i)
+    {
+        out << (i ? ", " : "") << "\"" << stripped_[i] << "\"";
+    }
+    out << "]\n}\n";
     return out.str();
 }
 
@@ -188,6 +206,13 @@ Career Career::FromJson(const std::string& json, const std::string& origin)
                 static_cast<float>(j.At("error").AsNumber()),
                 j.At("failed").AsBool(),
             });
+        }
+    }
+    if (doc.Has("stripped"))
+    {
+        for (const JsonValue& s : doc.At("stripped").Elements())
+        {
+            c.stripped_.push_back(s.AsString());
         }
     }
     return c;

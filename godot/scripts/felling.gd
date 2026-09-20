@@ -49,6 +49,9 @@ var _packing_quality := 0.0
 var _match_attempt := 0
 var _burn_left := 0.0
 var _caught := false
+## Act 2, done on another day in the other half of the game. Until it is, there is a conductor
+## down the side of this chimney and three iron bands round it, and you do not cut into that.
+var _stripped := false
 var _fall: FellFall
 var _outcome := {}
 var _settlement := {}
@@ -120,6 +123,9 @@ func _ready() -> void:
 	_face_the_chimney()
 	_peg_marks = Node3D.new()
 	add_child(_peg_marks)
+	_load_career()
+	_stripped = jack.career_stripped(_authored["id"]) or _authored["strip_out"].is_empty()
+	_step = 1 if _stripped else 0
 	_build_dust()
 	_capture(true)
 	hud.say("Cut the gob on the side you want it to fall. Aim at the brick and press E.", 6.0)
@@ -185,6 +191,7 @@ func _read_level() -> Dictionary:
 		out["mortar_bearing"] = float(asym.get("bearing", 0.0))
 		out["mortar_bias"] = float(asym.get("strengthBias", 0.0))
 	out["required_reduction"] = float(mission.get("requiredHeightReduction", 0.0))
+	out["strip_out"] = mission.get("stripOut", [])
 	var burn: Array = gob.get("burnSecondsRange", [45, 90])
 	out["burn_min"] = float(burn[0]) if burn.size() > 0 else 45.0
 	out["burn_max"] = float(burn[1]) if burn.size() > 1 else 90.0
@@ -486,6 +493,10 @@ func _aimed_cell() -> Array:
 func _cut() -> void:
 	if _fired:
 		return
+	if not _stripped:
+		hud.say("Not until she is stripped. The bands are still on her and the conductor is still "
+			+ "down her side. [enter] to go back and climb it.", 8.0)
+		return
 	var cell := _aimed_cell()
 	if cell.is_empty():
 		hud.say("Nothing in reach. Walk in with W and aim at the brickwork.")
@@ -533,7 +544,7 @@ func _plumb() -> void:
 		var s: Dictionary = jack.structure()
 		hud.say("Second reading. She leans %.1f° toward %03d° — and that is the way she wants to go."
 			% [float(s.get("lean_degrees", 0.0)), int(float(s.get("lean_bearing", 0.0)))], 7.0)
-		_step = maxi(_step, 1)
+		_step = maxi(_step, 2)
 	else:
 		hud.say("A reading from %03d°. You need another from at least %d° round." % [
 			int(here), int(SIGHTINGS_APART_DEG)], 6.0)
@@ -599,7 +610,7 @@ func _drive_peg() -> void:
 	var far: Vector3 = b if Vector2(b.x, b.z).length() > Vector2(a.x, a.z).length() else a
 	_peg = fmod(rad_to_deg(atan2(far.x, far.z)) + 360.0, 360.0)
 	hud.say("Pegged at %03d°. That is what you will be scored against." % int(_peg), 5.0)
-	_step = 3
+	_step = 5
 
 
 func _pull_pegs() -> void:
@@ -779,9 +790,9 @@ func _after_change() -> void:
 	# The steps are [survey, cut, prop, peg], so once there is a prop in, the next thing you are
 	# being asked for is the pegs.
 	if float(st.get("cut_arc", 0.0)) > 0.0:
-		_step = maxi(_step, 2)
-	if int(st.get("props_standing", 0)) > 0:
 		_step = maxi(_step, 3)
+	if int(st.get("props_standing", 0)) > 0:
+		_step = maxi(_step, 4)
 	var name_ := String(st.get("status_name", "SAFE"))
 	if name_ == "COLLAPSE":
 		hud.say("It is going. You are in the hole.", 6.0)
@@ -801,6 +812,7 @@ func _update_hud() -> void:
 	hud.pegs = _pegs.size()
 	hud.standing_at = Vector2(_at.x, _at.z)
 	hud.shift = jack.fell_shift(_height_removed)
+	hud.stripped = _stripped
 	hud.act4 = _act4
 	hud.packing = _packing / PACK_SECONDS
 	hud.burn_left = _burn_left

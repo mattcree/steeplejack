@@ -681,6 +681,12 @@ func _draw_top() -> void:
 		return
 	var paid: Dictionary = player.settlement
 	var money := y + 76.0 + 22.0 * float(lines.size()) + 18.0
+	if player.stripped_out:
+		_centre("bands off, conductor down. She is ready to come down.", money,
+			Color(0.95, 0.93, 0.88, 0.9 * c), 16)
+		_centre("enter — back to the board, and then back here with a bar and a match",
+			money + 30.0, Color(0.86, 0.84, 0.80, 0.6 * c), 13)
+		return
 	if not paid.is_empty():
 		var fee := float(paid.get("fee", 0.0))
 		var rep := int(paid.get("reputation_delta", 0))

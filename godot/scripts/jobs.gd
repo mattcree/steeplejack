@@ -78,6 +78,7 @@ func _read_jobs() -> Array:
 			"shift": int(_num(doc.get("shiftMinutes"), 0.0)),
 			"height": _num(doc.get("structure", {}).get("height"), 0.0),
 			"briefing": doc.get("briefing", {}),
+			"strip_out": not (doc.get("mission", {}).get("stripOut", []) as Array).is_empty(),
 		})
 	out.sort_custom(func(a, b): return int(a["order"]) < int(b["order"]))
 	return out
@@ -158,7 +159,14 @@ func _input(event: InputEvent) -> void:
 ## without starting a scene — a FELL job opening the climb would be a silent and very confusing
 ## failure, and it is exactly the kind that never gets tested because testing it looks expensive.
 func scene_for(job: Dictionary) -> String:
-	return FELL_SCENE if String(job.get("archetype", "")) == "FELL" else CLIMB_SCENE
+	if String(job.get("archetype", "")) != "FELL":
+		return CLIMB_SCENE
+	# A felling is two visits. Until her bands are off and her conductor is down she is a climb,
+	# and the board sends you where the work actually is rather than making you guess which
+	# half of the game today is.
+	if bool(job.get("strip_out", false)) and not jack.career_stripped(String(job["id"])):
+		return CLIMB_SCENE
+	return FELL_SCENE
 
 
 ## Start the job.
@@ -228,6 +236,9 @@ func _card(job: Dictionary, x: float, y: float, here: bool) -> float:
 	var fee := "no fee — a favour" if int(job["fee"]) <= 0 else "£%d" % int(job["fee"])
 	if done:
 		fee += "   (done)"
+	elif String(job["archetype"]) == "FELL" and bool(job.get("strip_out", false)):
+		fee += "   (strip her out)" if not jack.career_stripped(String(job["id"])) \
+			else "   (stripped — go and cut her)"
 	draw_string(_font, Vector2(x + 16, y + 74), fee, HORIZONTAL_ALIGNMENT_LEFT, -1, 14,
 		Color(INK.r, INK.g, INK.b, 0.45) if shut else INK)
 	if shut:

@@ -43,11 +43,19 @@ func _init() -> void:
 			_check(not job["briefing"].get("lines", []).is_empty(),
 				"and the letter that came with it is on the board")
 
-	# --- each job goes to the half of the game it belongs to ---------------------------------
+	# --- each job goes to the half of the game the work is actually in -------------------------
+	# A felling with its bands still on is a climb. The board sends you where the day's work is
+	# rather than making you guess which half of the game today is.
 	for job in board.jobs:
-		var want: String = "felling" if String(job["archetype"]) == "FELL" else "steeplejack"
-		_check(String(board.scene_for(job)).contains(want),
-			"%s is a %s job and opens %s" % [job["id"], job["archetype"], want])
+		if String(job["archetype"]) != "FELL":
+			_check(String(board.scene_for(job)).contains("steeplejack"),
+				"%s is a %s job and opens the climb" % [job["id"], job["archetype"]])
+			continue
+		_check(String(board.scene_for(job)).contains("steeplejack"),
+			"%s still wants stripping, so it opens the climb" % job["id"])
+		board.jack.career_mark_stripped(String(job["id"]))
+		_check(String(board.scene_for(job)).contains("felling"),
+			"and once she is stripped it opens the felling")
 
 	# --- the letters that have not arrived yet -------------------------------------------------
 	# A reputation gate is a rule about what the player may do, so the answer comes from the sim.
@@ -73,6 +81,7 @@ func _init() -> void:
 	_check(not board.unearnable(reachable), "and is not pretending to be a gap")
 
 	# Earn it. The tin is text, so this is what a career three jobs in looks like.
+	# (career_load also clears the stripped marks set above, which is what we want here.)
 	board.jack.career_load('{"money": 2350, "reputation": 42, "jobs": [' +
 		'{"id": "01-back-yard", "paid": 0, "error": 0, "failed": false},' +
 		'{"id": "06-waterside", "paid": 1250, "error": 3.0, "failed": false}]}')
@@ -84,12 +93,13 @@ func _init() -> void:
 	_check(not board.jack.career_done("07-kershaws-yard"), "and Kershaw's still to do")
 
 	# --- taking a felling opens the felling ---------------------------------------------------
+	board.jack.career_mark_stripped("07-kershaws-yard")
 	board._take_it()
 	await process_frame
 	await process_frame
 	var started: Node = root.get_child(root.get_child_count() - 1)
 	_check(started.has_method("_plumb"),
-		"taking a FELL job opened the felling and not the climb")
+		"taking a stripped FELL job opened the felling and not the climb")
 	_check(String(started.jack.level_name()).contains("Kershaw"),
 		"on the chimney the card named: %s" % started.jack.level_name())
 	_check(not is_instance_valid(board) or board.is_queued_for_deletion(),

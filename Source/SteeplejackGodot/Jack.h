@@ -336,6 +336,11 @@ public:
 	int64_t career_injured();
 	/** Whether this job has been done successfully before. */
 	bool career_done(const godot::String& job_id) const;
+	/** Whether this felling's Act 2 — bands off, conductor down — has been climbed already. */
+	bool career_stripped(const godot::String& job_id) const;
+	void career_mark_stripped(const godot::String& job_id);
+	/** What kind of job this level is: SURVEY, FELL, TOP and the rest, from the level file. */
+	godot::String level_archetype() const;
 	/**
 	 * Settle the felling just run. `{fee, bonus, damages, paid, reputation_delta, failed,
 	 * first_time}`. Uses the outcome the sim produced, not one a script made up.

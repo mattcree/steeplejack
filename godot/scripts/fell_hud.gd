@@ -14,6 +14,7 @@
 extends Control
 
 const STEPS := [
+	"Strip her out first — bands off, conductor down. That is a climb, from the board",
 	"Walk round and read the lean with the plumb bob [B], twice, from well apart",
 	"Cut the gob on the fall line — hold the chimney's own lean in mind",
 	"Prop behind you as you go — the prop goes in BEFORE the last course comes out",
@@ -79,6 +80,7 @@ var burn_left := 0.0
 var safe_line := 0.0
 var range_out := 0.0
 var caught := false
+var stripped := false
 
 var _font: Font
 var _plan_scale := 1.0
@@ -127,7 +129,7 @@ func _draw_steps() -> void:
 	draw_string(_font, Vector2(24, y), "FELLING — %s" % level_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK)
 	y += 24.0
 	for i in STEPS.size():
-		var done := i < step
+		var done := i < step or (i == 0 and stripped)
 		var here := i == step
 		var colour := INK if here else (DIM if not done else Color(0.55, 0.78, 0.50, 0.7))
 		var mark := "x" if done else (">" if here else " ")

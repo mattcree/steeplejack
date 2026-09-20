@@ -44,6 +44,10 @@ struct JobRecord
     bool        failed{};
 };
 
+// A felling's Act 2, which happens on a different day and in the other half of the game: the bands
+// come off, the conductor comes down, and the chimney is made ready to be cut. Remembered per job
+// because it is work you do once — you do not re-strip a chimney because your first gob went wrong.
+
 // What a job did to you, which is what the board tells you afterwards.
 struct Settlement
 {
@@ -69,6 +73,12 @@ public:
 
     // Has this job been done at all, and how well it went the best time.
     bool  Done(const std::string& levelId) const noexcept;
+
+    // The strip-out. "Act 2 exists so that a felling level is not a puzzle with no climbing in it.
+    // It's also where the player's relationship with the chimney becomes personal — you've been
+    // all over it before you kill it." So a felling will not let you cut until you have.
+    bool  Stripped(const std::string& levelId) const noexcept;
+    void  MarkStripped(const std::string& levelId);
     float BestErrorDegrees(const std::string& levelId) const noexcept;
 
     // Whether the letter arrives. A gate of 0 always does; the grey box and the back yard are 0.
@@ -109,6 +119,7 @@ private:
     float   money_{};
     int32_t reputation_{};
     std::vector<JobRecord> jobs_;
+    std::vector<std::string> stripped_;
 };
 
 }  // namespace sj

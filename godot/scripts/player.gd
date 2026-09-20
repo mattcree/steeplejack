@@ -384,10 +384,12 @@ const CAREER_PATH := "user://career.json"
 ## Overridable so a test can use its own tin rather than spending the player's money.
 var career_path := CAREER_PATH
 var settlement := {}
+## True when this climb was a felling's Act 2 rather than a job of its own.
+var stripped_out := false
 
 
 func _settle_the_job() -> void:
-	if not settlement.is_empty():
+	if not settlement.is_empty() or stripped_out:
 		return
 	var text := ""
 	if FileAccess.file_exists(career_path):
@@ -396,7 +398,14 @@ func _settle_the_job() -> void:
 			text = f.get_as_text()
 			f.close()
 	jack.career_load(text)
-	settlement = jack.career_settle_climb(_level_id(), _level_fee(), true)
+	if String(jack.level_archetype()) == "FELL":
+		# On a felling, getting to the top is not the job — it is Act 2, the strip-out. The bands
+		# come off, the conductor comes down, and the chimney is ready to be cut. It pays nothing
+		# on its own; the fee is the felling's, and you collect it at the bottom with a match.
+		jack.career_mark_stripped(_level_id())
+		stripped_out = true
+	else:
+		settlement = jack.career_settle_climb(_level_id(), _level_fee(), true)
 	var w := FileAccess.open(career_path, FileAccess.WRITE)
 	if w == null:
 		push_error("player: cannot write %s" % career_path)

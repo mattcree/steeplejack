@@ -47,8 +47,10 @@ thinks of you so far. Taking a job starts the half of the game it belongs to, an
 money in the tin and moves your name. What you have earned decides which letters arrive.
 
 * **SURVEY jobs — you climb it.** Get to the top. You can only climb as high as you have built.
-* **FELL jobs — you take it down.** Walk the site, read the lean, cut a hole in one side of the
-  base, prop it as you go, peg the line, pack it, light it and run.
+* **FELL jobs — two visits.** First you climb her and strip her out: the bands come off and the
+  conductor comes down. Then you come back with a bar and a match, cut a hole in one side of the
+  base, prop it as you go, peg the line, pack it, light it and run. The board sends you to
+  whichever half the day's work is actually in.
 
 ## How to play: the climb
 
@@ -134,9 +136,7 @@ And the demolition half: the gob's statics, the fall, three felling levels (Wate
 Yard, the Great Aire Chimney), the survey, the shift the job costs you, the fire-and-run, and a
 career that carries money and reputation between jobs and decides which letters arrive.
 
-**Not yet:** the character (ART-020), and the strip-out that should join the two halves — a felling
-level has ascent bands and an Act 2 that you currently skip, which is the largest single gap in the
-game. The CONDUCTOR, GILD, BAND and TOP jobs are designed and not built, so levels 2 to 5 and 8 to
+**Not yet:** the character (ART-020). The CONDUCTOR, GILD, BAND and TOP jobs are designed and not built, so levels 2 to 5 and 8 to
 11 have no data: there would be nothing to do on them but climb. LVL-001 — whether the Grey Box's
 four bands actually play as four experiences — is a judgement that needs someone who did not build
 it to climb it twice.
