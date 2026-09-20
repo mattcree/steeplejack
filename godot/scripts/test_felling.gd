@@ -218,7 +218,20 @@ func _init() -> void:
 	_check(float(tin.get("money", 0.0)) >= float(paid.get("paid", 0.0)),
 		"£%d in the tin" % int(float(tin.get("money", 0.0))))
 
-	# --- and the loop closes -----------------------------------------------------------------------
+	# --- walking off a job costs you ---------------------------------------------------------------
+	# `_leave_the_job` frees the scene on its way out, so the evidence has to be read from the tin
+	# afterwards rather than from the node — which is the point of the tin being text.
+	var before_rep := _tin_reputation()
+	var walker: Node = load("res://scenes/felling.tscn").instantiate()
+	walker.career_path = SCRATCH_TIN
+	root.add_child(walker)
+	await physics_frame
+	walker._leave_the_job()
+	await physics_frame
+	_check(_tin_reputation() < before_rep,
+		"walking off a job you took costs you: %d -> %d" % [before_rep, _tin_reputation()])
+
+	# --- and the loop closes ---	# --- and the loop closes -----------------------------------------------------------------------
 	# A mode you can only leave by killing the process is a scene, not a job.
 	world._back_to_the_board()
 	await physics_frame
@@ -261,6 +274,20 @@ func _delta(from: float, to: float) -> float:
 func _wait(frames: int) -> void:
 	for i in frames:
 		await physics_frame
+
+
+## What the tin on disk says, which is the only witness left once a scene has freed itself.
+func _tin_reputation() -> int:
+	if not FileAccess.file_exists(SCRATCH_TIN):
+		return 0
+	var f := FileAccess.open(SCRATCH_TIN, FileAccess.READ)
+	if f == null:
+		return 0
+	var doc = JSON.parse_string(f.get_as_text())
+	f.close()
+	if typeof(doc) != TYPE_DICTIONARY:
+		return 0
+	return int(doc.get("reputation", 0))
 
 
 func _check(ok: bool, what: String) -> void:

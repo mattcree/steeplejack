@@ -272,8 +272,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_ENTER, KEY_KP_ENTER: _back_to_the_board()
 			KEY_R when _fired: _again()
 			KEY_ESCAPE:
-				if _fired:
-					_back_to_the_board()
+				if _fired or not mouse_captured():
+					_leave_the_job()
 				else:
 					_capture(false)
 
@@ -375,10 +375,22 @@ func _after_the_fall(dt: float) -> void:
 		hud.settlement = _settlement
 
 
+func mouse_captured() -> bool:
+	return Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+
+
+## Leaving before you have lit it is walking off a job you took. The client is still looking at
+## their chimney, and `economy.json` has had a number for that since the economy was authored.
+func _leave_the_job() -> void:
+	if not _fired:
+		_load_career()
+		jack.career_settle_climb(_authored["id"], _authored["fee"], false)
+		_save_career()
+	_back_to_the_board()
+
+
 ## Back to the board. The loop has to close or it is not a game, it is a scene you can reach.
 func _back_to_the_board() -> void:
-	if not _fired:
-		return
 	_capture(false)
 	var board: Node = load("res://scenes/jobs.tscn").instantiate()
 	get_tree().root.add_child(board)
