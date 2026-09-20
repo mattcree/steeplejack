@@ -13,7 +13,7 @@ owns:
 spec:
   - docs/01-gdd/14-accessibility.md#motor
   - docs/01-gdd/11-camera-controls-feel.md#controls
-verify: make test-unit FILTER=lashinput
+verify: make test-unit FILTER=VERB-006
 editor_required: false
 risk: null
 ---

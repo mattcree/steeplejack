@@ -34,6 +34,7 @@ synthesised from envelopes. See [what is and is not in](#what-is-in-the-build).
 ```bash
 make godot-run                      # play it, in a window. Builds first.
 make godot-run LEVEL=01-back-yard   # the 12 m tutorial stack instead
+make fell                           # the other half: take a chimney down instead of climbing it
 make shot                           # a screenshot, headless. See AGENTS.md for posing him.
 make check                          # the sim's rules, ~1 s, no engine
 make godot-test                     # the real scene, driven and asserted on, ~3 min
@@ -109,6 +110,7 @@ needs someone who did not build it to climb it twice.
 make check                 # the sim: conventions, data, task graph, links, build, tests. ~1 s.
 make run                   # the game. Needs Godot 4.7 at ~/.local/bin/godot; builds the sim into it.
 make godot-test            # the game, headless, every verb driven and asserted on
+make fell                  # the demolition mode: cut the gob, prop it, peg the line, light it
 make shot CMDS="climb 20"  # a rendered frame of him 20 m up. Needs xvfb-run.
 ```
 

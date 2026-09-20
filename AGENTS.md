@@ -7,6 +7,7 @@ The long form is [`docs/06-workflow/`](docs/06-workflow/00-agent-workflow.md).
 
 ```bash
 make run          # play the game in a window (Godot; builds first)
+make fell         # the demolition mode — cut the gob, prop it, peg the line, light it
 make watch        # run the sim and watch it. One second, no engine.
 make check        # the gate: conventions, data, tests. ~1s. No engine needed.
 make godot-test   # the real scene, driven headlessly, including a full climb to the top
@@ -64,10 +65,12 @@ make watch        # the sim's behaviour, as text you can read
 make godot-test   # the real scene, driven node by node, asserting on state
 make shot         # the game, rendered to a PNG you can look at
 make ascent-sheet # a whole climb, a frame every 30 s of game time (slow: tens of minutes)
+make fell-shot    # the felling, posed the same way: CMDS="survey,cut 160,fire,wait 6,shot going"
 ```
 
-`godot-test` ends with `test_ascent.gd`: a bot that plays the Grey Box from the yard to the cap with
-the real verbs. If a change breaks the game as a whole, that is the test that says so.
+`godot-test` ends with two bots. `test_ascent.gd` plays the Grey Box from the yard to the cap with
+the real verbs; `test_felling.gd` surveys Waterside, cuts and props its gob, pegs the line and drops
+it. If a change breaks either half of the game, those are the tests that say so.
 
 `make shot` is the one that matters and the one that was missing for too long. **Godot's
 `--headless` has no renderer at all**, and the conclusion drawn from that — that this engine cannot

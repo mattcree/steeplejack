@@ -19,8 +19,8 @@ Cheapest and fastest first. Everything above a rung only runs if the rungs below
 | 6 | Level validation (schema + beat rule + reachability) | `make test-levels` | ~10 s | CI |
 | 7 | Replay: the format's round trip, then the recorded Grey Box climb | `make test-replay` | ~40 s | CI (the format in `sim`, the climb in `godot`) |
 | 8 | Determinism + the sim-step budget | `make test-determinism test-perf` | ~5 s | CI |
-| 9 | The game, headless: every verb, and a bot that climbs to the top | `make godot-test` | ~3 min | CI (`godot` job) |
-| 10 | The game, rendered: posed frames, and a whole climb as a contact sheet | `make shot`, `make ascent-sheet` | s / ~20 min | locally, and **look at them** |
+| 9 | The game, headless: every verb, a bot that climbs to the top, and a bot that fells a chimney | `make godot-test` | ~3 min | CI (`godot` job) |
+| 10 | The game, rendered: posed frames, a whole climb as a contact sheet, and a felling | `make shot`, `make ascent-sheet`, `make fell-shot` | s / ~20 min | locally, and **look at them** |
 | 11 | Frame-time capture on real GPUs | — | — | **does not exist yet** |
 | 12 | **Human playtest** | see the playtest plan | hours | per milestone |
 
