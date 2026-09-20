@@ -45,6 +45,7 @@ var _step := 0
 var _fired := false
 var _fall: FellFall
 var _outcome := {}
+var _settlement := {}
 var _authored := {}
 var _mouse_wanted := true
 
@@ -174,6 +175,8 @@ func _read_level() -> Dictionary:
 		out["mortar_bearing"] = float(asym.get("bearing", 0.0))
 		out["mortar_bias"] = float(asym.get("strengthBias", 0.0))
 	out["required_reduction"] = float(mission.get("requiredHeightReduction", 0.0))
+	out["fee"] = float(doc.get("fee", 0.0))
+	out["id"] = String(doc.get("id", ""))
 	var site_block: Dictionary = doc.get("site", {})
 	out["exclusions"] = site_block.get("exclusions", [])
 	out["safe_line"] = float(site_block.get("safeLineDistance", 100.0))
@@ -369,6 +372,7 @@ func _after_the_fall(dt: float) -> void:
 		_cheered = true
 		foley.cue("cheer")
 		hud.outcome = _outcome
+		hud.settlement = _settlement
 
 
 ## Back to the board. The loop has to close or it is not a game, it is a scene you can reach.
@@ -592,8 +596,14 @@ func _fire() -> void:
 		return
 	_fired = true
 	_capture(false)
+	# The tin comes along to the job, because what the felling pays is part of the felling.
+	_load_career()
 	var out: Dictionary = jack.fell_run(_peg, _height_removed, surveyed())
 	_outcome = out
+	# Settled through the sim on the same plan, so the money and the verdict cannot disagree.
+	_settlement = jack.career_settle(_authored["id"], _authored["fee"], _peg, _height_removed,
+		surveyed())
+	_save_career()
 	# Act 4: you run. A hard sprint to the safe line at 1.5 x height, and then you turn round and
 	# watch. The prototype does not make you run it yet, but it does put you where you would be.
 	_at = _on_bearing(fmod(float(out.get("fall_bearing", 0.0)) + 55.0, 360.0), _authored["safe_line"])
@@ -623,6 +633,33 @@ func _fire() -> void:
 func _on_broke(height_m: float) -> void:
 	foley.cue("crack", 1.15)
 	hud.say("she's broken at %d m" % int(height_m), 2.0)
+
+
+const CAREER_PATH := "user://career.json"
+
+## Where the tin lives. A variable rather than the constant so a test can use its own and not
+## spend the player's money — the first version of this made the headless suite depend on whether
+## anybody had run it before, which is the worst kind of flake because it passes alone.
+var career_path := CAREER_PATH
+
+
+func _load_career() -> void:
+	var text := ""
+	if FileAccess.file_exists(career_path):
+		var f := FileAccess.open(career_path, FileAccess.READ)
+		if f != null:
+			text = f.get_as_text()
+			f.close()
+	jack.career_load(text)
+
+
+func _save_career() -> void:
+	var f := FileAccess.open(career_path, FileAccess.WRITE)
+	if f == null:
+		push_error("felling: cannot write %s" % career_path)
+		return
+	f.store_string(jack.career_json())
+	f.close()
 
 
 func _on_landed() -> void:

@@ -14,6 +14,7 @@
 #include <godot_cpp/variant/dictionary.hpp>
 
 #include "Anchor.h"
+#include "Career.h"
 #include "Fell.h"
 #include "Gob.h"
 #include "JointGrid.h"
@@ -310,6 +311,26 @@ public:
 	 */
 	godot::Dictionary fell_shift(double height_removed_m) const;
 
+	// --- the career — CAREER-001 -----------------------------------------------------------------
+	// The money in the tin and whether anyone will have you back. The job board reads this to
+	// decide which letters have arrived, which is a rule and not a drawing.
+	/** Load the tin from JSON, or start empty if the text is missing or unreadable. */
+	void career_load(const godot::String& json);
+	/** The tin as text a person could read. Write it wherever you like. */
+	godot::String career_json() const;
+	/** `{money, reputation, stars, jobs}` — jobs is an Array of `{id, paid, error, failed}`. */
+	godot::Dictionary career_state() const;
+	/** Whether a level's letter has arrived, for a `reputationGate` in stars. */
+	bool career_can_take(int64_t gate_stars) const;
+	/** Whether this job has been done successfully before. */
+	bool career_done(const godot::String& job_id) const;
+	/**
+	 * Settle the felling just run. `{fee, bonus, damages, paid, reputation_delta, failed,
+	 * first_time}`. Uses the outcome the sim produced, not one a script made up.
+	 */
+	godot::Dictionary career_settle(const godot::String& job_id, double fee_gbp,
+	                                double peg_bearing_deg, double height_removed_m, bool surveyed);
+
 	/** A tuned number, for the presentation layer to read rather than invent. */
 	double tuning_f(const godot::String& key, double fallback) const;
 
@@ -362,6 +383,7 @@ private:
 	// The gob, when there is one. A felling level has one; a climbing level never touches it.
 	std::unique_ptr<sj::Gob> gob;
 	sj::FellSite fell;
+	sj::Career career;
 };
 
 }  // namespace steeplejack

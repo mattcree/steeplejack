@@ -14,6 +14,8 @@ var failures := 0
 
 func _init() -> void:
 	var board: Node = load("res://scenes/jobs.tscn").instantiate()
+	board.career_path = "user://test-career-board.json"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(board.career_path))
 	root.add_child(board)
 	await process_frame
 
@@ -47,10 +49,34 @@ func _init() -> void:
 		_check(String(board.scene_for(job)).contains(want),
 			"%s is a %s job and opens %s" % [job["id"], job["archetype"], want])
 
-	# --- taking a felling opens the felling ---------------------------------------------------
+	# --- the letters that have not arrived yet -------------------------------------------------
+	# A reputation gate is a rule about what the player may do, so the answer comes from the sim.
+	# A new jack has one star; Kershaw's wants three and Great Aire wants five.
 	for i in board.jobs.size():
 		if String(board.jobs[i]["id"]) == "07-kershaws-yard":
 			board.selected = i
+	_check(int(board.career.get("stars", 0)) == 1, "a new jack has one star")
+	_check(board.locked(board.jobs[board.selected]),
+		"and Kershaw's Yard is not offered to him")
+	board._take_it()
+	await process_frame
+	_check(is_instance_valid(board) and not board.is_queued_for_deletion(),
+		"pressing enter on a locked job does nothing at all")
+
+	# Earn it. The tin is text, so this is what a career three jobs in looks like.
+	board.jack.career_load('{"money": 2350, "reputation": 42, "jobs": [' +
+		'{"id": "01-back-yard", "paid": 0, "error": 0, "failed": false},' +
+		'{"id": "06-waterside", "paid": 1250, "error": 3.0, "failed": false}]}')
+	board.career = board.jack.career_state()
+	_check(int(board.career.get("stars", 0)) == 3, "forty-two points is three stars")
+	_check(not board.locked(board.jobs[board.selected]), "and now Kershaw's letter has arrived")
+	_check(board.jack.career_done("06-waterside"), "with Waterside behind him")
+	_check(not board.jack.career_done("07-kershaws-yard"), "and Kershaw's still to do")
+	for job in board.jobs:
+		if String(job["id"]) == "12-great-aire":
+			_check(board.locked(job), "but nobody is giving him the Great Aire chimney yet")
+
+	# --- taking a felling opens the felling ---------------------------------------------------
 	board._take_it()
 	await process_frame
 	await process_frame
@@ -62,6 +88,7 @@ func _init() -> void:
 	_check(not is_instance_valid(board) or board.is_queued_for_deletion(),
 		"and the board got out of the way")
 
+	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://test-career-board.json"))
 	if failures > 0:
 		printerr("JOBS: %d failure(s)" % failures)
 	else:

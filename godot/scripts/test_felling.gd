@@ -13,11 +13,17 @@
 
 extends SceneTree
 
+const SCRATCH_TIN := "user://test-career.json"
+
 var failures := 0
 
 
 func _init() -> void:
 	var world: Node = load("res://scenes/felling.tscn").instantiate()
+	# Its own tin. A suite that spends the player's money, or that passes only the first time it is
+	# ever run, is worse than no suite.
+	world.career_path = SCRATCH_TIN
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(SCRATCH_TIN))
 	root.add_child(world)
 	await physics_frame
 	await physics_frame
@@ -197,6 +203,21 @@ func _init() -> void:
 	await _wait(int((float(world.CHEER_AFTER) + 0.5) * 65.0))
 	_check(not hud.outcome.is_empty(), "and when the cheer comes, the verdict with it")
 
+	# --- and it pays ------------------------------------------------------------------------------
+	# The settlement is run through the sim on the same plan as the fall, so the money and the
+	# verdict cannot disagree about what happened.
+	var paid: Dictionary = world._settlement
+	_check(not paid.is_empty(), "the job settled")
+	_check(float(paid.get("fee", 0.0)) > 0.0, "it paid its fee of £%d" % int(float(paid.get("fee", 0.0))))
+	_check(float(paid.get("bonus", 0.0)) == float(out.get("bonus", 0.0)),
+		"and the bonus the fall earned, not a different one")
+	_check(float(paid.get("paid", -1.0)) >= 0.0, "and never less than nothing")
+	_check(int(paid.get("reputation_delta", 0)) > 0, "and it was worth something to his name")
+	_check(bool(paid.get("first_time", false)), "first time out on this one")
+	var tin: Dictionary = jack.career_state()
+	_check(float(tin.get("money", 0.0)) >= float(paid.get("paid", 0.0)),
+		"£%d in the tin" % int(float(tin.get("money", 0.0))))
+
 	# --- and the loop closes -----------------------------------------------------------------------
 	# A mode you can only leave by killing the process is a scene, not a job.
 	world._back_to_the_board()
@@ -205,6 +226,7 @@ func _init() -> void:
 	var now: Node = root.get_child(root.get_child_count() - 1)
 	_check(now.has_method("scene_for"), "enter takes you back to the board")
 
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(SCRATCH_TIN))
 	if failures > 0:
 		printerr("FELLING: %d failure(s)" % failures)
 	else:

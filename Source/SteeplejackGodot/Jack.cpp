@@ -3,6 +3,7 @@
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include "Career.h"
 #include "Fell.h"
 #include "Gob.h"
 #include "JointGrid.h"
@@ -195,6 +196,13 @@ void Jack::_bind_methods()
 	                     &Jack::fell_predict);
 	ClassDB::bind_method(D_METHOD("fell_run", "peg_bearing_deg", "height_removed_m", "surveyed"), &Jack::fell_run);
 	ClassDB::bind_method(D_METHOD("fell_shift", "height_removed_m"), &Jack::fell_shift);
+	ClassDB::bind_method(D_METHOD("career_load", "json"), &Jack::career_load);
+	ClassDB::bind_method(D_METHOD("career_json"), &Jack::career_json);
+	ClassDB::bind_method(D_METHOD("career_state"), &Jack::career_state);
+	ClassDB::bind_method(D_METHOD("career_can_take", "gate_stars"), &Jack::career_can_take);
+	ClassDB::bind_method(D_METHOD("career_done", "job_id"), &Jack::career_done);
+	ClassDB::bind_method(D_METHOD("career_settle", "job_id", "fee_gbp", "peg_bearing_deg",
+	                               "height_removed_m", "surveyed"), &Jack::career_settle);
 	ClassDB::bind_method(D_METHOD("tuning_f", "key", "fallback"), &Jack::tuning_f, DEFVAL(0.0));
 }
 
@@ -1295,6 +1303,97 @@ Dictionary Jack::fell_shift(double height_removed_m) const
 		d["per_metre"] = static_cast<double>(tuning->GetF("fellShiftSecondsPerMetreRemoved"));
 		d["max_reduction"] = static_cast<double>(
 			sj::Fell::MaxHeightReductionM(fell.heightM, *tuning));
+	}
+	catch (const std::exception& e)
+	{
+		UtilityFunctions::push_error("jack: ", String(e.what()));
+	}
+	return d;
+}
+
+// ---------------------------------------------------------------- the career
+
+void Jack::career_load(const String& json)
+{
+	const std::string text = json.utf8().get_data();
+	if (text.empty())
+	{
+		career = sj::Career();
+		return;
+	}
+	try
+	{
+		career = sj::Career::FromJson(text, "career.json");
+	}
+	catch (const std::exception& e)
+	{
+		// A corrupt tin starts you again rather than stopping the game. It is the one save in this
+		// project whose loss costs progress rather than work, and a crash would cost both.
+		UtilityFunctions::push_warning("jack: career could not be read, starting fresh: ",
+		                               String(e.what()));
+		career = sj::Career();
+	}
+}
+
+String Jack::career_json() const
+{
+	return String(career.ToJson().c_str());
+}
+
+Dictionary Jack::career_state() const
+{
+	Dictionary d;
+	d["money"] = static_cast<double>(career.MoneyGbp());
+	d["reputation"] = static_cast<int64_t>(career.Reputation());
+	d["stars"] = tuning ? static_cast<int64_t>(career.Stars(*tuning)) : 0;
+	Array jobs;
+	for (const sj::JobRecord& j : career.Jobs())
+	{
+		Dictionary r;
+		r["id"] = String(j.id.c_str());
+		r["paid"] = static_cast<double>(j.paidGbp);
+		r["error"] = static_cast<double>(j.errorDegrees);
+		r["failed"] = j.failed;
+		jobs.push_back(r);
+	}
+	d["jobs"] = jobs;
+	return d;
+}
+
+bool Jack::career_can_take(int64_t gate_stars) const
+{
+	return tuning ? career.CanTake(static_cast<int32_t>(gate_stars), *tuning) : true;
+}
+
+bool Jack::career_done(const String& job_id) const
+{
+	return career.Done(job_id.utf8().get_data());
+}
+
+Dictionary Jack::career_settle(const String& job_id, double fee_gbp, double peg_bearing_deg,
+                               double height_removed_m, bool surveyed)
+{
+	Dictionary d;
+	if (!gob || !tuning)
+	{
+		return d;
+	}
+	try
+	{
+		sj::FellPlan plan;
+		plan.pegBearingDeg = static_cast<float>(peg_bearing_deg);
+		plan.heightRemovedM = static_cast<float>(height_removed_m);
+		plan.surveyed = surveyed;
+		const sj::FellOutcome o = sj::Fell::Run(fell, *gob, plan, *tuning);
+		const sj::Settlement s = career.Settle(job_id.utf8().get_data(),
+		                                       static_cast<float>(fee_gbp), o, *tuning);
+		d["fee"] = static_cast<double>(s.feeGbp);
+		d["bonus"] = static_cast<double>(s.bonusGbp);
+		d["damages"] = static_cast<double>(s.damagesGbp);
+		d["paid"] = static_cast<double>(s.paidGbp);
+		d["reputation_delta"] = static_cast<int64_t>(s.reputationDelta);
+		d["failed"] = s.failed;
+		d["first_time"] = s.firstTime;
 	}
 	catch (const std::exception& e)
 	{

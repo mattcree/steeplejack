@@ -57,6 +57,7 @@ var ring: GobRing
 var state := {}
 var prediction := {}
 var outcome := {}
+var settlement := {}
 var peg_bearing := 0.0
 var height_removed := 0.0
 var aim_seg := -1
@@ -371,7 +372,7 @@ func _draw_gob() -> void:
 
 func _draw_verdict() -> void:
 	# Low and wide, not over the middle of the screen: you are meant to be looking at the dust.
-	var panel := Rect2(size.x * 0.5 - 330, size.y - 246, 660, 210)
+	var panel := Rect2(size.x * 0.5 - 330, size.y - 268, 660, 232)
 	draw_rect(panel, Color(0.05, 0.05, 0.06, 0.88))
 	var grade := String(outcome.get("grade_name", "WILD"))
 	var colour: Color = {
@@ -396,8 +397,23 @@ func _draw_verdict() -> void:
 	if bool(outcome.get("catastrophe", false)):
 		lines.append("that one was never going to be forgiven")
 	lines.append("")
-	lines.append("bonus £%d    damages £%d" % [
-		int(outcome.get("bonus", 0.0)), int(outcome.get("penalty", 0.0))])
+	if settlement.is_empty():
+		lines.append("bonus £%d    damages £%d" % [
+			int(outcome.get("bonus", 0.0)), int(outcome.get("penalty", 0.0))])
+	elif bool(settlement.get("failed", false)):
+		lines.append("no fee. £%d of damage. %d off your name." % [
+			int(float(settlement.get("damages", 0.0))),
+			-int(settlement.get("reputation_delta", 0))])
+	else:
+		var rep := int(settlement.get("reputation_delta", 0))
+		var name_ := "" if rep == 0 else ("    +%d to your name" % rep if rep > 0
+			else "    %d off your name" % rep)
+		lines.append("fee £%d    bonus £%d    damages £%d%s" % [
+			int(float(settlement.get("fee", 0.0))), int(float(settlement.get("bonus", 0.0))),
+			int(float(settlement.get("damages", 0.0))), name_])
+		lines.append("£%d in the tin" % int(float(settlement.get("paid", 0.0))))
+		if not bool(settlement.get("first_time", true)):
+			lines.append("(a job you have done before — it pays, but it does not make your name)")
 	for line in lines:
 		draw_string(_font, Vector2(panel.position.x, y), line, HORIZONTAL_ALIGNMENT_CENTER,
 			panel.size.x, 15, INK if line.begins_with("bonus") else DIM)
