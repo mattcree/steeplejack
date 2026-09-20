@@ -593,6 +593,42 @@ the level and forked off the gob, so a level always falls the same way and a rep
 
 ---
 
+## `Career.h` — CAREER-001
+
+```cpp
+struct JobRecord  { std::string id; float paidGbp{}, errorDegrees{}; bool failed{}; };
+struct Settlement { float feeGbp{}, bonusGbp{}, damagesGbp{}, paidGbp{};
+                    int32_t reputationDelta{}; bool failed{}, firstTime{}; };
+
+class Career
+{
+public:
+    float   MoneyGbp() const noexcept;
+    int32_t Reputation() const noexcept;
+    int32_t Stars(const Tuning&) const noexcept;
+    bool    Done(const std::string& levelId) const noexcept;
+    float   BestErrorDegrees(const std::string& levelId) const noexcept;
+    bool    CanTake(int32_t gateStars, const Tuning&) const noexcept;
+
+    Settlement Settle(const std::string& levelId, float feeGbp, const FellOutcome&, const Tuning&);
+    Settlement SettleClimb(const std::string& levelId, float feeGbp, bool reachedTop,
+                           const Tuning&);
+
+    std::string ToJson() const;
+    static Career FromJson(const std::string& json, const std::string& origin);
+};
+```
+
+The two things that carry between jobs. Here rather than in a script because `CanTake` decides what
+the player is allowed to do, and every number comes from `economy.json`'s `reputation` block, which
+was authored long ago and read by nothing until this landed.
+
+Two asymmetries, both tested: **gains are first-time only**, so the road to five stars is new work
+rather than re-felling Waterside; **losses apply every time**. And `paidGbp` is never negative — a
+job cannot leave you owing money.
+
+---
+
 ## The engine boundary
 
 The game may call into `sj::` freely, through the binding. **`sj::` may never call into Godot.** There

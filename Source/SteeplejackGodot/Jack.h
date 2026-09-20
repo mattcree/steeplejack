@@ -330,6 +330,9 @@ public:
 	 */
 	godot::Dictionary career_settle(const godot::String& job_id, double fee_gbp,
 	                                double peg_bearing_deg, double height_removed_m, bool surveyed);
+	/** Settle the climbing half: you got to the top of it, or you did not. Same shape. */
+	godot::Dictionary career_settle_climb(const godot::String& job_id, double fee_gbp,
+	                                      bool reached_top);
 
 	/** A tuned number, for the presentation layer to read rather than invent. */
 	double tuning_f(const godot::String& key, double fallback) const;

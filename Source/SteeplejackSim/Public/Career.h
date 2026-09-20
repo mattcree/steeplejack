@@ -78,6 +78,13 @@ public:
     Settlement Settle(const std::string& levelId, float feeGbp, const FellOutcome& outcome,
                       const Tuning& t);
 
+    // Settle the other half of the game: a job you finished by getting to the top of it. No
+    // bonuses and no damages, because a survey has nothing to hit — the fee, and your name moves
+    // the same way a completed felling moves it. `reachedTop` false is an abandoned job, which
+    // costs you rather than paying you, because the client is still looking at their chimney.
+    Settlement SettleClimb(const std::string& levelId, float feeGbp, bool reachedTop,
+                           const Tuning& t);
+
     // Round trip, as JSON, because everything this project persists is text somebody can read.
     std::string ToJson() const;
     static Career FromJson(const std::string& json, const std::string& origin);

@@ -203,6 +203,8 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("career_done", "job_id"), &Jack::career_done);
 	ClassDB::bind_method(D_METHOD("career_settle", "job_id", "fee_gbp", "peg_bearing_deg",
 	                               "height_removed_m", "surveyed"), &Jack::career_settle);
+	ClassDB::bind_method(D_METHOD("career_settle_climb", "job_id", "fee_gbp", "reached_top"),
+	                     &Jack::career_settle_climb);
 	ClassDB::bind_method(D_METHOD("tuning_f", "key", "fallback"), &Jack::tuning_f, DEFVAL(0.0));
 }
 
@@ -1399,6 +1401,22 @@ Dictionary Jack::career_settle(const String& job_id, double fee_gbp, double peg_
 	{
 		UtilityFunctions::push_error("jack: ", String(e.what()));
 	}
+	return d;
+}
+
+Dictionary Jack::career_settle_climb(const String& job_id, double fee_gbp, bool reached_top)
+{
+	Dictionary d;
+	if (!tuning) { return d; }
+	const sj::Settlement s = career.SettleClimb(job_id.utf8().get_data(),
+	                                            static_cast<float>(fee_gbp), reached_top, *tuning);
+	d["fee"] = static_cast<double>(s.feeGbp);
+	d["bonus"] = 0.0;
+	d["damages"] = 0.0;
+	d["paid"] = static_cast<double>(s.paidGbp);
+	d["reputation_delta"] = static_cast<int64_t>(s.reputationDelta);
+	d["failed"] = s.failed;
+	d["first_time"] = s.firstTime;
 	return d;
 }
 

@@ -673,6 +673,25 @@ func _draw_top() -> void:
 	]
 	for i in lines.size():
 		_centre(lines[i], y + 76.0 + 22.0 * i, Color(0.86, 0.84, 0.80, 0.8 * b), 14)
+
+	# What the job paid, and the way out. A climb that ends with no way back to the board is a
+	# scene you can reach, not a job you can finish.
+	var c := clampf((age - 4.5) / 1.5, 0.0, 1.0)
+	if c <= 0.0:
+		return
+	var paid: Dictionary = player.settlement
+	var money := y + 76.0 + 22.0 * float(lines.size()) + 18.0
+	if not paid.is_empty():
+		var fee := float(paid.get("fee", 0.0))
+		var rep := int(paid.get("reputation_delta", 0))
+		var said := "a favour, and he will remember it" if fee <= 0.0 else "£%d" % int(fee)
+		if rep > 0:
+			said += "   ·   +%d to your name" % rep
+		if not bool(paid.get("first_time", true)):
+			said += "   (you have done this one before)"
+		_centre(said, money, Color(0.95, 0.93, 0.88, 0.9 * c), 16)
+	_centre("enter — back to the board", money + 30.0,
+		Color(0.86, 0.84, 0.80, 0.6 * c), 13)
 	_centre("[S] back over the edge   ·   [V] look at the view", y + 160.0,
 		Color(0.78, 0.76, 0.72, 0.6 * b), 13)
 

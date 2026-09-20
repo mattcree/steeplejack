@@ -374,6 +374,62 @@ func _ready() -> void:
 ## Which chimney. The job board sets it on the tree root when it starts a scene, so both halves of
 ## the game take a level the same way and neither needs to know the board exists; `--level` is
 ## still there for `make run LEVEL=...` and for every headless script.
+# --- the career — CAREER-001 ---------------------------------------------------------------------
+# Getting to the top is the job on a SURVEY level, so getting to the top is when it pays. The
+# felling half does the same thing at its own ending; both go through the sim, and both write the
+# same tin, so the board is telling the truth whichever half you came from.
+
+const CAREER_PATH := "user://career.json"
+
+## Overridable so a test can use its own tin rather than spending the player's money.
+var career_path := CAREER_PATH
+var settlement := {}
+
+
+func _settle_the_job() -> void:
+	if not settlement.is_empty():
+		return
+	var text := ""
+	if FileAccess.file_exists(career_path):
+		var f := FileAccess.open(career_path, FileAccess.READ)
+		if f != null:
+			text = f.get_as_text()
+			f.close()
+	jack.career_load(text)
+	settlement = jack.career_settle_climb(_level_id(), _level_fee(), true)
+	var w := FileAccess.open(career_path, FileAccess.WRITE)
+	if w == null:
+		push_error("player: cannot write %s" % career_path)
+		return
+	w.store_string(jack.career_json())
+	w.close()
+
+
+## What the job pays, from the level file. Read here rather than carried through the sim because it
+## is the one number about a level that is nobody's rule — it is what the letter offered.
+func _level_fee() -> float:
+	var f := FileAccess.open(
+		ProjectSettings.globalize_path("res://../data/levels/%s.json" % _level_id()),
+		FileAccess.READ)
+	if f == null:
+		return 0.0
+	var doc = JSON.parse_string(f.get_as_text())
+	f.close()
+	if typeof(doc) != TYPE_DICTIONARY:
+		return 0.0
+	var fee = doc.get("fee", 0.0)
+	return float(fee) if typeof(fee) == TYPE_FLOAT or typeof(fee) == TYPE_INT else 0.0
+
+
+## Back to the board, once the job is done.
+func back_to_the_board() -> void:
+	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	var board: Node = load("res://scenes/jobs.tscn").instantiate()
+	get_tree().root.add_child(board)
+	get_tree().current_scene = board
+	get_parent().queue_free()
+
+
 func _level_id() -> String:
 	var root := get_tree().root
 	if root.has_meta("job_level"):
@@ -599,6 +655,12 @@ func _look_at_stack() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _options_input(event):
+		return
+	# The job is done and you are standing on the cap. Enter takes you back to the board, which is
+	# the only way out of a climb that is not closing the window.
+	if at_top and event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_ESCAPE]:
+		back_to_the_board()
 		return
 	# A click in the window with the mouse free takes it back. The click is spent on that, so it
 	# does not also start a hammer draw — except in a slip, where a click is the grab and must
@@ -1594,6 +1656,7 @@ func _arrive_at_top() -> void:
 	_clear_checkpoint()
 	on_ladder = false
 	top_since = _now
+	_settle_the_job()
 	work_mode = false
 	_cancel_rig()
 	if lashing:

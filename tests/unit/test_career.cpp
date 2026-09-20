@@ -182,6 +182,35 @@ TEST_CASE("Career: stars are the thresholds economy.json authors, and they gate 
     CHECK(c.CanTake(3, Tune()));
 }
 
+TEST_CASE("Career: the other half of the game pays too")
+{
+    Career c;
+    const Settlement s = c.SettleClimb("01-back-yard", 0.0f, true, Tune());
+    CHECK_FALSE(s.failed);
+    CHECK(s.paidGbp == doctest::Approx(0.0f));   // the back yard is a favour and pays nothing
+    CHECK(s.reputationDelta == Tune().GetI("reputation.jobCompleted"));
+    CHECK(c.Done("01-back-yard"));
+
+    Career paid;
+    paid.SettleClimb("00-greybox", 250.0f, true, Tune());
+    CHECK(paid.MoneyGbp() == doctest::Approx(250.0f));
+}
+
+TEST_CASE("Career: walking away from a job you took costs you")
+{
+    // The client is still looking at their chimney. A survey that never reached the top is not
+    // half a job, it is no job, and it is not `Done`.
+    Career c;
+    c.SettleClimb("00-greybox", 250.0f, true, Tune());
+    const int32_t earned = c.Reputation();
+    const Settlement s = c.SettleClimb("01-back-yard", 180.0f, false, Tune());
+    CHECK(s.failed);
+    CHECK(s.paidGbp == doctest::Approx(0.0f));
+    CHECK(s.reputationDelta == Tune().GetI("reputation.abandoned"));
+    CHECK(c.Reputation() < earned);
+    CHECK_FALSE(c.Done("01-back-yard"));
+}
+
 TEST_CASE("Career: it round-trips through text a person could read")
 {
     Career c;

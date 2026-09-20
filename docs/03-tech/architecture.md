@@ -127,7 +127,10 @@ face, generated from a level's bands) are the two big ones; see [`interfaces.md`
 and the one margin that says whether it is still standing) and `Fell` (where it goes, where it
 breaks and what that costs) are the demolition side — see [`interfaces.md`](interfaces.md).
 
-**Planned, not built:** topping, scoring and the economy. This paragraph used to claim their
+`Career` is the money and the reputation between jobs, and the gate on which letters arrive.
+
+**Planned, not built:** topping, and the rest of the economy — tools, the traction engine, the
+upgrade tree that `economy.json` already authors. This paragraph used to claim their
 signatures were already in `interfaces.md`. They were not, and neither were felling's until
 FELL-001/002 put them there — a doc saying a contract exists when it does not is worse than a doc
 that says nothing, because it is the one thing an agent is told to trust.

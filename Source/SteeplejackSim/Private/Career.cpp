@@ -112,6 +112,35 @@ Settlement Career::Settle(const std::string& levelId, float feeGbp, const FellOu
     return s;
 }
 
+Settlement Career::SettleClimb(const std::string& levelId, float feeGbp, bool reachedTop,
+                               const Tuning& t)
+{
+    Settlement s;
+    s.firstTime = !Done(levelId);
+    s.failed = !reachedTop;
+    s.feeGbp = s.firstTime ? feeGbp : feeGbp * t.GetF("replayFeeFraction");
+
+    if (s.failed)
+    {
+        s.feeGbp = kNoMoney;
+        s.paidGbp = kNoMoney;
+        s.reputationDelta = Rep(t, "abandoned");
+    }
+    else
+    {
+        s.paidGbp = std::max(s.feeGbp, kNoMoney);
+        if (s.firstTime)
+        {
+            s.reputationDelta = Rep(t, "jobCompleted");
+        }
+    }
+
+    money_ += s.paidGbp;
+    reputation_ = std::clamp(reputation_ + s.reputationDelta, 0, t.GetI("reputation.max"));
+    jobs_.push_back(JobRecord{levelId, s.paidGbp, 0.0f, s.failed});
+    return s;
+}
+
 std::string Career::ToJson() const
 {
     std::ostringstream out;
