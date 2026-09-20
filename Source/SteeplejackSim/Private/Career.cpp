@@ -44,6 +44,14 @@ bool Career::CanTake(int32_t gateStars, const Tuning& t) const noexcept
     return Stars(t) >= gateStars;
 }
 
+int32_t Career::StarsAfter(int32_t extraPoints, const Tuning& t) const noexcept
+{
+    Career ahead = *this;
+    ahead.reputation_ = std::clamp(reputation_ + std::max(extraPoints, 0), 0,
+                                   t.GetI("reputation.max"));
+    return ahead.Stars(t);
+}
+
 bool Career::Done(const std::string& levelId) const noexcept
 {
     for (const JobRecord& j : jobs_)

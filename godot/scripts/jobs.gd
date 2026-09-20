@@ -115,8 +115,26 @@ func save_career() -> void:
 
 ## Whether the letter has arrived. The gate is in the level file and the answer is in the sim —
 ## a .gd file deciding what the player is allowed to do would be a rule in the wrong layer.
+##
+## A gate you could not reach even by doing every job that exists is not locked, it is a gap: the
+## levels that would have earned it are designed and have no data yet. Those are offered, with the
+## reason on the card, and they will start enforcing themselves the moment the levels between land.
 func locked(job: Dictionary) -> bool:
-	return not jack.career_can_take(int(job["gate"]))
+	if jack.career_can_take(int(job["gate"])):
+		return false
+	return int(job["gate"]) <= _reachable_stars()
+
+
+## Marked on the card so the player is not left wondering which kind of closed door this is.
+func unearnable(job: Dictionary) -> bool:
+	return not jack.career_can_take(int(job["gate"])) and int(job["gate"]) > _reachable_stars()
+
+
+func _reachable_stars() -> int:
+	var ids := []
+	for job in jobs:
+		ids.append(String(job["id"]))
+	return int(jack.career_reachable_stars(ids))
 
 
 func _input(event: InputEvent) -> void:
@@ -203,7 +221,7 @@ func _card(job: Dictionary, x: float, y: float, here: bool) -> float:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK)
 	# The grey box has no shift, because it is a tool and not a job.
 	var shift := "untimed" if int(job["shift"]) <= 0 else "%d min" % int(job["shift"])
-	if not shut:
+	if not shut and not unearnable(job):
 		draw_string(_font, Vector2(x + 16, y + 52),
 			"%s   %.0f m   %s" % ["FELLING" if felling else "SURVEY", job["height"], shift],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, RED_INK if felling else FADED)
@@ -216,6 +234,12 @@ func _card(job: Dictionary, x: float, y: float, here: bool) -> float:
 		draw_string(_font, Vector2(x + 16, y + 52),
 			"they will not give this to a %d-star jack" % int(career.get("stars", 0)),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, RED_INK)
+	elif unearnable(job):
+		draw_string(_font, Vector2(x + 16, y + 52),
+			"%s   %.0f m   %s" % ["FELLING" if felling else "SURVEY", job["height"], shift],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, RED_INK if felling else FADED)
+		draw_string(_font, Vector2(x + CARD_W - 120, y + 30), "above your name",
+			HORIZONTAL_ALIGNMENT_RIGHT, 104, 11, Color(0.45, 0.40, 0.30))
 	if int(job["gate"]) > 0:
 		var stars := ""
 		for s in 5:
@@ -231,7 +255,7 @@ func _letter(job: Dictionary, x: float, y: float) -> void:
 	var w: float = size.x - x - 48.0
 	var briefing: Dictionary = job["briefing"]
 	var lines: Array = briefing.get("lines", [])
-	var h: float = 96.0 + float(lines.size()) * 22.0
+	var h: float = 130.0 + float(lines.size()) * 22.0
 	draw_rect(Rect2(x, y, w, h), PAPER)
 	draw_string(_font, Vector2(x + 26, y + 40), String(job["name"]),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 19, INK)
@@ -244,3 +268,14 @@ func _letter(job: Dictionary, x: float, y: float) -> void:
 	if who != "":
 		draw_string(_font, Vector2(x + 26, ly + 14), "— %s" % who,
 			HORIZONTAL_ALIGNMENT_RIGHT, int(w - 52), 13, FADED)
+	# Say which kind of closed door this is, where there is room to say it properly.
+	if unearnable(job):
+		draw_string(_font, Vector2(x + 26, ly + 44),
+			"This is above your name — but the jobs that would have earned it are designed and not "
+			+ "built yet, so it is yours to try.",
+			HORIZONTAL_ALIGNMENT_LEFT, int(w - 52), 12, Color(0.42, 0.30, 0.16))
+	elif locked(job):
+		draw_string(_font, Vector2(x + 26, ly + 44),
+			"They will not give this to a %d-star jack. Take smaller work first."
+				% int(career.get("stars", 0)),
+			HORIZONTAL_ALIGNMENT_LEFT, int(w - 52), 12, RED_INK)

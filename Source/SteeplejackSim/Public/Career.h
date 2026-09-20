@@ -74,6 +74,17 @@ public:
     // Whether the letter arrives. A gate of 0 always does; the grey box and the back yard are 0.
     bool CanTake(int32_t gateStars, const Tuning& t) const noexcept;
 
+    // The stars you would have if you gained `extraPoints` more. Used to answer a question the
+    // game has to be able to answer honestly while it is half built: **is this gate unreachable
+    // because I have not earned it, or because the jobs that would earn it do not exist yet?**
+    //
+    // Twelve levels were designed and five have data. Doing all five perfectly comes to two stars,
+    // and every felling in the game is gated at three or more — so a gate enforced without this
+    // distinction locks the player out of half the game and looks exactly like a bug. A gate above
+    // what the built content can reach is not a gate, it is a gap, and the board says so and lets
+    // you through. It starts enforcing itself the moment the levels between exist.
+    int32_t StarsAfter(int32_t extraPoints, const Tuning& t) const noexcept;
+
     // Settle a felling. Does not itself decide whether the job happened — the caller has run it.
     Settlement Settle(const std::string& levelId, float feeGbp, const FellOutcome& outcome,
                       const Tuning& t);

@@ -200,6 +200,8 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("career_json"), &Jack::career_json);
 	ClassDB::bind_method(D_METHOD("career_state"), &Jack::career_state);
 	ClassDB::bind_method(D_METHOD("career_can_take", "gate_stars"), &Jack::career_can_take);
+	ClassDB::bind_method(D_METHOD("career_reachable_stars", "job_ids"),
+	                     &Jack::career_reachable_stars);
 	ClassDB::bind_method(D_METHOD("career_done", "job_id"), &Jack::career_done);
 	ClassDB::bind_method(D_METHOD("career_settle", "job_id", "fee_gbp", "peg_bearing_deg",
 	                               "height_removed_m", "surveyed"), &Jack::career_settle);
@@ -1365,6 +1367,24 @@ Dictionary Jack::career_state() const
 bool Jack::career_can_take(int64_t gate_stars) const
 {
 	return tuning ? career.CanTake(static_cast<int32_t>(gate_stars), *tuning) : true;
+}
+
+int64_t Jack::career_reachable_stars(const Array& job_ids) const
+{
+	if (!tuning) { return 5; }   // literal: five stars, and no opinion without tuning
+	int32_t extra = 0;
+	for (int i = 0; i < job_ids.size(); ++i)
+	{
+		const std::string id = String(job_ids[i]).utf8().get_data();
+		if (!career.Done(id))
+		{
+			// The *ceiling*, so it uses what a job is worth done perfectly. Being generous is the
+			// right way to be wrong here: the only gates this is allowed to wave through are the
+			// ones no amount of skill could open.
+			extra += tuning->GetI("reputation.jobPerfect");
+		}
+	}
+	return static_cast<int64_t>(career.StarsAfter(extra, *tuning));
 }
 
 bool Jack::career_done(const String& job_id) const

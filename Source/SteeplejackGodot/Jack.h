@@ -322,6 +322,12 @@ public:
 	godot::Dictionary career_state() const;
 	/** Whether a level's letter has arrived, for a `reputationGate` in stars. */
 	bool career_can_take(int64_t gate_stars) const;
+	/**
+	 * The most stars the built content could get you: what you have, plus a *perfectly* done job
+	 * for every id in `job_ids` you have not done. A gate above this is a gap in the level set rather
+	 * than something the player has failed to earn — see Career.h.
+	 */
+	int64_t career_reachable_stars(const godot::Array& job_ids) const;
 	/** Whether this job has been done successfully before. */
 	bool career_done(const godot::String& job_id) const;
 	/**

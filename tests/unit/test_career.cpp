@@ -211,6 +211,24 @@ TEST_CASE("Career: walking away from a job you took costs you")
     CHECK_FALSE(c.Done("01-back-yard"));
 }
 
+TEST_CASE("Career: a gate above what the built content can reach is a gap, not a gate")
+{
+    // Twelve levels were designed and five have data. Doing all five perfectly comes to two stars,
+    // and every felling is gated at three or more. Without a way to ask "could I ever reach this
+    // yet?", enforcing those gates locks the player out of half the finished game and looks
+    // exactly like a bug.
+    const Career c;
+    const int32_t perfect = Tune().GetI("reputation.jobPerfect");
+    const int32_t jobsWithData = 5;
+    const int32_t ceiling = c.StarsAfter(perfect * jobsWithData, Tune());
+    CHECK(ceiling == 2);
+    CHECK(ceiling < 3);   // Waterside's gate, and Kershaw's
+
+    // And it un-gaps itself: the moment there are twelve jobs, three stars is reachable and the
+    // gate starts meaning what it says.
+    CHECK(c.StarsAfter(perfect * 12, Tune()) >= 3);
+}
+
 TEST_CASE("Career: it round-trips through text a person could read")
 {
     Career c;

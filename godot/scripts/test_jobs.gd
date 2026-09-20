@@ -51,17 +51,26 @@ func _init() -> void:
 
 	# --- the letters that have not arrived yet -------------------------------------------------
 	# A reputation gate is a rule about what the player may do, so the answer comes from the sim.
-	# A new jack has one star; Kershaw's wants three and Great Aire wants five.
+	# But a gate you could not reach even by doing every job that exists is a gap in the level set
+	# rather than something the player has failed to earn, and the board has to tell those apart:
+	# twelve levels were designed, five have data, and every felling is gated above what five jobs
+	# can pay. Enforcing that blindly would lock the player out of half the finished game.
 	for i in board.jobs.size():
 		if String(board.jobs[i]["id"]) == "07-kershaws-yard":
 			board.selected = i
 	_check(int(board.career.get("stars", 0)) == 1, "a new jack has one star")
-	_check(board.locked(board.jobs[board.selected]),
-		"and Kershaw's Yard is not offered to him")
-	board._take_it()
-	await process_frame
-	_check(is_instance_valid(board) and not board.is_queued_for_deletion(),
-		"pressing enter on a locked job does nothing at all")
+	_check(board._reachable_stars() == 2,
+		"and every job with data, done, would still only make him two")
+	_check(board.unearnable(board.jobs[board.selected]),
+		"so Kershaw's three-star gate is a gap, not a gate")
+	_check(not board.locked(board.jobs[board.selected]),
+		"and he is let through it, with the reason on the card")
+
+	# A gate he could reach and has not is a real lock, and stays shut.
+	var reachable := {"id": "x", "gate": 2, "archetype": "FELL", "fee": 100, "height": 40.0,
+		"shift": 90, "name": "x", "order": 3, "briefing": {}}
+	_check(board.locked(reachable), "a two-star gate he could earn is properly shut")
+	_check(not board.unearnable(reachable), "and is not pretending to be a gap")
 
 	# Earn it. The tin is text, so this is what a career three jobs in looks like.
 	board.jack.career_load('{"money": 2350, "reputation": 42, "jobs": [' +
@@ -70,11 +79,9 @@ func _init() -> void:
 	board.career = board.jack.career_state()
 	_check(int(board.career.get("stars", 0)) == 3, "forty-two points is three stars")
 	_check(not board.locked(board.jobs[board.selected]), "and now Kershaw's letter has arrived")
+	_check(not board.unearnable(board.jobs[board.selected]), "properly, this time")
 	_check(board.jack.career_done("06-waterside"), "with Waterside behind him")
 	_check(not board.jack.career_done("07-kershaws-yard"), "and Kershaw's still to do")
-	for job in board.jobs:
-		if String(job["id"]) == "12-great-aire":
-			_check(board.locked(job), "but nobody is giving him the Great Aire chimney yet")
 
 	# --- taking a felling opens the felling ---------------------------------------------------
 	board._take_it()
