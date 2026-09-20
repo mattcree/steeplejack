@@ -306,14 +306,22 @@ func _init() -> void:
 	# --- the keys the verdict advertises actually do those things ---------------------------------
 	# "R — the same chimney again" was advertised on the panel for a key that did nothing, because
 	# a bare KEY_R sat above a KEY_R-when-fired in the same match and made it unreachable.
-	var before_scenes := root.get_child_count()
-	world._again()
+	#
+	# On a scene of its own: restarting frees the scene it was called on, and the first version of
+	# this test went on using `world` afterwards and segfaulted the engine.
+	var spare: Node = load("res://scenes/felling.tscn").instantiate()
+	spare.career_path = SCRATCH_TIN
+	root.add_child(spare)
+	await physics_frame
+	spare._fired = true
+	spare._again()
 	await physics_frame
 	await physics_frame
 	var restarted: Node = root.get_child(root.get_child_count() - 1)
 	_check(restarted.has_method("_plumb") and not restarted._fired,
 		"R starts the same chimney again, unlit and uncut")
-	_check(root.get_child_count() >= before_scenes, "on a fresh scene")
+	_check(not is_instance_valid(spare) or spare.is_queued_for_deletion(),
+		"and the one you just dropped gets out of the way")
 	restarted.queue_free()
 	await physics_frame
 
