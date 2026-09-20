@@ -30,8 +30,13 @@ jobs:
       - name: Documentation links
         run: python3 tools/check_links.py
 
+      - name: Binary assets — LFS coverage, pointer integrity and size (CORE-010)
+        run: python3 tools/check_content_size.py
+
       - name: The convention checkers' own tests
         run: python3 tools/test_conventions.py
+      - name: The asset gate's own tests
+        run: python3 tools/test_content_size.py
 
   # The gameplay layer. Builds and tests with no engine installed — the Godot game links the
   # same library. Should stay under two minutes.

@@ -13,7 +13,7 @@ comma   := ,
 # ---------------------------------------------------------------- the gates
 
 ## check: the local gate — must stay under 60 seconds, forever
-check: check-conventions validate check-links test-unit
+check: check-conventions validate check-links check-assets test-unit
 
 ## ci: everything CI runs (gates 1-8)
 ci: check check-verify test-tools test-levels test-replay test-determinism
@@ -36,6 +36,7 @@ test-tools:
 	@$(PY) tools/test_conventions.py
 	@$(PY) tools/test_wt.py
 	@$(PY) tools/test_check_verify.py
+	@$(PY) tools/test_content_size.py
 
 ## check-verify: every task's verify: filter points at tests that exist
 check-verify: build-sim
@@ -50,6 +51,14 @@ validate-data:
 ## validate-tasks: frontmatter, dependency graph, ownership conflicts, spec refs
 validate-tasks:
 	@$(PY) tools/tasks.py validate
+
+## check-assets: every binary goes through LFS, and none of them is enormous — CORE-010
+##
+## Binary is the half of this project agents cannot author or review. This is what stops that
+## arrangement rotting: an undeclared extension is stored raw in every clone for ever, and getting
+## it back out means rewriting history.
+check-assets:
+	@$(PY) tools/check_content_size.py
 
 ## check-links: every relative link in the docs resolves
 check-links:

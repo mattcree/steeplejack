@@ -107,6 +107,7 @@ needs someone who did not build it to climb it twice.
 ## Quick start
 
 ```bash
+git lfs install            # once per machine. Binary assets are pointers without it.
 make check                 # the sim: conventions, data, task graph, links, build, tests. ~1 s.
 make run                   # the game. Needs Godot 4.7 at ~/.local/bin/godot; builds the sim into it.
 make godot-test            # the game, headless, every verb driven and asserted on

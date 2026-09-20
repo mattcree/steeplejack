@@ -65,4 +65,4 @@ shader parameter. The whole topping surface stays at a few draw calls however ma
 | Rebuilding the face every frame | `face.gd` rebuilds only on movement or a change (`REBUILD_EVERY`) |
 | `MultiMesh.use_colors` silently ignored | colour per material, per bank (found building the town) |
 | Many simultaneous falling-brick sounds | one looping rush and a terminating thump |
-| Binary assets growing unchecked | Git LFS and a size check (CORE-010) |
+| Binary assets growing unchecked | Git LFS and `make check-assets` — total, per-file, coverage and pointer integrity (CORE-010) |
