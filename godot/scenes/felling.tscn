@@ -7,13 +7,14 @@
 ;
 ; Hand-written text, reviewable in a diff. That is why we are in this engine.
 
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scripts/felling.gd" id="1_felling"]
 [ext_resource type="Script" path="res://scripts/chimney.gd" id="2_chimney"]
 [ext_resource type="Script" path="res://scripts/gob_ring.gd" id="3_ring"]
 [ext_resource type="Script" path="res://scripts/fell_hud.gd" id="4_hud"]
 [ext_resource type="Script" path="res://scripts/town.gd" id="5_town"]
+[ext_resource type="Script" path="res://scripts/fell_site.gd" id="7_site"]
 [ext_resource type="Script" path="res://scripts/foley.gd" id="6_foley"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
@@ -91,6 +92,11 @@ script = ExtResource("6_foley")
 
 [node name="Town" type="Node3D" parent="."]
 script = ExtResource("5_town")
+
+; The 120 m the town leaves out: what you can hit, the line you stand behind, the corridor you
+; have to drop it down, and the people watching. All of it from the level file.
+[node name="Site" type="Node3D" parent="."]
+script = ExtResource("7_site")
 
 [node name="Chimney" type="Node3D" parent="."]
 script = ExtResource("2_chimney")

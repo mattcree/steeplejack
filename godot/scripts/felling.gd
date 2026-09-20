@@ -26,6 +26,7 @@ const ORBIT_MAX := 26.0     ## while you are working. Watching it go, you stand 
 @onready var hud: Control = $HUD
 @onready var camera: Camera3D = $Camera
 @onready var foley: Node = $Foley
+@onready var site: FellSite = $Site
 
 var level_path := "res://../data/levels/06-waterside.json"
 var tuning_dir := "res://../data/tuning"
@@ -69,6 +70,7 @@ func _ready() -> void:
 	_begin_gob()
 	chimney.build(jack)
 	ring.build(jack)
+	site.build(_authored)
 	_clear_the_pitch()
 	hud.jack = jack
 	hud.ring = ring
@@ -141,13 +143,20 @@ func _read_level() -> Dictionary:
 		out["mortar_bearing"] = float(asym.get("bearing", 0.0))
 		out["mortar_bias"] = float(asym.get("strengthBias", 0.0))
 	out["required_reduction"] = float(mission.get("requiredHeightReduction", 0.0))
-	var site: Dictionary = doc.get("site", {})
-	out["exclusions"] = site.get("exclusions", [])
-	out["safe_line"] = float(site.get("safeLineDistance", 100.0))
-	var corridor: Dictionary = site.get("corridor", {})
+	var site_block: Dictionary = doc.get("site", {})
+	out["exclusions"] = site_block.get("exclusions", [])
+	out["safe_line"] = float(site_block.get("safeLineDistance", 100.0))
+	var corridor: Dictionary = site_block.get("corridor", {})
 	out["corridor_from"] = float(corridor.get("fromBearing", 0.0))
 	out["corridor_to"] = float(corridor.get("toBearing", 360.0))
+	out["crowd"] = site_block_crowd(site_block)
 	return out
+
+
+## The crowd, if the level authored one that reacts. A level with no crowd gets no people.
+func site_block_crowd(site_block: Dictionary) -> Dictionary:
+	var crowd: Dictionary = site_block.get("crowd", {})
+	return crowd if bool(crowd.get("reactsToFall", true)) else {}
 
 
 func _begin_gob() -> void:
@@ -414,6 +423,7 @@ func _on_broke(height_m: float) -> void:
 func _on_landed() -> void:
 	hud.outcome = _outcome
 	foley.cue("crash")
+	site.cheer()
 	_cheered = false
 
 
