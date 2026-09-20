@@ -451,23 +451,42 @@ func _draw_gob() -> void:
 # ---------------------------------------------------------------- the verdict
 
 func _draw_verdict() -> void:
-	# Low and wide, not over the middle of the screen: you are meant to be looking at the dust.
-	var panel := Rect2(size.x * 0.5 - 330, size.y - 268, 660, 232)
-	draw_rect(panel, Color(0.05, 0.05, 0.06, 0.88))
 	var grade := String(outcome.get("grade_name", "WILD"))
 	var colour: Color = {
 		"PERFECT": Color(0.55, 0.85, 0.50), "GOOD": Color(0.80, 0.85, 0.45),
 		"ACCEPTABLE": Color(0.90, 0.78, 0.35), "WILD": HAZARD,
 	}.get(grade, INK)
+	var lines := _verdict_lines()
+
+	# Sized from what it has to say, not from a number written down once. Three separate times
+	# tonight a fixed height has been right when it was typed and wrong one edit later — the step
+	# list, the state panel, and this, which ended up printing the money over its own footer.
+	var high: float = 60.0 + 22.0 * float(lines.size()) + 34.0
+	var panel := Rect2(size.x * 0.5 - 330, size.y - high - 36.0, 660, high)
+	draw_rect(panel, Color(0.05, 0.05, 0.06, 0.88))
+
 	var y := panel.position.y + 36.0
-	draw_string(_font, Vector2(panel.position.x, y), grade, HORIZONTAL_ALIGNMENT_CENTER, panel.size.x,
-		26, colour)
+	draw_string(_font, Vector2(panel.position.x, y), grade, HORIZONTAL_ALIGNMENT_CENTER,
+		panel.size.x, 26, colour)
 	y += 34.0
+	for line in lines:
+		draw_string(_font, Vector2(panel.position.x, y), line, HORIZONTAL_ALIGNMENT_CENTER,
+			panel.size.x, 15, INK if line.begins_with("£") else DIM)
+		y += 22.0
+	draw_string(_font, Vector2(panel.position.x, panel.position.y + panel.size.y - 14),
+		"enter — back to the board        R — the same chimney again",
+		HORIZONTAL_ALIGNMENT_CENTER, panel.size.x, 12, DIM)
+
+
+## What the job did, in the order you would want to hear it: where it went, how it broke, what it
+## touched, what it paid, and only then what it cost you.
+func _verdict_lines() -> Array:
 	var lines := [
 		"it went to %03d°, %.1f° off your pegs" % [
 			float(outcome.get("fall_bearing", 0.0)), float(outcome.get("error", 0.0))],
 		"broke into %d, %s" % [int(outcome.get("chunks", 1)),
-			"she broke up nicely" if bool(outcome.get("clean_break", false)) else "one piece, harder to clear"],
+			"she broke up nicely" if bool(outcome.get("clean_break", false))
+				else "one piece, harder to clear"],
 	]
 	var struck: Array = outcome.get("struck", [])
 	if struck.is_empty():
@@ -477,30 +496,29 @@ func _draw_verdict() -> void:
 	if bool(outcome.get("catastrophe", false)):
 		lines.append("that one was never going to be forgiven")
 	lines.append("")
+
 	if settlement.is_empty():
 		lines.append("bonus £%d    damages £%d" % [
 			int(outcome.get("bonus", 0.0)), int(outcome.get("penalty", 0.0))])
-	elif bool(settlement.get("failed", false)):
+		return lines
+	if bool(settlement.get("failed", false)):
 		lines.append("no fee. £%d of damage. %d off your name." % [
 			int(float(settlement.get("damages", 0.0))),
 			-int(settlement.get("reputation_delta", 0))])
-	else:
-		var rep := int(settlement.get("reputation_delta", 0))
-		var name_ := "" if rep == 0 else ("    +%d to your name" % rep if rep > 0
-			else "    %d off your name" % rep)
-		lines.append("fee £%d    bonus £%d    damages £%d%s" % [
-			int(float(settlement.get("fee", 0.0))), int(float(settlement.get("bonus", 0.0))),
-			int(float(settlement.get("damages", 0.0))), name_])
-		lines.append("£%d in the tin" % int(float(settlement.get("paid", 0.0))))
+		return lines
+
+	var rep := int(settlement.get("reputation_delta", 0))
+	var name_ := "" if rep == 0 else ("    +%d to your name" % rep if rep > 0
+		else "    %d off your name" % rep)
+	lines.append("fee £%d    bonus £%d    damages £%d%s" % [
+		int(float(settlement.get("fee", 0.0))), int(float(settlement.get("bonus", 0.0))),
+		int(float(settlement.get("damages", 0.0))), name_])
+	lines.append("£%d in the tin" % int(float(settlement.get("paid", 0.0))))
+	# These two were nested inside the injury branch, so "a job you have done before" only ever
+	# appeared if you had also been hurt doing it.
+	if not bool(settlement.get("first_time", true)):
+		lines.append("(a job you have done before — it pays, but it does not make your name)")
 	if settlement.has("injured"):
 		lines.append("and you were under it when it came down — %d off your name, and you were lucky"
 			% -int(settlement.get("injured", 0)))
-		if not bool(settlement.get("first_time", true)):
-			lines.append("(a job you have done before — it pays, but it does not make your name)")
-	for line in lines:
-		draw_string(_font, Vector2(panel.position.x, y), line, HORIZONTAL_ALIGNMENT_CENTER,
-			panel.size.x, 15, INK if line.begins_with("bonus") else DIM)
-		y += 22.0
-	draw_string(_font, Vector2(panel.position.x, panel.position.y + panel.size.y - 14),
-		"enter — back to the board        R — the same chimney again",
-		HORIZONTAL_ALIGNMENT_CENTER, panel.size.x, 12, DIM)
+	return lines
