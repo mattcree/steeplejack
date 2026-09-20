@@ -109,6 +109,13 @@ public:
     // props go in behind you as you cut, which is the loop the design asks for.
     bool SetProp(int32_t seg);
 
+    // Whether the next prop out of the stack is the one the level planted. The fairness contract
+    // requires it: "prop #9 is visibly knotty and split-ended if you look at it when placing it,
+    // and the character mutters 'that one's a bit shakey'. Players who inspect their props are
+    // rewarded. Players who don't get the lesson the hard way. **Fair.**" A dud with no tell is
+    // not a twist, it is the game cheating.
+    bool NextPropIsDud() const noexcept;
+
     // How much of the ring has been cut, as an arc in degrees, and where its middle is.
     float CutArcDegrees() const noexcept;
     float CutCentreBearing() const noexcept;

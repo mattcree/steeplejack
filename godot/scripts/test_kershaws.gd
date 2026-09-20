@@ -102,11 +102,15 @@ func _init() -> void:
 
 	var props := 0
 	var split_at := -1
+	var warned_at := -1
 	var margin_before := 0.0
 	for i in 16:
 		var seg: int = _arc_seg(rg, middle + 8.0, i)
 		for c in range(int(rg.courses) - 1):
 			jk.gob_cut(seg, c)
+		# Rule 7: the tell comes before the failure, not with it.
+		if jk.gob_next_prop_is_dud():
+			warned_at = props + 1
 		if not jk.gob_prop(seg):
 			break
 		props += 1
@@ -117,6 +121,8 @@ func _init() -> void:
 			break
 		margin_before = float(now.get("margin", 0.0))
 	_check(split_at > 0, "a prop split, at prop %d of sixteen" % split_at)
+	_check(warned_at == split_at,
+		"and you were told at prop %d, before you set it — which is what makes it fair" % warned_at)
 	_check(split_at == 10,
 		"and it was the tenth — the one the level planted (dudPropIndex 9), not a cascade")
 	var after: Dictionary = jk.gob_state()

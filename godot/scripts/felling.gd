@@ -604,6 +604,9 @@ func _prop() -> void:
 	if cell.is_empty():
 		hud.say("Aim at the segment you want propped.")
 		return
+	# The one the level planted. You can see it before you set it, and that is the whole of what
+	# makes it fair — a dud with no tell is the game cheating (rule 7).
+	var knotty := jack.gob_next_prop_is_dud()
 	if not jack.gob_prop(cell[0]):
 		var st: Dictionary = jack.gob_state()
 		if int(st.get("props_left", 0)) <= 0:
@@ -612,6 +615,10 @@ func _prop() -> void:
 			hud.say("A prop goes in behind the cut. Take some brick out of that segment first.", 5.0)
 		return
 	ring.refresh()
+	if knotty:
+		foley.cue("propCreak", 0.85)
+		hud.say("That one's a bit shakey — knotty, and split at the end. Get another in beside it.",
+			8.0)
 	_after_change()
 
 
@@ -1024,9 +1031,12 @@ func _update_hud() -> void:
 		var c: Dictionary = jack.gob_cell(cell[0], cell[1])
 		var p: Dictionary = jack.gob_prop_at(cell[0])
 		if bool(p.get("present", false)):
-			hud.aim_verb = "propped — %.0f kN on it" % float(p.get("load_kn", 0.0))
+			hud.aim_verb = "propped — %.0f kN on it%s" % [float(p.get("load_kn", 0.0)),
+				"  (this one is the bad one)" if bool(p.get("dud", false)) else ""]
 		elif bool(c.get("removed", false)):
-			hud.aim_verb = "cut away — [RMB] stand a prop here"
+			hud.aim_verb = "cut away — [RMB] stand a prop here" + (
+				"   (the next one out of the stack looks knotty)"
+				if jack.gob_next_prop_is_dud() else "")
 		else:
 			var strength := float(c.get("strength", 1.0))
 			var mortar := "soft" if strength < 0.9 else ("hard" if strength > 1.1 else "sound")

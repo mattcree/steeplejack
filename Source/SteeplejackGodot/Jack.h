@@ -279,6 +279,8 @@ public:
 	bool gob_cut(int64_t seg, int64_t course);
 	/** Stand a prop. False with none left, or if nothing has been cut at that segment yet. */
 	bool gob_prop(int64_t seg);
+	/** Whether the next prop off the stack is the knotty one the level planted. */
+	bool gob_next_prop_is_dud() const;
 	/**
 	 * `{margin, status, status_name, cut_arc, cut_centre, props_left, props_set, segments,
 	 *   courses, cog, support_centroid, base_radius}`. Safe every frame.

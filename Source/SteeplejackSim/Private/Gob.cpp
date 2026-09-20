@@ -167,6 +167,11 @@ bool Gob::Cut(int32_t seg, int32_t course)
     return true;
 }
 
+bool Gob::NextPropIsDud() const noexcept
+{
+    return dudProp_ >= 0 && static_cast<int32_t>(props_.size()) == dudProp_;
+}
+
 bool Gob::SetProp(int32_t seg)
 {
     if (seg < 0 || seg >= segments_ || PropsLeft() <= 0)

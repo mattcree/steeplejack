@@ -267,6 +267,33 @@ TEST_CASE("Gob: an authored dud prop splits under any load at all")
     CHECK_FALSE(g.Props()[1].split);
 }
 
+TEST_CASE("Gob: you can see the bad one coming, which is what makes it fair")
+{
+    // The fairness contract, in the one place a felling level breaks its own promise if it is
+    // missing: a dud that splits with no tell is the game cheating.
+    Gob g = Waterside(0.3f, 284.0f, 2);   // the third prop out of the stack is the dud
+    CHECK_FALSE(g.NextPropIsDud());
+    for (int32_t s = 0; s < 4; ++s)
+    {
+        for (int32_t c = 0; c < g.Courses(); ++c) { g.Cut(s, c); }
+    }
+    CHECK_FALSE(g.NextPropIsDud());
+    g.SetProp(0);
+    CHECK_FALSE(g.NextPropIsDud());
+    g.SetProp(1);
+    CHECK(g.NextPropIsDud());     // the next one off the stack is the knotty one
+    g.SetProp(2);
+    CHECK(g.Props()[2].dud);      // and it was
+    CHECK_FALSE(g.NextPropIsDud());
+
+    // A level with no dud never says there is one.
+    Gob clean = Waterside();
+    for (int32_t c = 0; c < clean.Courses(); ++c) { clean.Cut(0, c); }
+    CHECK_FALSE(clean.NextPropIsDud());
+    clean.SetProp(0);
+    CHECK_FALSE(clean.NextPropIsDud());
+}
+
 TEST_CASE("Gob: a prop that splits leans on its neighbours")
 {
     // What a split prop was carrying does not vanish - it goes to the nearest thing holding

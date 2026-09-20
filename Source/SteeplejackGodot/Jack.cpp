@@ -187,6 +187,7 @@ void Jack::_bind_methods()
 	                     &Jack::gob_mortar_asymmetry);
 	ClassDB::bind_method(D_METHOD("gob_cut", "seg", "course"), &Jack::gob_cut);
 	ClassDB::bind_method(D_METHOD("gob_prop", "seg"), &Jack::gob_prop);
+	ClassDB::bind_method(D_METHOD("gob_next_prop_is_dud"), &Jack::gob_next_prop_is_dud);
 	ClassDB::bind_method(D_METHOD("gob_state"), &Jack::gob_state);
 	ClassDB::bind_method(D_METHOD("gob_seconds_to_cut", "seg", "course"),
 	                     &Jack::gob_seconds_to_cut);
@@ -1132,6 +1133,11 @@ bool Jack::gob_prop(int64_t seg)
 		UtilityFunctions::push_error("jack: ", String(e.what()));
 		return false;
 	}
+}
+
+bool Jack::gob_next_prop_is_dud() const
+{
+	return gob && gob->NextPropIsDud();
 }
 
 Dictionary Jack::gob_state() const
