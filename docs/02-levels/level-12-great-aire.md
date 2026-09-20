@@ -109,6 +109,33 @@ Then: a cheer. A long one.
 
 Then the dust clears and there is a gap in the skyline where a chimney has been since 1867.
 
+## Note on the data (added 2026-09-20 with `data/levels/12-great-aire.json`)
+
+**The derelict mill is not an exclusion.** The corridor runs over it — "over the derelict mill" is
+how this page describes the only line the chimney can take — and `tools/validate_data.py` refuses a
+level with something valuable standing in its own fall corridor, which is right. The mill is scenery
+you are meant to drop it across, and it is derelict, so it has no value to lose. The gasholder and
+the railway are the exclusions.
+
+**The failure table's ±4° / ±9° pair is wrong, and the real numbers are worse.** Measured through
+`Fell::Predict` on this level's own data (`godot/scripts/test_great_aire.gd`):
+
+| | cone |
+|---|---|
+| eighteen metres off, as the Engineer requires | **±8.0°** |
+| left at its full height | **±14.9°** |
+
+The ±4 was arrived at — including once, here, by me — by adding up the height and height-reduction
+terms and forgetting the one this level is *about*. Great Aire leans 2.1° toward 156° and the only
+corridor is 232–272°, so the fall line is being fought through ninety-six degrees, and fighting a
+lean costs 3.5° of cone per degree of it. That is four degrees of the eight, and no amount of
+taking the top off buys it back; only the overcut does.
+
+So the Engineer's condition buys **6.9 degrees**, which is more than the table claimed, and the job
+without it is a great deal more dangerous than ±9 suggests. The mechanic is under-sold rather than
+over-sold, which is the right way round, but the row should say 8.0 and 14.9 when someone next
+edits it — and the model should not be bent to meet a pair of numbers nobody derived.
+
 ## Beats
 1. The survey, in the morning, with the crowd already gathering.
 2. The 76–96 m crux: cold, low on dogs, bad mortar, high wind, and a long way to go.

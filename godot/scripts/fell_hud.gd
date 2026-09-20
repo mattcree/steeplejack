@@ -107,7 +107,7 @@ func _draw() -> void:
 func _draw_steps() -> void:
 	# A scrim. The first render of this put pale text straight onto a bright sky and half of it
 	# could not be read, which for a panel whose whole job is telling you what to do is fatal.
-	draw_rect(Rect2(0, 0, 620, 340), Color(0.05, 0.05, 0.06, 0.55))
+	draw_rect(Rect2(0, 0, 620, 366), Color(0.05, 0.05, 0.06, 0.55))
 	var y := 26.0
 	draw_string(_font, Vector2(24, y), "FELLING — %s" % level_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK)
 	y += 24.0
@@ -402,3 +402,6 @@ func _draw_verdict() -> void:
 		draw_string(_font, Vector2(panel.position.x, y), line, HORIZONTAL_ALIGNMENT_CENTER,
 			panel.size.x, 15, INK if line.begins_with("bonus") else DIM)
 		y += 22.0
+	draw_string(_font, Vector2(panel.position.x, panel.position.y + panel.size.y - 14),
+		"enter — back to the board        R — the same chimney again",
+		HORIZONTAL_ALIGNMENT_CENTER, panel.size.x, 12, DIM)

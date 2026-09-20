@@ -46,7 +46,7 @@ the schema has no way to express "unordered".
 | **L0 grey box** | ✅ spec complete | ✅ | ⬜ | n/a — grey box | ⬜ | ⬜ |
 | L1–L4 | ✅ spec complete | 🟡 L1 only | ⬜ | ⬜ | ⬜ | ⬜ |
 | L5–L7 | ✅ spec complete | 🟡 L6, L7 | ⬜ | ⬜ | ⬜ | 🟡 L6, L7 felling only |
-| L8–L12 | ✅ spec complete | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| L8–L12 | ✅ spec complete | 🟡 L12 | ⬜ | ⬜ | ⬜ | 🟡 L12 felling only |
 
 ## The three fellings, and how they differ
 
@@ -58,9 +58,11 @@ prop is the tenth one in and takes the margin down with it.
 
 | | L6 Waterside | L7 Kershaw's Yard | L12 Great Aire |
 |---|---|---|---|
-| Data | ✅ | ✅ | ⬜ |
+| Data | ✅ | ✅ | ✅ |
 | Corridor | 70° of open field | **28°**, chapel one side, the client's own shed the other | 40°, railway + gasholder |
-| Lean | 0.3°, negligible | 1.4°, **28° outside the corridor** | 2.1°, and it is cracked |
-| Props | 14, exactly the arc | 16, and **#9 is a dud** | — |
-| Mortar | even | south side +0.35, harder to cut | — |
+| Lean | 0.3°, negligible | 1.4°, **28° outside the corridor** | 2.1°, **96° outside it**, and cracked |
+| Props | 14, exactly the arc | 16, and **#9 is a dud** | 22, and no dud — it is earned |
+| Courses | 4 | 4 | **5** — the wall is thicker |
+| Mortar | even | south side +0.35, harder to cut | north side +0.30, 1867 lime |
+| Cone, worked | ±7.6° | ±7.5° | **±8.0°**, and ±14.9° if you skip the 18 m |
 | Teaches | the loop | steering against a lean | everything, in two acts |

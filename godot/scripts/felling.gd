@@ -266,7 +266,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_P: _drive_peg()
 			KEY_R: _pull_pegs()
 			KEY_F: _fire()
-			KEY_ESCAPE: _capture(false)
+			KEY_ENTER, KEY_KP_ENTER: _back_to_the_board()
+			KEY_R when _fired: _again()
+			KEY_ESCAPE:
+				if _fired:
+					_back_to_the_board()
+				else:
+					_capture(false)
 
 
 func _process(dt: float) -> void:
@@ -363,6 +369,28 @@ func _after_the_fall(dt: float) -> void:
 		_cheered = true
 		foley.cue("cheer")
 		hud.outcome = _outcome
+
+
+## Back to the board. The loop has to close or it is not a game, it is a scene you can reach.
+func _back_to_the_board() -> void:
+	if not _fired:
+		return
+	_capture(false)
+	var board: Node = load("res://scenes/jobs.tscn").instantiate()
+	get_tree().root.add_child(board)
+	get_tree().current_scene = board
+	queue_free()
+
+
+## The same chimney again. A felling is a bet you cannot take back, but the job is one you can be
+## sent out on twice, and a player who has just put it through the chapel wants that immediately.
+func _again() -> void:
+	var packed: PackedScene = load("res://scenes/felling.tscn")
+	var world: Node = packed.instantiate()
+	world.level_path = level_path
+	get_tree().root.add_child(world)
+	get_tree().current_scene = world
+	queue_free()
 
 
 # ---------------------------------------------------------------- what you are pointing at

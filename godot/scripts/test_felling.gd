@@ -197,6 +197,14 @@ func _init() -> void:
 	await _wait(int((float(world.CHEER_AFTER) + 0.5) * 65.0))
 	_check(not hud.outcome.is_empty(), "and when the cheer comes, the verdict with it")
 
+	# --- and the loop closes -----------------------------------------------------------------------
+	# A mode you can only leave by killing the process is a scene, not a job.
+	world._back_to_the_board()
+	await physics_frame
+	await physics_frame
+	var now: Node = root.get_child(root.get_child_count() - 1)
+	_check(now.has_method("scene_for"), "enter takes you back to the board")
+
 	if failures > 0:
 		printerr("FELLING: %d failure(s)" % failures)
 	else:
