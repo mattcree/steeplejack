@@ -172,6 +172,18 @@ LevelData LevelData::Parse(const std::string& json, const std::string& origin)
     {
         const JsonValue& w = doc.At("weather");
         level.weather_.windBase = Number(w, "windBase");
+        // Optional, and zero is a legal bearing, so a level that says nothing gets a wind out of
+        // the north that never turns. That is a weaker default than it looks: it is the same wind
+        // every shift, which is what the game had everywhere until this landed.
+        if (w.Has("windBearing") && w.At("windBearing").Type() == JsonValue::Kind::Number)
+        {
+            level.weather_.windBearingDeg = static_cast<float>(w.At("windBearing").AsNumber());
+        }
+        if (w.Has("windVeerPerHour") && w.At("windVeerPerHour").Type() == JsonValue::Kind::Number)
+        {
+            level.weather_.windVeerDegPerHour =
+                static_cast<float>(w.At("windVeerPerHour").AsNumber());
+        }
         if (w.Has("precipitation"))
         {
             level.weather_.precipitation = Text(w, "precipitation");

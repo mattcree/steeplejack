@@ -370,6 +370,12 @@ public:
 	 */
 	godot::Dictionary stack_survey() const;
 
+	/**
+	 * The wind as something with a direction — FEEL-001. `{speed, bearing, trend, gust, tell,
+	 * tell_progress, seconds_to_gust}`. Bearing is the quarter it blows FROM, clockwise from north.
+	 */
+	godot::Dictionary wind_state(double height) const;
+
 	/** A tuned number, for the presentation layer to read rather than invent. */
 	double tuning_f(const godot::String& key, double fallback) const;
 

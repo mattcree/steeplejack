@@ -74,6 +74,17 @@ public:
     // Seconds until the next gust begins its tell. Negative on a level with no gusts.
     float SecondsToNextGust() const noexcept { return armed_ ? untilNext_ : -1.0f; }
 
+    // Which quarter it is blowing from, clockwise from north: the level's own bearing, veered by
+    // however long the shift has run, and swung by `gustBearingSpreadDegrees` while a gust is on
+    // it. A gust that arrives from the same bearing as the wind is not a gust, it is more wind —
+    // the shift in direction is most of what makes one feel like a separate event.
+    float BearingDeg(const WeatherSpec& weather, const Tuning& t) const noexcept;
+
+    // How the wind is trending, -1 to 1: rising towards a gust, falling as one eases, 0 in calm.
+    // What a needle on a gauge does between gusts, and the thing a jack reads off the rope and the
+    // sound long before any number changes.
+    float Trend() const noexcept;
+
 private:
     void Arm(const WeatherSpec& weather, Rng& rng) noexcept;
 
@@ -82,6 +93,8 @@ private:
     float     untilNext_{0.0f};
     float     inPhase_{0.0f};
     float     strength_{0.0f};
+    float     elapsed_{0.0f};       // seconds of shift, for the veer
+    float     gustSwingDeg_{0.0f};  // this gust's quarter, drawn when it is armed
 };
 
 }  // namespace sj

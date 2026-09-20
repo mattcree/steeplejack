@@ -143,6 +143,8 @@
   ],
   "weather": {
     "windBase": 7.0,
+    "windBearing": 198,
+    "windVeerPerHour": 9.0,
     "windAtHeight": [
       [
         0,

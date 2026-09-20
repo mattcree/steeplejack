@@ -118,6 +118,8 @@
   ],
   "weather": {
     "windBase": 4.0,
+    "windBearing": 262,
+    "windVeerPerHour": 6.0,
     "windAtHeight": [
       [
         0,

@@ -333,6 +333,16 @@
           "type": "number",
           "minimum": 0
         },
+        "windBearing": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 360,
+          "description": "Which quarter the wind blows from, clockwise from north. The wind was a scalar with no direction at all until FEEL-001; a jack knows the quarter the weather is in before he knows anything else about it."
+        },
+        "windVeerPerHour": {
+          "type": "number",
+          "description": "Degrees the wind turns over an hour of shift. Weather does not hold still, and a wind that has backed round behind you since the morning is a real thing to notice from the top of a chimney."
+        },
         "windAtHeight": {
           "type": "array",
           "items": {

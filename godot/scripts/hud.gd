@@ -123,6 +123,7 @@ func _draw() -> void:
 		player.dogs_carried, player.ladder_top]
 	_label(stock, Vector2(info_x, hand.y + 22), Color(DIM, 0.85), SMALL)
 	_draw_ladder_verdict(jack, Vector2(info_x, hand.y + 48))
+	_draw_wind(jack, Vector2(HAND.x, hand.y - NERVE_R - 58.0))
 
 	# Only once there is something to span *from*. With no dogs driven, the span is measured from
 	# the ground and reads "62.0 m span — about to buckle" at the top of a ladder that is lashed all
@@ -741,6 +742,89 @@ func _draw_top() -> void:
 ## The stack's warnings. The fairness table: "Ladder buckled — fair, because the span was over 8 m
 ## and the HUD said so." So the HUD says so, loudly, for the whole of the 8 seconds, with the time
 ## left as a bar that empties — and says the one thing to do about it.
+# ---------------------------------------------------------------- the wind
+#
+# The wind had no direction. It was a number of metres per second, so the game could tell you a
+# gust was coming and never which way it would push you — and which quarter the weather is in is
+# the first thing a jack knows about a day, before its speed and long before any gust.
+#
+# What this has to replace is a whole sense. On a ladder you feel the push on one cheek, hear it
+# in the rope, and watch it move the ladder before it moves you. None of that reaches a player
+# through a screen, so it becomes an instrument: a rose that says where it is coming from relative
+# to the way you are facing, how hard, and whether it is getting up or dying away.
+
+const ROSE_R := 26.0
+const WIND_CALM := 3.0        ## m/s below which it is just weather, not a force
+const WIND_STIFF := 12.0      ## and above which it is the thing you are fighting
+
+
+func _draw_wind(jack: Jack, at: Vector2) -> void:
+	var w: Dictionary = jack.wind_state(maxf(player.height_m(), 0.0))
+	if w.is_empty():
+		return
+	var speed := float(w.get("speed", 0.0))
+	var hard: float = clampf((speed - WIND_CALM) / (WIND_STIFF - WIND_CALM), 0.0, 1.0)
+	var tell := bool(w.get("tell", false))
+	var gust := float(w.get("gust", 0.0))
+
+	# Loud only when it deserves to be. A dial that is bright in a flat calm has spent the one
+	# thing it had to say about a gale.
+	var live: float = maxf(hard, maxf(gust, 1.0 if tell else 0.0))
+	var colour := FAINT.lerp(WATCH, hard)
+	if tell or gust > 0.0:
+		colour = DANGER
+	var a: float = 0.62 + 0.38 * live
+
+	# A disc of shade under it, because this dial spends its life against a bright sky and a pale
+	# roofscape. Quiet is a thing the dial says; invisible is a thing the sky does to it.
+	draw_circle(at, ROSE_R + 3.0, Color(0.04, 0.04, 0.05, 0.34 + 0.16 * live))
+
+	# The rose, and north on it, so the bearing is readable as a bearing and not only as a push.
+	draw_arc(at, ROSE_R, 0.0, TAU, 40, Color(GHOST, 0.5 + 0.3 * live), 1.0)
+	var yaw: float = player._yaw if "_yaw" in player else 0.0
+	for q in range(4):
+		var u := Vector2(sin(deg_to_rad(90.0 * q) - yaw), -cos(deg_to_rad(90.0 * q) - yaw))
+		# North gets the long tick, so the rose still has an orientation in the frames where the
+		# arrow is lying across the letter.
+		var inner := ROSE_R - (8.0 if q == 0 else 4.0)
+		draw_line(at + u * inner, at + u * ROSE_R, Color(GHOST, 0.7 if q == 0 else 0.45), 1.0)
+	_label("N", _north_label_at(at), Color(GHOST, 0.62), TINY)
+
+	# Which way it is pushing HIM, not which way it is pushing north: the rose is turned by the way
+	# he is facing, because that is the only frame in which "it is on your left" means anything.
+	var from_deg := float(w.get("bearing", 0.0))
+	var facing := rad_to_deg(player._yaw if "_yaw" in player else 0.0)
+	var rel := deg_to_rad(from_deg - facing + 180.0)   # +180: the arrow flies the way it blows
+	var dir := Vector2(sin(rel), -cos(rel))
+	var tail := at - dir * (ROSE_R - 4.0)
+	var tip := at + dir * (ROSE_R - 4.0) * (0.45 + 0.55 * live)
+	draw_line(tail, tip, Color(colour, a), 2.0 + 2.5 * live)
+	var wing := dir.rotated(PI * 0.82) * 8.0
+	draw_line(tip, tip + wing, Color(colour, a), 2.0)
+	draw_line(tip, tip + dir.rotated(-PI * 0.82) * 8.0, Color(colour, a), 2.0)
+
+	# The number, and whether it is getting up or dying away. The arrow says where; a climber still
+	# wants to know how much, and a rising wind is a different decision from a falling one.
+	var trend := float(w.get("trend", 0.0))
+	var arrow := "" if is_zero_approx(trend) else ("  rising" if trend > 0.0 else "  easing")
+	_label("%.0f m/s%s" % [speed, arrow], at + Vector2(ROSE_R + 12.0, 5.0), Color(colour, a), SMALL)
+
+	# The gust's 1.2 seconds, as a ring closing round the rose. Rule 8's visual half of the audio
+	# tell, in the one place the player is already looking to read the weather.
+	if tell:
+		var p: float = clampf(float(w.get("tell_progress", 0.0)), 0.0, 1.0)
+		draw_arc(at, ROSE_R + 5.0, -PI * 0.5, -PI * 0.5 + TAU * p, 36, DANGER, 3.0)
+
+
+## Where "N" sits on an egocentric rose: opposite the way he is facing, turning as he turns. Inside
+## the rim, not outside it — outside, the letter swings round into whatever the dial is sitting
+## next to, and "N" plus "4 m/s" reads as one word.
+func _north_label_at(at: Vector2) -> Vector2:
+	var t: float = -(player._yaw if "_yaw" in player else 0.0)
+	var u := Vector2(sin(t), -cos(t))
+	return at + u * (ROSE_R - 15.0) - Vector2(3.5, -4.0)
+
+
 ## "Am I happy on this ladder?" — CLIMB-007, on screen.
 ##
 ## Every other warning in this HUD is about the section under his feet this second. This is the

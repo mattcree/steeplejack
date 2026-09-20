@@ -224,6 +224,7 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("career_settle_climb", "job_id", "fee_gbp", "reached_top"),
 	                     &Jack::career_settle_climb);
 	ClassDB::bind_method(D_METHOD("stack_survey"), &Jack::stack_survey);
+	ClassDB::bind_method(D_METHOD("wind_state", "height"), &Jack::wind_state);
 	ClassDB::bind_method(D_METHOD("tuning_f", "key", "fallback"), &Jack::tuning_f, DEFVAL(0.0));
 }
 
@@ -1595,6 +1596,21 @@ Dictionary Jack::stack_survey() const
 	{
 		UtilityFunctions::push_error("jack: ", String(e.what()));
 	}
+	return d;
+}
+
+Dictionary Jack::wind_state(double height) const
+{
+	Dictionary d;
+	if (!tuning || !level) { return d; }
+	const sj::WeatherSpec& w = level->Weather();
+	d["speed"] = static_cast<double>(wind.SpeedAt(static_cast<float>(height), w, *tuning));
+	d["bearing"] = static_cast<double>(wind.BearingDeg(w, *tuning));
+	d["trend"] = static_cast<double>(wind.Trend());
+	d["gust"] = static_cast<double>(wind.Strength());
+	d["tell"] = wind.Tell();
+	d["tell_progress"] = static_cast<double>(wind.TellProgress(*tuning));
+	d["seconds_to_gust"] = static_cast<double>(wind.SecondsToNextGust());
 	return d;
 }
 

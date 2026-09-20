@@ -84,6 +84,18 @@ struct WeatherSpec
 {
     float windBase{};
 
+    // Which way it is blowing from, clockwise from north, and how fast that is turning. The wind
+    // was a scalar until 2026-09-20 — a number of metres per second with no direction at all —
+    // which meant the game could tell you a gust was coming and never which way it would push you.
+    // A jack on a ladder knows the quarter the weather is in before he knows anything else about
+    // it; it decides which side of the stack he works and which way he leans when it hits.
+    //
+    // `windVeerDegPerHour` is the slow turn over a shift. Weather does not hold still for two
+    // hours, and a wind that has backed round behind you since the morning is a real thing to
+    // notice from the top of a chimney.
+    float windBearingDeg{};
+    float windVeerDegPerHour{};
+
     // Multiplier against height, as authored: [[0, 1.0], [40, 1.6], [70, 2.1]]. Interpolated
     // linearly between points and held flat outside them, so a level need only give the corners.
     std::vector<Vec2> windAtHeight;

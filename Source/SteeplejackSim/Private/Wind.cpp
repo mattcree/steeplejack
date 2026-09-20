@@ -2,6 +2,8 @@
 
 #include "Wind.h"
 
+#include <cmath>
+
 #include "Level.h"
 #include "Rng.h"
 #include "Tuning.h"
@@ -9,6 +11,17 @@
 #include <algorithm>
 
 namespace sj {
+namespace {
+
+constexpr float kFullTurn = 360.0f;          // literal: degrees in a turn
+constexpr float kSecondsPerHour = 3600.0f;   // literal: seconds in an hour
+// How far off the prevailing quarter a gust can come from. Not tuned: a gust that arrives from the
+// same bearing as the wind is not a gust, it is more wind, and the swing is most of what makes one
+// read as a separate event rather than as the needle going up.
+constexpr float kGustSpread = 35.0f;         // literal: degrees either side of the prevailing wind
+
+}  // namespace
+
 namespace {
 
 // Guards two divisions against a designer setting gustPreRollSeconds to zero. Not a tuned value:
@@ -27,6 +40,10 @@ void WindModel::Arm(const WeatherSpec& weather, Rng& rng) noexcept
     }
     armed_ = true;
     untilNext_ = rng.RangeFloat(weather.gustEverySecondsMin, weather.gustEverySecondsMax);
+    // Which quarter this one will come out of. Drawn when the gust is armed rather than when it
+    // arrives, so it is part of the same deterministic stream as its timing and a replay puts the
+    // same gust on the same side of the same man.
+    gustSwingDeg_ = rng.RangeFloat(-kGustSpread, kGustSpread);
 }
 
 void WindModel::Begin(const WeatherSpec& weather, Rng& rng, const Tuning& t) noexcept
@@ -47,6 +64,7 @@ void WindModel::Step(float dt, const WeatherSpec& weather, Rng& rng, const Tunin
     const float blow = tell;
 
     inPhase_ += dt;
+    elapsed_ += dt;
 
     switch (phase_)
     {
@@ -122,6 +140,32 @@ float WindModel::SpeedAt(float height, const WeatherSpec& weather, const Tuning&
     // gust on a sheltered level and an exposed one should not be the same event.
     const float steady = weather.WindAt(height);
     return steady * (1.0f + strength_ * t.GetF("gustWindMultiplier"));
+}
+
+float WindModel::BearingDeg(const WeatherSpec& weather, const Tuning&) const noexcept
+{
+    // The level's quarter, veered by however long the shift has run, and swung while a gust is on
+    // it. The swing fades in and out with the gust's own strength, so the needle moves with the
+    // weather rather than snapping to a new bearing the instant one arrives.
+    const float veer = weather.windVeerDegPerHour * (elapsed_ / kSecondsPerHour);
+    float deg = weather.windBearingDeg + veer + gustSwingDeg_ * Strength();
+    deg = std::fmod(deg, kFullTurn);
+    return (deg < 0.0f) ? deg + kFullTurn : deg;
+}
+
+float WindModel::Trend() const noexcept
+{
+    switch (phase_)
+    {
+    case GustPhase::Building:
+        return 1.0f;    // it is coming, and this is the second and a bit you have to notice
+    case GustPhase::Blowing:
+        return 1.0f;
+    case GustPhase::Easing:
+        return -1.0f;
+    default:
+        return 0.0f;
+    }
 }
 
 }  // namespace sj
