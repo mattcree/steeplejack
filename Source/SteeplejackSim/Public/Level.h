@@ -124,6 +124,12 @@ public:
 
     float TotalHeight() const noexcept { return structure_.height; }
 
+    // The daylight the job comes with, and what a good day looks like. Authored in every level
+    // file since the first one and read by nothing until FELL-006 priced a felling in shift.
+    // 0 when the file does not say, which means "untimed".
+    int32_t ShiftMinutes() const noexcept { return shiftMinutes_; }
+    int32_t TargetMinutes() const noexcept { return targetMinutes_; }
+
     // The band containing `height`. Throws if none does — a height outside the structure is a
     // caller bug, and returning the nearest band would put a climber in brickwork that is not there.
     const BandSpec& BandAt(float height) const;
@@ -149,6 +155,7 @@ private:
     StructureSpec         structure_;
     std::vector<BandSpec> bands_;
     int32_t               loadoutLadders_{};
+    int32_t               shiftMinutes_{}, targetMinutes_{};
     SiteSpec              site_;
     WeatherSpec           weather_;
     std::string           origin_;

@@ -194,6 +194,7 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("fell_predict", "peg_bearing_deg", "height_removed_m", "surveyed"),
 	                     &Jack::fell_predict);
 	ClassDB::bind_method(D_METHOD("fell_run", "peg_bearing_deg", "height_removed_m", "surveyed"), &Jack::fell_run);
+	ClassDB::bind_method(D_METHOD("fell_shift", "height_removed_m"), &Jack::fell_shift);
 	ClassDB::bind_method(D_METHOD("tuning_f", "key", "fallback"), &Jack::tuning_f, DEFVAL(0.0));
 }
 
@@ -1260,6 +1261,40 @@ Dictionary Jack::fell_run(double peg_bearing_deg, double height_removed_m, bool 
 		d["catastrophe"] = o.catastrophe;
 		d["bonus"] = static_cast<double>(o.bonusGbp);
 		d["penalty"] = static_cast<double>(o.penaltyGbp);
+	}
+	catch (const std::exception& e)
+	{
+		UtilityFunctions::push_error("jack: ", String(e.what()));
+	}
+	return d;
+}
+
+Dictionary Jack::fell_shift(double height_removed_m) const
+{
+	Dictionary d;
+	if (!gob || !tuning || !level) { return d; }
+	try
+	{
+		int32_t cells = 0;
+		for (int32_t s = 0; s < gob->Segments(); ++s)
+		{
+			for (int32_t c = 0; c < gob->Courses(); ++c)
+			{
+				cells += gob->At(s, c).removed ? 1 : 0;
+			}
+		}
+		const auto props = static_cast<int32_t>(gob->Props().size());
+		const float removed = static_cast<float>(height_removed_m);
+		const float spent = sj::Fell::ShiftCostSeconds(cells, props, removed, *tuning);
+		const float shift = static_cast<float>(level->ShiftMinutes()) * 60.0f;
+		d["spent"] = static_cast<double>(spent);
+		d["shift"] = static_cast<double>(shift);
+		d["left"] = static_cast<double>(shift - spent);
+		d["cells"] = static_cast<int64_t>(cells);
+		d["props"] = static_cast<int64_t>(props);
+		d["per_metre"] = static_cast<double>(tuning->GetF("fellShiftSecondsPerMetreRemoved"));
+		d["max_reduction"] = static_cast<double>(
+			sj::Fell::MaxHeightReductionM(fell.heightM, *tuning));
 	}
 	catch (const std::exception& e)
 	{

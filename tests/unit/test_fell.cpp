@@ -280,6 +280,33 @@ TEST_CASE("Fell: a stump too short to break comes down in one piece")
     CHECK(Fell::FractureHeights(0.0f, Tune()).empty());
 }
 
+TEST_CASE("Fell: accuracy is bought with daylight, and there is no other currency for it")
+{
+    // "every metre taken by hand is 40 seconds of your daylight" — and a worked gob is about half
+    // a shift, which leaves the other half to argue over. That argument is the level's strategy.
+    const float perMetre = Tune().GetF("fellShiftSecondsPerMetreRemoved");
+    CHECK(Fell::ShiftCostSeconds(0, 0, 1.0f, Tune()) == doctest::Approx(perMetre));
+    CHECK(Fell::ShiftCostSeconds(0, 0, 0.0f, Tune()) == doctest::Approx(0.0f));
+
+    // Waterside's gob: 14 segments of 4 courses, and a prop in each.
+    const float gob = Fell::ShiftCostSeconds(14 * 4, 14, 0.0f, Tune());
+    const float shift = 120.0f * 60.0f;   // the level authors 120 minutes
+    CAPTURE(gob / 60.0f);
+    CHECK(gob < shift * 0.6f);            // it fits, with room to think
+    CHECK(gob > shift * 0.35f);           // and it is not free
+
+    // Eight metres off the top, at the rate the system doc gives, is five and a half minutes.
+    // level-07 said twelve, which is 90 seconds a metre; the two docs disagreed and the system
+    // doc wins, because it is the spec for the system (AGENTS.md rule 9). level-07 is corrected.
+    CHECK(Fell::ShiftCostSeconds(0, 0, 8.0f, Tune()) / 60.0f == doctest::Approx(5.33f).epsilon(0.02));
+
+    // You may take the perished top, not the whole chimney.
+    CHECK(Fell::MaxHeightReductionM(65.0f, Tune()) > 8.0f);
+    CHECK(Fell::MaxHeightReductionM(65.0f, Tune()) < 65.0f * 0.5f);
+    CHECK(Fell::MaxHeightReductionM(110.0f, Tune()) ==
+          doctest::Approx(Tune().GetF("fellMaxHeightReductionM")));   // capped on a tall one
+}
+
 TEST_CASE("Fell: a felling scores on how far off the pegs it landed")
 {
     FellSite site = Waterside();

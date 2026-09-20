@@ -21,6 +21,9 @@ const STEPS := [
 	"Drive two pegs down the line you want [P], then light it [F]",
 ]
 
+## What a felling costs you in daylight, and the one thing you can spend it on for accuracy.
+const TRADE := "[ ] and [ ] take metres off the top: tighter cone, less of your day"
+
 const PLAN_SIZE := 250.0      ## the site plan: the fan, the neighbours, the line
 const GOB_SIZE := 250.0       ## the gob detail: the ring itself, which is 6 m across
 const PLAN_MARGIN := 20.0
@@ -67,6 +70,7 @@ var sightings := 0
 var pegs := 0
 var standing_at := Vector2.ZERO
 var level_name := ""
+var shift := {}
 
 var _font: Font
 var _plan_scale := 1.0
@@ -103,7 +107,7 @@ func _draw() -> void:
 func _draw_steps() -> void:
 	# A scrim. The first render of this put pale text straight onto a bright sky and half of it
 	# could not be read, which for a panel whose whole job is telling you what to do is fatal.
-	draw_rect(Rect2(0, 0, 620, 286), Color(0.05, 0.05, 0.06, 0.55))
+	draw_rect(Rect2(0, 0, 620, 340), Color(0.05, 0.05, 0.06, 0.55))
 	var y := 26.0
 	draw_string(_font, Vector2(24, y), "FELLING — %s" % level_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK)
 	y += 24.0
@@ -152,6 +156,22 @@ func _draw_state() -> void:
 	y += 19.0
 	draw_string(_font, Vector2(24, y), "%d of 2 pegs in" % pegs, HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
 		PEGS if pegs >= 2 else DIM)
+
+	if not shift.is_empty():
+		y += 22.0
+		var left: float = float(shift.get("left", 0.0))
+		var whole: float = maxf(float(shift.get("shift", 1.0)), 1.0)
+		var clock := INK if left > whole * 0.25 else Color(0.95, 0.52, 0.22)
+		draw_string(_font, Vector2(24, y),
+			"daylight %d min left of %d    %.0f m off the top" % [
+				int(left / 60.0), int(whole / 60.0), height_removed],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, clock)
+		# The bar, because a number counting down is not a feeling and a bar emptying is.
+		var w: float = 320.0
+		draw_rect(Rect2(24, y + 8, w, 4), Color(0.25, 0.24, 0.23))
+		draw_rect(Rect2(24, y + 8, w * clampf(left / whole, 0.0, 1.0), 4), clock)
+		y += 16.0
+		draw_string(_font, Vector2(24, y), TRADE, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, DIM)
 
 	if not prediction.is_empty():
 		y += 22.0

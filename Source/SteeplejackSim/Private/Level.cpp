@@ -90,6 +90,15 @@ LevelData LevelData::Parse(const std::string& json, const std::string& origin)
     level.name_ = Text(doc, "name");
     level.archetype_ = Text(doc, "archetype");
     level.order_ = static_cast<int32_t>(Number(doc, "order"));
+    // Optional: a level may be untimed, and the grey box is.
+    if (doc.Has("shiftMinutes") && doc.At("shiftMinutes").Type() == JsonValue::Kind::Number)
+    {
+        level.shiftMinutes_ = static_cast<int32_t>(doc.At("shiftMinutes").AsNumber());
+    }
+    if (doc.Has("targetMinutes") && doc.At("targetMinutes").Type() == JsonValue::Kind::Number)
+    {
+        level.targetMinutes_ = static_cast<int32_t>(doc.At("targetMinutes").AsNumber());
+    }
 
     if (doc.Has("structure"))
     {

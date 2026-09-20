@@ -132,6 +132,18 @@ public:
     // than its own height, and it is the reason the debris fan is 1.15 × height and not 1.0.
     static std::vector<float> FractureHeights(float shaftHeightM, const Tuning& t);
 
+    // What a day's work has cost, in seconds of shift. Every cell out, every prop in and every
+    // metre taken off the top is time, and the level authors how much of it you have.
+    //
+    // This is the trade Act 2 exists for and the design is emphatic about it: "the game tells you
+    // your predicted accuracy improves by ~1.5 degrees per 5 m removed... every metre taken by hand
+    // is 40 seconds of your daylight. This is a real strategic choice and it should be presented as
+    // one at the survey." Accuracy is bought with daylight; there is no other currency for it.
+    static float ShiftCostSeconds(int32_t cellsCut, int32_t propsSet, float heightRemovedM,
+                                  const Tuning& t);
+    // The most you are allowed to take off by hand: the perished top, not the whole chimney.
+    static float MaxHeightReductionM(float heightM, const Tuning& t);
+
     // Signed difference between two bearings, in (-180, 180].
     static float BearingDelta(float fromDeg, float toDeg) noexcept;
 };

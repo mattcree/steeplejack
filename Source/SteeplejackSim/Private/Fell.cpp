@@ -138,6 +138,22 @@ std::vector<float> Fell::FractureHeights(float shaftHeightM, const Tuning& t)
     return out;
 }
 
+float Fell::ShiftCostSeconds(int32_t cellsCut, int32_t propsSet, float heightRemovedM,
+                            const Tuning& t)
+{
+    return static_cast<float>(std::max(cellsCut, 0)) * t.GetF("fellShiftSecondsPerCell") +
+           static_cast<float>(std::max(propsSet, 0)) * t.GetF("fellShiftSecondsPerProp") +
+           std::max(heightRemovedM, 0.0f) * t.GetF("fellShiftSecondsPerMetreRemoved");
+}
+
+float Fell::MaxHeightReductionM(float heightM, const Tuning& t)
+{
+    // A fraction of the chimney, capped. You are taking the perished top off by hand over a
+    // morning, not demolishing it twice.
+    return std::min(heightM * t.GetF("fellMaxHeightReductionFraction"),
+                    t.GetF("fellMaxHeightReductionM"));
+}
+
 FellOutcome Fell::Run(const FellSite& site, const Gob& gob, const FellPlan& plan, const Tuning& t)
 {
     const FellPrediction pred = Predict(site, gob, plan, t);

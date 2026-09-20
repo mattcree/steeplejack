@@ -28,6 +28,12 @@
   "fellScorePerfectBonus": 400.0,
   "fellScoreGoodBonus": 150.0,
   "fellScoreCleanBreakBonus": 80.0,
+  "_shiftComment": "What a felling costs in daylight. The 40 seconds a metre is the design's own number and the reason Act 2 is a decision rather than a chore: accuracy is bought with daylight and there is no other currency for it. Cutting and propping are priced so that a worked gob - 56 cells and 14 props - is about half a shift, which leaves the other half to argue over.",
+  "fellShiftSecondsPerCell": 28.0,
+  "fellShiftSecondsPerProp": 80.0,
+  "fellShiftSecondsPerMetreRemoved": 40.0,
+  "fellMaxHeightReductionM": 20.0,
+  "fellMaxHeightReductionFraction": 0.28,
   "fellHingeSecondsToGround": 7.5,
   "fractureCountTypical": [
     2,

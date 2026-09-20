@@ -72,8 +72,19 @@ which is the difference between "the chapel might catch some" and "it won't."
 
 ### Act 2: Strip Out (25 min)
 Bands off, conductor off. **The briefing recommends taking 8 m off the top** to improve
-predictability (accuracy improves ~1.5°/5 m → ~2.4°). It costs ~12 minutes of shift.
-**This is a genuine, meaningful, player-facing trade and most of the level's strategy lives in it.**
+predictability (accuracy improves ~1.5°/5 m → ~2.4°). At the rate
+[the felling system](../01-gdd/06-felling-system.md) gives — 40 seconds a metre — that is **about
+five and a half minutes** of shift.
+
+> **Corrected 2026-09-20 (FELL-006).** This said "~12 minutes", which is 90 seconds a metre and
+> disagrees with the system doc. The system doc wins: it is the spec for the system, and the 40
+> seconds is the number the game quotes the player. Per AGENTS.md rule 9, one of them was a bug.
+>
+> That correction makes the trade *cheaper than it is supposed to be*, and worth saying plainly:
+> **it is not yet a decision.** Act 2's climbing is not implemented, so nothing else is spending
+> the shift, and taking the full allowance off the top is simply free accuracy. The trade becomes
+> real when the strip-out and the ascent are priced against the same clock, and not before. The
+> cap (`fellMaxHeightReductionM`, and 28% of the chimney) is what stands in for that until then.
 
 ### Act 3: The Gob (40 min)
 - **Mortar asymmetry:** the south side is `strengthBias +0.35` — much harder to cut. Working the

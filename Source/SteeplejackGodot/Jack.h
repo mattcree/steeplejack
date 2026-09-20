@@ -303,6 +303,13 @@ public:
 	godot::Dictionary fell_run(double peg_bearing_deg, double height_removed_m,
 	                           bool surveyed) const;
 
+	/**
+	 * What the day has cost so far and what is left of it: `{spent, shift, left, per_metre,
+	 * max_reduction}`, all seconds and metres. Counts the cells actually out and the props
+	 * actually standing, so a .gd file cannot get the arithmetic wrong by counting its own way.
+	 */
+	godot::Dictionary fell_shift(double height_removed_m) const;
+
 	/** A tuned number, for the presentation layer to read rather than invent. */
 	double tuning_f(const godot::String& key, double fallback) const;
 

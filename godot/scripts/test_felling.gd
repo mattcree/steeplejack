@@ -121,6 +121,28 @@ func _init() -> void:
 	_check(absf(blind - known - jack.tuning_f("fallAccuracyUnsurveyedDegrees", 0.0)) < 0.01,
 		"which is worth %.0f degrees of cone" % (blind - known))
 
+	# --- Act 2's trade: metres off the top, paid for in daylight -----------------------------------
+	var shift: Dictionary = jack.fell_shift(0.0)
+	_check(float(shift.get("shift", 0.0)) > 0.0,
+		"the level gives you %d minutes of daylight" % int(float(shift.get("shift", 0.0)) / 60.0))
+	_check(float(shift.get("spent", 0.0)) > 0.0,
+		"and the gob has already cost %d of them" % int(float(shift.get("spent", 0.0)) / 60.0))
+	_check(float(shift.get("left", 0.0)) > 0.0, "with some left to argue over")
+	var cap: float = float(shift.get("max_reduction", 0.0))
+	_check(cap > 0.0 and cap < float(jack.structure().get("height", 70.0)) * 0.5,
+		"you may take %.0f m off by hand — the perished top, not the whole chimney" % cap)
+	var tight: float = float(jack.fell_predict(peg, cap, true).get("accuracy", 0.0))
+	var loose: float = float(jack.fell_predict(peg, 0.0, true).get("accuracy", 0.0))
+	_check(tight < loose, "taking it tightens the cone, %.1f deg -> %.1f deg" % [loose, tight])
+	_check(float(jack.fell_shift(cap).get("left", 0.0)) < float(shift.get("left", 0.0)),
+		"and costs you the daylight to do it")
+	world._height_removed = 0.0
+	world._take_off(2.0)
+	_check(world._height_removed == 2.0, "two metres off, through the real action")
+	world._take_off(1000.0)
+	_check(world._height_removed <= cap, "and it will not let you take more than she has")
+	world._height_removed = 0.0
+
 	# --- the pegs are the commitment ---------------------------------------------------------------
 	world._pegs.clear()
 	world._at = world._on_bearing(peg, 20.0)

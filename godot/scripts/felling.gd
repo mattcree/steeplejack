@@ -256,6 +256,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_E: _cut()
 			KEY_Q: _prop()
 			KEY_B: _plumb()
+			KEY_BRACKETLEFT: _take_off(-2.0)
+			KEY_BRACKETRIGHT: _take_off(2.0)
 			KEY_P: _drive_peg()
 			KEY_R: _pull_pegs()
 			KEY_F: _fire()
@@ -453,6 +455,34 @@ func _plumb() -> void:
 			int(here), int(SIGHTINGS_APART_DEG)], 6.0)
 
 
+## Act 2's trade, as a decision you make at the survey. "The game tells you your predicted accuracy
+## improves by ~1.5 degrees per 5 m removed... every metre taken by hand is 40 seconds of your
+## daylight. This is a real strategic choice and it should be presented as one at the survey."
+##
+## The metres are committed here rather than climbed, because the strip-out is not built yet. What
+## is real is the arithmetic: the cone tightens, the daylight goes, and both numbers come from the
+## sim. See level-07's note on why this is not yet a decision.
+func _take_off(metres: float) -> void:
+	if _fired:
+		return
+	var shift: Dictionary = jack.fell_shift(_height_removed)
+	var cap: float = float(shift.get("max_reduction", 0.0))
+	var want: float = clampf(_height_removed + metres, 0.0, cap)
+	if is_equal_approx(want, _height_removed):
+		if metres > 0.0:
+			hud.say("That is all she will give you by hand — %.0f m is the perished top." % cap, 5.0)
+		return
+	_height_removed = want
+	var after: Dictionary = jack.fell_shift(_height_removed)
+	if float(after.get("left", 0.0)) < 0.0:
+		_height_removed -= metres
+		hud.say("Not enough daylight left to take that off.", 4.0)
+		return
+	foley.cue("hammer", 0.92)
+	hud.say("%.0f m off the top. %d minutes of your day for it." % [
+		_height_removed, int(float(after.get("spent", 0.0)) - float(shift.get("spent", 0.0))) / 60], 4.0)
+
+
 ## Whether the lean has actually been established, rather than assumed.
 func surveyed() -> bool:
 	for i in _sightings.size():
@@ -597,6 +627,8 @@ func _update_hud() -> void:
 	hud.sightings = _sightings.size()
 	hud.pegs = _pegs.size()
 	hud.standing_at = Vector2(_at.x, _at.z)
+	hud.shift = jack.fell_shift(_height_removed)
+	hud.height_removed = _height_removed
 	var cell := _aimed_cell()
 	if cell.is_empty() or _fired:
 		hud.aim_seg = -1
