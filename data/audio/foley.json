@@ -24,7 +24,15 @@
     "rung": -22.0,
     "creak": -19.0,
     "thump": -10.0,
-    "gustTell": -17.0
+    "gustTell": -17.0,
+    "mortarTick": -24.0,
+    "groan": -15.0,
+    "propCreak": -18.0,
+    "propSplit": -7.0,
+    "crack": -6.0,
+    "roar": -9.0,
+    "crash": -5.0,
+    "cheer": -19.0
   },
   "taps": {
     "sound": {
@@ -194,5 +202,120 @@
     "groundDb": -42.0,
     "topDb": -24.0,
     "refHeightM": 60.0
+  },
+  "_fellComment": "The felling - FELL-003. The design says sound is seventy per cent of that moment, and it also says every failure has a telegraph (rule 7) and every audio cue a visual one (rule 8). So: mortar ticking and a low groan while the gob is uneasy, timber creaking as a prop loads up, a bang when one splits, and then the crack, the roar, the thump you feel, and a long way off, a cheer.",
+  "mortarTick": {
+    "decayMs": 45,
+    "transient": 0.9,
+    "partials": [
+      1450,
+      2300,
+      3100
+    ],
+    "lowpassHz": 6000,
+    "noise": 0.5,
+    "rattle": 0.0
+  },
+  "groan": {
+    "decayMs": 1400,
+    "transient": 0.05,
+    "partials": [
+      38,
+      57,
+      91
+    ],
+    "lowpassHz": 260,
+    "noise": 0.3,
+    "rattle": 0.2,
+    "rattleDelayMs": 140,
+    "rattleHz": 3
+  },
+  "propCreak": {
+    "decayMs": 420,
+    "transient": 0.15,
+    "partials": [
+      270,
+      405,
+      610
+    ],
+    "lowpassHz": 2200,
+    "noise": 0.45,
+    "rattle": 0.55,
+    "rattleDelayMs": 26,
+    "rattleHz": 17
+  },
+  "propSplit": {
+    "decayMs": 340,
+    "transient": 1.0,
+    "partials": [
+      180,
+      520,
+      1240
+    ],
+    "lowpassHz": 4200,
+    "noise": 0.8,
+    "rattle": 0.35,
+    "rattleDelayMs": 9,
+    "rattleHz": 44
+  },
+  "crack": {
+    "decayMs": 620,
+    "transient": 1.0,
+    "partials": [
+      96,
+      310,
+      880,
+      1600
+    ],
+    "lowpassHz": 5200,
+    "noise": 0.75,
+    "rattle": 0.3,
+    "rattleDelayMs": 15,
+    "rattleHz": 38
+  },
+  "roar": {
+    "decayMs": 4200,
+    "transient": 0.2,
+    "partials": [
+      54,
+      83,
+      129,
+      198
+    ],
+    "lowpassHz": 1400,
+    "noise": 0.95,
+    "rattle": 0.25,
+    "rattleDelayMs": 55,
+    "rattleHz": 9
+  },
+  "crash": {
+    "decayMs": 1800,
+    "transient": 1.0,
+    "partials": [
+      28,
+      41,
+      66,
+      104
+    ],
+    "lowpassHz": 380,
+    "noise": 0.9,
+    "rattle": 0.5,
+    "rattleDelayMs": 70,
+    "rattleHz": 6
+  },
+  "cheer": {
+    "decayMs": 2600,
+    "transient": 0.1,
+    "partials": [
+      420,
+      630,
+      940,
+      1380
+    ],
+    "lowpassHz": 2600,
+    "noise": 0.9,
+    "rattle": 0.2,
+    "rattleDelayMs": 90,
+    "rattleHz": 7
   }
 }

@@ -75,6 +75,27 @@ func _init() -> void:
 	var hull = st.get("support_hull", PackedVector2Array())
 	_check(hull.size() >= 3, "the support polygon has %d corners for the HUD to draw" % hull.size())
 
+	# --- the telegraphs, which rule 7 says ship with the failure -----------------------------------
+	# A gob whose only warning is a word on a panel fails the fairness contract. Every band has to
+	# be louder, dustier and shakier than the one before it, and every cue has to exist to be played.
+	var foley: Node = world.get_node("Foley")
+	for name in ["mortarTick", "groan", "propCreak", "propSplit", "crack", "roar", "crash", "cheer"]:
+		_check(foley.cue_stream(name) != null, "there is a sound for %s" % name)
+	var worse := ["SAFE", "UNEASY", "CRITICAL", "COLLAPSE"]
+	var rising := true
+	for i in range(1, worse.size()):
+		if float(world.TICKS_PER_SECOND[worse[i]]) <= float(world.TICKS_PER_SECOND[worse[i - 1]]):
+			rising = false
+		if float(world.SHAKE_M[worse[i]]) <= float(world.SHAKE_M[worse[i - 1]]):
+			rising = false
+		if i > 1 and float(world.GROAN_EVERY[worse[i]]) >= float(world.GROAN_EVERY[worse[i - 1]]):
+			rising = false
+	_check(rising, "each band ticks faster, groans oftener and shakes harder than the one before")
+	_check(float(world.SHAKE_HZ) <= 3.0, "and nothing on screen moves faster than 3 Hz (rule 20)")
+	world._telegraph(0.02)
+	_check(world._dust != null and world._dust.emitting,
+		"the gob is shedding dust, which is what the ticking looks like (rule 8)")
+
 	# --- what it will do, before you light it ------------------------------------------------------
 	var pred: Dictionary = jack.fell_predict(peg, 0.0)
 	_check(abs(_delta(float(pred.get("fall_bearing", 0.0)), peg)) < 20.0,

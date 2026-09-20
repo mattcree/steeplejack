@@ -58,7 +58,8 @@ func _ready() -> void:
 
 	for key in TIER_KEYS:
 		_taps.append(_render(_spec["taps"][key]))
-	for key in ["hammer", "bent", "seated", "rung", "creak", "thump"]:
+	for key in ["hammer", "bent", "seated", "rung", "creak", "thump",
+			"mortarTick", "groan", "propCreak", "propSplit", "crack", "roar", "crash", "cheer"]:
 		_one_shot[key] = _render(_spec[key])
 	_breath = _render_breath(_spec["breath"])
 	_slide = _render_slide(_spec["slide"])

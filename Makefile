@@ -267,6 +267,14 @@ run: godot-run
 godot-run: godot-build godot-import
 	@$(GODOT) --path godot $(if $(LEVEL),-- --level $(LEVEL),)
 
+## fell: play the demolition mode — cut the gob, prop it, peg the line, light it
+##
+##   LMB cut a cell   RMB stand a prop   P drive the pegs   F fire
+##   A/D walk round the base   W/S in and out   mouse look   Esc free the mouse
+fell: godot-build godot-import
+	@$(GODOT) --path godot --main-pack-scene res://scenes/felling.tscn 2>/dev/null \
+		|| $(GODOT) --path godot res://scenes/felling.tscn
+
 # Run a script headlessly against the project — the way anything gets verified without a human
 # watching.
 #   make godot-script SCRIPT=res://scripts/prove_sim.gd

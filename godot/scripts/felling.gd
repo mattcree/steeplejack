@@ -25,6 +25,7 @@ const ORBIT_MAX := 26.0     ## while you are working. Watching it go, you stand 
 @onready var ring: GobRing = $GobRing
 @onready var hud: Control = $HUD
 @onready var camera: Camera3D = $Camera
+@onready var foley: Node = $Foley
 
 var level_path := "res://../data/levels/06-waterside.json"
 var tuning_dir := "res://../data/tuning"
@@ -41,6 +42,22 @@ var _fall: FellFall
 var _outcome := {}
 var _authored := {}
 var _mouse_wanted := true
+
+# The telegraphs. Rule 7: every failure has one, shipped with the failure. Rule 8: every audio cue
+# has a visual fallback. A gob whose only warning was a word on a panel would fail both.
+const TICKS_PER_SECOND := {"SAFE": 0.0, "UNEASY": 1.1, "CRITICAL": 3.6, "COLLAPSE": 7.0}
+const GROAN_EVERY := {"SAFE": 0.0, "UNEASY": 7.0, "CRITICAL": 2.6, "COLLAPSE": 1.2}
+const SHAKE_M := {"SAFE": 0.0, "UNEASY": 0.004, "CRITICAL": 0.022, "COLLAPSE": 0.06}
+const SHAKE_HZ := 2.8          ## rule 20: nothing on screen moves faster than 3 Hz
+const CHEER_AFTER := 4.6       ## "then - after four or five seconds - a distant cheer"
+
+var _tick_due := 0.0
+var _groan_due := 0.0
+var _shake := 0.0
+var _last_status := "SAFE"
+var _split_seen := 0
+var _cheered := false
+var _dust: GPUParticles3D
 
 
 func _ready() -> void:
@@ -59,8 +76,45 @@ func _ready() -> void:
 	_peg = _corridor_centre()
 	_around = _peg
 	_face_the_chimney()
+	_build_dust()
 	_capture(true)
 	hud.say("Cut the gob on the side you want it to fall. Aim at the brick and press E.", 6.0)
+
+
+## Dust off the gob. This is the visual half of the mortar ticking (rule 8) and the first thing a
+## player sees that says the chimney is working, before any number does.
+func _build_dust() -> void:
+	_dust = GPUParticles3D.new()
+	var mat := ParticleProcessMaterial.new()
+	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
+	mat.emission_ring_radius = jack.structure().get("base_radius", 3.2)
+	mat.emission_ring_inner_radius = float(mat.emission_ring_radius) * 0.8
+	mat.emission_ring_height = 0.2
+	mat.emission_ring_axis = Vector3.UP
+	mat.direction = Vector3(0.0, -1.0, 0.0)
+	mat.spread = 12.0
+	mat.initial_velocity_min = 0.2
+	mat.initial_velocity_max = 0.7
+	mat.gravity = Vector3(0.0, -1.4, 0.0)
+	mat.scale_min = 0.03
+	mat.scale_max = 0.11
+	mat.color = Color(0.72, 0.67, 0.58, 0.5)
+	_dust.process_material = mat
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.5, 0.5)
+	var dm := StandardMaterial3D.new()
+	dm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	dm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	dm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	dm.vertex_color_use_as_albedo = true
+	dm.albedo_color = Color(0.72, 0.67, 0.58, 0.45)
+	quad.material = dm
+	_dust.draw_pass_1 = quad
+	_dust.amount = 80
+	_dust.lifetime = 2.2
+	_dust.emitting = false
+	_dust.position.y = GobRing.COURSE_H * float(ring.courses)
+	add_child(_dust)
 
 
 ## Everything the level authored about this felling. Data, carried through, not interpreted.
@@ -155,6 +209,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _process(dt: float) -> void:
 	if _fired:
+		_after_the_fall(dt)
 		_update_hud()
 		return
 	var move := Input.get_axis("ui_left", "ui_right")
@@ -162,7 +217,49 @@ func _process(dt: float) -> void:
 	_around = fmod(_around + move * WALK / maxf(_orbit, 1.0) * dt * 57.2958 + 360.0, 360.0)
 	_orbit = clampf(_orbit - in_out * WALK * dt, ORBIT_MIN, ORBIT_MAX)
 	_place_camera()
+	_telegraph(dt)
 	_update_hud()
+
+
+## What the chimney is telling you, in dust, timber and noise. The words on the panel are the last
+## of the four, not the first: a player who never looks at the HUD should still know.
+func _telegraph(dt: float) -> void:
+	var st: Dictionary = jack.gob_state()
+	var status := String(st.get("status_name", "SAFE"))
+
+	# A prop going is a bang, and you see it fold.
+	var split := int(st.get("props_split", 0))
+	if split > _split_seen:
+		_split_seen = split
+		foley.cue("propSplit")
+		ring.refresh()
+		hud.say("A prop has split. That load is on its neighbours now.", 5.0)
+
+	if status != _last_status:
+		_last_status = status
+		if status == "CRITICAL" or status == "COLLAPSE":
+			foley.cue("crack", 0.85)
+
+	# Mortar ticking, and the dust that is its visual fallback.
+	var rate: float = TICKS_PER_SECOND.get(status, 0.0)
+	if _dust != null:
+		_dust.emitting = rate > 0.0
+		_dust.amount_ratio = clampf(rate / 4.0, 0.08, 1.0)
+	if rate > 0.0:
+		_tick_due -= dt
+		if _tick_due <= 0.0:
+			_tick_due = 1.0 / rate
+			foley.cue("mortarTick", randf_range(0.88, 1.16))
+
+	var groan: float = GROAN_EVERY.get(status, 0.0)
+	if groan > 0.0:
+		_groan_due -= dt
+		if _groan_due <= 0.0:
+			_groan_due = groan
+			foley.cue("groan", randf_range(0.94, 1.06))
+
+	# And it moves. "visible movement, screen shake" — under 3 Hz, per rule 20.
+	_shake = float(SHAKE_M.get(status, 0.0))
 
 
 func _face_the_chimney() -> void:
@@ -177,7 +274,21 @@ func _face_the_chimney() -> void:
 func _place_camera() -> void:
 	var b := deg_to_rad(_around)
 	camera.position = Vector3(sin(b) * _orbit, EYE, cos(b) * _orbit)
+	if _shake > 0.0:
+		var t := Time.get_ticks_msec() / 1000.0 * TAU * SHAKE_HZ
+		camera.position += Vector3(sin(t) * _shake, sin(t * 0.7) * _shake, cos(t * 1.3) * _shake)
 	camera.rotation = Vector3(_pitch, _yaw, 0.0)
+
+
+## "then a ground thump you feel in the subwoofer, then bricks raining, then dust, then birds,
+## then - after four or five seconds - a distant cheer from the crowd. Then nothing."
+func _after_the_fall(dt: float) -> void:
+	if _fall == null or _fall.running() or _cheered:
+		return
+	_tick_due -= dt
+	if _tick_due <= -CHEER_AFTER:
+		_cheered = true
+		foley.cue("cheer")
 
 
 # ---------------------------------------------------------------- what you are pointing at
@@ -280,6 +391,12 @@ func _fire() -> void:
 	add_child(_fall)
 	var centroid: Vector2 = st.get("support_centroid", Vector2.ZERO)
 	var s: Dictionary = jack.structure()
+	foley.cue("crack")
+	foley.cue("roar", 0.9)
+	if _dust != null:
+		_dust.emitting = false
+	_shake = 0.0
+	_fall.broke.connect(_on_broke)
 	_fall.landed.connect(_on_landed)
 	_fall.begin(float(s.get("height", 70.0)), float(s.get("base_radius", 3.2)),
 		float(s.get("top_radius", 1.9)),
@@ -289,8 +406,15 @@ func _fire() -> void:
 
 ## The verdict is for afterwards. Putting it up the moment the match is lit covers the one thing
 ## the whole level was for.
+func _on_broke(height_m: float) -> void:
+	foley.cue("crack", 1.15)
+	hud.say("she's broken at %d m" % int(height_m), 2.0)
+
+
 func _on_landed() -> void:
 	hud.outcome = _outcome
+	foley.cue("crash")
+	_cheered = false
 
 
 func _after_change() -> void:
