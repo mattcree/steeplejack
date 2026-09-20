@@ -139,7 +139,12 @@ func _ready() -> void:
 	if foley.has_method("set_height"):
 		foley.set_height(EYE)
 	_capture(true)
-	hud.say("Cut the gob on the side you want it to fall. Aim at the brick and press E.", 6.0)
+	if _stripped:
+		hud.say("Cut the gob on the side you want it to fall. Aim at a cell and hold the left "
+			+ "button until it comes out.", 8.0)
+	else:
+		hud.say("She is not stripped yet — bands on, conductor down her side. Take the job from the "
+			+ "board and climb her first. [enter]", 10.0)
 
 
 ## Dust off the gob. This is the visual half of the mortar ticking (rule 8) and the first thing a
@@ -511,7 +516,7 @@ func _cut() -> void:
 		return
 	var cell := _aimed_cell()
 	if cell.is_empty():
-		hud.say("Nothing in reach. Walk in with W and aim at the brickwork.")
+		hud.say("Nothing in reach. Walk in and aim at the brickwork.")
 		return
 	if not jack.gob_cut(cell[0], cell[1]):
 		hud.say("That one is already out.")

@@ -17,9 +17,14 @@ const PROP_RADIUS := 0.08       ## a timber prop, in metres
 const RING_PROUD := 0.02        ## the ring sits a little proud of the shaft above it
 
 # Intact brick, cut away, and propped. Cut cells are not drawn at all — the hole is the point.
-const INTACT := Color(0.42, 0.33, 0.28)
-const WEAK := Color(0.52, 0.44, 0.30)       ## mortar the level authored soft
-const PROPPED := Color(0.46, 0.38, 0.31)
+#
+# Darker than they look written down. These sit at the very foot of the chimney, where the shaft
+# above them is at its sootiest, and the first pass rendered as a course of pale stone blocks
+# against black brick — a seam exactly where the player spends twenty minutes looking.
+const INTACT := Color(0.22, 0.17, 0.15)
+const WEAK := Color(0.30, 0.25, 0.17)       ## mortar the level authored soft: paler, limier
+const HARD := Color(0.17, 0.13, 0.12)       ## and the tough side is darker and denser
+const PROPPED := Color(0.25, 0.20, 0.17)
 const TIMBER := Color(0.70, 0.56, 0.32)
 const TIMBER_LOADED := Color(0.78, 0.42, 0.20)
 const TIMBER_SPLIT := Color(0.30, 0.16, 0.12)
@@ -123,8 +128,11 @@ func refresh() -> void:
 				var basis := Basis(Vector3.UP, b)
 				t = Transform3D(basis, _point_on(bearing, radius + RING_PROUD, COURSE_H * (float(course) + 0.5)))
 			_cells.multimesh.set_instance_transform(i, t)
+			# Soft mortar reads paler and hard mortar darker, so the asymmetry a level authors is
+			# visible before you put a bar in it — which is the tell rule 7 asks for.
 			var strength := float(cell.get("strength", 1.0))
-			var colour := INTACT.lerp(WEAK, clampf(1.0 - strength, 0.0, 1.0))
+			var colour := INTACT.lerp(WEAK, clampf(1.0 - strength, 0.0, 1.0)) if strength <= 1.0 \
+				else INTACT.lerp(HARD, clampf(strength - 1.0, 0.0, 1.0))
 			if bool(cell.get("propped", false)):
 				colour = colour.lerp(PROPPED, 0.5)
 			_cells.multimesh.set_instance_color(i, colour)
