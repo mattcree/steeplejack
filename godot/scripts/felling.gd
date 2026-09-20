@@ -145,7 +145,10 @@ func _ready() -> void:
 	add_child(_peg_marks)
 	_place_body()
 	_load_career()
-	_stripped = jack.career_stripped(_authored["id"]) or _authored["strip_out"].is_empty()
+	# `--stripped` is the shortcut's shortcut: `make fell` exists to put you at a gob without
+	# playing the board, and sending you back to the board to climb her first would defeat it.
+	_stripped = jack.career_stripped(_authored["id"]) or _authored["strip_out"].is_empty() \
+		or OS.get_cmdline_args().has("--stripped")
 	_step = 1 if _stripped else 0
 	_build_dust()
 	# The wind, at head height. The felling had no ambient bed at all — every sound in it was a cue,

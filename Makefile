@@ -278,10 +278,13 @@ godot-run: godot-build godot-import
 
 ## fell: play the demolition mode — cut the gob, prop it, peg the line, light it
 ##
-##   LMB cut a cell   RMB stand a prop   P drive the pegs   F fire
+##   hold LMB cut a cell   RMB stand a prop   B plumb   P pegs   hold F pack   L light   X a board
+##
+## Skips the board, and skips the strip-out with it — a felling from the board is two visits, and
+## this one is for looking at the gob.
 ##   A/D walk round the base   W/S in and out   mouse look   Esc free the mouse
 fell: godot-build godot-import
-	@$(GODOT) --path godot res://scenes/felling.tscn $(if $(LEVEL),--level $(LEVEL),)
+	@$(GODOT) --path godot res://scenes/felling.tscn --stripped $(if $(LEVEL),--level $(LEVEL),)
 
 # Run a script headlessly against the project — the way anything gets verified without a human
 # watching.
