@@ -2,7 +2,7 @@
   "_comment": [
     "Sound design as numbers. Every cue in this game is synthesised from this file at load, because",
     "a .wav is a binary asset and binary assets are the half of this project agents cannot author or",
-    "review \u2014 see ADR-0006 and the ownership table in AGENTS.md. A tap sound written as an envelope",
+    "review - see ADR-0006 and the ownership table in AGENTS.md. A tap sound written as an envelope",
     "is a tap sound that can be diffed, tuned in a pull request, and argued about.",
     "",
     "Deliberately NOT under data/tuning/. Tuning::LoadAll reads every file there and stamps the lot",

@@ -24,6 +24,57 @@ namespace {
 
 constexpr std::size_t kFirstLine = 1;
 
+// UTF-16 escapes, and the UTF-8 they turn into. This reader used to refuse `\u` outright, on the
+// grounds that no key or value in the data needed one and that decoding surrogate pairs quietly
+// wrong is worse than saying so. Then someone wrote an em dash in a comment in `foley.json` and
+// every sound in the game stopped loading, so now it decodes them, properly and loudly.
+constexpr uint32_t kSurrogateHighMin = 0xD800;   // literal: UTF-16 high surrogate range
+constexpr uint32_t kSurrogateHighMax = 0xDBFF;   // literal: UTF-16 high surrogate range
+constexpr uint32_t kSurrogateLowMin = 0xDC00;    // literal: UTF-16 low surrogate range
+constexpr uint32_t kSurrogateLowMax = 0xDFFF;    // literal: UTF-16 low surrogate range
+constexpr uint32_t kSupplementary = 0x10000;     // literal: first code point needing a pair
+constexpr int      kSurrogateShift = 10;         // literal: payload bits in a surrogate half
+constexpr int      kHexDigits = 4;               // literal: \u takes exactly four
+constexpr uint32_t kHexBase = 16;                // literal: hexadecimal
+constexpr uint32_t kUtf8Max1 = 0x80;             // literal: one UTF-8 byte up to U+007F
+constexpr uint32_t kUtf8Max2 = 0x800;            // literal: two UTF-8 bytes up to U+07FF
+constexpr uint32_t kUtf8ContMask = 0x3F;         // literal: payload bits in a continuation byte
+constexpr uint32_t kUtf8ContTag = 0x80;          // literal: continuation byte tag
+constexpr uint32_t kUtf8Lead2 = 0xC0;            // literal: two-byte lead tag
+constexpr uint32_t kUtf8Lead3 = 0xE0;            // literal: three-byte lead tag
+constexpr uint32_t kUtf8Lead4 = 0xF0;            // literal: four-byte lead tag
+constexpr int      kUtf8ContShift = 6;           // literal: payload bits per continuation byte
+
+void AppendUtf8(std::string& out, uint32_t cp)
+{
+    const auto byte = [&out](uint32_t v) { out.push_back(static_cast<char>(v)); };
+    const auto cont = [&byte](uint32_t v, int shift) {
+        byte(kUtf8ContTag | ((v >> shift) & kUtf8ContMask));
+    };
+    if (cp < kUtf8Max1)
+    {
+        byte(cp);
+    }
+    else if (cp < kUtf8Max2)
+    {
+        byte(kUtf8Lead2 | (cp >> kUtf8ContShift));
+        cont(cp, 0);
+    }
+    else if (cp < kSupplementary)
+    {
+        byte(kUtf8Lead3 | (cp >> (kUtf8ContShift * 2)));   // literal: two continuation bytes follow
+        cont(cp, kUtf8ContShift);
+        cont(cp, 0);
+    }
+    else
+    {
+        byte(kUtf8Lead4 | (cp >> (kUtf8ContShift * 3)));   // literal: three continuation bytes follow
+        cont(cp, kUtf8ContShift * 2);                      // literal: two continuation bytes follow
+        cont(cp, kUtf8ContShift);
+        cont(cp, 0);
+    }
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------- reader
@@ -251,13 +302,66 @@ private:
             case 'r':  out.push_back('\r'); break;
             case 't':  out.push_back('\t'); break;
             case 'u':
-                // Decoding UTF-16 surrogate pairs and getting it quietly wrong is worse than
-                // saying so. No key or value in the data needs one.
-                Fail("\\u escapes are not supported");
+            {
+                uint32_t cp = ReadHex4();
+                if (cp >= kSurrogateHighMin && cp <= kSurrogateHighMax)
+                {
+                    if (pos_ + 1 >= text_.size() || text_[pos_] != '\\' || text_[pos_ + 1] != 'u')
+                    {
+                        Fail("a high surrogate with no \\u after it");
+                    }
+                    pos_ += 2;   // literal: the backslash and the u
+                    const uint32_t lo = ReadHex4();
+                    if (lo < kSurrogateLowMin || lo > kSurrogateLowMax)
+                    {
+                        Fail("a high surrogate followed by something that is not a low surrogate");
+                    }
+                    cp = kSupplementary + ((cp - kSurrogateHighMin) << kSurrogateShift) +
+                         (lo - kSurrogateLowMin);
+                }
+                else if (cp >= kSurrogateLowMin && cp <= kSurrogateLowMax)
+                {
+                    Fail("a low surrogate with no high surrogate before it");
+                }
+                AppendUtf8(out, cp);
+                break;
+            }
             default:
                 Fail(std::string("unknown escape '\\") + e + "'");
             }
         }
+    }
+
+    uint32_t ReadHex4()
+    {
+        uint32_t v = 0;
+        for (int i = 0; i < kHexDigits; ++i)
+        {
+            if (pos_ >= text_.size())
+            {
+                Fail("a \\u escape cut short");
+            }
+            const char h = text_[pos_++];
+            uint32_t d = 0;
+            if (h >= '0' && h <= '9')   // literal: the decimal digits, as characters
+            {
+                d = static_cast<uint32_t>(h - '0');
+            }
+            else if (h >= 'a' && h <= 'f')
+            {
+                d = static_cast<uint32_t>(h - 'a') + 10;   // literal: 'a' is the tenth hex digit
+            }
+            else if (h >= 'A' && h <= 'F')
+            {
+                d = static_cast<uint32_t>(h - 'A') + 10;   // literal: 'A' is the tenth hex digit
+            }
+            else
+            {
+                Fail(std::string("'") + h + "' is not a hex digit");
+            }
+            v = v * kHexBase + d;
+        }
+        return v;
     }
 
     double ReadNumber()

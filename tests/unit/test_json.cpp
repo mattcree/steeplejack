@@ -203,12 +203,24 @@ TEST_CASE("Json: the errors that matter are rejections, not guesses")
     CHECK_THROWS_AS(JsonValue::Parse(R"({"a": 1,)", "t.json"), JsonError);
     CHECK_THROWS_AS(JsonValue::Parse(R"({"a": tru})", "t.json"), JsonError);
 
-    // Decoding surrogate pairs wrongly in silence is worse than refusing. The escape is built
-    // at runtime rather than written in the source: a compiler may fold a universal character
-    // name into its character even inside a raw string literal, and then the test tests nothing.
-    const std::string uEscape = std::string("{\"a\": \"") + char(92) + "u0041\"}";
-    CHECK(MessageOf([&] { (void)JsonValue::Parse(uEscape, "t.json"); })
-              .find("escapes are not supported") != std::string::npos);
+    // Half a surrogate pair is not a character and there is nothing honest to do with it. The
+    // escapes are built at runtime rather than written in the source: a compiler may fold a
+    // universal character name into its character even inside a raw string literal, and then the
+    // test tests nothing.
+    const auto esc = [](const std::string& body) {
+        return std::string("{\"a\": \"") + body + "\"}";
+    };
+    const std::string bs(1, char(92));
+    CHECK(MessageOf([&] { (void)JsonValue::Parse(esc(bs + "uD83D"), "t.json"); })
+              .find("high surrogate with no") != std::string::npos);
+    CHECK(MessageOf([&] { (void)JsonValue::Parse(esc(bs + "uD83D" + bs + "u0041"), "t.json"); })
+              .find("not a low surrogate") != std::string::npos);
+    CHECK(MessageOf([&] { (void)JsonValue::Parse(esc(bs + "uDE00"), "t.json"); })
+              .find("low surrogate with no") != std::string::npos);
+    CHECK(MessageOf([&] { (void)JsonValue::Parse(esc(bs + "u00G1"), "t.json"); })
+              .find("not a hex digit") != std::string::npos);
+    CHECK(MessageOf([&] { (void)JsonValue::Parse(std::string("{\"a\": \"") + bs + "u00", "t.json"); })
+              .find("cut short") != std::string::npos);
 
     CHECK(MessageOf([] { (void)JsonValue::Parse(R"({"a": "\q"})", "t.json"); })
               .find("unknown escape") != std::string::npos);
@@ -262,6 +274,21 @@ TEST_CASE("Json: Size and Has on a value that is neither an object nor an array"
     CHECK_FALSE(d.At("n").Has("anything"));
     CHECK_FALSE(d.At("list").Has("anything"));
     CHECK(d.Has("n"));
+}
+
+TEST_CASE("Json: \\u decodes to UTF-8, which is what a comment with an em dash in it needs")
+{
+    // This reader refused \u until an em dash in a comment in data/audio/foley.json took every
+    // sound in the game out at load. One byte, two bytes, three and a surrogate pair.
+    const std::string bs(1, char(92));
+    const auto text = [&bs](const std::string& body) {
+        return std::string("{\"a\": \"") + bs + body + "\"}";
+    };
+    CHECK(JsonValue::Parse(text("u0041"), "t.json").At("a").AsString() == "A");
+    CHECK(JsonValue::Parse(text("u00e9"), "t.json").At("a").AsString() == "\xc3\xa9");             // e-acute
+    CHECK(JsonValue::Parse(text("u2014"), "t.json").At("a").AsString() == "\xe2\x80\x94");        // em dash
+    const std::string pair = std::string("{\"a\": \"") + bs + "uD83D" + bs + "uDE00\"}";
+    CHECK(JsonValue::Parse(pair, "t.json").At("a").AsString() == "\xf0\x9f\x98\x80");   // U+1F600, a surrogate pair
 }
 
 TEST_CASE("Json: the escapes that are supported round-trip")
