@@ -31,7 +31,9 @@
 
   "fellHingeSecondsToGround": 7.5,
   "fractureCountTypical": [2, 4],
-  "fractureCleanBreakChunks": [3, 4],
-  "fellFractureStressCoeff": 0.0016,
-  "fellFractureMinHeightM": 12.0
+  "fellCleanBreakMinChunks": 3,
+  "fellCleanBreakMaxChunks": 4,
+  "fellFractureStressCoeff": 0.06,
+  "fellFractureMinHeightM": 12.0,
+  "fellFractureMinChunkM": 12.0
 }

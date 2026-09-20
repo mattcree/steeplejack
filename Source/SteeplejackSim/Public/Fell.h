@@ -1,0 +1,131 @@
+#pragma once
+
+// The fall — FELL-002. Gob.h cuts the hole; this drops the chimney into it.
+//
+// The whole of a felling is a bet the player makes at the survey and cannot take back: two pegs in
+// the ground saying "it will land there". Everything after that — the lean they measured, the arc
+// they cut, the metres they took off by hand, the wind on the day — moves the real answer towards
+// or away from those pegs, and then it falls once.
+//
+// ## Where it actually goes
+//
+// Three things pull on the fall line and it goes where their sum points:
+//
+//   * **The gob.** A chimney falls into the hole you cut. This is the player's instrument and it
+//     has the most authority, which is what makes cutting the gob the game.
+//   * **The lean.** "The chimney wants to fall along its lean. Fighting it costs you accuracy."
+//     Each degree of lean pulls with `fallLeanPullPerDegree` percent of the gob's authority, so a
+//     negligible lean is a rounding error and 2.1° is nearly half the argument.
+//   * **The wind**, weakly, per metre per second.
+//
+// This is deterministic — ADR-0002 — so the same site, gob and plan always fall the same way. The
+// seed only shakes out the fractures, and it comes from the level, so a given level's chimney
+// always breaks up the same way too. There is no dice roll anywhere the player can feel one.
+//
+// ## Why it is never exactly right
+//
+// `Accuracy` is the half-angle of the cone the HUD draws, and it is an honest prediction of the
+// error, not a fudge applied to it: the fall really does land inside it. It widens with the lean
+// being fought, with height, and with a gob too narrow to steer with; it narrows by
+// `fallAccuracyPerFiveMetresRemoved` for every five metres taken off by hand, which is the trade
+// Act 2 exists to offer — "every metre taken by hand is 40 seconds of your daylight".
+
+#include "Export.h"
+
+#include <cstdint>
+#include <string>
+#include <vector>
+
+namespace sj {
+
+class Gob;
+class Tuning;
+
+// Something on the site that must not be hit. `value` is pounds; a catastrophic one has no price
+// and fails the job.
+struct Exclusion
+{
+    std::string id;
+    float       bearingDeg{};
+    float       distanceM{};
+    float       valueGbp{};
+    bool        catastrophic{};
+};
+
+// The chimney and its day. Bearings clockwise from north, metres, m/s.
+struct FellSite
+{
+    float heightM{};
+    float baseRadiusM{};
+    float leanDeg{};
+    float leanBearingDeg{};
+    float windSpeedMps{};
+    float windBearingDeg{};
+    float safeLineDistanceM{};
+    std::vector<Exclusion> exclusions;
+    uint32_t seed{};
+};
+
+// What the player committed to: where the pegs are, and what they took off the top first.
+struct FellPlan
+{
+    float pegBearingDeg{};
+    float heightRemovedM{};
+};
+
+enum class FellGrade : uint8_t { Wild, Acceptable, Good, Perfect };
+
+// What the HUD shows before the match is lit. Every number here is one the player can change.
+struct FellPrediction
+{
+    float fallBearingDeg{};     // where it will really go
+    float errorDegrees{};       // how far that is off the pegs
+    float accuracyDegrees{};    // half-angle of the cone drawn round it
+    float debrisHalfAngleDeg{};
+    float debrisLengthM{};
+
+    // Is this thing inside the fan? Bearing and distance from the base, as the level authors them.
+    bool Threatens(const Exclusion& e) const noexcept;
+};
+
+// What happened. `fractureHeightsM` are where the shaft broke, highest first.
+struct FellOutcome
+{
+    float fallBearingDeg{};
+    float errorDegrees{};
+    FellGrade grade{FellGrade::Wild};
+    std::vector<float>       fractureHeightsM;
+    std::vector<std::string> struck;
+    int32_t chunks{1};
+    bool    cleanBreak{};
+    bool    catastrophe{};
+    float   bonusGbp{};
+    float   penaltyGbp{};
+};
+
+// No state: a felling is a function of the site, the hole and the plan.
+class SJ_API Fell
+{
+public:
+    // What the survey and the gob say will happen. Safe to call every frame while cutting — this
+    // is what makes the gob legible, and the design leans on it: the player watches the cone
+    // swing as they take brick out.
+    static FellPrediction Predict(const FellSite& site, const Gob& gob, const FellPlan& plan,
+                                  const Tuning& t);
+
+    // Light it. Runs the hinge, breaks the shaft where the bending stress says, and scores it.
+    static FellOutcome Run(const FellSite& site, const Gob& gob, const FellPlan& plan,
+                           const Tuning& t);
+
+    // Where the shaft breaks, highest first. A rod hinging about its base has an angular rate that
+    // grows as it goes over, and the bending stress at height h goes as rate² × h — so the stress
+    // is worst high up and late, the top lets go first, and the piece above it overtakes the rest
+    // and lands beyond the base of the fall. That is why a felled chimney throws debris further
+    // than its own height, and it is the reason the debris fan is 1.15 × height and not 1.0.
+    static std::vector<float> FractureHeights(float shaftHeightM, const Tuning& t);
+
+    // Signed difference between two bearings, in (-180, 180].
+    static float BearingDelta(float fromDeg, float toDeg) noexcept;
+};
+
+}  // namespace sj
