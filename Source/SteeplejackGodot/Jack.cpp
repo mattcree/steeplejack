@@ -182,6 +182,8 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("structure"), &Jack::structure);
 	ClassDB::bind_method(D_METHOD("gob_begin", "segments", "courses", "props", "dud_index"),
 	                     &Jack::gob_begin);
+	ClassDB::bind_method(D_METHOD("gob_mortar_asymmetry", "bearing_deg", "bias"),
+	                     &Jack::gob_mortar_asymmetry);
 	ClassDB::bind_method(D_METHOD("gob_cut", "seg", "course"), &Jack::gob_cut);
 	ClassDB::bind_method(D_METHOD("gob_prop", "seg"), &Jack::gob_prop);
 	ClassDB::bind_method(D_METHOD("gob_state"), &Jack::gob_state);
@@ -1065,6 +1067,12 @@ void Jack::gob_begin(int64_t segments, int64_t courses, int64_t props, int64_t d
 		UtilityFunctions::push_error("jack: ", String(e.what()));
 		gob.reset();
 	}
+}
+
+void Jack::gob_mortar_asymmetry(double bearing_deg, double bias)
+{
+	if (!gob) { return; }
+	gob->SetMortarAsymmetry(static_cast<float>(bearing_deg), static_cast<float>(bias));
 }
 
 bool Jack::gob_cut(int64_t seg, int64_t course)

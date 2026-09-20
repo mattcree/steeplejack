@@ -32,7 +32,8 @@ const PEG_MIN_APART_M := 6.0     ## two pegs closer together than this are not a
 @onready var foley: Node = $Foley
 @onready var site: FellSite = $Site
 
-var level_path := "res://../data/levels/06-waterside.json"
+## Which chimney. `make fell LEVEL=07-kershaws-yard`, or the default.
+var level_path := "res://../data/levels/%s.json" % _level_arg()
 var tuning_dir := "res://../data/tuning"
 
 var _at := Vector3(0.0, 0.0, 14.0)   ## where you are standing, on the site
@@ -69,6 +70,20 @@ var _pegs: Array[Vector3] = []
 var _peg_marks: Node3D
 
 
+## The level named on the command line, or Waterside. Waterside is the tutorial felling and the
+## only one with 180 degrees of open field; everything after it is a narrower yard.
+static func _level_arg() -> String:
+	var args := OS.get_cmdline_args()
+	for i in args.size():
+		if args[i] == "--level" and i + 1 < args.size():
+			return args[i + 1]
+	for a in OS.get_cmdline_user_args():
+		var s := String(a)
+		if s.begins_with("level="):
+			return s.substr(6)
+	return "06-waterside"
+
+
 func _ready() -> void:
 	if not jack.load(ProjectSettings.globalize_path(tuning_dir),
 			ProjectSettings.globalize_path(level_path)):
@@ -82,6 +97,7 @@ func _ready() -> void:
 	_clear_the_pitch()
 	hud.jack = jack
 	hud.ring = ring
+	hud.level_name = jack.level_name()
 	hud.set_meta("exclusions", _authored.get("exclusions", []))
 	_peg = _corridor_centre()
 	_at = _on_bearing(_peg, 16.0)
@@ -174,6 +190,10 @@ func _begin_gob() -> void:
 	# thousand tons of brickwork is a rule in the wrong layer, and the whole prop model hangs off
 	# that one number.
 	jack.gob_begin(_authored["segments"], _authored["courses"], _authored["props"], _authored["dud"])
+	# One side of the ring tougher than the other, where the level says so. Kershaw's Yard authors
+	# a 0.35 bias on the south side, and working the gob evenly there takes longer on one side.
+	if _authored["mortar_bearing"] >= 0.0:
+		jack.gob_mortar_asymmetry(_authored["mortar_bearing"], _authored["mortar_bias"])
 	# The wind at the top is the wind that argues with a falling chimney. Its bearing is the
 	# level's prevailing one; the sim only uses it as a weak pull on the fall line.
 	var s: Dictionary = jack.structure()

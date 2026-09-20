@@ -45,5 +45,22 @@ the schema has no way to express "unordered".
 |---|---|---|---|---|---|---|
 | **L0 grey box** | ✅ spec complete | ✅ | ⬜ | n/a — grey box | ⬜ | ⬜ |
 | L1–L4 | ✅ spec complete | 🟡 L1 only | ⬜ | ⬜ | ⬜ | ⬜ |
-| L5–L7 | ✅ spec complete | 🟡 L6 only | ⬜ | ⬜ | ⬜ | ⬜ |
+| L5–L7 | ✅ spec complete | 🟡 L6, L7 | ⬜ | ⬜ | ⬜ | 🟡 L6, L7 felling only |
 | L8–L12 | ✅ spec complete | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+
+## The three fellings, and how they differ
+
+The design says they must. `godot/scripts/test_kershaws.gd` is where "must differ" stops being a
+sentence and becomes something a machine checks: that Kershaw's corridor is 28 degrees and not 180,
+that its lean points outside that corridor, that cutting straight down the yard goes 9 degrees wide,
+that overcutting about 8 degrees against the lean is what corrects it, and that the authored dud
+prop is the tenth one in and takes the margin down with it.
+
+| | L6 Waterside | L7 Kershaw's Yard | L12 Great Aire |
+|---|---|---|---|
+| Data | ✅ | ✅ | ⬜ |
+| Corridor | 70° of open field | **28°**, chapel one side, the client's own shed the other | 40°, railway + gasholder |
+| Lean | 0.3°, negligible | 1.4°, **28° outside the corridor** | 2.1°, and it is cracked |
+| Props | 14, exactly the arc | 16, and **#9 is a dud** | — |
+| Mortar | even | south side +0.35, harder to cut | — |
+| Teaches | the loop | steering against a lean | everything, in two acts |

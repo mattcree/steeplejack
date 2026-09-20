@@ -66,6 +66,7 @@ var surveyed := false
 var sightings := 0
 var pegs := 0
 var standing_at := Vector2.ZERO
+var level_name := ""
 
 var _font: Font
 var _plan_scale := 1.0
@@ -104,7 +105,7 @@ func _draw_steps() -> void:
 	# could not be read, which for a panel whose whole job is telling you what to do is fatal.
 	draw_rect(Rect2(0, 0, 620, 286), Color(0.05, 0.05, 0.06, 0.55))
 	var y := 26.0
-	draw_string(_font, Vector2(24, y), "FELLING — Waterside", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK)
+	draw_string(_font, Vector2(24, y), "FELLING — %s" % level_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK)
 	y += 24.0
 	for i in STEPS.size():
 		var done := i < step

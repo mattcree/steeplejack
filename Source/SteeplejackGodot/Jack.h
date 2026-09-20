@@ -269,6 +269,11 @@ public:
 	 * nothing here for a .gd file to get wrong.
 	 */
 	void gob_begin(int64_t segments, int64_t courses, int64_t props, int64_t dud_index);
+	/**
+	 * One side of the ring tougher to cut than the other, as a level authors it. `bias` 0-1 comes
+	 * off the mortar strength at `bearing_deg` and goes on opposite it.
+	 */
+	void gob_mortar_asymmetry(double bearing_deg, double bias);
 	/** Take a cell out. False if there is nothing there. */
 	bool gob_cut(int64_t seg, int64_t course);
 	/** Stand a prop. False with none left, or if nothing has been cut at that segment yet. */

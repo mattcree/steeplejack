@@ -272,8 +272,7 @@ godot-run: godot-build godot-import
 ##   LMB cut a cell   RMB stand a prop   P drive the pegs   F fire
 ##   A/D walk round the base   W/S in and out   mouse look   Esc free the mouse
 fell: godot-build godot-import
-	@$(GODOT) --path godot --main-pack-scene res://scenes/felling.tscn 2>/dev/null \
-		|| $(GODOT) --path godot res://scenes/felling.tscn
+	@$(GODOT) --path godot res://scenes/felling.tscn $(if $(LEVEL),--level $(LEVEL),)
 
 # Run a script headlessly against the project — the way anything gets verified without a human
 # watching.
@@ -351,7 +350,7 @@ ascent-sheet: godot-build godot-import
 ## fail: the scene never loads, the script never reaches its quit(), and the run just sits there.
 ## A gate that hangs is worse than a gate that fails, because nobody reads a hang as a result.
 godot-test: godot-build godot-import
-	@for t in test_ladder test_character test_slip test_stance test_audio test_face test_lash_game test_stack_game test_top test_haul_game test_checkpoint test_options test_grip test_felling; do \
+	@for t in test_ladder test_character test_slip test_stance test_audio test_face test_lash_game test_stack_game test_top test_haul_game test_checkpoint test_options test_grip test_felling test_kershaws; do \
 		timeout 120 $(GODOT) --path godot --headless --script res://scripts/$$t.gd; \
 		rc=$$?; \
 		if [ $$rc -eq 124 ]; then \
