@@ -14,15 +14,34 @@ Cheapest and fastest first. Everything above a rung only runs if the rungs below
 | 1 | **Enforced conventions** | `make check-conventions` | ~1 s | pre-commit, CI |
 | 2 | Data validation (schemas, tuning, task graph) | `make validate` | ~2 s | pre-commit, CI |
 | 3 | Doc link integrity | `make check-links` | ~1 s | CI |
+| 3b | Binary assets: LFS coverage, pointer integrity, per-file and total size | `make check-assets` | ~1 s | pre-commit, CI |
 | 4 | Sim build (**no engine needed**) | `make build-sim` | ~20 s | pre-commit, CI |
 | 5 | Sim unit + property tests | `make test-unit` | ~10 s | pre-commit, CI |
 | 6 | Level validation (schema + beat rule + reachability) | `make test-levels` | ~10 s | CI |
 | 7 | Replay: the format's round trip, then the recorded Grey Box climb | `make test-replay` | ~40 s | CI (the format in `sim`, the climb in `godot`) |
 | 8 | Determinism + the sim-step budget | `make test-determinism test-perf` | ~5 s | CI |
-| 9 | The game, headless: every verb, a bot that climbs to the top, and a bot that fells a chimney | `make godot-test` | ~3 min | CI (`godot` job) |
+| 9 | The game, headless: 20 suites — every verb, a bot that climbs the Grey Box, bots that fell all three chimneys, the job board, the career, and the eight felling sounds measured | `make godot-test` | ~4 min | CI (`godot` job) |
 | 10 | The game, rendered: posed frames, a whole climb as a contact sheet, and a felling | `make shot`, `make ascent-sheet`, `make fell-shot` | s / ~20 min | locally, and **look at them** |
 | 11 | Frame-time capture on real GPUs | — | — | **does not exist yet** |
 | 12 | **Human playtest** | see the playtest plan | hours | per milestone |
+
+### What the headless suites cover, and why each exists
+
+`make godot-test` is the gate that catches "the game broke" rather than "a rule broke". The ones
+added with the demolition half are worth naming, because each exists for a failure that nothing
+else in the ladder can see:
+
+| Suite | The failure it exists to catch |
+|---|---|
+| `test_felling` | a felling that cannot be played start to finish |
+| `test_kershaws` | the three fellings stopping being different from one another |
+| `test_great_aire` | the biggest level's numbers drifting from its own design doc |
+| `test_strip_out` | the two halves of the game losing track of each other across a save |
+| `test_jobs` | a FELL job silently opening the climb, or a gate locking out content that cannot be earned |
+| `test_job_done` | a job with no way to finish it |
+| `test_caught` | being under a chimney costing nothing |
+| `test_went_early` | cutting past the collapse margin doing nothing but turning a word red |
+| `test_fell_audio` | two of the eight cues converging so the chimney's voice stops distinguishing a warning from an event |
 
 ### Empty gates must not report success
 
