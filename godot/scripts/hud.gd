@@ -170,8 +170,14 @@ func _draw() -> void:
 	# There is no objective marker because the objective is the top and you can see it. But you
 	# cannot see the *rule*, so it is said once and then never again.
 	if player._now < 14.0 and not player.at_top:
-		_centre("Climb the stack. You can only go as high as you have built.",
-			size.y * 0.14, Color(0.92, 0.90, 0.86, 0.85 * _ease((14.0 - player._now) / 3.0)))
+		var fade := Color(0.92, 0.90, 0.86, 0.85 * _ease((14.0 - player._now) / 3.0))
+		_centre("Climb the stack. You can only go as high as you have built.", size.y * 0.14, fade)
+		# On a felling, this climb is Act 2 and not the job. A player who took the letter off the
+		# board arrives here without being told why, and the top of a chimney they are about to
+		# demolish is a strange place to be for no stated reason.
+		if String(player.jack.level_archetype()) == "FELL":
+			_centre("She is to come down. Strip her out first — bands off, conductor down — "
+				+ "and then you can cut her.", size.y * 0.14 + 30.0, fade)
 
 
 func _next_step() -> String:
