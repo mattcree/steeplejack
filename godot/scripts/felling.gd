@@ -33,7 +33,7 @@ const PEG_MIN_APART_M := 6.0     ## two pegs closer together than this are not a
 @onready var site: FellSite = $Site
 
 ## Which chimney. `make fell LEVEL=07-kershaws-yard`, or the default.
-var level_path := "res://../data/levels/%s.json" % _level_arg()
+var level_path := ""
 var tuning_dir := "res://../data/tuning"
 
 var _at := Vector3(0.0, 0.0, 14.0)   ## where you are standing, on the site
@@ -70,9 +70,12 @@ var _pegs: Array[Vector3] = []
 var _peg_marks: Node3D
 
 
-## The level named on the command line, or Waterside. Waterside is the tutorial felling and the
+## The level the job board picked, or the one named on the command line, or Waterside. Waterside is the tutorial felling and the
 ## only one with 180 degrees of open field; everything after it is a narrower yard.
-static func _level_arg() -> String:
+func _level_arg() -> String:
+	var root := get_tree().root
+	if root.has_meta("job_level"):
+		return String(root.get_meta("job_level"))
 	var args := OS.get_cmdline_args()
 	for i in args.size():
 		if args[i] == "--level" and i + 1 < args.size():
@@ -85,6 +88,8 @@ static func _level_arg() -> String:
 
 
 func _ready() -> void:
+	if level_path == "":
+		level_path = "res://../data/levels/%s.json" % _level_arg()
 	if not jack.load(ProjectSettings.globalize_path(tuning_dir),
 			ProjectSettings.globalize_path(level_path)):
 		push_error("felling: could not start: %s" % jack.get_last_error())

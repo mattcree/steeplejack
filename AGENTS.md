@@ -6,8 +6,8 @@ The long form is [`docs/06-workflow/`](docs/06-workflow/00-agent-workflow.md).
 ## Start here
 
 ```bash
-make run          # play the game in a window (Godot; builds first)
-make fell         # the demolition mode — cut the gob, prop it, peg the line, light it
+make run          # play the game: the job board, and both halves of it from there
+make fell         # straight into the demolition mode, skipping the board
 make watch        # run the sim and watch it. One second, no engine.
 make check        # the gate: conventions, data, tests. ~1s. No engine needed.
 make godot-test   # the real scene, driven headlessly, including a full climb to the top

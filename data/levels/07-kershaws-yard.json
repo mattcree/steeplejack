@@ -6,79 +6,161 @@
   "archetype": "FELL",
   "reputationGate": 3,
   "fee": 1250,
+  "briefing": {
+    "from": "H. Kershaw",
+    "lines": [
+      "Kershaw's Yard, Hebble Lane.",
+      "Chimney to be felled. I will not pretend it is an easy one. There is the Bethel chapel",
+      "on the one side and Kershaw's own weaving shed on the other and about thirty foot of",
+      "daylight between them. Three men have looked at it and two have said no.",
+      "\u00a31,250. The chapel is insured for eleven thousand pounds."
+    ]
+  },
   "shiftMinutes": 120,
   "targetMinutes": 105,
-
   "structure": {
     "type": "chimney",
     "height": 65.0,
     "baseRadius": 2.9,
     "topRadius": 1.7,
     "profile": "round",
-    "batter": [{ "at": 0.0, "step": 0.0 }],
-    "bands": [{ "at": 30, "type": "iron" }, { "at": 44, "type": "iron" }],
+    "batter": [
+      {
+        "at": 0.0,
+        "step": 0.0
+      }
+    ],
+    "bands": [
+      {
+        "at": 30,
+        "type": "iron"
+      },
+      {
+        "at": 44,
+        "type": "iron"
+      }
+    ],
     "cap": "corbelled-oversail",
     "leanDegrees": 1.4,
     "leanBearing": 70,
-    "jointGrid": { "courseHeight": 0.075, "brickLength": 0.225, "candidateDensity": 4.0 },
-    "weathering": { "sootTo": 0.3, "bleachFrom": 0.7, "seed": 7301 }
+    "jointGrid": {
+      "courseHeight": 0.075,
+      "brickLength": 0.225,
+      "candidateDensity": 4.0
+    },
+    "weathering": {
+      "sootTo": 0.3,
+      "bleachFrom": 0.7,
+      "seed": 7301
+    }
   },
-
   "bands": [
     {
       "from": 0.0,
       "to": 12.0,
       "type": "plain",
-      "quality": { "sound": 0.6, "fair": 0.3, "perished": 0.1, "cracked": 0.0 },
+      "quality": {
+        "sound": 0.6,
+        "fair": 0.3,
+        "perished": 0.1,
+        "cracked": 0.0
+      },
       "note": "The square base. Four flat faces and dead corners."
     },
     {
       "from": 12.0,
       "to": 20.0,
       "type": "batter-change",
-      "quality": { "sound": 0.45, "fair": 0.35, "perished": 0.18, "cracked": 0.02 },
-      "params": { "stepOut": 0.18 },
+      "quality": {
+        "sound": 0.45,
+        "fair": 0.35,
+        "perished": 0.18,
+        "cracked": 0.02
+      },
+      "params": {
+        "stepOut": 0.18
+      },
       "note": "Square to round. Eight metres of chamfered, awkward geometry where ladders do not sit and everything needs shimming. The most annoying ladder work in the game, on purpose."
     },
     {
       "from": 20.0,
       "to": 33.0,
       "type": "plain",
-      "quality": { "sound": 0.4, "fair": 0.35, "perished": 0.22, "cracked": 0.03 },
+      "quality": {
+        "sound": 0.4,
+        "fair": 0.35,
+        "perished": 0.22,
+        "cracked": 0.03
+      },
       "note": "Round shaft, and wet. The drizzle is in the weather block; what it costs is grip and the tap test reading a tier pessimistic."
     },
     {
       "from": 33.0,
       "to": 44.0,
       "type": "salt-bloom",
-      "quality": { "sound": 0.32, "fair": 0.34, "perished": 0.3, "cracked": 0.04 },
-      "note": "Where the wet has been getting in for years. Salt out of the brick, mortar that looks sound and is not, and a tap test you cannot quite trust — which on a level about believing your instruments is the right band in the right place."
+      "quality": {
+        "sound": 0.32,
+        "fair": 0.34,
+        "perished": 0.3,
+        "cracked": 0.04
+      },
+      "note": "Where the wet has been getting in for years. Salt out of the brick, mortar that looks sound and is not, and a tap test you cannot quite trust \u2014 which on a level about believing your instruments is the right band in the right place."
     },
     {
       "from": 44.0,
       "to": 56.0,
       "type": "existing-band",
-      "quality": { "sound": 0.55, "fair": 0.32, "perished": 0.13, "cracked": 0.0 },
-      "params": { "freeAnchors": [44.0, 52.0], "freeAnchorRating": 3, "mustStripInAct2": true }
+      "quality": {
+        "sound": 0.55,
+        "fair": 0.32,
+        "perished": 0.13,
+        "cracked": 0.0
+      },
+      "params": {
+        "freeAnchors": [
+          44.0,
+          52.0
+        ],
+        "freeAnchorRating": 3,
+        "mustStripInAct2": true
+      }
     },
     {
       "from": 56.0,
       "to": 65.0,
       "type": "wind-band",
-      "quality": { "sound": 0.3, "fair": 0.3, "perished": 0.34, "cracked": 0.06 },
-      "params": { "windMultiplier": 1.5 },
+      "quality": {
+        "sound": 0.3,
+        "fair": 0.3,
+        "perished": 0.34,
+        "cracked": 0.06
+      },
+      "params": {
+        "windMultiplier": 1.5
+      },
       "note": "Perished top. This is what the eight metres of height reduction comes off, and it is the worst brickwork on the chimney, which is the argument for taking it."
     }
   ],
-
   "weather": {
     "windBase": 7.0,
-    "windAtHeight": [[0, 1.0], [30, 1.5], [65, 1.9]],
+    "windAtHeight": [
+      [
+        0,
+        1.0
+      ],
+      [
+        30,
+        1.5
+      ],
+      [
+        65,
+        1.9
+      ]
+    ],
     "gustIntervalSeconds": null,
     "precipitation": "drizzle",
     "ramp": null
   },
-
   "site": {
     "safeLineDistance": 100,
     "exclusions": [
@@ -97,44 +179,91 @@
         "catastrophic": false
       }
     ],
-    "corridor": { "fromBearing": 84, "toBearing": 112 },
-    "crowd": { "distance": 120, "size": 14, "reactsToFall": true },
+    "corridor": {
+      "fromBearing": 84,
+      "toBearing": 112
+    },
+    "crowd": {
+      "distance": 120,
+      "size": 14,
+      "reactsToFall": true
+    },
     "backdrop": "mill-town-river"
   },
-
   "mission": {
     "type": "FELL",
     "requiredHeightReduction": 0,
-    "stripOut": ["bands", "conductor"],
+    "stripOut": [
+      "bands",
+      "conductor"
+    ],
     "gob": {
       "segments": 32,
       "courses": 4,
-      "mortarAsymmetry": { "bearing": 200, "strengthBias": 0.35 },
+      "mortarAsymmetry": {
+        "bearing": 200,
+        "strengthBias": 0.35
+      },
       "props": 16,
       "dudPropIndex": 9,
       "packingQualityMatters": true,
-      "burnSecondsRange": [45, 90]
+      "burnSecondsRange": [
+        45,
+        90
+      ]
     }
   },
-
   "complications": [
-    { "at": "gob:0.40", "type": "groan-intensify" },
-    { "at": "gob:0.70", "type": "prop-split" },
-    { "at": "gob:0.85", "type": "dust-fall" }
+    {
+      "at": "gob:0.40",
+      "type": "groan-intensify"
+    },
+    {
+      "at": "gob:0.70",
+      "type": "prop-split"
+    },
+    {
+      "at": "gob:0.85",
+      "type": "dust-fall"
+    }
   ],
-
   "scoring": {
     "bonuses": [
-      { "id": "accuracy_5", "condition": "angularError<=5", "amount": 400 },
-      { "id": "accuracy_15", "condition": "angularError<=15 and angularError>5", "amount": 150 },
-      { "id": "clean_break", "condition": "fractureCount>=3 and fractureCount<=4", "amount": 80 },
-      { "id": "no_collateral", "condition": "collateralValue==0", "amount": 150 },
-      { "id": "before_dark", "condition": "shiftRemaining>0", "amount": 40 }
+      {
+        "id": "accuracy_5",
+        "condition": "angularError<=5",
+        "amount": 400
+      },
+      {
+        "id": "accuracy_15",
+        "condition": "angularError<=15 and angularError>5",
+        "amount": 150
+      },
+      {
+        "id": "clean_break",
+        "condition": "fractureCount>=3 and fractureCount<=4",
+        "amount": 80
+      },
+      {
+        "id": "no_collateral",
+        "condition": "collateralValue==0",
+        "amount": 150
+      },
+      {
+        "id": "before_dark",
+        "condition": "shiftRemaining>0",
+        "amount": 40
+      }
     ],
-    "hardFailConditions": ["bethel_chapel"]
+    "hardFailConditions": [
+      "bethel_chapel"
+    ]
   },
-
-  "loadoutHint": { "ladders": 17, "dogs": 38, "rope": 3 },
+  "loadoutHint": {
+    "ladders": 17,
+    "dogs": 38,
+    "rope": 3
+  },
   "replay": "data/replays/07-kershaws-yard-expert.replay",
   "designDoc": "docs/02-levels/level-07-kershaws-yard.md"
 }

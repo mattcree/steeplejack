@@ -371,7 +371,13 @@ func _ready() -> void:
 ## field with the chimney off to one side. The first frame of a game about climbing something tall
 ## has one job.
 ## Which level to play. Defaults to the MVP grey box; `--level <id>` picks another.
+## Which chimney. The job board sets it on the tree root when it starts a scene, so both halves of
+## the game take a level the same way and neither needs to know the board exists; `--level` is
+## still there for `make run LEVEL=...` and for every headless script.
 func _level_id() -> String:
+	var root := get_tree().root
+	if root.has_meta("job_level"):
+		return String(root.get_meta("job_level"))
 	var args := OS.get_cmdline_user_args()
 	for i in args.size():
 		if args[i] == "--level" and i + 1 < args.size():

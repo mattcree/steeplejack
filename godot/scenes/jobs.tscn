@@ -1,0 +1,15 @@
+; The job board — the front of the game, and the thing that makes it one game rather than two
+; scenes reachable only from two make targets. Generated entirely from data/levels/*.json: a new
+; level appears here by existing.
+;
+; Hand-written text, reviewable in a diff. That is why we are in this engine.
+
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/jobs.gd" id="1_jobs"]
+
+[node name="Jobs" type="Control"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_jobs")

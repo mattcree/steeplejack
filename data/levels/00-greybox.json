@@ -6,53 +6,127 @@
   "archetype": "SURVEY",
   "reputationGate": 0,
   "fee": 250,
+  "briefing": {
+    "from": "the tool",
+    "lines": [
+      "Not a job. A grey box with every band type on it, for looking at how something behaves",
+      "rather than for playing. Climb it and see."
+    ]
+  },
   "shiftMinutes": null,
   "targetMinutes": 25,
-
   "structure": {
     "type": "chimney",
     "height": 55.0,
     "baseRadius": 2.6,
     "topRadius": 1.6,
     "profile": "round",
-    "batter": [ { "at": 0.0, "step": 0.0 } ],
+    "batter": [
+      {
+        "at": 0.0,
+        "step": 0.0
+      }
+    ],
     "bands": [],
     "cap": "plain",
     "leanDegrees": 0.0,
     "leanBearing": 0,
-    "jointGrid": { "courseHeight": 0.075, "brickLength": 0.225, "candidateDensity": 4.0 },
-    "weathering": { "sootTo": 0.20, "bleachFrom": 0.80, "seed": 1000 }
+    "jointGrid": {
+      "courseHeight": 0.075,
+      "brickLength": 0.225,
+      "candidateDensity": 4.0
+    },
+    "weathering": {
+      "sootTo": 0.2,
+      "bleachFrom": 0.8,
+      "seed": 1000
+    }
   },
-
   "bands": [
-    { "from": 0.0,  "to": 16.0, "type": "plain",
-      "quality": { "sound": 0.70, "fair": 0.25, "perished": 0.05, "cracked": 0.0 },
-      "note": "Baseline. Teaches tap -> dog -> lash -> climb with joints that mostly reward the obvious read. 16m is deliberately under the 20m Ascent Beat ceiling — long enough to settle into the loop, short enough that it has not become a chore before the first complication." },
-
-    { "from": 16.0, "to": 30.0, "type": "salt-bloom",
-      "quality": { "sound": 0.45, "fair": 0.35, "perished": 0.18, "cracked": 0.02 },
-      "params": { "visualReadReliability": 0.0, "bloomCoverage": 0.85 },
-      "note": "The band that makes tapping load-bearing. Efflorescence whitens the face so the visual read that carried band 1 stops working — the distribution is genuinely mixed, so guessing costs you. This is the level's argument that the tap-test verb earns its place." },
-
-    { "from": 30.0, "to": 42.0, "type": "old-fixtures",
-      "quality": { "sound": 0.55, "fair": 0.30, "perished": 0.15, "cracked": 0.0 },
-      "params": { "fixtureCount": 9, "fixtureSpacingMetres": 1.4, "fixtureRated": false },
-      "note": "A previous jack's rusted dogs. Free anchors, but unrated — take one and save the hammer work, or ignore them and place your own. Speed for uncertainty. The brick behind them is sound enough that refusing the gamble is always available." },
-
-    { "from": 42.0, "to": 55.0, "type": "perished",
-      "quality": { "sound": 0.20, "fair": 0.30, "perished": 0.42, "cracked": 0.08 },
-      "params": { "soundJointClustering": 0.7 },
-      "note": "The top. Sound joints exist but are scarce and clustered, so spans get short exactly when the player can see the cap and wants to hurry. The pressure here is self-inflicted, which is the point — nothing in the level forces a long span." }
+    {
+      "from": 0.0,
+      "to": 16.0,
+      "type": "plain",
+      "quality": {
+        "sound": 0.7,
+        "fair": 0.25,
+        "perished": 0.05,
+        "cracked": 0.0
+      },
+      "note": "Baseline. Teaches tap -> dog -> lash -> climb with joints that mostly reward the obvious read. 16m is deliberately under the 20m Ascent Beat ceiling \u2014 long enough to settle into the loop, short enough that it has not become a chore before the first complication."
+    },
+    {
+      "from": 16.0,
+      "to": 30.0,
+      "type": "salt-bloom",
+      "quality": {
+        "sound": 0.45,
+        "fair": 0.35,
+        "perished": 0.18,
+        "cracked": 0.02
+      },
+      "params": {
+        "visualReadReliability": 0.0,
+        "bloomCoverage": 0.85
+      },
+      "note": "The band that makes tapping load-bearing. Efflorescence whitens the face so the visual read that carried band 1 stops working \u2014 the distribution is genuinely mixed, so guessing costs you. This is the level's argument that the tap-test verb earns its place."
+    },
+    {
+      "from": 30.0,
+      "to": 42.0,
+      "type": "old-fixtures",
+      "quality": {
+        "sound": 0.55,
+        "fair": 0.3,
+        "perished": 0.15,
+        "cracked": 0.0
+      },
+      "params": {
+        "fixtureCount": 9,
+        "fixtureSpacingMetres": 1.4,
+        "fixtureRated": false
+      },
+      "note": "A previous jack's rusted dogs. Free anchors, but unrated \u2014 take one and save the hammer work, or ignore them and place your own. Speed for uncertainty. The brick behind them is sound enough that refusing the gamble is always available."
+    },
+    {
+      "from": 42.0,
+      "to": 55.0,
+      "type": "perished",
+      "quality": {
+        "sound": 0.2,
+        "fair": 0.3,
+        "perished": 0.42,
+        "cracked": 0.08
+      },
+      "params": {
+        "soundJointClustering": 0.7
+      },
+      "note": "The top. Sound joints exist but are scarce and clustered, so spans get short exactly when the player can see the cap and wants to hurry. The pressure here is self-inflicted, which is the point \u2014 nothing in the level forces a long span."
+    }
   ],
-
   "weather": {
     "windBase": 3.0,
-    "windAtHeight": [ [0, 1.0], [30, 1.4], [55, 1.8] ],
-    "gustIntervalSeconds": [50, 95],
+    "windAtHeight": [
+      [
+        0,
+        1.0
+      ],
+      [
+        30,
+        1.4
+      ],
+      [
+        55,
+        1.8
+      ]
+    ],
+    "gustIntervalSeconds": [
+      50,
+      95
+    ],
     "precipitation": "none",
     "ramp": null
   },
-
   "site": {
     "safeLineDistance": 90,
     "exclusions": [],
@@ -60,11 +134,16 @@
     "crowd": null,
     "backdrop": "open-field"
   },
-
-  "mission": { "type": "SURVEY" },
-
-  "scoring": { "bonuses": [] },
-
-  "loadoutHint": { "ladders": 14, "dogs": 32, "rope": 2 },
+  "mission": {
+    "type": "SURVEY"
+  },
+  "scoring": {
+    "bonuses": []
+  },
+  "loadoutHint": {
+    "ladders": 14,
+    "dogs": 32,
+    "rope": 2
+  },
   "designDoc": "docs/02-levels/level-00-greybox.md"
 }
