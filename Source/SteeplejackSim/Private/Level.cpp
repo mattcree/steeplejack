@@ -216,6 +216,10 @@ LevelData LevelData::Parse(const std::string& json, const std::string& origin)
         }
     }
 
+    if (doc.Has("loadoutHint") && doc.At("loadoutHint").Has("dogs"))
+    {
+        level.loadoutDogs_ = static_cast<int32_t>(doc.At("loadoutHint").At("dogs").AsNumber());
+    }
     if (doc.Has("loadoutHint") && doc.At("loadoutHint").Has("ladders"))
     {
         level.loadoutLadders_ = static_cast<int32_t>(doc.At("loadoutHint").At("ladders").AsNumber());

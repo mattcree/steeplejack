@@ -156,6 +156,15 @@ public:
     // fills the cradle with it.
     int32_t LoadoutLadders() const noexcept { return loadoutLadders_; }
 
+    // And the dogs it comes with — `loadoutHint.dogs`. 0 when the file does not say.
+    //
+    // Authored in every level since the first one and, until now, read by nobody: `player.gd` held
+    // `dogs_at_base := 14` as a literal, so Great Aire handed out 14 of the 70 its file asks for
+    // and the Grey Box 14 of 32. A clean Grey Box ascent seats 12. Bend three dogs — which spoils
+    // the joint as well as costing the dog — and the climb cannot be finished, from a supply the
+    // level never intended.
+    int32_t LoadoutDogs() const noexcept { return loadoutDogs_; }
+
     // Every rule `tools/validate_data.py` enforces, in the same order, with messages that name the
     // same things. Empty means the level is playable. Never throws: a broken level must be
     // *reportable*, not fatal, or the editor tooling cannot show a designer what is wrong.
@@ -166,7 +175,7 @@ private:
     int32_t               order_{};
     StructureSpec         structure_;
     std::vector<BandSpec> bands_;
-    int32_t               loadoutLadders_{};
+    int32_t               loadoutLadders_{}, loadoutDogs_{};
     int32_t               shiftMinutes_{}, targetMinutes_{};
     SiteSpec              site_;
     WeatherSpec           weather_;

@@ -54,6 +54,8 @@ public:
 	double total_height() const;
 	// The ladder sections the job comes with, from the level's loadoutHint. 0 if it does not say.
 	int64_t loadout_ladders() const;
+	// And the dogs, from the same place. 0 if it does not say.
+	int64_t loadout_dogs() const;
 	double radius_at(double height) const;
 	int64_t band_count() const;
 	/** `{from, to, type}` for one band. */

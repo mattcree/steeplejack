@@ -18,6 +18,9 @@ func _process_modification() -> void:
 	var skel := get_skeleton()
 	if skel == null or grip == null:
 		return
+	grip.note_roots(skel)
+	if grip.watch_limbs:
+		grip.capture(skel)
 	var out: Vector3 = grip._out()          # away from the wall, level
 	var along := Vector3(0, 0, 1)           # along a rung: the ladder lies across world Z
 	for limb in 4:

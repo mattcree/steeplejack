@@ -185,6 +185,19 @@ func _run(cmd: String) -> void:
 			player._pitch = deg_to_rad(b)
 			player._cam_yaw = player._yaw
 			player._cam_pitch = player._pitch
+		"legs":
+			# Numbers, not pixels. Two sessions of leg bugs were argued from screenshots; a shin
+			# angle is a number and should have been read as one. Prints, per limb, how far the
+			# target is as a fraction of the limb's own bones (1.00 = locked straight) and how far
+			# the shin leans off the ladder's own line.
+			var grip_node = player.find_child("RungGrip", true, false)
+			if grip_node == null:
+				print("LEGS: no RungGrip")
+			else:
+				grip_node.watch_limbs = true
+				await _wait(45)
+				print("LEGS: ", grip_node.describe_limbs())
+				grip_node.watch_limbs = false
 		"orbit":
 			# A camera of our own, parented to nothing and aimed by hand. The boom re-eases towards
 			# the player's facing every frame, so setting its rotation does not hold for a capture;

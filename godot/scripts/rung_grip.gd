@@ -26,7 +26,19 @@ const HAND_ON_WALL_ABOVE_FEET := 1.55   ## at the head of the ladder, where a ha
 const WALL_PALM := 0.06                 ## the wrist, off the face of the brick
 const MIN_ANKLE_ABOVE_FEET := 0.20     ## the lowest a straight leg puts the ankle, plus a little bend
 const LEG := 0.84                       ## hip to sole on the rig
-const LEG_SLACK := 0.04                 ## a climbing leg is never locked straight
+const SHIN := 0.42                      ## ankle to knee: half the leg, and how high above a rung
+                                        ## the knee wants to sit if the shin is to stand up straight
+const KNEE_PROUD := 0.05                ## and how far it leads the foot, off the brickwork
+const LEG_SLACK := 0.12                 ## a climbing leg is never locked straight. At 0.04 the
+                                        ## measured lower leg came out 0.997 of its own bone length
+                                        ## — a locked knee — because the two feet sit a rung apart
+                                        ## and the hips were placed for the higher one.
+const NEVER_STRAIGHT := 0.96            ## the furthest any limb may be asked to reach, as a fraction
+                                        ## of its own bones. A two-bone IK handed a target at exactly
+                                        ## chain length locks the joint dead straight, and one past it
+                                        ## locks straight AND stops tracking. Both read as a snapped
+                                        ## elbow or a backwards knee, so no target is ever allowed
+                                        ## that far out: a climber's joints are never locked.
 const HIP_ABOVE_FEET := 0.95            ## the rig's hips, above its feet
 const MAX_DROP := 0.40                  ## the body never settles further than this below the capsule
 const MAX_RISE := 0.16                  ## nor further above it than half a rung                  ## the most the drawn body settles at the head of the ladder
@@ -57,6 +69,21 @@ var _from := [Vector3.ZERO, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO]
 var _moving := -1                   ## the pair in the air, or -1
 var _step_t := 0.0
 var _grip := [0.0, 0.0, 0.0, 0.0]   ## IK influence per limb, eased
+var _reach := [0.0, 0.0, 0.0, 0.0]  ## root to end with the limb straight, measured off the rig
+
+## Debug capture, off unless the capture script asks for it (`make shot CMDS="...,legs"`). A solved
+## pose can only be read from inside a SkeletonModifier3D's own pass — read anywhere else it is a
+## frame stale or plain wrong, which is how a first attempt at this readout reported every limb 68
+## metres from its own shoulder. So RungOrient fills these in while it has the real thing.
+var watch_limbs := false
+var _watch := ["", "", "", ""]
+
+## Where each chain starts — the shoulder or the hip — in the world. Kept here because a bone's
+## solved position can only be read from inside the modifier pass, and `_place()` needs it a frame
+## later to know how far it may ask a limb to reach. One frame stale is nothing; reading it at the
+## wrong time is not stale but wrong, and silently made the reach clamp a no-op.
+var _root := [Vector3.ZERO, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO]
+var _have_root := false
 var _was_on := false
 var _drop := 0.0                    ## how far below the capsule the drawn body sits
 
@@ -87,11 +114,39 @@ func setup(p: Node3D, c: Node3D, skel: Skeleton3D) -> void:
 		_ik.append(ik)
 		_target.append(target)
 		_pole.append(pole)
+		_reach[i] = _chain_reach(i)
 	# Last on the skeleton, so it turns the hands and feet after the IK has placed them.
 	var orient := RungOrient.new()
 	orient.name = "RungOrient"
 	orient.grip = self
 	skeleton.add_child(orient)
+
+
+## How far this limb reaches with both bones in line, taken from the rig's own rest pose rather
+## than a constant, so a re-export that changes the skeleton cannot leave a stale number here.
+func _chain_reach(limb: int) -> float:
+	var b0 := skeleton.find_bone(CHAINS[limb][0])
+	var b1 := skeleton.find_bone(CHAINS[limb][1])
+	var b2 := skeleton.find_bone(CHAINS[limb][2])
+	if b0 < 0 or b1 < 0 or b2 < 0:
+		return LEG
+	var p0: Vector3 = skeleton.get_bone_global_rest(b0).origin
+	var p1: Vector3 = skeleton.get_bone_global_rest(b1).origin
+	var p2: Vector3 = skeleton.get_bone_global_rest(b2).origin
+	return p0.distance_to(p1) + p1.distance_to(p2)
+
+
+## The one rule that makes hyperextension unreachable rather than unlikely: whatever a limb is
+## asked to hold, it is asked no further out than its own bones minus a few per cent. A rung that
+## is genuinely too far away pulls the hand or foot short of it, which looks like a man not quite
+## reaching — the truth — instead of a limb snapping inside out to pretend it got there.
+func _within_reach(limb: int, root: Vector3, want: Vector3) -> Vector3:
+	var span: float = _reach[limb] * NEVER_STRAIGHT
+	var d: Vector3 = want - root
+	var l: float = d.length()
+	if l <= span or l < 0.0001:
+		return want
+	return root + d * (span / l)
 
 
 ## Where on the ladder a limb holds a given rung, in the world.
@@ -251,13 +306,12 @@ func _place(limb: int, _dt: float) -> void:
 	if _moving == PAIR[limb] and _step_t < 1.0:
 		var u: float = smoothstep(0.0, 1.0, _step_t)
 		at = (_from[limb] as Vector3).lerp(to, u) + _out() * STEP_ARC * sin(PI * _step_t)
-	_target[limb].global_position = at
-	# Elbows low and a little out; knees down and AWAY from the ladder. The
-	# first poles sat beside and behind the shoulders and put the elbows up by his ears.
 	var out := _out()
 	var along: Vector3 = Vector3(0, 0, 1) * float(SIDE[limb])
-	var root: Vector3 = skeleton.global_transform * skeleton.get_bone_global_pose(
-		skeleton.find_bone(CHAINS[limb][0])).origin
+	var root: Vector3 = _root[limb] if _have_root else (skeleton.global_transform
+		* skeleton.get_bone_global_rest(skeleton.find_bone(CHAINS[limb][0])).origin)
+	at = _within_reach(limb, root, at)
+	_target[limb].global_position = at
 	# Well off the limb's own line, or the bend has no plane to happen in and the joint flips to
 	# whichever side it likes: that is what put his knees out sideways and his elbows behind him.
 	#
@@ -276,7 +330,58 @@ func _place(limb: int, _dt: float) -> void:
 	if limb < 2:
 		_pole[limb].global_position = root + along * 0.55 + out * 0.45 - Vector3.UP * 0.35
 	else:
-		_pole[limb].global_position = root - out * 0.42 + along * 0.14 - Vector3.UP * 0.62
+		# The knee is aimed from the FOOT, not from the hip, and that is the whole of it.
+		#
+		# A man on a ladder keeps his shin near enough parallel with the stiles and lets the THIGH
+		# do the opening and closing; his torso then sits wherever those two angles put it. Hung off
+		# the hip, the pole could not express that — the knee wandered with the body and the raised
+		# leg jack-knifed until the shin measured 104 degrees off vertical, which is a shin lying
+		# flat. Put the pole where the knee actually belongs, a shin's length above the foot and a
+		# hand's breadth off the brick, and the shin stands up on its own at any stance height.
+		_pole[limb].global_position = at + Vector3.UP * SHIN + out * KNEE_PROUD + along * 0.03
+
+
+## For the capture script: every limb's solved geometry as numbers. `straight` is how far the limb
+## is actually extended over its own bone length — 1.00 is a locked joint, and NEVER_STRAIGHT is
+## what keeps it away from there. `lower-limb` is how far the shin or forearm leans off vertical,
+## which is the shape the climb is judged on: a climber's shin stays near enough parallel with the
+## stiles and it is the thigh that opens and closes.
+## Every frame, from inside the modifier: the real position of each chain's first bone.
+func note_roots(skel: Skeleton3D) -> void:
+	var xf := skel.global_transform
+	for i in 4:
+		var b := skel.find_bone(CHAINS[i][0])
+		if b >= 0:
+			_root[i] = xf * skel.get_bone_global_pose(b).origin
+	_have_root = true
+
+
+func capture(skel: Skeleton3D) -> void:
+	var names := ["hand.l", "hand.r", "foot.l", "foot.r"]
+	for i in 4:
+		var b0 := skel.find_bone(CHAINS[i][0])
+		var b1 := skel.find_bone(CHAINS[i][1])
+		var b2 := skel.find_bone(CHAINS[i][2])
+		if b0 < 0 or b1 < 0 or b2 < 0:
+			continue
+		var xf := skel.global_transform
+		var root: Vector3 = xf * skel.get_bone_global_pose(b0).origin
+		var mid: Vector3 = xf * skel.get_bone_global_pose(b1).origin
+		var tip: Vector3 = xf * skel.get_bone_global_pose(b2).origin
+		var straight: float = root.distance_to(tip) / maxf(_reach[i], 0.001)
+		var lower: Vector3 = tip - mid
+		var lean: float = rad_to_deg(Vector3.DOWN.angle_to(lower)) if lower.length() > 0.001 else 0.0
+		var asked: float = _root[i].distance_to(_target[i].global_position) / maxf(_reach[i], 0.001)
+		var drift: float = root.distance_to(_root[i])
+		_watch[i] = "%-7s straight %.3f  asked %.3f  infl %.2f  drift %.3f  lower %5.1f deg" % [
+			names[i], straight, asked, _grip[i], drift, lean]
+
+
+func describe_limbs() -> String:
+	var out_s := ""
+	for i in 4:
+		out_s += "\n  " + (_watch[i] if _watch[i] != "" else "%d not captured" % i)
+	return out_s
 
 
 ## For tests: the world position a limb's target is at, and whether that limb is mid-reach.

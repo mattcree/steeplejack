@@ -111,7 +111,10 @@ const SLIP_FELL := 2
 var ladder_top := 5.0
 var carrying_ladder := false
 var dogs_carried := 0
-## The cradle. Filled from the level's loadoutHint at load; 12 only if the level does not say.
+## The cradle. Filled from the level's loadoutHint at load; these are the fallbacks for a level
+## that does not say. `dogs_at_base` used to be this literal for EVERY level, whatever the file
+## asked for — 14 on the Grey Box's 32, 14 on Great Aire's 70 — which is a supply a clean ascent
+## clears by two. Bend a few and the climb cannot be finished.
 var ladders_at_base := 12
 var dogs_at_base := 14
 
@@ -328,6 +331,8 @@ func _ready() -> void:
 	# level the gate had passed.
 	if jack.loadout_ladders() > 0:
 		ladders_at_base = jack.loadout_ladders()
+	if jack.loadout_dogs() > 0:
+		dogs_at_base = jack.loadout_dogs()
 
 	# glTF animations import unlooped, so idle and run play once and then he freezes mid-stride.
 	# Nothing warns about this; the character simply stops a second or two after you start.
