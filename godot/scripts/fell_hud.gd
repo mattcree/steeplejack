@@ -530,6 +530,11 @@ func _verdict_lines() -> Array:
 	lines.append("fee £%d    bonus £%d    damages £%d%s" % [
 		int(float(settlement.get("fee", 0.0))), int(float(settlement.get("bonus", 0.0))),
 		int(float(settlement.get("damages", 0.0))), name_])
+	if float(settlement.get("before_dark", 0.0)) > 0.0:
+		lines.append("done before dark, with %d minutes to spare"
+			% int(float(settlement.get("daylight_left", 0.0)) / 60.0))
+	elif settlement.has("daylight_left") and float(settlement.get("daylight_left", 1.0)) <= 0.0:
+		lines.append("the light went before you did — no bonus for the day")
 	lines.append("£%d in the tin" % int(float(settlement.get("paid", 0.0))))
 	# These two were nested inside the injury branch, so "a job you have done before" only ever
 	# appeared if you had also been hurt doing it.

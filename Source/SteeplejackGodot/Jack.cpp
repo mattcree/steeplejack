@@ -218,8 +218,9 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("level_archetype"), &Jack::level_archetype);
 	ClassDB::bind_method(D_METHOD("career_done", "job_id"), &Jack::career_done);
 	ClassDB::bind_method(D_METHOD("career_settle", "job_id", "fee_gbp", "peg_bearing_deg",
-	                               "height_removed_m", "surveyed", "packing_quality"),
-	                     &Jack::career_settle, DEFVAL(1.0));
+	                               "height_removed_m", "surveyed", "packing_quality",
+	                               "extra_bonus_gbp"),
+	                     &Jack::career_settle, DEFVAL(1.0), DEFVAL(0.0));
 	ClassDB::bind_method(D_METHOD("career_settle_climb", "job_id", "fee_gbp", "reached_top"),
 	                     &Jack::career_settle_climb);
 	ClassDB::bind_method(D_METHOD("tuning_f", "key", "fallback"), &Jack::tuning_f, DEFVAL(0.0));
@@ -1471,7 +1472,8 @@ bool Jack::career_done(const String& job_id) const
 }
 
 Dictionary Jack::career_settle(const String& job_id, double fee_gbp, double peg_bearing_deg,
-                               double height_removed_m, bool surveyed, double packing_quality)
+                               double height_removed_m, bool surveyed, double packing_quality,
+                               double extra_bonus_gbp)
 {
 	Dictionary d;
 	if (!gob || !tuning)
@@ -1487,7 +1489,8 @@ Dictionary Jack::career_settle(const String& job_id, double fee_gbp, double peg_
 		plan.packingQuality = static_cast<float>(packing_quality);
 		const sj::FellOutcome o = sj::Fell::Run(fell, *gob, plan, *tuning);
 		const sj::Settlement s = career.Settle(job_id.utf8().get_data(),
-		                                       static_cast<float>(fee_gbp), o, *tuning);
+		                                       static_cast<float>(fee_gbp), o, *tuning,
+		                                       static_cast<float>(extra_bonus_gbp));
 		d["fee"] = static_cast<double>(s.feeGbp);
 		d["bonus"] = static_cast<double>(s.bonusGbp);
 		d["damages"] = static_cast<double>(s.damagesGbp);

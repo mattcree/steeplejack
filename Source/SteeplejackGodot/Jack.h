@@ -357,7 +357,7 @@ public:
 	 */
 	godot::Dictionary career_settle(const godot::String& job_id, double fee_gbp,
 	                                double peg_bearing_deg, double height_removed_m, bool surveyed,
-	                                double packing_quality = 1.0);
+	                                double packing_quality = 1.0, double extra_bonus_gbp = 0.0);
 	/** Settle the climbing half: you got to the top of it, or you did not. Same shape. */
 	godot::Dictionary career_settle_climb(const godot::String& job_id, double fee_gbp,
 	                                      bool reached_top);

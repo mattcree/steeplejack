@@ -281,8 +281,12 @@ func _init() -> void:
 	var paid: Dictionary = world._settlement
 	_check(not paid.is_empty(), "the job settled")
 	_check(float(paid.get("fee", 0.0)) > 0.0, "it paid its fee of £%d" % int(float(paid.get("fee", 0.0))))
-	_check(float(paid.get("bonus", 0.0)) == float(out.get("bonus", 0.0)),
-		"and the bonus the fall earned, not a different one")
+	_check(float(paid.get("bonus", 0.0))
+			== float(out.get("bonus", 0.0)) + float(paid.get("before_dark", 0.0)),
+		"the bonus the fall earned, plus £%d for getting it done in the daylight"
+			% int(float(paid.get("before_dark", 0.0))))
+	_check(float(paid.get("before_dark", 0.0)) > 0.0,
+		"which it was, with %d minutes to spare" % int(float(paid.get("daylight_left", 0.0)) / 60.0))
 	_check(float(paid.get("paid", -1.0)) >= 0.0, "and never less than nothing")
 	_check(int(paid.get("reputation_delta", 0)) > 0, "and it was worth something to his name")
 	_check(bool(paid.get("first_time", false)), "first time out on this one")

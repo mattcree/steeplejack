@@ -96,8 +96,10 @@ public:
     int32_t StarsAfter(int32_t extraPoints, const Tuning& t) const noexcept;
 
     // Settle a felling. Does not itself decide whether the job happened — the caller has run it.
+    // `extraBonusGbp` is what the level pays for things the fall itself does not know about —
+    // finishing before dark, chiefly. It goes on the bonus and into the tin like any other.
     Settlement Settle(const std::string& levelId, float feeGbp, const FellOutcome& outcome,
-                      const Tuning& t);
+                      const Tuning& t, float extraBonusGbp = 0.0f);
 
     // Settle the other half of the game: a job you finished by getting to the top of it. No
     // bonuses and no damages, because a survey has nothing to hit — the fee, and your name moves

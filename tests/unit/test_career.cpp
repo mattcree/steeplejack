@@ -182,6 +182,21 @@ TEST_CASE("Career: stars are the thresholds economy.json authors, and they gate 
     CHECK(c.CanTake(3, Tune()));
 }
 
+TEST_CASE("Career: a level can pay for things the fall does not know about")
+{
+    // Finishing before dark, chiefly. The fall has no idea what time it is; the shift does.
+    Career quick, slow;
+    const Settlement fast = quick.Settle("06-waterside", 1100.0f, Good(), Tune(), 50.0f);
+    const Settlement late = slow.Settle("06-waterside", 1100.0f, Good(), Tune(), 0.0f);
+    CHECK(fast.bonusGbp == doctest::Approx(late.bonusGbp + 50.0f));
+    CHECK(quick.MoneyGbp() == doctest::Approx(slow.MoneyGbp() + 50.0f));
+
+    // And it cannot be used to hand money back.
+    Career odd;
+    const Settlement s = odd.Settle("06-waterside", 1100.0f, Good(), Tune(), -500.0f);
+    CHECK(s.bonusGbp == doctest::Approx(Good().bonusGbp));
+}
+
 TEST_CASE("Career: the other half of the game pays too")
 {
     Career c;

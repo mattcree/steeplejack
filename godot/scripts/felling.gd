@@ -240,6 +240,11 @@ func _read_level() -> Dictionary:
 	out["train_every"] = float(table.get("everyMinutes", 0.0))
 	out["train_first"] = float(table.get("firstAtMinute", 0.0))
 	out["train_line"] = String(table.get("exclusionId", ""))
+	# What the level pays for getting it done in the daylight it gave you. Data, read as written.
+	out["before_dark"] = 0.0
+	for b in (doc.get("scoring", {}).get("bonuses", []) as Array):
+		if String(b.get("id", "")) == "before_dark":
+			out["before_dark"] = float(b.get("amount", 0.0))
 	out["crowd"] = site_block_crowd(site_block)
 	return out
 
@@ -907,8 +912,14 @@ func _props_burn_through() -> void:
 		out["penalty"] = float(out.get("penalty", 0.0)) + _train_value()
 	_outcome = out
 	# Settled through the sim on the same plan, so the money and the verdict cannot disagree.
+	# The fall has no idea what time it is; the shift does. Run out of daylight and the bonus for
+	# getting it done in it is simply not there, which is what the daylight bar has been promising.
+	var left: float = float(jack.fell_shift(_height_removed).get("left", 0.0))
+	var before_dark: float = _authored["before_dark"] if left > 0.0 else 0.0
 	_settlement = jack.career_settle(_authored["id"], _authored["fee"], _peg, _height_removed,
-		surveyed(), _packing_quality)
+		surveyed(), _packing_quality, before_dark)
+	_settlement["before_dark"] = before_dark
+	_settlement["daylight_left"] = left
 	if _went_early:
 		_settlement["went_early"] = true
 	if _caught:

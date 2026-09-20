@@ -91,12 +91,12 @@ float Career::BestErrorDegrees(const std::string& levelId) const noexcept
 }
 
 Settlement Career::Settle(const std::string& levelId, float feeGbp, const FellOutcome& outcome,
-                          const Tuning& t)
+                          const Tuning& t, float extraBonusGbp)
 {
     Settlement s;
     s.firstTime = !Done(levelId);
     s.failed = outcome.catastrophe;
-    s.bonusGbp = outcome.bonusGbp;
+    s.bonusGbp = outcome.bonusGbp + std::max(extraBonusGbp, 0.0f);
     s.damagesGbp = outcome.penaltyGbp;
     s.feeGbp = s.firstTime ? feeGbp : feeGbp * t.GetF("replayFeeFraction");
 
