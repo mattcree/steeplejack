@@ -335,6 +335,7 @@ func _after_the_fall(dt: float) -> void:
 	if _tick_due <= -CHEER_AFTER:
 		_cheered = true
 		foley.cue("cheer")
+		hud.outcome = _outcome
 
 
 # ---------------------------------------------------------------- what you are pointing at
@@ -542,18 +543,22 @@ func _on_broke(height_m: float) -> void:
 
 
 func _on_landed() -> void:
-	hud.outcome = _outcome
 	foley.cue("crash")
 	site.cheer()
 	_cheered = false
+	# The verdict waits for the dust. "Camera control is returned to the player. They can stand
+	# anywhere outside the line." Putting a scorecard over the thing the whole level was for, at
+	# the moment it happens, is the single worst thing this mode could do.
 
 
 func _after_change() -> void:
 	var st: Dictionary = jack.gob_state()
-	if _step < 1 and float(st.get("cut_arc", 0.0)) > 0.0:
-		_step = 1
-	if _step < 2 and int(st.get("props_standing", 0)) > 0:
-		_step = 2
+	# The steps are [survey, cut, prop, peg], so once there is a prop in, the next thing you are
+	# being asked for is the pegs.
+	if float(st.get("cut_arc", 0.0)) > 0.0:
+		_step = maxi(_step, 2)
+	if int(st.get("props_standing", 0)) > 0:
+		_step = maxi(_step, 3)
 	var name_ := String(st.get("status_name", "SAFE"))
 	if name_ == "COLLAPSE":
 		hud.say("It is going. You are in the hole.", 6.0)

@@ -170,7 +170,10 @@ func _init() -> void:
 	var seconds: float = float(jack.tuning_f("fellHingeSecondsToGround", 7.5))
 	await _wait(int(seconds * 65.0))
 	_check(not world._fall.running(), "it is down")
-	_check(not hud.outcome.is_empty(), "and now the verdict is up")
+	_check(hud.outcome.is_empty(),
+		"and still no scorecard over it — you are meant to be watching the dust")
+	await _wait(int((float(world.CHEER_AFTER) + 0.5) * 65.0))
+	_check(not hud.outcome.is_empty(), "and when the cheer comes, the verdict with it")
 
 	if failures > 0:
 		printerr("FELLING: %d failure(s)" % failures)

@@ -102,7 +102,7 @@ func _draw() -> void:
 func _draw_steps() -> void:
 	# A scrim. The first render of this put pale text straight onto a bright sky and half of it
 	# could not be read, which for a panel whose whole job is telling you what to do is fatal.
-	draw_rect(Rect2(0, 0, 620, 240), Color(0.05, 0.05, 0.06, 0.55))
+	draw_rect(Rect2(0, 0, 620, 286), Color(0.05, 0.05, 0.06, 0.55))
 	var y := 26.0
 	draw_string(_font, Vector2(24, y), "FELLING — Waterside", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK)
 	y += 24.0
@@ -349,17 +349,18 @@ func _draw_gob() -> void:
 # ---------------------------------------------------------------- the verdict
 
 func _draw_verdict() -> void:
-	var panel := Rect2(size.x * 0.5 - 260, size.y * 0.5 - 130, 520, 260)
+	# Low and wide, not over the middle of the screen: you are meant to be looking at the dust.
+	var panel := Rect2(size.x * 0.5 - 330, size.y - 246, 660, 210)
 	draw_rect(panel, Color(0.05, 0.05, 0.06, 0.88))
 	var grade := String(outcome.get("grade_name", "WILD"))
 	var colour: Color = {
 		"PERFECT": Color(0.55, 0.85, 0.50), "GOOD": Color(0.80, 0.85, 0.45),
 		"ACCEPTABLE": Color(0.90, 0.78, 0.35), "WILD": HAZARD,
 	}.get(grade, INK)
-	var y := panel.position.y + 42.0
+	var y := panel.position.y + 36.0
 	draw_string(_font, Vector2(panel.position.x, y), grade, HORIZONTAL_ALIGNMENT_CENTER, panel.size.x,
-		30, colour)
-	y += 40.0
+		26, colour)
+	y += 34.0
 	var lines := [
 		"it went to %03d°, %.1f° off your pegs" % [
 			float(outcome.get("fall_bearing", 0.0)), float(outcome.get("error", 0.0))],
@@ -379,4 +380,4 @@ func _draw_verdict() -> void:
 	for line in lines:
 		draw_string(_font, Vector2(panel.position.x, y), line, HORIZONTAL_ALIGNMENT_CENTER,
 			panel.size.x, 15, INK if line.begins_with("bonus") else DIM)
-		y += 24.0
+		y += 22.0

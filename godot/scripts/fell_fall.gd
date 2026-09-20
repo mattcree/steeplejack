@@ -17,7 +17,14 @@ extends Node3D
 
 const OVERTAKE_PER_CHUNK := 0.16   ## each piece up turns this much faster once it is free
 const FIRST_BREAK_AT := 0.52       ## fraction of the way over before anything parts
-const DUST := Color(0.62, 0.58, 0.52)
+
+# "On ground contact, each chunk spawns a short-lived debris burst + dust column. Dust plume
+# persists ~40 s and rolls outward. Do not cheap out on the dust." So: a burst where each piece
+# lands, and a plume that keeps rolling long after the noise has stopped.
+const DUST := Color(0.66, 0.62, 0.55)
+const PLUME_SECONDS := 40.0
+const BURST_PARTICLES := 220
+const PLUME_PARTICLES := 420
 
 signal landed
 signal broke(height_m: float)
@@ -25,6 +32,7 @@ signal broke(height_m: float)
 var _chunks: Array[Node3D] = []
 var _break_at: Array[float] = []     ## angle, radians, at which each chunk above is released
 var _freed: Array[bool] = []
+var _hit: Array[bool] = []
 var _pivot := Vector3.ZERO
 var _axis := Vector3.RIGHT
 var _seconds := 7.5
@@ -56,6 +64,7 @@ func begin(height_m: float, base_r: float, top_r: float, fall_bearing_deg: float
 		add_child(chunk)
 		_chunks.append(chunk)
 		_freed.append(false)
+		_hit.append(false)
 	# Chunk 0 never breaks off anything below it, so it has no angle of its own.
 	var breaks := _chunks.size() - 1
 	for i in range(_chunks.size()):
@@ -104,17 +113,102 @@ func _process(dt: float) -> void:
 	var a := angle()
 	for i in _chunks.size():
 		var chunk := _chunks[i]
-		var turn := a
-		if i > 0 and a > _break_at[i]:
-			if not _freed[i]:
-				_freed[i] = true
-				broke.emit(float(chunk.get_meta("lo", 0.0)))
-			# Free, and turning faster than the stub it left behind.
-			turn = _break_at[i] + (a - _break_at[i]) * (1.0 + OVERTAKE_PER_CHUNK * float(i))
-		chunk.transform = _hinged(minf(turn, deg_to_rad(120.0)))
+		if i > 0 and a > _break_at[i] and not _freed[i]:
+			_freed[i] = true
+			broke.emit(float(chunk.get_meta("lo", 0.0)))
+		chunk.transform = _hinged(minf(_turn_of(i, a), deg_to_rad(120.0)))
+	# Each piece throws its dust where it actually hits, not all at the foot of the chimney: the top
+	# of a chimney lands a long way out, which is the whole reason the fan is longer than it is tall.
+	for i in _chunks.size():
+		if _hit[i]:
+			continue
+		var turn: float = _turn_of(i, a)
+		if turn >= deg_to_rad(88.0):
+			_hit[i] = true
+			_burst(_landing_point(i))
 	if _t >= _seconds:
 		_running = false
+		_plume(_landing_point(_chunks.size() - 1))
 		landed.emit()
+
+
+## Where a chunk's middle ends up once it is flat on the ground.
+func _landing_point(i: int) -> Vector3:
+	if i < 0 or i >= _chunks.size():
+		return _pivot
+	var mid: Node3D = _chunks[i].get_child(0)
+	return _chunks[i].transform * mid.position
+
+
+func _turn_of(i: int, a: float) -> float:
+	if i > 0 and a > _break_at[i]:
+		return _break_at[i] + (a - _break_at[i]) * (1.0 + OVERTAKE_PER_CHUNK * float(i))
+	return a
+
+
+func _dust_material(up: float, out: float, life: float, size: float) -> ParticleProcessMaterial:
+	var mat := ParticleProcessMaterial.new()
+	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	mat.emission_sphere_radius = 2.4
+	mat.direction = Vector3(0.0, 1.0, 0.0)
+	mat.spread = 85.0
+	mat.initial_velocity_min = out * 0.4
+	mat.initial_velocity_max = out
+	mat.gravity = Vector3(0.0, up, 0.0)
+	mat.damping_min = 0.6
+	mat.damping_max = 1.8
+	mat.scale_min = size * 0.5
+	mat.scale_max = size
+	mat.scale_over_velocity_min = 1.0
+	mat.color = Color(DUST.r, DUST.g, DUST.b, 0.42)
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(DUST.r, DUST.g, DUST.b, 0.5))
+	ramp.set_color(1, Color(DUST.r, DUST.g, DUST.b, 0.0))
+	var tex := GradientTexture1D.new()
+	tex.gradient = ramp
+	mat.color_ramp = tex
+	return mat
+
+
+func _dust_mesh(size: float) -> Mesh:
+	var quad := QuadMesh.new()
+	quad.size = Vector2(size, size)
+	var m := StandardMaterial3D.new()
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	m.vertex_color_use_as_albedo = true
+	m.albedo_color = Color(DUST.r, DUST.g, DUST.b, 0.45)
+	m.disable_receive_shadows = false
+	quad.material = m
+	return quad
+
+
+## A short, hard burst where a piece hits the ground.
+func _burst(at: Vector3) -> void:
+	var p := GPUParticles3D.new()
+	p.process_material = _dust_material(-1.6, 9.0, 2.6, 3.0)
+	p.draw_pass_1 = _dust_mesh(3.0)
+	p.amount = BURST_PARTICLES
+	p.lifetime = 3.2
+	p.one_shot = true
+	p.explosiveness = 0.85
+	p.position = at
+	add_child(p)
+	p.emitting = true
+
+
+## And the plume, which rolls outward and is still there when the birds come back.
+func _plume(at: Vector3) -> void:
+	var p := GPUParticles3D.new()
+	p.process_material = _dust_material(-0.25, 4.5, PLUME_SECONDS, 9.0)
+	p.draw_pass_1 = _dust_mesh(9.0)
+	p.amount = PLUME_PARTICLES
+	p.lifetime = PLUME_SECONDS
+	p.explosiveness = 0.12
+	p.position = at
+	add_child(p)
+	p.emitting = true
 
 
 ## Rotate about the hinge, not about the origin. Built explicitly rather than by chaining
