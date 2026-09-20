@@ -52,6 +52,13 @@ var _caught := false
 ## Act 2, done on another day in the other half of the game. Until it is, there is a conductor
 ## down the side of this chimney and three iron bands round it, and you do not cut into that.
 var _stripped := false
+
+# Working a cell out is a held action, not a click. Fifty-six clicks is not the act the design
+# calls the heart of it, and it is the only way the mortar a level authors can reach your hands.
+var _working := Vector2i(-1, -1)
+var _worked := 0.0             ## seconds of effort into the cell under the crosshair
+var _work_needs := 0.0
+var _chip_due := 0.0
 var _fall: FellFall
 var _outcome := {}
 var _settlement := {}
@@ -280,12 +287,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 			_capture(true)
 		elif event.button_index == MOUSE_BUTTON_LEFT:
-			_cut()
+			pass   # cutting is a hold; _work() drives it from _process
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			_prop()
 	elif event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
-			KEY_E: _cut()
+			KEY_E: pass   # a hold, like the mouse
 			KEY_Q: _prop()
 			KEY_B: _plumb()
 			KEY_BRACKETLEFT: _take_off(-2.0)
@@ -325,6 +332,7 @@ func _process(dt: float) -> void:
 		if out >= keep_out and out <= _authored["safe_line"] * 2.2:
 			_at = want
 	_place_camera()
+	_work(dt)
 	_act4_step(dt)
 	_telegraph(dt)
 	_update_hud()
@@ -552,6 +560,43 @@ func _plumb() -> void:
 	else:
 		hud.say("A reading from %03d°. You need another from at least %d° round." % [
 			int(here), int(SIGHTINGS_APART_DEG)], 6.0)
+
+
+## Working a cell out with a bar. Hold the left button, or E, and keep the crosshair on it: look
+## away or let go and you have lost the bite and have to start that cell again.
+func _work(dt: float) -> void:
+	if _fired or _act4 != READY and _act4 != PACKING:
+		return
+	var holding := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_key_pressed(KEY_E)
+	var cell := _aimed_cell()
+	if not holding or cell.is_empty():
+		_working = Vector2i(-1, -1)
+		_worked = 0.0
+		return
+	if not _stripped:
+		_cut()   # says why, once
+		return
+	var here := Vector2i(cell[0], cell[1])
+	if here != _working:
+		_working = here
+		_worked = 0.0
+		_work_needs = float(jack.gob_seconds_to_cut(here.x, here.y))
+		if _work_needs <= 0.0:
+			_working = Vector2i(-1, -1)
+			return
+	_worked += dt
+	# A chip of mortar every so often, so the effort is audible as well as visible.
+	_chip_due -= dt
+	if _chip_due <= 0.0:
+		_chip_due = 0.22
+		foley.cue("hammer", randf_range(0.82, 1.05))
+	if _worked >= _work_needs:
+		_working = Vector2i(-1, -1)
+		_worked = 0.0
+		if jack.gob_cut(here.x, here.y):
+			foley.cue("bent", 0.9)
+			ring.refresh()
+			_after_change()
 
 
 ## Act 2's trade, as a decision you make at the survey. "The game tells you your predicted accuracy
@@ -828,9 +873,11 @@ func _update_hud() -> void:
 	if cell.is_empty() or _fired:
 		hud.aim_seg = -1
 		hud.aim_verb = ""
+		hud.work_progress = 0.0
 	else:
 		hud.aim_seg = cell[0]
 		hud.aim_course = cell[1]
+		hud.work_progress = (_worked / _work_needs) if _work_needs > 0.0 else 0.0
 		var c: Dictionary = jack.gob_cell(cell[0], cell[1])
 		var p: Dictionary = jack.gob_prop_at(cell[0])
 		if bool(p.get("present", false)):
@@ -838,5 +885,7 @@ func _update_hud() -> void:
 		elif bool(c.get("removed", false)):
 			hud.aim_verb = "cut away — [RMB] stand a prop here"
 		else:
-			hud.aim_verb = "course %d, mortar %s — [LMB] cut it out" % [
-				cell[1] + 1, "soft" if float(c.get("strength", 1.0)) < 0.9 else "sound"]
+			var strength := float(c.get("strength", 1.0))
+			var mortar := "soft" if strength < 0.9 else ("hard" if strength > 1.1 else "sound")
+			hud.aim_verb = "course %d, %s mortar, %.1f s of work — [hold LMB]" % [
+				cell[1] + 1, mortar, jack.gob_seconds_to_cut(cell[0], cell[1])]

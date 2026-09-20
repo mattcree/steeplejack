@@ -128,8 +128,27 @@ void Gob::SetMortarAsymmetry(float bearingDeg, float bias) noexcept
     for (GobCell& c : cells_)
     {
         const float d = (SegmentBearing(c.seg) - bearingDeg) * kDegToRad;
-        c.strength = std::clamp(1.0f - bias * std::cos(d), 0.0f, 2.0f);
+        // Plus, not minus. A level saying `mortarAsymmetry: {bearing: 200, strengthBias: 0.35}`
+        // means "the south side is much harder to cut", so the named bearing is where the mortar
+        // is *tougher*. This had the sign the other way, which made the side every level doc calls
+        // hard the easy one — invisible until cutting took time and somebody had to feel it.
+        c.strength = std::clamp(1.0f + bias * std::cos(d), 0.0f, 2.0f);
     }
+}
+
+float Gob::SecondsToCut(int32_t seg, int32_t course, const Tuning& t) const noexcept
+{
+    const GobCell& c = At(seg, course);
+    if (c.removed)
+    {
+        return 0.0f;
+    }
+    // Lower courses carry more and are packed tighter, so they come harder. A gob is cut from the
+    // top course down for exactly this reason, and a player who works out why has found something.
+    const float depth = 1.0f + t.GetF("gobCourseDepthPenalty") *
+                                   (static_cast<float>(courses_ - 1 - c.course) /
+                                    std::max(1.0f, static_cast<float>(courses_ - 1)));
+    return t.GetF("gobSecondsPerCell") * std::max(c.strength, kTiny) * depth;
 }
 
 bool Gob::Cut(int32_t seg, int32_t course)

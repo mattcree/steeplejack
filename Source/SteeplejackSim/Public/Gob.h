@@ -96,6 +96,13 @@ public:
     // at `bearingDeg` and added opposite it.
     void SetMortarAsymmetry(float bearingDeg, float bias) noexcept;
 
+    // How long a cell takes to work out, in seconds of real effort, from its mortar. This is what
+    // makes `mortarAsymmetry` something the player feels rather than a number in a file: at
+    // Kershaw's the south side is 0.65 against 1.35, so the same gob takes twice as long to cut on
+    // one side as the other, and "working the gob evenly takes longer on one side" stops being a
+    // sentence in a design document.
+    float SecondsToCut(int32_t seg, int32_t course, const Tuning& t) const noexcept;
+
     // Cut a cell out. False if there is nothing there to cut.
     bool Cut(int32_t seg, int32_t course);
     // Stand a prop at a segment. False with no props left, or if nothing has been cut there yet:

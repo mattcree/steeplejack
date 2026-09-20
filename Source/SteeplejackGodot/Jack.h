@@ -284,6 +284,8 @@ public:
 	 *   courses, cog, support_centroid, base_radius}`. Safe every frame.
 	 */
 	godot::Dictionary gob_state() const;
+	/** How many seconds of work this cell is, from its mortar and its course. */
+	double gob_seconds_to_cut(int64_t seg, int64_t course) const;
 	/** `{removed, propped, strength, bearing}` for one cell. */
 	godot::Dictionary gob_cell(int64_t seg, int64_t course) const;
 	/** `{present, load_kn, split, dud, reserve}` for the prop at a segment. */

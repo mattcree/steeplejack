@@ -321,8 +321,53 @@ TEST_CASE("Gob: the bands run the right way as the cut deepens")
     CHECK(worst == GobStatus::Collapse);
 }
 
+TEST_CASE("Gob: a cell is worked out, and the mortar decides how long it takes")
+{
+    Gob g = Waterside();
+    const float top = g.SecondsToCut(0, g.Courses() - 1, Tune());
+    const float bottom = g.SecondsToCut(0, 0, Tune());
+    CHECK(top > 0.0f);
+    CHECK(bottom > top);   // the lower courses carry more and come harder
+    CHECK(bottom / top == doctest::Approx(1.0f + Tune().GetF("gobCourseDepthPenalty")).epsilon(0.01));
+
+    // A cell already out takes no time at all, because there is nothing there.
+    g.Cut(0, 0);
+    CHECK(g.SecondsToCut(0, 0, Tune()) == doctest::Approx(0.0f));
+
+    // And the asymmetry a level authors is felt in the hands: Kershaw's south side is 0.65 against
+    // 1.35 the other way, so the same gob is twice the work on one side.
+    Gob k = Waterside();
+    k.SetMortarAsymmetry(200.0f, 0.35f);
+    int32_t hard = 0, soft = 0;
+    for (int32_t s = 0; s < k.Segments(); ++s)
+    {
+        float d = std::fabs(k.SegmentBearing(s) - 200.0f);
+        d = (d > 180.0f) ? 360.0f - d : d;
+        hard = (d < 6.0f) ? s : hard;
+        soft = (d > 174.0f) ? s : soft;
+    }
+    CHECK(k.SecondsToCut(hard, 0, Tune()) > k.SecondsToCut(soft, 0, Tune()) * 1.8f);
+
+    // A whole gob is a couple of minutes of steady work, not fifty-six clicks.
+    float whole = 0.0f;
+    Gob w = Waterside();
+    for (int32_t s = 0; s < 14; ++s)
+    {
+        for (int32_t course = 0; course < w.Courses(); ++course)
+        {
+            whole += w.SecondsToCut(s, course, Tune());
+        }
+    }
+    CAPTURE(whole);
+    CHECK(whole > 60.0f);
+    CHECK(whole < 240.0f);
+}
+
 TEST_CASE("Gob: mortar can be tougher on one side, as a level authors it")
 {
+    // "the south side is `strengthBias +0.35` — much harder to cut". The bearing a level names is
+    // where the mortar is TOUGHER, and the strength number is bigger there. This assertion used to
+    // read the other way round and pass, which is how the sign stayed wrong.
     Gob g = Waterside();
     g.SetMortarAsymmetry(200.0f, 0.35f);
     int32_t at200 = 0, at20 = 0;
@@ -331,5 +376,7 @@ TEST_CASE("Gob: mortar can be tougher on one side, as a level authors it")
         at200 = (std::fabs(g.SegmentBearing(s) - 200.0f) < 6.0f) ? s : at200;
         at20 = (std::fabs(g.SegmentBearing(s) - 20.0f) < 6.0f) ? s : at20;
     }
-    CHECK(g.At(at200, 0).strength < g.At(at20, 0).strength);
+    CHECK(g.At(at200, 0).strength > g.At(at20, 0).strength);
+    CHECK(g.At(at200, 0).strength == doctest::Approx(1.35f).epsilon(0.02));
+    CHECK(g.At(at20, 0).strength == doctest::Approx(0.65f).epsilon(0.02));
 }

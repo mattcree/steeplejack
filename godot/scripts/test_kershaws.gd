@@ -54,7 +54,8 @@ func _init() -> void:
 			hard = strength
 		if absf(_delta(bearing, 20.0)) < 10.0:
 			soft = strength
-	_check(hard < soft, "the south side is harder mortar (%.2f against %.2f)" % [hard, soft])
+	_check(hard > soft,
+		"the south side is harder mortar to cut (%.2f against %.2f)" % [hard, soft])
 
 	# --- cutting straight down the corridor is not good enough -------------------------------------
 	# The lean pulls the fall off the hole you cut. Down the middle of the yard, and it goes wide.

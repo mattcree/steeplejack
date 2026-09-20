@@ -188,6 +188,8 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("gob_cut", "seg", "course"), &Jack::gob_cut);
 	ClassDB::bind_method(D_METHOD("gob_prop", "seg"), &Jack::gob_prop);
 	ClassDB::bind_method(D_METHOD("gob_state"), &Jack::gob_state);
+	ClassDB::bind_method(D_METHOD("gob_seconds_to_cut", "seg", "course"),
+	                     &Jack::gob_seconds_to_cut);
 	ClassDB::bind_method(D_METHOD("gob_cell", "seg", "course"), &Jack::gob_cell);
 	ClassDB::bind_method(D_METHOD("gob_prop_at", "seg"), &Jack::gob_prop_at);
 	ClassDB::bind_method(D_METHOD("fell_site", "wind_ms", "wind_bearing_deg", "safe_line_m", "seed",
@@ -1164,6 +1166,13 @@ Dictionary Jack::gob_state() const
 		UtilityFunctions::push_error("jack: ", String(e.what()));
 	}
 	return d;
+}
+
+double Jack::gob_seconds_to_cut(int64_t seg, int64_t course) const
+{
+	if (!gob || !tuning) { return 0.0; }
+	return static_cast<double>(gob->SecondsToCut(static_cast<int32_t>(seg),
+	                                             static_cast<int32_t>(course), *tuning));
 }
 
 Dictionary Jack::gob_cell(int64_t seg, int64_t course) const

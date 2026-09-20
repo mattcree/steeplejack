@@ -81,6 +81,21 @@ func _init() -> void:
 	# The chimney the rest of this test works on has been stripped off-screen.
 	world._stripped = true
 
+	# --- and a cell is worked out, not clicked out ------------------------------------------------
+	# Fifty-six clicks is not the act the design calls the heart of it, and a held verb is the only
+	# way the mortar a level authors reaches the player's hands.
+	var bite := _seg_at(ring, peg)
+	var needs: float = float(jack.gob_seconds_to_cut(bite, 0))
+	_check(needs > 0.5, "the bottom course here is %.1f seconds of work" % needs)
+	_check(float(jack.gob_seconds_to_cut(bite, ring.courses - 1)) < needs,
+		"and the top course comes easier, which is why you cut a gob downwards")
+	world._at = world._on_bearing(peg, float(jack.structure().get("base_radius", 3.2)) + 3.0)
+	world._working = Vector2i(bite, 0)
+	world._work_needs = needs
+	world._worked = needs * 0.6
+	_check(not bool(jack.gob_cell(bite, 0).get("removed", false)),
+		"six tenths of the way in and it is still in the wall")
+
 	# --- a prop will not go in in front of the cut ------------------------------------------------
 	var seg := _seg_at(ring, peg)
 	_check(not jack.gob_prop(seg), "a prop will not stand where nothing has been cut")

@@ -81,6 +81,7 @@ var safe_line := 0.0
 var range_out := 0.0
 var caught := false
 var stripped := false
+var work_progress := 0.0
 
 var _font: Font
 var _plan_scale := 1.0
@@ -208,6 +209,16 @@ func _draw_aim() -> void:
 	var c := size * 0.5
 	draw_line(c - Vector2(7, 0), c + Vector2(7, 0), DIM, 1.0)
 	draw_line(c - Vector2(0, 7), c + Vector2(0, 7), DIM, 1.0)
+	# The bite you have on the cell you are working. A ring, at the crosshair, because that is
+	# where you are looking and you cannot look anywhere else without losing it.
+	if work_progress > 0.0:
+		var steps := 28
+		var arc: float = TAU * clampf(work_progress, 0.0, 1.0)
+		for i in steps:
+			var a0: float = -PI * 0.5 + arc * float(i) / float(steps)
+			var a1: float = -PI * 0.5 + arc * float(i + 1) / float(steps)
+			draw_line(c + Vector2(cos(a0), sin(a0)) * 20.0,
+				c + Vector2(cos(a1), sin(a1)) * 20.0, TIMBER, 3.0)
 	if aim_verb == "":
 		return
 	draw_string(_font, Vector2(c.x - 150, c.y + 34), aim_verb,
