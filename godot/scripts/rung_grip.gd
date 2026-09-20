@@ -261,14 +261,22 @@ func _place(limb: int, _dt: float) -> void:
 	# Well off the limb's own line, or the bend has no plane to happen in and the joint flips to
 	# whichever side it likes: that is what put his knees out sideways and his elbows behind him.
 	#
-	# An elbow goes down, out and back from the shoulder. A knee goes down and *away* from the
-	# brickwork — this pole used to sit half a metre towards the wall, which drove the bent leg's
-	# knee straight through the rungs it was climbing. You keep your knees on your side of a
-	# ladder; that is why your hips hang back off it.
+	# An elbow goes down, out and back from the shoulder.
+	#
+	# A knee goes down and *towards* the brickwork, because that is the only way a human knee
+	# bends. This pole was moved out to the far side once, to stop the bent leg driving through
+	# the rungs, and it did stop that — by hyperextending him. He climbed on a pair of bird's
+	# legs, shin raked back under him, knee pointing out over the town.
+	#
+	# The clipping was never the knee's fault and the answer was never to break the joint. It is
+	# standoff: hips hang back off a ladder far enough that a knee coming forward passes behind
+	# the stiles instead of through them. That is what BODY_OFF_LADDER is for, and it is also why
+	# the trade packs a ladder off the wall in the first place — "so there's room for your boots
+	# to go through on the rungs".
 	if limb < 2:
 		_pole[limb].global_position = root + along * 0.55 + out * 0.45 - Vector3.UP * 0.35
 	else:
-		_pole[limb].global_position = root + out * 0.55 + along * 0.15 - Vector3.UP * 0.55
+		_pole[limb].global_position = root - out * 0.42 + along * 0.14 - Vector3.UP * 0.62
 
 
 ## For tests: the world position a limb's target is at, and whether that limb is mid-reach.

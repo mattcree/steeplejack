@@ -35,7 +35,11 @@
 #   options          the F1 motion options overlay, open
 #   walkfor <s>      walk forward for s seconds — mid-stride
 #   climbfor <s>     hold W for s seconds (negative for S) — mid-climb, hands moving
-#   cam <yaw> <pit>  aim the camera, degrees
+#   cam <yaw> <pit>  aim the camera, degrees — NOTE this turns the jack too, because it sets his
+#                    facing and the boom follows it. Use it to pose him, not to look at him.
+#   orbit <d> <m> [p]  look at him from `d` degrees round his own facing, `m` metres back, pitch `p`.
+#                    A free camera that ignores the boom, so it does not turn him: this is the one
+#                    for limb geometry, where the whole question is what a leg does side-on.
 #   boom <m>         how far back the camera sits
 #   fov <deg>        lens
 #   wait <s>         let it settle
@@ -96,6 +100,7 @@ func _run(cmd: String) -> void:
 	var verb := parts[0].to_lower()
 	var a := float(parts[1]) if parts.size() > 1 else 0.0
 	var b := float(parts[2]) if parts.size() > 2 else 0.0
+	var c := float(parts[3]) if parts.size() > 3 else 0.0
 
 	match verb:
 		"climb":
@@ -180,6 +185,20 @@ func _run(cmd: String) -> void:
 			player._pitch = deg_to_rad(b)
 			player._cam_yaw = player._yaw
 			player._cam_pitch = player._pitch
+		"orbit":
+			# A camera of our own, parented to nothing and aimed by hand. The boom re-eases towards
+			# the player's facing every frame, so setting its rotation does not hold for a capture;
+			# and `cam` yaws the jack himself. Neither can photograph a man from the side while he
+			# keeps climbing, which is exactly what a knee bending the wrong way needs.
+			var eye := Camera3D.new()
+			eye.fov = player.get_node("Boom/Camera").fov
+			root.add_child(eye)
+			var chest: Vector3 = player.global_position + Vector3.UP * 1.1
+			var ang: float = player._yaw + deg_to_rad(a)
+			var back := Vector3(sin(ang), 0.0, cos(ang)) * maxf(b, 0.5)
+			eye.global_position = chest + back + Vector3.UP * (maxf(b, 0.5) * sin(deg_to_rad(c)))
+			eye.look_at(chest, Vector3.UP)
+			eye.make_current()
 		"boom":
 			player.get_node("Boom").spring_length = a
 			# Hold it: the camera eases towards its own framing every frame.
