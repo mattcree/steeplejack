@@ -40,6 +40,17 @@ make check                          # the sim's rules, ~1 s, no engine
 make godot-test                     # the real scene, driven and asserted on, ~3 min
 ```
 
+## What it looks like
+
+| | |
+|---|---|
+| ![the job board](docs/shots/jobs.png) | **The board.** Every level file is a letter on it. What you have earned decides which ones arrive, and a felling with its bands still on sends you climbing. |
+| ![the gob](docs/shots/fell-gob.png) | **The gob.** A hole in one side of the base, a crescent of brick behind it and fourteen props holding up nine thousand kilonewtons. The plan, bottom right, is the sim's own support polygon. |
+| ![cutting](docs/shots/fell-cutting.png) | **Act 3.** Hold the bar in the joint and a cell comes out in its own time — longer where the mortar is harder, longer again low down. |
+| ![the run](docs/shots/fell-run.png) | **Act 4.** Lit, and the only running in the game. The burn is the timer, the safe line is the finish, and the camera is behind you. |
+| ![she goes](docs/shots/fell-going.png) | **The fall.** Deterministic, hinge-driven, broken where the bending stress says — and the top of it lands a long way past the base. |
+| ![the climb](docs/shots/waterside-climb.png) | **The other half.** Sound the joint, drive the dog, lash the next section, climb what you built. |
+
 ## The two halves
 
 `make run` opens a **job board**: the letters that have come in, what each pays, and what anyone
