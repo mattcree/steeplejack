@@ -15,6 +15,11 @@
 class_name FellFall
 extends Node3D
 
+## NOT the standing chimney's brick shader, which was tried here and is wrong: it weathers by world
+## height, so a chimney lying on its side reads as entirely soot and the fall goes black halfway
+## down. Dressing the chunks properly wants a shader that weathers along the piece rather than
+## along the world, which is a real job and not this one.
+
 const OVERTAKE_PER_CHUNK := 0.16   ## each piece up turns this much faster once it is free
 const FIRST_BREAK_AT := 0.52       ## fraction of the way over before anything parts
 
@@ -87,7 +92,7 @@ func _make_chunk(lo: float, hi: float, base_r: float, top_r: float, height_m: fl
 	cyl.radial_segments = 20
 	mesh.mesh = cyl
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.36, 0.29, 0.25)
+	mat.albedo_color = Color(0.38, 0.30, 0.26)
 	mat.roughness = 0.95
 	mesh.material_override = mat
 	mesh.position = Vector3(0.0, (lo + hi) * 0.5, 0.0)

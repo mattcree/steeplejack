@@ -127,6 +127,10 @@ func _ready() -> void:
 	_stripped = jack.career_stripped(_authored["id"]) or _authored["strip_out"].is_empty()
 	_step = 1 if _stripped else 0
 	_build_dust()
+	# The wind, at head height. The felling had no ambient bed at all — every sound in it was a cue,
+	# which left a chimney standing in total silence between them.
+	if foley.has_method("set_height"):
+		foley.set_height(EYE)
 	_capture(true)
 	hud.say("Cut the gob on the side you want it to fall. Aim at the brick and press E.", 6.0)
 
