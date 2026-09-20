@@ -14,6 +14,8 @@
 #include <godot_cpp/variant/dictionary.hpp>
 
 #include "Anchor.h"
+#include "Fell.h"
+#include "Gob.h"
 #include "JointGrid.h"
 #include "Level.h"
 #include "Meters.h"
@@ -251,6 +253,49 @@ public:
 	double grip_drain_multiplier(int64_t band) const;
 	double nerve_drain_multiplier(int64_t band) const;
 
+	// --- felling — FELL-001/002 ------------------------------------------------------------------
+	// The demolition mode. The gob lives here for the same reason the stack does: it is the rule,
+	// not the picture of it, and a .gd file asking "is this still standing" must not be allowed to
+	// have an opinion.
+	/**
+	 * What the level says this chimney is: `{height, base_radius, top_radius, lean_degrees,
+	 * lean_bearing, seed}`. The felling mode needs the lean before it can do anything, and a .gd
+	 * file re-reading the level file to find it would be two sources of one truth.
+	 */
+	godot::Dictionary structure() const;
+	/**
+	 * Start a gob at the base of the level's chimney. Everything about the chimney — its height,
+	 * its taper, its lean and what it weighs — comes from the level and the tuning, so there is
+	 * nothing here for a .gd file to get wrong.
+	 */
+	void gob_begin(int64_t segments, int64_t courses, int64_t props, int64_t dud_index);
+	/** Take a cell out. False if there is nothing there. */
+	bool gob_cut(int64_t seg, int64_t course);
+	/** Stand a prop. False with none left, or if nothing has been cut at that segment yet. */
+	bool gob_prop(int64_t seg);
+	/**
+	 * `{margin, status, status_name, cut_arc, cut_centre, props_left, props_set, segments,
+	 *   courses, cog, support_centroid, base_radius}`. Safe every frame.
+	 */
+	godot::Dictionary gob_state() const;
+	/** `{removed, propped, strength, bearing}` for one cell. */
+	godot::Dictionary gob_cell(int64_t seg, int64_t course) const;
+	/** `{present, load_kn, split, dud, reserve}` for the prop at a segment. */
+	godot::Dictionary gob_prop_at(int64_t seg) const;
+	/** Set the day and the neighbours. Exclusions as an Array of Dictionaries. */
+	void fell_site(double wind_ms, double wind_bearing_deg, double safe_line_m, int64_t seed,
+	               const godot::Array& exclusions);
+	/**
+	 * `{fall_bearing, error, accuracy, debris_half_angle, debris_length, threatened}` — call it
+	 * while the player cuts, which is what makes the gob legible.
+	 */
+	godot::Dictionary fell_predict(double peg_bearing_deg, double height_removed_m) const;
+	/**
+	 * Light it. `{fall_bearing, error, grade, grade_name, fractures, chunks, clean_break, struck,
+	 * catastrophe, bonus, penalty}`.
+	 */
+	godot::Dictionary fell_run(double peg_bearing_deg, double height_removed_m) const;
+
 	/** A tuned number, for the presentation layer to read rather than invent. */
 	double tuning_f(const godot::String& key, double fallback) const;
 
@@ -299,6 +344,10 @@ private:
 	bool grab_latched{false};
 	/** In-level seconds. The slip's budget and window are absolute times against this. */
 	float now{0.0f};
+
+	// The gob, when there is one. A felling level has one; a climbing level never touches it.
+	std::unique_ptr<sj::Gob> gob;
+	sj::FellSite fell;
 };
 
 }  // namespace steeplejack

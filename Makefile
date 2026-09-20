@@ -304,6 +304,16 @@ shot: godot-build godot-import
 		$(if $(LEVEL),--level $(LEVEL),) \
 		2>&1 | grep -vE "^(WARNING|MESA|Note:|     at:)" || true
 
+## fell-shot: render the felling mode to a PNG. CMDS="cut 160,shot gob"
+##
+## Same software renderer as `make shot`. A felling is almost entirely a thing you look at, so
+## this is the gate on whether the gob, the props and the plan view actually read.
+fell-shot: godot-build godot-import
+	@command -v xvfb-run >/dev/null || (echo "fell-shot needs xvfb-run (package xorg-x11-server-Xvfb)" && exit 1)
+	@timeout 600 xvfb-run -a -s "-screen 0 $(SHOT_RES)x24" \
+		$(GODOT) --path godot --audio-driver Dummy --resolution $(SHOT_RES) --fixed-fps 60 --script res://scripts/fell_shot.gd -- $(CMDS) \
+		2>&1 | grep -vE "^(WARNING|MESA|Note:|     at:)" || true
+
 ## character: rebuild the steeplejack — model, rig and clips — from tools/blender/build_character.py
 ##   Blender is run headless; the script is the source and the .glb is its output. Commit both.
 BLENDER ?= $(or $(shell command -v blender 2>/dev/null),flatpak run org.blender.Blender)
@@ -333,7 +343,7 @@ ascent-sheet: godot-build godot-import
 ## fail: the scene never loads, the script never reaches its quit(), and the run just sits there.
 ## A gate that hangs is worse than a gate that fails, because nobody reads a hang as a result.
 godot-test: godot-build godot-import
-	@for t in test_ladder test_character test_slip test_stance test_audio test_face test_lash_game test_stack_game test_top test_haul_game test_checkpoint test_options test_grip; do \
+	@for t in test_ladder test_character test_slip test_stance test_audio test_face test_lash_game test_stack_game test_top test_haul_game test_checkpoint test_options test_grip test_felling; do \
 		timeout 120 $(GODOT) --path godot --headless --script res://scripts/$$t.gd; \
 		rc=$$?; \
 		if [ $$rc -eq 124 ]; then \

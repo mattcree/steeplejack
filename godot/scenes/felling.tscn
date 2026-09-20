@@ -1,0 +1,113 @@
+; The felling scene — FELL-003. The demolition half of the game.
+;
+; Same sky, sun and ground as steeplejack.tscn; what is different is that the chimney is something
+; you are taking down rather than climbing. The gob ring and the plan-view HUD are the two things
+; this scene exists for. As ever: no hand-placed geometry, it is all generated from
+; data/levels/06-waterside.json by chimney.gd and gob_ring.gd.
+;
+; Hand-written text, reviewable in a diff. That is why we are in this engine.
+
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://scripts/felling.gd" id="1_felling"]
+[ext_resource type="Script" path="res://scripts/chimney.gd" id="2_chimney"]
+[ext_resource type="Script" path="res://scripts/gob_ring.gd" id="3_ring"]
+[ext_resource type="Script" path="res://scripts/fell_hud.gd" id="4_hud"]
+[ext_resource type="Script" path="res://scripts/town.gd" id="5_town"]
+[ext_resource type="Script" path="res://scripts/foley.gd" id="6_foley"]
+
+[sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
+sky_top_color = Color(0.478, 0.588, 0.675, 1)
+sky_horizon_color = Color(0.784, 0.769, 0.733, 1)
+sky_curve = 0.18
+ground_bottom_color = Color(0.157, 0.165, 0.145, 1)
+ground_horizon_color = Color(0.404, 0.412, 0.376, 1)
+ground_curve = 0.25
+sun_angle_max = 24.0
+sun_curve = 0.12
+
+[sub_resource type="Sky" id="Sky"]
+sky_material = SubResource("SkyMat")
+
+[sub_resource type="Environment" id="Env"]
+background_mode = 2
+sky = SubResource("Sky")
+ambient_light_source = 3
+ambient_light_energy = 0.45
+tonemap_mode = 3
+tonemap_white = 2.2
+ssao_enabled = true
+ssao_radius = 2.0
+ssao_intensity = 1.6
+sdfgi_enabled = false
+fog_enabled = true
+fog_light_color = Color(0.725, 0.788, 0.831, 1)
+fog_light_energy = 1.1
+fog_sun_scatter = 0.12
+fog_density = 0.0
+fog_aerial_perspective = 0.35
+fog_sky_affect = 0.25
+fog_height = -20.0
+fog_height_density = 0.006
+fog_depth_enabled = true
+fog_depth_begin = 25.0
+fog_depth_end = 850.0
+adjustment_enabled = true
+adjustment_contrast = 1.08
+adjustment_saturation = 0.92
+
+[sub_resource type="StandardMaterial3D" id="GroundMat"]
+albedo_color = Color(0.243, 0.255, 0.216, 1)
+roughness = 1.0
+specular_mode = 3
+
+[sub_resource type="PlaneMesh" id="GroundMesh"]
+size = Vector2(4000, 4000)
+subdivide_width = 8
+subdivide_depth = 8
+
+[node name="Felling" type="Node3D"]
+script = ExtResource("1_felling")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.77, 0.43, -0.47, 0, 0.74, 0.67, 0.64, -0.52, 0.57, 0, 60, 0)
+light_energy = 1.5
+light_color = Color(1, 0.94, 0.85, 1)
+shadow_enabled = true
+shadow_opacity = 0.82
+light_angular_distance = 1.4
+directional_shadow_mode = 2
+directional_shadow_max_distance = 320.0
+
+[node name="Ground" type="MeshInstance3D" parent="."]
+mesh = SubResource("GroundMesh")
+material_override = SubResource("GroundMat")
+
+[node name="Foley" type="Node" parent="."]
+script = ExtResource("6_foley")
+
+[node name="Town" type="Node3D" parent="."]
+script = ExtResource("5_town")
+
+[node name="Chimney" type="Node3D" parent="."]
+script = ExtResource("2_chimney")
+
+; The bottom 1.4 m of it, as the 32 x 4 cells the sim thinks in. A sibling of the chimney rather
+; than a child, because chimney.gd frees its children whenever it rebuilds.
+[node name="GobRing" type="Node3D" parent="."]
+script = ExtResource("3_ring")
+
+[node name="Camera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.62, 12)
+fov = 68.0
+far = 2000.0
+
+[node name="HUD" type="Control" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("4_hud")

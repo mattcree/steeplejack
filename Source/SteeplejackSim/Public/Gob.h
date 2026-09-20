@@ -13,6 +13,19 @@
 // Each cell carries load until it is removed. A prop stands at a segment and carries load too,
 // up to `gobPropCapacityKN`, and splits with a bang if it is asked for more.
 //
+// ## Why a 40 kN prop is any use under a thousand tons
+//
+// Waterside weighs about 9,400 kN. A segment of thirty-two is 294 kN of that, and fourteen props
+// at 40 kN come to 560 kN between them, so if a prop really had to carry the column above it the
+// whole thing would be impossible. It does not: **brickwork arches over the hole**. Load above an
+// opening goes round it to the sides, and what is left for the prop is the wall directly above it
+// up to the height the arch forms — `gobArchHeightM`, about five metres of it, 22 kN at Waterside.
+//
+// That is what makes the design's loop — "cut two cells, set a prop, cut two cells" — a rule
+// rather than advice. One unpropped hole beside a prop sheds half its share onto it and takes it
+// to 33 kN, which it survives. Two, and it is at 44 and it splits. You may run one segment ahead
+// of your props. You may not run two.
+//
 // ## The rule the player is fighting
 //
 // It stands while the centre of gravity is inside the support polygon — the intact cells and the
@@ -65,6 +78,11 @@ public:
     Gob(int32_t segments, int32_t courses, float baseRadius, float heightM, float weightKN,
         float leanDeg, float leanBearingDeg, int32_t props, int32_t dudProp, const Tuning& t);
 
+    // What the shaft above a gob weighs, from the wall it is made of. Here rather than in the
+    // caller because a test fixture and the running game guessing separately at the weight of a
+    // chimney is two answers to one question, and the whole prop model hangs off this number.
+    static float ShaftWeightKN(float baseRadius, float topRadius, float heightM, const Tuning& t);
+
     int32_t Segments() const noexcept { return segments_; }
     int32_t Courses() const noexcept { return courses_; }
     float   BaseRadius() const noexcept { return radius_; }
@@ -102,6 +120,9 @@ public:
     // is supposed to finish.
     Vec2 CentreOfGravity() const noexcept;
     Vec2 SupportCentroid() const noexcept;
+    // The polygon itself, counter-clockwise, so the HUD can draw the thing the margin is measured
+    // against rather than a drawing of its own that agrees with it by luck.
+    std::vector<Vec2> SupportHull() const;
     float Margin() const noexcept;
     GobStatus Status(const Tuning& t) const noexcept;
 
@@ -127,7 +148,7 @@ private:
     float   radius_{}, height_{}, weightKN_{};
     float   leanDeg_{}, leanBearingDeg_{};
     int32_t propBudget_{}, dudProp_{-1};
-    float   capacityKN_{}, propLever_{};
+    float   capacityKN_{}, propLever_{}, archHeight_{};
     std::vector<GobCell> cells_;
     std::vector<Prop>    props_;
     std::vector<float>   segLoad_;

@@ -3,6 +3,8 @@
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include "Fell.h"
+#include "Gob.h"
 #include "JointGrid.h"
 #include "Recovery.h"
 #include "Rng.h"
@@ -177,6 +179,19 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("span_name", "band"), &Jack::span_name);
 	ClassDB::bind_method(D_METHOD("grip_drain_multiplier", "band"), &Jack::grip_drain_multiplier);
 	ClassDB::bind_method(D_METHOD("nerve_drain_multiplier", "band"), &Jack::nerve_drain_multiplier);
+	ClassDB::bind_method(D_METHOD("structure"), &Jack::structure);
+	ClassDB::bind_method(D_METHOD("gob_begin", "segments", "courses", "props", "dud_index"),
+	                     &Jack::gob_begin);
+	ClassDB::bind_method(D_METHOD("gob_cut", "seg", "course"), &Jack::gob_cut);
+	ClassDB::bind_method(D_METHOD("gob_prop", "seg"), &Jack::gob_prop);
+	ClassDB::bind_method(D_METHOD("gob_state"), &Jack::gob_state);
+	ClassDB::bind_method(D_METHOD("gob_cell", "seg", "course"), &Jack::gob_cell);
+	ClassDB::bind_method(D_METHOD("gob_prop_at", "seg"), &Jack::gob_prop_at);
+	ClassDB::bind_method(D_METHOD("fell_site", "wind_ms", "wind_bearing_deg", "safe_line_m", "seed",
+	                               "exclusions"), &Jack::fell_site);
+	ClassDB::bind_method(D_METHOD("fell_predict", "peg_bearing_deg", "height_removed_m"),
+	                     &Jack::fell_predict);
+	ClassDB::bind_method(D_METHOD("fell_run", "peg_bearing_deg", "height_removed_m"), &Jack::fell_run);
 	ClassDB::bind_method(D_METHOD("tuning_f", "key", "fallback"), &Jack::tuning_f, DEFVAL(0.0));
 }
 
@@ -1010,6 +1025,236 @@ double Jack::nerve_drain_multiplier(int64_t band) const
 	if (!tuning) { return 1.0; }
 	return static_cast<double>(
 		sj::anchor::NerveDrainMultiplier(static_cast<sj::SpanBand>(band), *tuning));
+}
+
+// ---------------------------------------------------------------- felling
+
+Dictionary Jack::structure() const
+{
+	Dictionary d;
+	if (!level) { return d; }
+	const sj::StructureSpec& s = level->Structure();
+	d["height"] = static_cast<double>(s.height);
+	d["base_radius"] = static_cast<double>(s.baseRadius);
+	d["top_radius"] = static_cast<double>(s.topRadius);
+	d["lean_degrees"] = static_cast<double>(s.leanDegrees);
+	d["lean_bearing"] = static_cast<double>(s.leanBearing);
+	d["seed"] = static_cast<int64_t>(s.weatherSeed);
+	return d;
+}
+
+void Jack::gob_begin(int64_t segments, int64_t courses, int64_t props, int64_t dud_index)
+{
+	if (!tuning || !level) { return; }
+	try
+	{
+		const sj::StructureSpec& s = level->Structure();
+		const float weight = sj::Gob::ShaftWeightKN(s.baseRadius, s.topRadius, s.height, *tuning);
+		gob = std::make_unique<sj::Gob>(static_cast<int32_t>(segments), static_cast<int32_t>(courses),
+		                                s.baseRadius, s.height, weight, s.leanDegrees,
+		                                static_cast<float>(s.leanBearing),
+		                                static_cast<int32_t>(props), static_cast<int32_t>(dud_index),
+		                                *tuning);
+		fell.heightM = s.height;
+		fell.baseRadiusM = s.baseRadius;
+		fell.leanDeg = s.leanDegrees;
+		fell.leanBearingDeg = static_cast<float>(s.leanBearing);
+	}
+	catch (const std::exception& e)
+	{
+		UtilityFunctions::push_error("jack: ", String(e.what()));
+		gob.reset();
+	}
+}
+
+bool Jack::gob_cut(int64_t seg, int64_t course)
+{
+	if (!gob || !tuning) { return false; }
+	try
+	{
+		const bool did = gob->Cut(static_cast<int32_t>(seg), static_cast<int32_t>(course));
+		if (did) { gob->Settle(*tuning); }
+		return did;
+	}
+	catch (const std::exception& e)
+	{
+		UtilityFunctions::push_error("jack: ", String(e.what()));
+		return false;
+	}
+}
+
+bool Jack::gob_prop(int64_t seg)
+{
+	if (!gob || !tuning) { return false; }
+	try
+	{
+		const bool did = gob->SetProp(static_cast<int32_t>(seg));
+		if (did) { gob->Settle(*tuning); }
+		return did;
+	}
+	catch (const std::exception& e)
+	{
+		UtilityFunctions::push_error("jack: ", String(e.what()));
+		return false;
+	}
+}
+
+Dictionary Jack::gob_state() const
+{
+	Dictionary d;
+	if (!gob || !tuning) { return d; }
+	try
+	{
+		static const char* kNames[] = {"SAFE", "UNEASY", "CRITICAL", "COLLAPSE"};
+		const sj::GobStatus st = gob->Status(*tuning);
+		const sj::Vec2 cog = gob->CentreOfGravity();
+		const sj::Vec2 cen = gob->SupportCentroid();
+		int32_t set = 0;
+		for (const sj::Prop& pr : gob->Props()) { set += pr.split ? 0 : 1; }
+		d["margin"] = static_cast<double>(gob->Margin());
+		d["status"] = static_cast<int64_t>(st);
+		d["status_name"] = String(kNames[static_cast<int>(st)]);
+		d["cut_arc"] = static_cast<double>(gob->CutArcDegrees());
+		d["cut_centre"] = static_cast<double>(gob->CutCentreBearing());
+		d["props_left"] = static_cast<int64_t>(gob->PropsLeft());
+		d["props_standing"] = static_cast<int64_t>(set);
+		d["props_split"] = static_cast<int64_t>(gob->Props().size()) - static_cast<int64_t>(set);
+		d["segments"] = static_cast<int64_t>(gob->Segments());
+		d["courses"] = static_cast<int64_t>(gob->Courses());
+		d["base_radius"] = static_cast<double>(gob->BaseRadius());
+		PackedVector2Array hull;
+		for (const sj::Vec2& p : gob->SupportHull()) { hull.push_back(Vector2(p.x, p.y)); }
+		d["support_hull"] = hull;
+		d["cog"] = Vector2(cog.x, cog.y);
+		d["support_centroid"] = Vector2(cen.x, cen.y);
+	}
+	catch (const std::exception& e)
+	{
+		UtilityFunctions::push_error("jack: ", String(e.what()));
+	}
+	return d;
+}
+
+Dictionary Jack::gob_cell(int64_t seg, int64_t course) const
+{
+	Dictionary d;
+	if (!gob) { return d; }
+	const sj::GobCell& c = gob->At(static_cast<int32_t>(seg), static_cast<int32_t>(course));
+	d["removed"] = c.removed;
+	d["propped"] = c.propped;
+	d["strength"] = static_cast<double>(c.strength);
+	d["bearing"] = static_cast<double>(gob->SegmentBearing(static_cast<int32_t>(seg)));
+	return d;
+}
+
+Dictionary Jack::gob_prop_at(int64_t seg) const
+{
+	Dictionary d;
+	d["present"] = false;
+	if (!gob || !tuning) { return d; }
+	const float capacity = static_cast<float>(tuning_f("gobPropCapacityKN", 1.0));
+	int32_t index = 0;
+	for (const sj::Prop& pr : gob->Props())
+	{
+		if (pr.seg == static_cast<int16_t>(seg))
+		{
+			d["present"] = true;
+			d["index"] = static_cast<int64_t>(index);
+			d["load_kn"] = static_cast<double>(pr.loadKN);
+			d["split"] = pr.split;
+			d["dud"] = pr.dud;
+			d["reserve"] = (capacity > 0.0f)
+			                   ? static_cast<double>(std::clamp(1.0f - pr.loadKN / capacity, 0.0f, 1.0f))
+			                   : 0.0;
+			break;
+		}
+		++index;
+	}
+	return d;
+}
+
+void Jack::fell_site(double wind_ms, double wind_bearing_deg, double safe_line_m, int64_t seed,
+                     const Array& exclusions)
+{
+	fell.windSpeedMps = static_cast<float>(wind_ms);
+	fell.windBearingDeg = static_cast<float>(wind_bearing_deg);
+	fell.safeLineDistanceM = static_cast<float>(safe_line_m);
+	fell.seed = static_cast<uint32_t>(seed);
+	fell.exclusions.clear();
+	for (int i = 0; i < exclusions.size(); ++i)
+	{
+		const Dictionary e = exclusions[i];
+		sj::Exclusion x;
+		x.id = String(e.get("id", "")).utf8().get_data();
+		x.bearingDeg = static_cast<float>(static_cast<double>(e.get("bearing", 0.0)));
+		x.distanceM = static_cast<float>(static_cast<double>(e.get("distance", 0.0)));
+		x.valueGbp = static_cast<float>(static_cast<double>(e.get("value", 0.0)));
+		x.catastrophic = static_cast<bool>(e.get("catastrophic", false));
+		fell.exclusions.push_back(x);
+	}
+}
+
+Dictionary Jack::fell_predict(double peg_bearing_deg, double height_removed_m) const
+{
+	Dictionary d;
+	if (!gob || !tuning) { return d; }
+	try
+	{
+		sj::FellPlan plan;
+		plan.pegBearingDeg = static_cast<float>(peg_bearing_deg);
+		plan.heightRemovedM = static_cast<float>(height_removed_m);
+		const sj::FellPrediction p = sj::Fell::Predict(fell, *gob, plan, *tuning);
+		Array threatened;
+		for (const sj::Exclusion& e : fell.exclusions)
+		{
+			if (p.Threatens(e)) { threatened.push_back(String(e.id.c_str())); }
+		}
+		d["fall_bearing"] = static_cast<double>(p.fallBearingDeg);
+		d["error"] = static_cast<double>(p.errorDegrees);
+		d["accuracy"] = static_cast<double>(p.accuracyDegrees);
+		d["debris_half_angle"] = static_cast<double>(p.debrisHalfAngleDeg);
+		d["debris_length"] = static_cast<double>(p.debrisLengthM);
+		d["threatened"] = threatened;
+	}
+	catch (const std::exception& e)
+	{
+		UtilityFunctions::push_error("jack: ", String(e.what()));
+	}
+	return d;
+}
+
+Dictionary Jack::fell_run(double peg_bearing_deg, double height_removed_m) const
+{
+	Dictionary d;
+	if (!gob || !tuning) { return d; }
+	try
+	{
+		static const char* kGrades[] = {"WILD", "ACCEPTABLE", "GOOD", "PERFECT"};
+		sj::FellPlan plan;
+		plan.pegBearingDeg = static_cast<float>(peg_bearing_deg);
+		plan.heightRemovedM = static_cast<float>(height_removed_m);
+		const sj::FellOutcome o = sj::Fell::Run(fell, *gob, plan, *tuning);
+		Array fractures;
+		for (float h : o.fractureHeightsM) { fractures.push_back(static_cast<double>(h)); }
+		Array struck;
+		for (const std::string& id : o.struck) { struck.push_back(String(id.c_str())); }
+		d["fall_bearing"] = static_cast<double>(o.fallBearingDeg);
+		d["error"] = static_cast<double>(o.errorDegrees);
+		d["grade"] = static_cast<int64_t>(o.grade);
+		d["grade_name"] = String(kGrades[static_cast<int>(o.grade)]);
+		d["fractures"] = fractures;
+		d["chunks"] = static_cast<int64_t>(o.chunks);
+		d["clean_break"] = o.cleanBreak;
+		d["struck"] = struck;
+		d["catastrophe"] = o.catastrophe;
+		d["bonus"] = static_cast<double>(o.bonusGbp);
+		d["penalty"] = static_cast<double>(o.penaltyGbp);
+	}
+	catch (const std::exception& e)
+	{
+		UtilityFunctions::push_error("jack: ", String(e.what()));
+	}
+	return d;
 }
 
 double Jack::tuning_f(const String& key, double fallback) const

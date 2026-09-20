@@ -513,6 +513,86 @@ ladder allowance is a broken level, and this catches it in seconds rather than i
 
 ---
 
+## `Gob.h` — FELL-001
+
+```cpp
+struct GobCell { int16_t seg{}, course{}; bool removed{}, propped{}; float strength{1.0f}; };
+struct Prop    { int16_t seg{-1}; float loadKN{}; bool split{}, dud{}; };
+enum class GobStatus : uint8_t { Safe, Uneasy, Critical, Collapse };
+
+class Gob
+{
+public:
+    Gob(int32_t segments, int32_t courses, float baseRadius, float heightM, float weightKN,
+        float leanDeg, float leanBearingDeg, int32_t props, int32_t dudProp, const Tuning&);
+
+    bool  Cut(int32_t seg, int32_t course);       // false if there is nothing there to cut
+    bool  SetProp(int32_t seg);                   // false with no props left, or nothing cut there
+
+    float CutArcDegrees() const noexcept;
+    float CutCentreBearing() const noexcept;
+    Vec2  CentreOfGravity() const noexcept;
+    Vec2  SupportCentroid() const noexcept;
+    float Margin() const noexcept;                // metres; negative is a collapse
+    GobStatus Status(const Tuning&) const noexcept;
+
+    void  Settle(const Tuning&);                  // the split cascade
+    float PropLoadKN(int32_t index) const noexcept;
+    float SegmentLoadKN(int32_t seg) const noexcept;
+    void  SetMortarAsymmetry(float bearingDeg, float bias) noexcept;
+};
+```
+
+`Margin` is the whole of Act 3: the distance from the centre of gravity to the nearest edge of the
+polygon formed by the intact cells and the standing props. The design's bands (`gobSafeMarginM`
+0.60, `gobCriticalMarginM` 0.30, `gobCollapseMarginM` 0.10) are the chord of the bare crescent —
+cut 160° of a 3.2 m ring and the margin is 0.56 m, the middle of UNEASY, which is where a felling
+is meant to finish. **A prop is not worth the brick it replaced**: it contributes a support point
+drawn in towards the middle by what it is carrying (`gobPropLeverFrac`), because timber in
+compression holds the weight up and does little against the topple. That is what keeps the cut arc,
+not the prop count, in charge.
+
+Loads are always current — `Cut` and `SetProp` redistribute. `Settle` runs the split cascade.
+
+## `Fell.h` — FELL-002
+
+```cpp
+struct Exclusion { std::string id; float bearingDeg{}, distanceM{}, valueGbp{}; bool catastrophic{}; };
+struct FellSite  { float heightM{}, baseRadiusM{}, leanDeg{}, leanBearingDeg{},
+                   windSpeedMps{}, windBearingDeg{}, safeLineDistanceM{};
+                   std::vector<Exclusion> exclusions; uint32_t seed{}; };
+struct FellPlan  { float pegBearingDeg{}, heightRemovedM{}; };
+enum class FellGrade : uint8_t { Wild, Acceptable, Good, Perfect };
+
+struct FellPrediction { float fallBearingDeg{}, errorDegrees{}, accuracyDegrees{},
+                              debrisHalfAngleDeg{}, debrisLengthM{};
+                        bool Threatens(const Exclusion&) const noexcept; };
+
+struct FellOutcome { float fallBearingDeg{}, errorDegrees{}; FellGrade grade{};
+                     std::vector<float> fractureHeightsM; std::vector<std::string> struck;
+                     int32_t chunks{1}; bool cleanBreak{}, catastrophe{};
+                     float bonusGbp{}, penaltyGbp{}; };
+
+class Fell
+{
+public:
+    static FellPrediction Predict(const FellSite&, const Gob&, const FellPlan&, const Tuning&);
+    static FellOutcome    Run(const FellSite&, const Gob&, const FellPlan&, const Tuning&);
+    static std::vector<float> FractureHeights(float shaftHeightM, const Tuning&);
+    static float BearingDelta(float fromDeg, float toDeg) noexcept;
+};
+```
+
+No state: a felling is a function of the site, the hole and the plan. `Predict` is safe to call
+every frame while the player cuts, and the design leans on that — the cone swinging as brick comes
+out is what makes the gob legible.
+
+`accuracyDegrees` is an honest prediction, not a fudge: `Run` lands inside the cone `Predict` drew,
+and a test asserts it. Deterministic per [ADR-0002](adr/0002-physics-and-destruction.md), seeded off
+the level and forked off the gob, so a level always falls the same way and a replay reproduces it.
+
+---
+
 ## The engine boundary
 
 The game may call into `sj::` freely, through the binding. **`sj::` may never call into Godot.** There

@@ -46,10 +46,17 @@ const Tuning& Tune()
     return t;
 }
 
+// What Waterside's shaft weighs — about 960 tonnes of brick, which is the number the whole prop
+// model answers to. Taken from the sim so the fixture and the game cannot drift apart.
+float Weight()
+{
+    return Gob::ShaftWeightKN(3.2f, 1.9f, 70.0f, Tune());
+}
+
 // The Waterside chimney: 70 m, 3.2 m at the base, 32 segments of 4 courses, 14 props.
 Gob Waterside(float leanDeg = 0.3f, float leanBearing = 284.0f, int32_t dud = -1)
 {
-    return Gob(32, 4, 3.2f, 70.0f, 900.0f, leanDeg, leanBearing, 14, dud, Tune());
+    return Gob(32, 4, 3.2f, 70.0f, Weight(), leanDeg, leanBearing, 14, dud, Tune());
 }
 
 // Cut an arc of `degrees` centred on a bearing, all courses through.
@@ -112,8 +119,8 @@ TEST_CASE("Gob: props are what let you take out more brick than the brick would 
     // hole it stands. This wants more props than Waterside authors, which is the point: the prop
     // count is how a level sets how far you are allowed to go.
     const int32_t kDeep = 18;
-    Gob bare(32, 4, 3.2f, 70.0f, 900.0f, 0.3f, 284.0f, 0, -1, Tune());
-    Gob propped(32, 4, 3.2f, 70.0f, 900.0f, 0.3f, 284.0f, kDeep, -1, Tune());
+    Gob bare(32, 4, 3.2f, 70.0f, Weight(), 0.3f, 284.0f, 0, -1, Tune());
+    Gob propped(32, 4, 3.2f, 70.0f, Weight(), 0.3f, 284.0f, kDeep, -1, Tune());
     for (Gob* g : {&bare, &propped})
     {
         for (int32_t i = 0; i < kDeep; ++i)
@@ -133,13 +140,13 @@ TEST_CASE("Gob: props are what let you take out more brick than the brick would 
     CHECK(propped.Status(Tune()) != GobStatus::Collapse);
 }
 
-TEST_CASE("Gob: inside the prop budget it is the cut arc that decides, not the props")
+TEST_CASE("Gob: props buy margin back, and how much depends on how hard they are working")
 {
-    // Worth knowing, and it surprised me: Waterside authors 14 props and a 14-segment cut is 160
-    // degrees, so a correctly worked gob props every hole it makes and the props still do not move
-    // the margin - each is carrying about 30 kN of its 40 kN, which leaves it a shorter lever than
-    // the crescent already has. Props here buy you the load path and the cascade, not the statics.
-    // Going deeper is what props buy, and going deeper is what the budget forbids.
+    // Waterside authors 14 props and a 14-segment cut is 160 degrees, so a correctly worked gob
+    // props every hole it makes. The crescent alone leaves 0.44 m; the props push the front of the
+    // support polygon back out to about 0.53 m. Still UNEASY, which is where it should finish, but
+    // measurably better than the brick alone - and it moves as the props load up, which is what
+    // ties "are my props in trouble" to "is this thing about to go".
     Gob bare = Waterside();
     CutArc(bare, 284.0f, 160.0f);
     Gob propped = Waterside();
@@ -153,26 +160,46 @@ TEST_CASE("Gob: inside the prop budget it is the cut arc that decides, not the p
     CHECK(set == 14);                       // the budget is exactly the arc
     CHECK(propped.PropsLeft() == 0);
     CHECK(propped.PropLoadKN(0) > 0.0f);
-    CHECK(propped.PropLoadKN(0) < Tune().GetF("gobPropCapacityKN"));
-    CHECK(propped.Margin() == doctest::Approx(bare.Margin()));
+    CHECK(propped.PropLoadKN(0) < Tune().GetF("gobPropCapacityKN") * 0.75f);   // room to spare
+    CHECK(propped.Margin() > bare.Margin());
+    CHECK(propped.Status(Tune()) == GobStatus::Uneasy);
 }
 
-TEST_CASE("Gob: a prop is worth less than the brick it replaced")
+TEST_CASE("Gob: acceptance, you may run one segment ahead of your props but not two")
 {
-    // It holds the weight up; it does very little against the topple. So propping every cell you
-    // cut still loses you margin — you cannot prop your way back to an uncut ring.
-    Gob g = Waterside();
-    const float uncut = g.Margin();
-    CutArc(g, 284.0f, 140.0f);
-    for (int32_t s = 0; s < g.Segments(); ++s)
-    {
-        if (g.At(s, 0).removed)
+    // The design's loop - "cut two cells, set a prop, cut two cells" - as arithmetic. A prop under
+    // a worked gob carries about 22 kN of its 40. One unpropped hole beside it sheds half its
+    // tributary on and takes it to 33, which stands. Two, and it is at 44, and it splits.
+    // On segment 25, which is 281 degrees: the fall line, and the way it leans. That matters —
+    // the ring carries more where the weight already is, so the lean side of the gob is the side
+    // that bites first, and it is also the side you have to cut.
+    const int32_t kOnTheLean = 25;
+    const auto run = [kOnTheLean](int32_t gaps) {
+        Gob g = Waterside();
+        // A propped segment, then `gaps` holes with nothing in them, on one side of it.
+        for (int32_t c = 0; c < g.Courses(); ++c) { g.Cut(kOnTheLean, c); }
+        g.SetProp(kOnTheLean);
+        for (int32_t i = 1; i <= gaps; ++i)
         {
-            g.SetProp(s);
+            for (int32_t c = 0; c < g.Courses(); ++c) { g.Cut(kOnTheLean + i, c); }
         }
-    }
-    g.Settle(Tune());
-    CHECK(g.Margin() < uncut);
+        g.Settle(Tune());
+        return g;
+    };
+    const float capacity = Tune().GetF("gobPropCapacityKN");
+
+    Gob none = run(0);
+    CAPTURE(none.PropLoadKN(0));
+    CHECK(none.PropLoadKN(0) < capacity * 0.7f);
+    CHECK_FALSE(none.Props()[0].split);
+
+    Gob one = run(1);
+    CAPTURE(one.PropLoadKN(0));
+    CHECK(one.PropLoadKN(0) > none.PropLoadKN(0));
+    CHECK_FALSE(one.Props()[0].split);      // one ahead is allowed
+
+    Gob two = run(2);
+    CHECK(two.Props()[0].split);            // two is not
 }
 
 TEST_CASE("Gob: a prop goes in behind the cut, never in front of it, and one to a segment")
@@ -201,7 +228,7 @@ TEST_CASE("Gob: the props run out, and that is the budget the level authored")
 TEST_CASE("Gob: overloaded props split, and a split one hands its load to the rest")
 {
     // Three props under the whole weight: 300 kN each against a 40 kN prop.
-    Gob g(32, 4, 3.2f, 70.0f, 900.0f, 0.0f, 0.0f, 14, -1, Tune());
+    Gob g(32, 4, 3.2f, 70.0f, Weight(), 0.0f, 0.0f, 14, -1, Tune());
     for (int32_t s = 0; s < g.Segments(); ++s)
     {
         for (int32_t c = 0; c < g.Courses(); ++c)
@@ -240,27 +267,22 @@ TEST_CASE("Gob: an authored dud prop splits under any load at all")
     CHECK_FALSE(g.Props()[1].split);
 }
 
-TEST_CASE("Gob: a prop that splits leans on its neighbours, and can take them with it")
+TEST_CASE("Gob: a prop that splits leans on its neighbours")
 {
-    // Every prop in a finished gob is carrying about 28 kN of a 40 kN prop. There is not 28 kN of
-    // slack in the one next door, so a prop going means the next one goes: that is the cascade the
-    // design wants, and the reason a dud is worth authoring.
-    Gob g = Waterside(0.3f, 284.0f, 0);
+    // What a split prop was carrying does not vanish - it goes to the nearest thing holding
+    // anything up, each side. Whether that is enough to take the neighbour with it depends on how
+    // loaded the neighbour already was, which is the difference between a bang and a disaster.
+    Gob g = Waterside(0.3f, 284.0f, 0);   // the first prop set is the dud
     for (int32_t s = 0; s < 3; ++s)
     {
-        for (int32_t c = 0; c < g.Courses(); ++c)
-        {
-            g.Cut(s, c);
-        }
+        for (int32_t c = 0; c < g.Courses(); ++c) { g.Cut(s, c); }
         CHECK(g.SetProp(s));
     }
+    const float before = g.PropLoadKN(1);
     g.Settle(Tune());
-    int32_t split = 0;
-    for (const sj::Prop& p : g.Props())
-    {
-        split += p.split ? 1 : 0;
-    }
-    CHECK(split > 1);   // the dud did not go alone
+    CHECK(g.Props()[0].split);
+    CHECK(g.PropLoadKN(1) > before);      // the neighbour took what the dud dropped
+    CHECK_FALSE(g.Props()[1].split);      // and stood up to it, this time
 }
 
 TEST_CASE("Gob: the bands are the design's, and a finished gob sits in uneasy")

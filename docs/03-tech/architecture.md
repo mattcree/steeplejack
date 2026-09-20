@@ -123,9 +123,14 @@ struct Meters  { float grip, nerve, nerveMax; Stance stance; Exposure exposure; 
 `Stack` (anchors, sections, load sharing, cascades, buckling, hitch drift) and `JointGrid` (the
 face, generated from a level's bands) are the two big ones; see [`interfaces.md`](interfaces.md).
 
-**Planned, not built:** the demolition side of the game — gob cells, props and the fall plan for
-felling (`GobCell`, `Prop`, `FallPlan`), topping, scoring and the economy. Their signatures are in
-`interfaces.md`; nothing implements them yet.
+`Gob` (the ring of cells you cut out of the base, the props that hold up what the brick used to,
+and the one margin that says whether it is still standing) and `Fell` (where it goes, where it
+breaks and what that costs) are the demolition side — see [`interfaces.md`](interfaces.md).
+
+**Planned, not built:** topping, scoring and the economy. This paragraph used to claim their
+signatures were already in `interfaces.md`. They were not, and neither were felling's until
+FELL-001/002 put them there — a doc saying a contract exists when it does not is worse than a doc
+that says nothing, because it is the one thing an agent is told to trust.
 
 ## Procedural structure generation
 

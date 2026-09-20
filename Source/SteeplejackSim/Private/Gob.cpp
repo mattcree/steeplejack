@@ -14,6 +14,9 @@ constexpr float kDegToRad = 0.017453292f;   // literal: degrees to radians
 constexpr float kFullTurn = 360.0f;         // literal: degrees in a turn
 constexpr float kTiny = 1e-6f;              // literal: a bearing this small has no direction
 constexpr float kFar = 1e9f;                // literal: further than any site
+constexpr float kGravity = 9.81f;           // literal: m/s^2
+constexpr float kNewtonsPerKN = 1000.0f;    // literal: N in a kN
+constexpr float kTau = 6.2831853f;          // literal: a full turn, in radians
 
 Vec2 OnBearing(float bearingDeg, float r) noexcept
 {
@@ -77,7 +80,8 @@ Gob::Gob(int32_t segments, int32_t courses, float baseRadius, float heightM, flo
     : segments_(std::max(segments, 1)), courses_(std::max(courses, 1)), radius_(baseRadius),
       height_(heightM), weightKN_(weightKN), leanDeg_(leanDeg), leanBearingDeg_(leanBearingDeg),
       propBudget_(std::max(props, 0)), dudProp_(dudProp),
-      capacityKN_(t.GetF("gobPropCapacityKN")), propLever_(t.GetF("gobPropLeverFrac"))
+      capacityKN_(t.GetF("gobPropCapacityKN")), propLever_(t.GetF("gobPropLeverFrac")),
+      archHeight_(t.GetF("gobArchHeightM"))
 {
     cells_.reserve(static_cast<std::size_t>(segments_ * courses_));
     for (int32_t s = 0; s < segments_; ++s)
@@ -89,6 +93,14 @@ Gob::Gob(int32_t segments, int32_t courses, float baseRadius, float heightM, flo
     }
     segLoad_.assign(static_cast<std::size_t>(segments_), 0.0f);
     Distribute();
+}
+
+float Gob::ShaftWeightKN(float baseRadius, float topRadius, float heightM, const Tuning& t)
+{
+    // A hollow tapered cylinder of brickwork: mean circumference times wall thickness times height.
+    const float meanR = (baseRadius + topRadius) * 0.5f;
+    const float volume = kTau * meanR * t.GetF("gobWallThicknessM") * heightM;
+    return volume * t.GetF("gobBrickDensityKgPerM3") * kGravity / kNewtonsPerKN;
 }
 
 float Gob::SegmentBearing(int32_t seg) const noexcept
@@ -264,20 +276,40 @@ void Gob::Distribute() noexcept
     }
 
     // Anything with nothing under it sheds to the nearest support each side. Walking out rather
-    // than spreading it over the whole ring is what makes a split prop dangerous to its neighbours
+    // than spreading it over the whole ring is what makes a gap dangerous to its neighbours
     // instead of to the chimney in general.
+    //
+    // But only the part of it the arch cannot carry round. Above a hole in a wall the load goes to
+    // the sides, and all that is left over the opening is the wall directly above it up to the
+    // height the arch forms. That fraction is what a prop is actually under, and it is the whole
+    // reason a gob is possible (Gob.h).
+    const float arching = (height_ > kTiny) ? std::clamp(archHeight_ / height_, 0.0f, 1.0f) : 1.0f;
     segLoad_.assign(static_cast<std::size_t>(segments_), 0.0f);
     std::vector<bool> holds(static_cast<std::size_t>(segments_), false);
+    bool anyBrick = false;
     for (int32_t s = 0; s < segments_; ++s)
     {
         const Prop* p = PropAt(s);
         holds[static_cast<std::size_t>(s)] = Bearing(s) || (p != nullptr && !p->split);
+        anyBrick = anyBrick || Bearing(s);
     }
+    // With no brick left anywhere there is no arch and nothing to arch to, and the props are under
+    // the lot. That is a chimney standing on matchsticks, and it should read as one.
+    const float local = anyBrick ? arching : 1.0f;
     for (int32_t s = 0; s < segments_; ++s)
     {
+        const bool brick = Bearing(s);
+        const float share = want[static_cast<std::size_t>(s)];
+        if (brick)
+        {
+            segLoad_[static_cast<std::size_t>(s)] += share;
+            continue;
+        }
+        // The hole's load arches away to the crescent; only its tributary stays here.
+        const float here = share * local;
         if (holds[static_cast<std::size_t>(s)])
         {
-            segLoad_[static_cast<std::size_t>(s)] += want[static_cast<std::size_t>(s)];
+            segLoad_[static_cast<std::size_t>(s)] += here;
             continue;
         }
         int32_t left = -1, right = -1;
@@ -305,10 +337,10 @@ void Gob::Distribute() noexcept
         if (left < 0 || right < 0)
         {
             const int32_t only = (left < 0) ? right : left;
-            segLoad_[static_cast<std::size_t>(only)] += want[static_cast<std::size_t>(s)];
+            segLoad_[static_cast<std::size_t>(only)] += here;
             continue;
         }
-        const float half = want[static_cast<std::size_t>(s)] * 0.5f;
+        const float half = here * 0.5f;
         segLoad_[static_cast<std::size_t>(left)] += half;
         segLoad_[static_cast<std::size_t>(right)] += half;
     }
@@ -374,9 +406,14 @@ Vec2 Gob::SupportCentroid() const noexcept
     return Vec2{sum.x / n, sum.y / n};
 }
 
+std::vector<Vec2> Gob::SupportHull() const
+{
+    return Hull(SupportPoints());
+}
+
 float Gob::Margin() const noexcept
 {
-    const std::vector<Vec2> hull = Hull(SupportPoints());
+    const std::vector<Vec2> hull = SupportHull();
     const Vec2 cog = CentreOfGravity();
     if (hull.size() < 3)   // literal: fewer than three supports is not a polygon
     {

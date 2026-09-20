@@ -66,7 +66,8 @@ FellSite Waterside()
 
 Gob Ring(float leanDeg = 0.3f, float leanBearing = 284.0f)
 {
-    return Gob(32, 4, 3.2f, 70.0f, 900.0f, leanDeg, leanBearing, 14, -1, Tune());
+    return Gob(32, 4, 3.2f, 70.0f, Gob::ShaftWeightKN(3.2f, 1.9f, 70.0f, Tune()),
+               leanDeg, leanBearing, 14, -1, Tune());
 }
 
 // A worked gob: the design's arc, cut on a bearing, propped as you go.
