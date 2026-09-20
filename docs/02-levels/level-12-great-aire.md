@@ -111,6 +111,15 @@ Then the dust clears and there is a gap in the skyline where a chimney has been 
 
 ## Note on the data (added 2026-09-20 with `data/levels/12-great-aire.json`)
 
+**The timetable is built and behaves as this page asks.** Trains every 18 minutes from minute 7,
+authored in `site.timetable`. The board is at the site office out by the line — you cannot read it
+from the foot of the chimney — and nothing in the game mentions that it exists or that **X** reads
+it. A train passing while she comes down adds the railway's own £1,200 to the damages.
+
+It is arithmetic rather than a dice roll on purpose: a player who reads the board can work out
+which minutes are safe to light it in, and one who never finds the board loses £1,200 about a fifth
+of the time and never learns why. That asymmetry is the whole point of an optional expert move.
+
 **The derelict mill is not an exclusion.** The corridor runs over it — "over the derelict mill" is
 how this page describes the only line the chimney can take — and `tools/validate_data.py` refuses a
 level with something valuable standing in its own fall corridor, which is right. The mill is scenery

@@ -159,6 +159,19 @@ public:
     static bool MatchTakes(float windMps, bool sheltered, uint32_t seed, int32_t attempt,
                            const Tuning& t);
 
+    // The main line you cannot close for more than twenty minutes. Trains come on a timetable and
+    // a chimney takes a while to reach the ground, so the question is whether one is passing in
+    // the window between the props going and the dust settling.
+    //
+    // The design is specific that this is optional and unannounced: "the railway timetable is on a
+    // board at the site office. Reading the board is optional and the game never mentions it."
+    // Which means it has to be *learnable* — arithmetic on a published timetable, not a surprise —
+    // and that is why it takes the minute rather than a seed.
+    static bool TrainInTheWindow(float minuteOfShift, float windowSeconds, float everyMinutes,
+                                 float firstAtMinute);
+    // How long after the last train, in minutes. What the board on the wall tells you.
+    static float MinutesSinceTrain(float minuteOfShift, float everyMinutes, float firstAtMinute);
+
     // Signed difference between two bearings, in (-180, 180].
     static float BearingDelta(float fromDeg, float toDeg) noexcept;
 };

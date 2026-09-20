@@ -110,6 +110,7 @@ run with `-- --fresh`.
 | **right mouse** / **Q** | stand a prop at that segment — **before** the last course comes out |
 | **hold F** | pack the gob with waste timber. A full one burns clean; a light one smoulders |
 | **L** | strike a match. Put yourself between the wind and the gob or it will have it |
+| **X** | read a board, if the site has one to read. Some sites have a thing on the wall worth knowing |
 | **enter** / **esc** | back to the board |
 
 It stands while its centre of gravity is inside what is still holding it up. The plan view bottom

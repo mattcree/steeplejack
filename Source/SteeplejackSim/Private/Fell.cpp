@@ -22,6 +22,8 @@ constexpr float kRodRate = 3.0f;            // literal: a uniform rod hinging ab
 constexpr float kFiveMetres = 5.0f;         // literal: the unit the accuracy bonus is quoted in
 constexpr float kTenMetres = 10.0f;         // literal: the unit the accuracy penalty is quoted in
 constexpr float kTiny = 1e-6f;              // literal: a pull this small has no direction
+constexpr float kFar = 1e9f;                // literal: longer ago than any shift
+constexpr float kSecondsPerMinute = 60.0f;  // literal: seconds in a minute
 constexpr int   kSteps = 512;               // literal: hinge steps from upright to ground
 
 float Wrap360(float deg) noexcept
@@ -175,6 +177,44 @@ bool Fell::MatchTakes(float windMps, bool sheltered, uint32_t seed, int32_t atte
     Rng rng(seed);
     Rng attemptRng = rng.Fork(static_cast<uint32_t>(attempt));
     return attemptRng.NextFloat() < chance;
+}
+
+float Fell::MinutesSinceTrain(float minuteOfShift, float everyMinutes, float firstAtMinute)
+{
+    if (everyMinutes <= kTiny)
+    {
+        return kFar;
+    }
+    const float since = minuteOfShift - firstAtMinute;
+    if (since < 0.0f)
+    {
+        return since;   // negative: the first one has not come yet, and this says how long you have
+    }
+    return std::fmod(since, everyMinutes);
+}
+
+bool Fell::TrainInTheWindow(float minuteOfShift, float windowSeconds, float everyMinutes,
+                            float firstAtMinute)
+{
+    if (everyMinutes <= kTiny || windowSeconds <= 0.0f)
+    {
+        return false;
+    }
+    // Walk the window a few seconds at a time and ask whether a train passes during it. Cruder
+    // than solving it, and right at every window length rather than only at short ones.
+    const float step = 1.0f / kSecondsPerMinute;   // literal: one second, in minutes
+    const float end = minuteOfShift + windowSeconds / kSecondsPerMinute;
+    float last = MinutesSinceTrain(minuteOfShift, everyMinutes, firstAtMinute);
+    for (float t = minuteOfShift + step; t <= end; t += step)
+    {
+        const float now = MinutesSinceTrain(t, everyMinutes, firstAtMinute);
+        if (now < last)   // it wrapped: a train went by between those two seconds
+        {
+            return true;
+        }
+        last = now;
+    }
+    return false;
 }
 
 FellOutcome Fell::Run(const FellSite& site, const Gob& gob, const FellPlan& plan, const Tuning& t)

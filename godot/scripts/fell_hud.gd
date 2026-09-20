@@ -82,6 +82,8 @@ var range_out := 0.0
 var caught := false
 var stripped := false
 var work_progress := 0.0
+var timetable := {}
+var train_line := ""
 
 var _font: Font
 var _plan_scale := 1.0
@@ -174,6 +176,17 @@ func _draw_state() -> void:
 	y += 19.0
 	draw_string(_font, Vector2(24, y), "%d of 2 pegs in" % pegs, HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
 		PEGS if pegs >= 2 else DIM)
+
+	# The line, if you walked out and read the board. If you did not, there is nothing here and
+	# the game never mentions it — which is the design's instruction, word for word.
+	if not timetable.is_empty():
+		y += 22.0
+		var due: bool = bool(timetable.get("train_due", false))
+		draw_string(_font, Vector2(24, y),
+			"%s: next train about %d min%s" % [train_line.replace("_", " "),
+				int(float(timetable.get("minutes_until", 0.0))),
+				"  — ONE IS DUE WHILE SHE COMES DOWN" if due else ""],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, HAZARD if due else DIM)
 
 	if not shift.is_empty():
 		y += 22.0

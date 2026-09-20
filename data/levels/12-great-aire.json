@@ -111,6 +111,7 @@
       }
     ],
     "corridor": { "fromBearing": 232, "toBearing": 272 },
+    "timetable": { "everyMinutes": 18, "firstAtMinute": 7, "exclusionId": "main_line_railway" },
     "crowd": { "distance": 130, "size": 60, "reactsToFall": true },
     "backdrop": "mill-town-river"
   },

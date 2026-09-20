@@ -58,6 +58,11 @@ var _facing := 0.0             ## which way he is pointed, radians
 ## Act 2, done on another day in the other half of the game. Until it is, there is a conductor
 ## down the side of this chimney and three iron bands round it, and you do not cut into that.
 var _stripped := false
+## The board at the site office. The design is explicit that reading it is optional and that the
+## game never mentions it, so this starts false and the only way it becomes true is walking over
+## to the office and looking at it.
+var _read_the_board := false
+var _struck_a_train := false
 
 # Working a cell out is a held action, not a click. Fifty-six clicks is not the act the design
 # calls the heart of it, and it is the only way the mortar a level authors can reach your hands.
@@ -226,6 +231,10 @@ func _read_level() -> Dictionary:
 	var corridor: Dictionary = site_block.get("corridor", {})
 	out["corridor_from"] = float(corridor.get("fromBearing", 0.0))
 	out["corridor_to"] = float(corridor.get("toBearing", 360.0))
+	var table: Dictionary = site_block.get("timetable", {})
+	out["train_every"] = float(table.get("everyMinutes", 0.0))
+	out["train_first"] = float(table.get("firstAtMinute", 0.0))
+	out["train_line"] = String(table.get("exclusionId", ""))
 	out["crowd"] = site_block_crowd(site_block)
 	return out
 
@@ -307,6 +316,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_E: pass   # a hold, like the mouse
 			KEY_Q: _prop()
 			KEY_B: _plumb()
+			KEY_X: _read_board()
 			KEY_BRACKETLEFT: _take_off(-2.0)
 			KEY_BRACKETRIGHT: _take_off(2.0)
 			KEY_P: _drive_peg()
@@ -674,6 +684,35 @@ func _take_off(metres: float) -> void:
 		_height_removed, int(float(after.get("spent", 0.0)) - float(shift.get("spent", 0.0))) / 60], 4.0)
 
 
+## The timetable board, which hangs on the site office wall. You have to be standing at it.
+func _read_board() -> void:
+	if _authored["train_every"] <= 0.0:
+		return
+	if _range() < _authored["safe_line"] * 0.5:
+		hud.say("The board is up at the site office, out by the line.", 4.0)
+		return
+	_read_the_board = true
+	var t: Dictionary = _timetable()
+	hud.say("Trains every %d minutes. The next one is about %d minutes off."
+		% [int(_authored["train_every"]), int(float(t.get("minutes_until", 0.0)))], 7.0)
+
+
+## Where the shift has got to, in minutes, which is what the timetable is read against.
+func _minute_of_shift() -> float:
+	var shift: Dictionary = jack.fell_shift(_height_removed)
+	return float(shift.get("spent", 0.0)) / 60.0
+
+
+## What the line is doing around the fall — a fall being the burn plus the time she takes to come
+## down plus a little for the dust.
+func _timetable() -> Dictionary:
+	if _authored["train_every"] <= 0.0:
+		return {}
+	var window: float = maxf(_burn_left, 0.0) + jack.tuning_f("fellHingeSecondsToGround", 7.5) + 8.0
+	return jack.fell_timetable(_minute_of_shift(), window, _authored["train_every"],
+		_authored["train_first"])
+
+
 ## Whether the lean has actually been established, rather than assumed.
 func surveyed() -> bool:
 	for i in _sightings.size():
@@ -777,6 +816,14 @@ func _strike_a_match() -> void:
 	_fire()
 
 
+## What the line costs when you stop it, from the level's own exclusion.
+func _train_value() -> float:
+	for e in _authored["exclusions"]:
+		if String(e.get("id", "")) == _authored["train_line"]:
+			return float(e.get("value", 0.0))
+	return 0.0
+
+
 func _wind_bearing() -> float:
 	return float(jack.structure().get("lean_bearing", 0.0))
 
@@ -806,6 +853,17 @@ func _props_burn_through() -> void:
 	# The tin comes along to the job, because what the felling pays is part of the felling.
 	_load_career()
 	var out: Dictionary = jack.fell_run(_peg, _height_removed, surveyed(), _packing_quality)
+	# The main line, if there is one. A train passing while ninety metres of brickwork comes down
+	# across the cutting is a delay to service, and the board that would have told you is still
+	# hanging on the wall of the office you did not walk to.
+	var t: Dictionary = _timetable()
+	_struck_a_train = bool(t.get("train_due", false))
+	if _struck_a_train:
+		var struck: Array = out.get("struck", [])
+		if not struck.has(_authored["train_line"]):
+			struck.append(_authored["train_line"])
+			out["struck"] = struck
+		out["penalty"] = float(out.get("penalty", 0.0)) + _train_value()
 	_outcome = out
 	# Settled through the sim on the same plan, so the money and the verdict cannot disagree.
 	_settlement = jack.career_settle(_authored["id"], _authored["fee"], _peg, _height_removed,
@@ -909,6 +967,8 @@ func _update_hud() -> void:
 	hud.standing_at = Vector2(_at.x, _at.z)
 	hud.shift = jack.fell_shift(_height_removed)
 	hud.stripped = _stripped
+	hud.timetable = _timetable() if _read_the_board else {}
+	hud.train_line = _authored["train_line"]
 	hud.act4 = _act4
 	hud.packing = _packing / PACK_SECONDS
 	hud.burn_left = _burn_left

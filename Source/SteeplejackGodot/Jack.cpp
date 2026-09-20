@@ -198,6 +198,8 @@ void Jack::_bind_methods()
 	                               "packing_quality"), &Jack::fell_predict, DEFVAL(1.0));
 	ClassDB::bind_method(D_METHOD("fell_run", "peg_bearing_deg", "height_removed_m", "surveyed",
 	                               "packing_quality"), &Jack::fell_run, DEFVAL(1.0));
+	ClassDB::bind_method(D_METHOD("fell_timetable", "minute_of_shift", "window_s", "every_minutes",
+	                               "first_at_minute"), &Jack::fell_timetable);
 	ClassDB::bind_method(D_METHOD("fell_burn_seconds", "packing_quality", "min_s", "max_s"),
 	                     &Jack::fell_burn_seconds);
 	ClassDB::bind_method(D_METHOD("fell_match_takes", "wind_ms", "sheltered", "attempt"),
@@ -1300,6 +1302,20 @@ Dictionary Jack::fell_run(double peg_bearing_deg, double height_removed_m, bool 
 	{
 		UtilityFunctions::push_error("jack: ", String(e.what()));
 	}
+	return d;
+}
+
+Dictionary Jack::fell_timetable(double minute_of_shift, double window_s, double every_minutes,
+                                double first_at_minute) const
+{
+	Dictionary d;
+	const float m = static_cast<float>(minute_of_shift);
+	const float every = static_cast<float>(every_minutes);
+	const float first = static_cast<float>(first_at_minute);
+	const float since = sj::Fell::MinutesSinceTrain(m, every, first);
+	d["minutes_since"] = static_cast<double>(since);
+	d["minutes_until"] = static_cast<double>(since < 0.0f ? -since : every - since);
+	d["train_due"] = sj::Fell::TrainInTheWindow(m, static_cast<float>(window_s), every, first);
 	return d;
 }
 

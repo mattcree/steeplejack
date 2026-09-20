@@ -92,6 +92,35 @@ func _init() -> void:
 	_check(not mill_in_corridor,
 		"and nothing valuable stands in the corridor, which would make the level unwinnable")
 
+	# --- the main line, and the board nobody tells you about --------------------------------------
+	# "The railway timetable is on a board at the site office. Reading the board is optional and the
+	# game never mentions it; a train arriving during the collapse is a -£1,200 delay to service."
+	_check(float(fresh._authored["train_every"]) > 0.0,
+		"there is a timetable: trains every %d minutes" % int(float(fresh._authored["train_every"])))
+	_check(not fresh._read_the_board, "and nobody has told you about it")
+	_check(fresh.hud.timetable.is_empty(), "so there is nothing on the HUD about it either")
+
+	# Standing at the gob, the board is out of reach — it is up at the site office by the line.
+	fresh._at = fresh._on_bearing(corridor, 12.0)
+	fresh._read_board()
+	_check(not fresh._read_the_board, "you cannot read it from the foot of the chimney")
+
+	# Walk out to it.
+	fresh._at = fresh._on_bearing(90.0, float(fresh._authored["safe_line"]) * 0.7)
+	fresh._read_board()
+	_check(fresh._read_the_board, "walk out to the office and there it is")
+	fresh._update_hud()
+	_check(not fresh.hud.timetable.is_empty(), "and now it is on the HUD, because you looked")
+
+	# The arithmetic is the sim's, and it is learnable rather than a dice roll.
+	var t: Dictionary = fresh._timetable()
+	_check(float(t.get("minutes_until", -1.0)) >= 0.0,
+		"the next one is %.0f minutes off" % float(t.get("minutes_until", 0.0)))
+	var clear: bool = not bool(jack.fell_timetable(20.0, 25.0, 18.0, 7.0).get("train_due", true))
+	var caught: bool = bool(jack.fell_timetable(24.9, 25.0, 18.0, 7.0).get("train_due", false))
+	_check(clear and caught,
+		"and it says plainly which minutes are safe to light it in and which are not")
+
 	if failures > 0:
 		printerr("GREAT AIRE: %d failure(s)" % failures)
 	else:

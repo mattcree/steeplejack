@@ -462,6 +462,30 @@
             }
           }
         },
+        "timetable": {
+          "type": "object",
+          "description": "A line you cannot close, and the gaps between its trains. Optional, and the game never mentions it: there is a board at the site office and reading it is the player's business. A train arriving during the collapse is a delay to service and a very bad look.",
+          "additionalProperties": false,
+          "required": [
+            "everyMinutes",
+            "firstAtMinute",
+            "exclusionId"
+          ],
+          "properties": {
+            "everyMinutes": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "firstAtMinute": {
+              "type": "number",
+              "minimum": 0
+            },
+            "exclusionId": {
+              "type": "string",
+              "description": "which exclusion the line is, so a strike is priced"
+            }
+          }
+        },
         "crowd": {
           "type": [
             "object",

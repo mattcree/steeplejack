@@ -356,6 +356,43 @@ TEST_CASE("Fell: the match, and the wind that kills it")
     }
 }
 
+TEST_CASE("Fell: the main line, and the gap you have to drop it into")
+{
+    // Great Aire: "there is the main line on the east, which we cannot close for more than twenty
+    // minutes". Trains every 18, the first at minute 7. The board on the wall is arithmetic, not
+    // a dice roll, which is what makes reading it worth doing.
+    const float every = 18.0f, first = 7.0f;
+    CHECK(Fell::MinutesSinceTrain(7.0f, every, first) == doctest::Approx(0.0f));
+    CHECK(Fell::MinutesSinceTrain(16.0f, every, first) == doctest::Approx(9.0f));
+    CHECK(Fell::MinutesSinceTrain(25.0f, every, first) == doctest::Approx(0.0f));   // the next one
+    CHECK(Fell::MinutesSinceTrain(3.0f, every, first) < 0.0f);   // none yet, and how long you have
+
+    // A felling takes about twenty seconds from the props going to the dust settling. Light it
+    // just after a train and you are clear; light it just before one and you are not.
+    const float window = 20.0f;
+    CHECK_FALSE(Fell::TrainInTheWindow(7.5f, window, every, first));    // just missed one
+    CHECK(Fell::TrainInTheWindow(24.9f, window, every, first));         // one due in six seconds
+    CHECK_FALSE(Fell::TrainInTheWindow(20.0f, window, every, first));   // five minutes of clear
+
+    // A line with no timetable is a line with no trains.
+    CHECK_FALSE(Fell::TrainInTheWindow(24.9f, window, 0.0f, 0.0f));
+
+    // Every gap gets hit eventually, and only about a fifth of the minutes are dangerous — which
+    // is the right shape: ignorable if you never read the board, and free if you do.
+    // Sampled every six seconds: a twenty-second window can sit entirely between two whole
+    // minutes, so sampling on the minute finds nothing and says so with a straight face.
+    int32_t caught = 0, tried = 0;
+    for (float m = 0.0f; m < 180.0f; m += 0.1f)
+    {
+        ++tried;
+        caught += Fell::TrainInTheWindow(m, window, every, first) ? 1 : 0;
+    }
+    CAPTURE(caught);
+    CAPTURE(tried);
+    CHECK(caught > 0);
+    CHECK(caught < tried / 4);
+}
+
 TEST_CASE("Fell: a felling scores on how far off the pegs it landed")
 {
     FellSite site = Waterside();

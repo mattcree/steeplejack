@@ -305,6 +305,12 @@ public:
 	 */
 	godot::Dictionary fell_run(double peg_bearing_deg, double height_removed_m,
 	                           bool surveyed, double packing_quality = 1.0) const;
+	/**
+	 * The main line's timetable, if the level has one: `{minutes_since, minutes_until, train_due}`
+	 * for a fall happening `window_s` after this minute of the shift.
+	 */
+	godot::Dictionary fell_timetable(double minute_of_shift, double window_s, double every_minutes,
+	                                 double first_at_minute) const;
 	/** How long the packing burns, between the level's authored seconds. */
 	double fell_burn_seconds(double packing_quality, double min_s, double max_s) const;
 	/** Whether this attempt at a match takes, in this wind. Deterministic on the level's seed. */
