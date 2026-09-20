@@ -19,6 +19,20 @@ move the row to Resolved with the date.
 | [VERB-003](tasks/VERB-003.md) | 2026-09-19 | Acceptance 2 wants 0.65–0.75 power to beat full power at every angle error. Per strike, full power drives further below 6° (0.200 vs 0.140) and only loses past 6°, when it bends. The GDD's lesson comes from the draw (power builds while aim drifts), not the strike. Is the criterion about one strike or about play? | Restate it as a property of the draw, and test it there; the strike model is already the GDD's |
 | [METER-003](tasks/METER-003.md) | 2026-09-19 | Acceptance 3 says worst-case wobble is **6x** base; the tuning gives **13.1x** (one-hand 1.6 × nerve 3 × grip 2, plus the gust). 6 is exactly grip × nerve from the GDD formula, so it looks like it predates the stance and gust terms. Which is the target? | Keep the data and restate the acceptance; the hammer test already asserts the real intent (worst wobble beats the angle tolerance) |
 
+## Design questions raised 2026-09-20, none of them blocking
+
+Building the felling out end to end turned up four places where a document and the arithmetic
+disagree. All four are **decided and implemented** in the direction named below, with the reasoning
+written where the decision lives, so nothing is waiting — but each is a design call somebody other
+than the implementer should look at.
+
+| Where | The disagreement | What was done, and why |
+|---|---|---|
+| [level-07](docs/02-levels/level-07-kershaws-yard.md) | The felling system doc says 40 seconds a metre for taking height off by hand; level-07 says eight metres costs twelve minutes, which is ninety seconds a metre | The system doc wins — it is the spec for the system, and 40 s is the number the game quotes the player. level-07 corrected to five and a half minutes |
+| [level-07](docs/02-levels/level-07-kershaws-yard.md) | With Act 2 unpriced, taking the full allowance off the top is free accuracy, so "most of the level's strategy" is not yet a decision | Said so in the level doc rather than faking the tension. It becomes a decision when the strip-out and the ascent are priced against the same clock |
+| [level-12](docs/02-levels/level-12-great-aire.md) | The failure table promises ±4° with the height reduction and ±9° without; measured through `Fell::Predict` it is **±8.0° and ±14.9°** | The model wins. Both numbers forgot that the fall line is fought through ninety-six degrees of lean, which is four degrees of cone on its own. The job is more dangerous than advertised, which is the right way round |
+| `economy.json` vs the level set | Every felling is gated at three stars or more; doing all five levels that have data, perfectly, comes to two. The demolition half was unreachable | Kept the gates, and taught the career to tell "not earned" from "not buildable yet" (`Career::StarsAfter`). Gates above what the content can reach are marked and let through, and start enforcing themselves the moment the levels between land |
+
 ## Standing decisions the lead owes the project
 
 These are not agent escalations — they are preflight items that nothing can proceed past.
@@ -29,7 +43,7 @@ See [`docs/06-workflow/06-launch.md`](docs/06-workflow/06-launch.md).
 | 1 | Populate `tools/likeness_denylist.local.txt` | rule 16 is inert; ART-020 is the highest-risk task for it | ⬜ open |
 | 2 | Name a human for the editor queue (10.5 days already queued) | ART-020, AUD-001, AUD-004, ENV-002, and everything downstream | ⬜ open |
 | 3 | ~~Install Unreal and set `UE_ROOT`~~ | CORE-001's second half, and all of `SteeplejackGame` | ✅ closed 2026-09-17; **moot 2026-09-19** — Unreal removed from the project (ADR-0006 moved the game to Godot) |
-| 4 | Enable Git LFS on the remote (CORE-010) | must land **before** the first binary asset, or history gets rewritten | ⬜ open |
+| 4 | Enable Git LFS on the remote (CORE-010) | must land **before** the first binary asset, or history gets rewritten | 🟡 **local side done 2026-09-20.** LFS is working in the clone and `make check-assets` enforces coverage, integrity and size. The remote half is still yours: turn LFS on for the GitHub repo before pushing, or the pointers push and the objects do not |
 | 5 | Character approach: commission, marketplace, or something built for Godot (MetaHuman went with Unreal) | ART-020, and therefore the whole art direction's credibility | ⬜ open |
 | 6 | Budget and stopping condition for the first run | knowing when to stop, decided while calm | ⬜ open |
 
