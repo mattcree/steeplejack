@@ -1104,6 +1104,9 @@ func _draw_slip(jack: Jack) -> void:
 
 # --- drawing helpers ----------------------------------------------------------------------------
 
+## The four one-pixel passes that put an edge round every glyph in this HUD.
+const OUTLINE := [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]
+
 func _arc(centre: Vector2, radius: float, fraction: float, width: float, col: Color) -> void:
 	if fraction <= 0.0 or col.a <= 0.01:
 		return
@@ -1119,7 +1122,15 @@ func _label(text: String, at: Vector2, col: Color, px: int = 15) -> void:
 		return
 	# A shadow rather than a panel: legible against sky without putting a box between the player
 	# and the thing they climbed up to see.
-	draw_string(_font, at + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, px, Color(0, 0, 0, col.a * 0.6))
+	#
+	# It has to go all the way round, though. A single offset drop only darkens one side of the
+	# glyph, and this HUD spends most of its life against bright sky, where the undarkened side is
+	# pale ink on pale cloud and the letter loses an edge. Four one-pixel passes cost nothing and
+	# are the difference between text you read and text you decipher.
+	var halo := Color(0, 0, 0, col.a * 0.55)
+	for o in OUTLINE:
+		draw_string(_font, at + o, text, HORIZONTAL_ALIGNMENT_LEFT, -1, px, halo)
+	draw_string(_font, at + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, px, Color(0, 0, 0, col.a * 0.45))
 	draw_string(_font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, px, col)
 
 

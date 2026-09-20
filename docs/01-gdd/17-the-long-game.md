@@ -70,7 +70,7 @@ Measured against what runs today:
 | **0. The yard** | Load the van. Twelve ladders or sixteen? That decision is the strategy layer | Not built; `loadoutHint.ladders` fills the cradle for you |
 | **1. Laddering** | Dog, lash, haul, climb, sound the joints | **Built, and it is the best thing in the game.** Leave it alone |
 | **2. The work** | Nine archetypes: survey, conductor, gild, band, top, fell, mechanism, lattice, emergency | **Two exist** — the ascent itself, and felling with its strip-out Act 2. Seven are paper |
-| **3. Striking** | Take it all down and bring it home | **Missing entirely.** The level ends when you reach the top |
+| **3. Striking** | Take it all down and bring it home | **Missing entirely.** The level ends when you reach the top. The trade laddered up in 2-2.5 hours and stripped back down in about **30 minutes** |
 
 ### Stage 3 is the real hole
 
@@ -88,8 +88,26 @@ What makes it a stage worth playing rather than a victory lap:
 - **Each section comes down on the gin wheel**, one at a time, lowered rather than dropped. A
   dropped ladder is damage and money. This is the same modulate-against-gravity feel the GILD
   level's lowering sequence is built on, and it would arrive first.
-- **The dogs are drawn and the holes plugged.** The trade's own last act, per
-  [`16-how-it-was-actually-done.md`](16-how-it-was-actually-done.md).
+- **The way down is not the way up reversed.** This is the trade's own rule, and it is the best
+  argument for the whole stage: ATLAS requires that a strip be re-assessed rather than assumed,
+  *because the work you did on the job may have put an obstruction where there was none on the way
+  up*. A game that has just made you band, gild or strip a chimney has, by construction, changed the
+  route you have to come down.
+- **Stand-offs work loose during removal**, and are checked *before* the lashings come off. Once a
+  ladder is off its anchors **nobody goes back on it**. Nothing is dropped: anchors come down tied
+  to the ladders or lowered in a container.
+- **And the dogs stay in, or they do not.** This was written here first as "the dogs are drawn and
+  the holes plugged — the trade's own last act". That was wrong. Across two book-length memoirs and
+  some 2,600 forum posts there is **no first-hand account of drawing a dog or plugging a hole**, and
+  there is direct evidence the other way: *"Some jacks with a regular contact used to leave dogs in
+  place on stacks"*, and a later crew on such a stack *"had used the old dog holes and it wandered a
+  bit"*. See [`18-the-trade-on-record.md`](18-the-trade-on-record.md).
+
+  The true version is the better mechanic, because it is **a decision with a cost either way**.
+  Leave them: you keep the daylight, and you leave corroding iron in someone's chimney and a set of
+  holes that will pull the next man's line out of plumb. Draw them: you get your gear back, and it
+  costs you the end of a shift you have already spent. The trade also knew gear does not always
+  survive the trip — fixings *"have been known to break on removal (but not during use)"*.
 
 And one recommendation that ties stage 3 back to stage 0:
 
@@ -99,7 +117,8 @@ And one recommendation that ties stage 3 back to stage 0:
 > integer in `Career`.
 
 That is a design decision, not an implementation one, so it is **recorded in `BLOCKED.md`** rather
-than acted on.
+than acted on — and note it is a *game* rule, not a trade one. The trade's usual answer was to leave
+them in. A faithful game prices that convenience against the state it leaves the stack in.
 
 ### Which archetype to build second
 
