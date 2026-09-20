@@ -67,3 +67,12 @@ Act 2's strip-out, which needs the climb. Packing and lighting the gob as an act
 
 ## Outcome
 Built. `make godot-test` runs the bot as its fifteenth suite.
+
+**Since first handoff.** Act 4 is a sequence rather than a keypress (FELL-006), Act 2 gates it
+(the bar will not go in until she is stripped), cutting a cell is a held verb whose length comes
+from the mortar, the jack is in the scene and the run is shot from behind him, and the whole thing
+is reachable from a job board that carries money and reputation between jobs (CAREER-001).
+
+Four layout numbers were written down and were right when typed and wrong one edit later — the
+step list, the state panel, the verdict panel and the left-hand scrim. All four derive their size
+from their contents now. It is the single most repeated mistake in this file's history.

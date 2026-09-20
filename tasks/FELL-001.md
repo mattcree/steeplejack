@@ -79,3 +79,9 @@ has to author more of them than the arc needs.
 Also fixed on the way: the support polygon sampled segment *centres*, which lost half a segment of
 wall off each end of the crescent - a whole segment of support, and at 32 segments that is the
 difference between a gob that stands and one that does not.
+
+**Since first handoff.** `SetMortarAsymmetry` had its sign inverted — the side every level doc
+calls "much harder to cut" was the easy one. Invisible for as long as cutting was instant; the
+first test that asked *how long a cell takes* found it in a minute. An earlier test of mine had
+enshrined the mistake with a message calling 0.65 "harder mortar", which is how a wrong thing
+stays green.

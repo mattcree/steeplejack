@@ -76,7 +76,7 @@ predictability (accuracy improves ~1.5°/5 m → ~2.4°). At the rate
 [the felling system](../01-gdd/06-felling-system.md) gives — 40 seconds a metre — that is **about
 five and a half minutes** of shift.
 
-> **Corrected 2026-09-20 (FELL-006).** This said "~12 minutes", which is 90 seconds a metre and
+> **Corrected 2026-09-20 ([FELL-006](../../tasks/FELL-006.md)).** This said "~12 minutes", which is 90 seconds a metre and
 > disagrees with the system doc. The system doc wins: it is the spec for the system, and the 40
 > seconds is the number the game quotes the player. Per AGENTS.md rule 9, one of them was a bug.
 >
