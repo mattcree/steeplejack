@@ -63,6 +63,19 @@ against the built game. None of these are implementation questions; all four set
 One thing in the same audit is **not** a question and is worth stating plainly: every level file has
 authored `shiftMinutes` and `targetMinutes` since the first one, and nothing in the climb reads
 either. The day clock the meta layer needs already has its data.
+
+### Added the same day, on progression
+
+Raised as *"what would drive you to continue completing the objectives versus the challenge?"*, with
+a doubt about the traction engine and an interest in lighter RPG-style progression. Written up in
+[`17-the-long-game.md`](docs/01-gdd/17-the-long-game.md) Part 4.
+
+| The question | Why it is yours | Recommendation |
+|---|---|---|
+| **Does the district persist between jobs?** `Career` remembers money, reputation and what each job paid. It remembers nothing you learned and nothing you left on the chimney; every sounded joint is discarded when the level ends | It is the difference between twelve levels and one district, and it decides what a repeat job is for | **The strongest idea on the table.** Your own dogs still in the stack, your own chalk on the joints, your own bad line making the next ascent harder. It makes striking a deferred decision, makes repeat work interesting instead of just cheaper, and is the trade's real business model — the standing contract |
+| **Does the work start coming to you?** Early, a jack rode the top deck of the bus with binoculars and wrote letters to every mill. Late, letters arrived addressed to *"Steeplejack, Somewhere in England"* | It sets what the job board *is*, and the board is already built | **Do it.** Best-attested progression in the record, needs no new system, and it is the answer to what pulls: not a rising number but becoming the one they send for |
+| **Is the traction engine the right carrot?** Raised as a doubt, not settled | It is the campaign's money sink and its emotional counterweight | **Keep the shape, add salvage beside it.** As designed it is a progress bar with a model on it — bought, not earned, and disconnected from the trade. A yard filling with a finial, a weathervane, a dog out of a stack that is gone costs nothing to buy and makes the shrinking world tangible. If only one gets built, build the salvage |
+| **How far do the RPG mechanics go?** | `08-hub-and-meta.md` forbids a skill tree, and should keep forbidding it | **Progress standing, kit and knowledge; never ability.** The moment a number makes his hands steadier, the player is roleplaying competence instead of having it |
 | **Packing** | a block under the third rung holds the ladder off the wall *so boots fit on the rungs* | not modelled; the drawn body's standoff does the same job by accident | Cosmetic but cheap, and it explains on screen why the body hangs back |
 
 ## Standing decisions the lead owes the project

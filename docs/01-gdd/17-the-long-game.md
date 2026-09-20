@@ -153,6 +153,109 @@ communicate"* — gauges. The wind rose landed today. What is still available, c
 
 ---
 
+## Part 4 — What pulls, as opposed to what is hard
+
+Raised 2026-09-20, second pass: *"what would drive you to continue completing the objectives versus
+the challenge?"* — along with a well-placed doubt about whether the traction engine is really the
+answer, and a note that some **lighter RPG progression** might give the game more meat without
+turning it into an RPG.
+
+### Challenge is the weakest driver this game has
+
+Worth saying plainly, because it changes what to build. The gripping thing about being on a ladder
+at 50 m is not *can I do this*. It is **exposure** — you are very high up and something might go
+wrong. That is not difficulty and it does not improve by being made harder. It is renewed by the
+*site*: a worse structure, a longer drop, a nastier day, less margin. Which is what
+[`05-mission-types.md`](05-mission-types.md) already says when it insists difficulty comes from
+context rather than from the task.
+
+So the progression to build is not a difficulty curve. It is three things the game already half has
+and does not use.
+
+### 1. The district remembers you — the strongest idea available
+
+Today `Career` persists money, reputation, and per job `{id, paidGbp, errorDegrees, failed}`. It
+remembers **what you were paid and whether you failed**. It remembers nothing about what you
+learned or what you left behind, and every joint you sounded is thrown away when the level ends.
+
+Make the district persistent instead, and several loose threads tie together at once:
+
+- **Your dogs are still in it.** The research says this is exactly what happened: jacks with a
+  standing contract left the dogs in. Come back to Kershaw's two jobs later and there is your own
+  ironwork, a bit more corroded than you left it. That makes the striking decision in Part 2 a real
+  one with a *deferred* consequence rather than an immediate fee.
+- **And so are your holes.** *"They had used the old dog holes and it wandered a bit"* — a stack you
+  laddered badly is a stack that is harder to ladder next time, and it is your own fault, visibly,
+  two hours of play later.
+- **Your chalk is still on the joints you sounded.** Knowledge, made physical, in the place you
+  learned it.
+- **Repeat work becomes interesting rather than cheap.** `replayFeeFraction` currently just pays you
+  less for a job you have done — a penalty for replaying, not a reason. A chimney you know is a
+  chimney you can ladder faster, and that is a better reward than money.
+
+This is also the trade's actual business model — the *regular contact* — and it costs one persisted
+structure per level.
+
+### 2. The work comes to you, instead of you going to find it
+
+The best-attested progression in the whole record, and the job board is already built to carry it.
+
+Early career, the sources are unambiguous: you go looking. Riding on the top deck of the bus
+because *"he could see the chimneys better from an upstairs bus seat and he could look out for a
+dodgy lightening conductor rod or broken band"*; roaming the district with binoculars; a boy of
+fourteen set to **writing letters to every mill locally by hand**, and bringing in work by them.
+
+Late career, it inverts. *"Letters from all quarters"* arrive — and one addressed simply **"To
+Steeplejack, Somewhere in England"** reached its man.
+
+That is the arc, and it is the answer to *what pulls*. Not a number going up: **becoming the one
+they send for.** It is visible every time the board is opened, it needs no new system, and it is
+the exact emotional shape of "competence in a vanishing trade".
+
+### 3. The world shrinks, and the game never shows you
+
+Already true and never surfaced. Twelve jobs in, the district has fewer chimneys because of you.
+Nothing in the game says so. The credits drive past them; nothing before the credits does.
+
+### On the traction engine
+
+The doubt is well placed, and it is worth naming *why*: as designed it is a progress bar with a
+model attached. It is bought rather than earned, and it has no connection to the skill the player
+is actually building. The shape is right — the economy wants a sink, and a thing you pour money
+into that does nothing useful is a very good 1970s working-man's obsession — but it is doing one
+job where it could do two.
+
+**Recommendation: keep the engine as the money sink, and let the yard fill with salvage beside it.**
+A finial off a spire. A weathervane you re-gilded. A dog out of a stack that is not there any more.
+None of it bought; all of it carried home from jobs you did. The engine is what you *buy*; the
+salvage is what you *remember*, and it makes the shrinking world tangible in the one place in the
+game where nothing is trying to kill you.
+
+If only one of the two gets built, build the salvage.
+
+### Where the RPG goes, and where it must not
+
+`08-hub-and-meta.md` has a hard rule — **no skill tree; the player gets better, the character does
+not** — and it should stay. But there is a lot of room between "no skill tree" and "no progression",
+and a trade career is naturally RPG-shaped without a single stat:
+
+| Progresses | How | State |
+|---|---|---|
+| **Who will hire you** | Reputation, stars, `reputationGate` | Built |
+| **What you are carrying** | Kit, with trade-offs, never strict upgrades | Designed |
+| **What you know about this district** | Persistent stacks, your own chalk and ironwork | **Not built — the big one** |
+| **Who you are to people** | The board's letters changing character | **Not built — the cheap one** |
+| **What you can physically do** | — | **Nothing. Keep it that way** |
+
+The line to hold: the moment there is a dialogue tree or a number that makes his hands steadier, the
+game is asking the player to roleplay someone competent instead of *being* competent. The fantasy is
+knowledge, and knowledge is the one thing a player can actually acquire.
+
+**Undecided, and recorded as such.** None of the above is a decision; the engine question in
+particular was raised as a doubt, not settled. See [`BLOCKED.md`](../../BLOCKED.md).
+
+---
+
 ## What this document decides
 
 Nothing. Every ranked item above is a recommendation to a designer, and the ones that set numbers or
