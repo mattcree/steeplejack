@@ -11,6 +11,7 @@
 #   cut <deg>      cut that arc of gob on the pegged line, propping behind as you go
 #   ahead <n>      leave n segments unpropped ahead of the props, to see one in trouble
 #   peg <deg>      drive the pegs on a bearing
+#   survey         take the two plumb readings Act 1 asks for
 #   stand <deg>    walk round to that bearing
 #   back <m>       stand that far off
 #   watch <deg>    stand at that angle to the fall line, to see it side on
@@ -45,16 +46,18 @@ func _init() -> void:
 			"cut": await _cut(arg, 0)
 			"ahead": await _cut(160.0, int(arg))
 			"peg": world._peg = arg
+			"survey":
+					world._sightings.assign([0.0, 120.0, 240.0])
 			"stand":
-					world._around = arg
+					world._at = world._on_bearing(arg, world._range())
 					world._face_the_chimney()
 			"back":
-					world._orbit = arg
+					world._at = world._on_bearing(world._around(), arg)
 					world._face_the_chimney()
 			"watch":
-					world._around = fmod(world._peg + arg, 360.0)
+					world._at = world._on_bearing(fmod(world._peg + arg, 360.0), world._range())
 					world._face_the_chimney()
-			"look": world._yaw = deg_to_rad(world._around + arg)
+			"look": world._yaw = deg_to_rad(world._around() + arg)
 			"pitch": world._pitch = deg_to_rad(arg)
 			"fire": world._fire()
 			"wait": await _wait(int(arg * 60.0))

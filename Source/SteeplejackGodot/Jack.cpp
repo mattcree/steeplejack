@@ -189,9 +189,9 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("gob_prop_at", "seg"), &Jack::gob_prop_at);
 	ClassDB::bind_method(D_METHOD("fell_site", "wind_ms", "wind_bearing_deg", "safe_line_m", "seed",
 	                               "exclusions"), &Jack::fell_site);
-	ClassDB::bind_method(D_METHOD("fell_predict", "peg_bearing_deg", "height_removed_m"),
+	ClassDB::bind_method(D_METHOD("fell_predict", "peg_bearing_deg", "height_removed_m", "surveyed"),
 	                     &Jack::fell_predict);
-	ClassDB::bind_method(D_METHOD("fell_run", "peg_bearing_deg", "height_removed_m"), &Jack::fell_run);
+	ClassDB::bind_method(D_METHOD("fell_run", "peg_bearing_deg", "height_removed_m", "surveyed"), &Jack::fell_run);
 	ClassDB::bind_method(D_METHOD("tuning_f", "key", "fallback"), &Jack::tuning_f, DEFVAL(0.0));
 }
 
@@ -1194,7 +1194,8 @@ void Jack::fell_site(double wind_ms, double wind_bearing_deg, double safe_line_m
 	}
 }
 
-Dictionary Jack::fell_predict(double peg_bearing_deg, double height_removed_m) const
+Dictionary Jack::fell_predict(double peg_bearing_deg, double height_removed_m,
+                              bool surveyed) const
 {
 	Dictionary d;
 	if (!gob || !tuning) { return d; }
@@ -1203,6 +1204,7 @@ Dictionary Jack::fell_predict(double peg_bearing_deg, double height_removed_m) c
 		sj::FellPlan plan;
 		plan.pegBearingDeg = static_cast<float>(peg_bearing_deg);
 		plan.heightRemovedM = static_cast<float>(height_removed_m);
+		plan.surveyed = surveyed;
 		const sj::FellPrediction p = sj::Fell::Predict(fell, *gob, plan, *tuning);
 		Array threatened;
 		for (const sj::Exclusion& e : fell.exclusions)
@@ -1223,7 +1225,7 @@ Dictionary Jack::fell_predict(double peg_bearing_deg, double height_removed_m) c
 	return d;
 }
 
-Dictionary Jack::fell_run(double peg_bearing_deg, double height_removed_m) const
+Dictionary Jack::fell_run(double peg_bearing_deg, double height_removed_m, bool surveyed) const
 {
 	Dictionary d;
 	if (!gob || !tuning) { return d; }
@@ -1233,6 +1235,7 @@ Dictionary Jack::fell_run(double peg_bearing_deg, double height_removed_m) const
 		sj::FellPlan plan;
 		plan.pegBearingDeg = static_cast<float>(peg_bearing_deg);
 		plan.heightRemovedM = static_cast<float>(height_removed_m);
+		plan.surveyed = surveyed;
 		const sj::FellOutcome o = sj::Fell::Run(fell, *gob, plan, *tuning);
 		Array fractures;
 		for (float h : o.fractureHeightsM) { fractures.push_back(static_cast<double>(h)); }

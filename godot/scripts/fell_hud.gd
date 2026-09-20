@@ -14,10 +14,11 @@
 extends Control
 
 const STEPS := [
+	"Walk round and read the lean with the plumb bob [B], twice, from well apart",
 	"Cut the gob on the fall line — hold the chimney's own lean in mind",
 	"Prop behind you as you go — the prop goes in BEFORE the last course comes out",
 	"Watch the margin. Finish UNEASY, not SAFE — safe does not fall",
-	"Peg the fall line, then fire",
+	"Drive two pegs down the line you want [P], then light it [F]",
 ]
 
 const PLAN_SIZE := 250.0      ## the site plan: the fan, the neighbours, the line
@@ -61,6 +62,10 @@ var aim_verb := ""
 var message := ""
 var message_until := 0.0
 var step := 0
+var surveyed := false
+var sightings := 0
+var pegs := 0
+var standing_at := Vector2.ZERO
 
 var _font: Font
 var _plan_scale := 1.0
@@ -134,8 +139,21 @@ func _draw_state() -> void:
 		draw_string(_font, Vector2(24, y), "%d prop%s split" % [split, "" if split == 1 else "s"],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, HAZARD)
 
+	y += 26.0
+	if surveyed:
+		draw_string(_font, Vector2(24, y), "lean surveyed — two plumb readings taken",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.55, 0.78, 0.50))
+	else:
+		draw_string(_font, Vector2(24, y),
+			"lean NOT surveyed (%d reading%s) — the cone is wider for it" % [
+				sightings, "" if sightings == 1 else "s"],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.95, 0.52, 0.22))
+	y += 19.0
+	draw_string(_font, Vector2(24, y), "%d of 2 pegs in" % pegs, HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
+		PEGS if pegs >= 2 else DIM)
+
 	if not prediction.is_empty():
-		y += 26.0
+		y += 22.0
 		draw_string(_font, Vector2(24, y),
 			"predicted %03d° ±%.1f°    pegged %03d°    off by %.1f°" % [
 				int(prediction.get("fall_bearing", 0.0)), float(prediction.get("accuracy", 0.0)),
@@ -262,6 +280,10 @@ func _draw_site() -> void:
 
 	# The chimney, to scale, so the fan has something to come out of.
 	draw_circle(_at(o, Vector2.ZERO, scale), maxf(radius * scale, 2.0), Color(0.52, 0.40, 0.33))
+	# And you, because a survey you walk needs you on the map.
+	var me := _at(o, standing_at, scale)
+	draw_circle(me, 3.0, INK)
+	draw_string(_font, me + Vector2(5, -4), "you", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, DIM)
 
 
 # ---------------------------------------------------------------- the gob

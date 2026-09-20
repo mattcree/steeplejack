@@ -219,6 +219,21 @@ TEST_CASE("Fell: a narrow gob is a gob you cannot steer with")
     CHECK(narrow - full == doctest::Approx(Tune().GetF("fallAccuracyNarrowGobDegrees")).epsilon(0.01));
 }
 
+TEST_CASE("Fell: felling a chimney you never surveyed costs you the lean you did not measure")
+{
+    FellSite site = Waterside();
+    FellPlan surveyed, blind;
+    surveyed.pegBearingDeg = blind.pegBearingDeg = 284.0f;
+    blind.surveyed = false;
+    const Gob g = CutOn(284.0f);
+    const float known = Fell::Predict(site, g, surveyed, Tune()).accuracyDegrees;
+    const float guessed = Fell::Predict(site, g, blind, Tune()).accuracyDegrees;
+    CHECK(guessed - known == doctest::Approx(Tune().GetF("fallAccuracyUnsurveyedDegrees")).epsilon(0.01));
+    // And it is worth more than the five minutes it costs: nine degrees is the difference between
+    // GOOD and WILD on a corridor the width of Kershaw's Yard.
+    CHECK(guessed - known > Tune().GetF("fellScorePerfectDegrees"));
+}
+
 TEST_CASE("Fell: the debris fan is 18 degrees and 1.15 times the height it fell from")
 {
     FellSite site = Waterside();

@@ -1,18 +1,16 @@
 {
-  "_comment": "Felling — the gob, the fall and what it scores. docs/01-gdd/06-felling-system.md is the spec; these are its numbers.",
-
+  "_comment": "Felling \u2014 the gob, the fall and what it scores. docs/01-gdd/06-felling-system.md is the spec; these are its numbers.",
   "gobSegmentsDefault": 32,
   "gobCoursesDefault": 4,
   "gobPropCapacityKN": 40.0,
   "gobPropLeverFrac": 0.45,
   "_archComment": "Brickwork arches over the hole you cut, which is the only reason a 40 kN prop is any use under a 9400 kN chimney: a prop carries the wall directly above it up to the height the arch forms, about five metres of it, and the rest goes round the opening to the crescent. At Waterside that is 22 kN on a good prop - one hole next door takes it to 33 and it stands, two takes it to 44 and it splits. Which is why the loop is cut two cells, set a prop, cut two cells.",
   "gobArchHeightM": 5.0,
-  "gobSafeMarginM": 0.60,
-  "gobCriticalMarginM": 0.30,
-  "gobCollapseMarginM": 0.10,
+  "gobSafeMarginM": 0.6,
+  "gobCriticalMarginM": 0.3,
+  "gobCollapseMarginM": 0.1,
   "gobWallThicknessM": 0.45,
   "gobBrickDensityKgPerM3": 1900.0,
-
   "fallDebrisHalfAngleDegrees": 18.0,
   "fallDebrisLengthFactor": 1.15,
   "fallLeanPullPerDegree": 22.0,
@@ -22,17 +20,19 @@
   "fallAccuracyPerTenMetres": 0.8,
   "fallAccuracyPerFiveMetresRemoved": 1.5,
   "fallAccuracyNarrowGobDegrees": 6.0,
+  "fallAccuracyUnsurveyedDegrees": 9.0,
   "fallGobIdealArcDegrees": 140.0,
-
   "fellScorePerfectDegrees": 5.0,
   "fellScoreGoodDegrees": 15.0,
   "fellScoreAcceptableDegrees": 30.0,
   "fellScorePerfectBonus": 400.0,
   "fellScoreGoodBonus": 150.0,
   "fellScoreCleanBreakBonus": 80.0,
-
   "fellHingeSecondsToGround": 7.5,
-  "fractureCountTypical": [2, 4],
+  "fractureCountTypical": [
+    2,
+    4
+  ],
   "fellCleanBreakMinChunks": 3,
   "fellCleanBreakMaxChunks": 4,
   "fellFractureStressCoeff": 0.06,

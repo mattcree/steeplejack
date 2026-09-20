@@ -13,12 +13,16 @@
 ## deciding anything.
 extends Node3D
 
-const WALK := 5.0                ## metres per second round the base
+const WALK := 5.2                ## metres per second, walking the site
+const SPRINT := 9.0              ## Act 4 step 3: "a hard sprint to the safe line"
 const LOOK := 0.0022             ## radians per pixel
 const EYE := 1.62
 const REACH := 4.5               ## how far you can reach into the brickwork
-const ORBIT_MIN := 5.0
-const ORBIT_MAX := 26.0     ## while you are working. Watching it go, you stand at the safe line.
+
+# The survey — Act 1. "Read it with the plumb bob from two orthogonal positions." Two sightings
+# this far apart and you know the lean; one, or two from nearly the same place, and you do not.
+const SIGHTINGS_APART_DEG := 55.0
+const PEG_MIN_APART_M := 6.0     ## two pegs closer together than this are not a line
 
 @onready var jack: Jack = Jack.new()
 @onready var chimney: Chimney = $Chimney
@@ -31,8 +35,7 @@ const ORBIT_MAX := 26.0     ## while you are working. Watching it go, you stand 
 var level_path := "res://../data/levels/06-waterside.json"
 var tuning_dir := "res://../data/tuning"
 
-var _orbit := 12.0               ## how far out you are standing
-var _around := 104.0             ## your bearing round the base
+var _at := Vector3(0.0, 0.0, 14.0)   ## where you are standing, on the site
 var _yaw := 0.0
 var _pitch := -0.06
 var _peg := 284.0
@@ -60,6 +63,11 @@ var _split_seen := 0
 var _cheered := false
 var _dust: GPUParticles3D
 
+# What you have established by walking about with a plumb bob and a bag of pegs.
+var _sightings: Array[float] = []
+var _pegs: Array[Vector3] = []
+var _peg_marks: Node3D
+
 
 func _ready() -> void:
 	if not jack.load(ProjectSettings.globalize_path(tuning_dir),
@@ -76,8 +84,10 @@ func _ready() -> void:
 	hud.ring = ring
 	hud.set_meta("exclusions", _authored.get("exclusions", []))
 	_peg = _corridor_centre()
-	_around = _peg
+	_at = _on_bearing(_peg, 16.0)
 	_face_the_chimney()
+	_peg_marks = Node3D.new()
+	add_child(_peg_marks)
 	_build_dust()
 	_capture(true)
 	hud.say("Cut the gob on the side you want it to fall. Aim at the brick and press E.", 6.0)
@@ -181,6 +191,20 @@ func _clear_the_pitch() -> void:
 		cradle.queue_free()
 
 
+func _on_bearing(bearing_deg: float, metres: float) -> Vector3:
+	var b := deg_to_rad(bearing_deg)
+	return Vector3(sin(b) * metres, 0.0, cos(b) * metres)
+
+
+## Your bearing from the foot of the chimney, and how far out you are standing.
+func _around() -> float:
+	return fmod(rad_to_deg(atan2(_at.x, _at.z)) + 360.0, 360.0)
+
+
+func _range() -> float:
+	return Vector2(_at.x, _at.z).length()
+
+
 func _corridor_centre() -> float:
 	var a: float = _authored["corridor_from"]
 	var b: float = _authored["corridor_to"]
@@ -211,7 +235,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		match event.keycode:
 			KEY_E: _cut()
 			KEY_Q: _prop()
-			KEY_P: _drive_pegs()
+			KEY_B: _plumb()
+			KEY_P: _drive_peg()
+			KEY_R: _pull_pegs()
 			KEY_F: _fire()
 			KEY_ESCAPE: _capture(false)
 
@@ -221,10 +247,22 @@ func _process(dt: float) -> void:
 		_after_the_fall(dt)
 		_update_hud()
 		return
-	var move := Input.get_axis("ui_left", "ui_right")
-	var in_out := Input.get_axis("ui_down", "ui_up")
-	_around = fmod(_around + move * WALK / maxf(_orbit, 1.0) * dt * 57.2958 + 360.0, 360.0)
-	_orbit = clampf(_orbit - in_out * WALK * dt, ORBIT_MIN, ORBIT_MAX)
+	# You walk the site. Act 1 is a map-reading activity in first person and you cannot read a map
+	# by orbiting a chimney at a fixed distance — the first version of this could not even reach
+	# the pump house.
+	var side := Input.get_axis("ui_left", "ui_right")
+	var fwd := Input.get_axis("ui_down", "ui_up")
+	if side != 0.0 or fwd != 0.0:
+		var pace: float = SPRINT if Input.is_key_pressed(KEY_SHIFT) else WALK
+		var f := Vector3(-sin(_yaw), 0.0, -cos(_yaw))
+		var r := Vector3(cos(_yaw), 0.0, -sin(_yaw))
+		var step := (f * fwd + r * side).normalized() * pace * dt
+		var want := _at + step
+		# You cannot walk into the chimney, and you cannot walk off the site.
+		var out: float = Vector2(want.x, want.z).length()
+		var keep_out: float = float(jack.structure().get("base_radius", 3.2)) + 0.8
+		if out >= keep_out and out <= _authored["safe_line"] * 2.2:
+			_at = want
 	_place_camera()
 	_telegraph(dt)
 	_update_hud()
@@ -272,17 +310,16 @@ func _telegraph(dt: float) -> void:
 
 
 func _face_the_chimney() -> void:
-	# Standing off at `_around`, looking in at the base. The yaw IS the bearing: a camera at
-	# bearing b is at (sin b, cos b) and must look at (-sin b, -cos b), which is exactly where
+	# Looking in at the base from wherever you are standing. The yaw IS the bearing: standing at
+	# bearing b you are at (sin b, cos b) and must look at (-sin b, -cos b), which is exactly where
 	# Godot's -Z points when yawed by b. Adding a half turn puts your back to the chimney, which
 	# is what the first frame of this scene showed.
-	_yaw = deg_to_rad(_around)
+	_yaw = deg_to_rad(_around())
 	_place_camera()
 
 
 func _place_camera() -> void:
-	var b := deg_to_rad(_around)
-	camera.position = Vector3(sin(b) * _orbit, EYE, cos(b) * _orbit)
+	camera.position = _at + Vector3(0.0, EYE, 0.0)
 	if _shake > 0.0:
 		var t := Time.get_ticks_msec() / 1000.0 * TAU * SHAKE_HZ
 		camera.position += Vector3(sin(t) * _shake, sin(t * 0.7) * _shake, cos(t * 1.3) * _shake)
@@ -330,7 +367,9 @@ func _aimed_cell() -> Array:
 	var p = _aim_point()
 	if p == null:
 		return []
-	if camera.global_position.distance_to(p) > _orbit + REACH:
+	# You have to be close enough to get a bar into it. Measured from the wall, not from the middle
+	# of the chimney, so walking round does not change what you can reach.
+	if _range() - float(jack.structure().get("base_radius", 3.2)) > REACH:
 		return []
 	return ring.cell_at(p)
 
@@ -369,12 +408,95 @@ func _prop() -> void:
 	_after_change()
 
 
-func _drive_pegs() -> void:
+## Act 1: the plumb bob. "Read it with the plumb bob from two orthogonal positions." One reading
+## from one spot tells you a chimney is out of plumb; it does not tell you which way. Two, from far
+## enough apart, and you have it — and until you do, the prediction cone carries the penalty the
+## sim charges for guessing.
+func _plumb() -> void:
 	if _fired:
 		return
-	_peg = fmod(_around + 180.0, 360.0)   # you sight across the chimney from where you stand
-	hud.say("Pegs in at %03d°. That is what you will be scored against." % int(_peg), 4.0)
+	var here := _around()
+	for had in _sightings:
+		if absf(_delta(had, here)) < SIGHTINGS_APART_DEG:
+			hud.say("You have already read it from about here. Walk round the chimney and read it again.", 5.0)
+			return
+	_sightings.append(here)
+	foley.cue("rung", 1.3)
+	if surveyed():
+		var s: Dictionary = jack.structure()
+		hud.say("Second reading. She leans %.1f° toward %03d° — and that is the way she wants to go."
+			% [float(s.get("lean_degrees", 0.0)), int(float(s.get("lean_bearing", 0.0)))], 7.0)
+		_step = maxi(_step, 1)
+	else:
+		hud.say("A reading from %03d°. You need another from at least %d° round." % [
+			int(here), int(SIGHTINGS_APART_DEG)], 6.0)
+
+
+## Whether the lean has actually been established, rather than assumed.
+func surveyed() -> bool:
+	for i in _sightings.size():
+		for j in range(i + 1, _sightings.size()):
+			if absf(_delta(_sightings[i], _sightings[j])) >= SIGHTINGS_APART_DEG:
+				return true
+	return false
+
+
+## "The player drives in two pegs. This is their public commitment and the thing they are scored
+## against." Two pegs, and the line runs from the chimney out through them.
+func _drive_peg() -> void:
+	if _fired:
+		return
+	if _pegs.size() >= 2:
+		hud.say("Both pegs are in. R pulls them up if you have changed your mind.", 4.0)
+		return
+	if _pegs.size() == 1 and _at.distance_to(_pegs[0]) < PEG_MIN_APART_M:
+		hud.say("Too close to the first peg to be a line. Walk out and drive the second.", 5.0)
+		return
+	_pegs.append(_at)
+	foley.cue("hammer", 1.1)
+	_mark_pegs()
+	if _pegs.size() == 1:
+		hud.say("One peg in. Walk out along the line you want and drive the second.", 5.0)
+		return
+	# The line the two pegs make, taken outward from the chimney.
+	var a := _pegs[0]
+	var b := _pegs[1]
+	var far: Vector3 = b if Vector2(b.x, b.z).length() > Vector2(a.x, a.z).length() else a
+	_peg = fmod(rad_to_deg(atan2(far.x, far.z)) + 360.0, 360.0)
+	hud.say("Pegged at %03d°. That is what you will be scored against." % int(_peg), 5.0)
 	_step = 3
+
+
+func _pull_pegs() -> void:
+	if _fired:
+		return
+	_pegs.clear()
+	_mark_pegs()
+	hud.say("Pegs up.", 2.0)
+
+
+func _mark_pegs() -> void:
+	for child in _peg_marks.get_children():
+		child.queue_free()
+	for at in _pegs:
+		var peg := MeshInstance3D.new()
+		var m := CylinderMesh.new()
+		m.top_radius = 0.05
+		m.bottom_radius = 0.02
+		m.height = 0.8
+		m.radial_segments = 5
+		peg.mesh = m
+		peg.position = at + Vector3(0.0, 0.4, 0.0)
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(0.60, 0.85, 0.95)
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		peg.material_override = mat
+		_peg_marks.add_child(peg)
+
+
+func _delta(from: float, to: float) -> float:
+	var d := fmod(to - from + 360.0, 360.0)
+	return d - 360.0 if d > 180.0 else d
 
 
 func _fire() -> void:
@@ -386,12 +508,11 @@ func _fire() -> void:
 		return
 	_fired = true
 	_capture(false)
-	var out: Dictionary = jack.fell_run(_peg, _height_removed)
+	var out: Dictionary = jack.fell_run(_peg, _height_removed, surveyed())
 	_outcome = out
 	# Act 4: you run. A hard sprint to the safe line at 1.5 x height, and then you turn round and
 	# watch. The prototype does not make you run it yet, but it does put you where you would be.
-	_orbit = _authored["safe_line"]
-	_around = fmod(float(out.get("fall_bearing", 0.0)) + 55.0, 360.0)
+	_at = _on_bearing(fmod(float(out.get("fall_bearing", 0.0)) + 55.0, 360.0), _authored["safe_line"])
 	_pitch = 0.22
 	_face_the_chimney()
 	ring.drop()
@@ -443,10 +564,14 @@ func _after_change() -> void:
 func _update_hud() -> void:
 	var st: Dictionary = jack.gob_state()
 	hud.state = st
-	hud.prediction = jack.fell_predict(_peg, _height_removed)
+	hud.prediction = jack.fell_predict(_peg, _height_removed, surveyed())
 	hud.peg_bearing = _peg
 	hud.height_removed = _height_removed
 	hud.step = _step
+	hud.surveyed = surveyed()
+	hud.sightings = _sightings.size()
+	hud.pegs = _pegs.size()
+	hud.standing_at = Vector2(_at.x, _at.z)
 	var cell := _aimed_cell()
 	if cell.is_empty() or _fired:
 		hud.aim_seg = -1

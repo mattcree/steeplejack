@@ -38,6 +38,15 @@ func _init() -> void:
 	var peg: float = world._peg
 	_check(peg >= 250.0 and peg <= 320.0, "pegs start in the level's corridor, at %03d deg" % peg)
 
+	# --- you can walk the site, not just circle it ------------------------------------------------
+	var keep_out: float = float(jack.structure().get("base_radius", 3.2))
+	_check(world._range() > keep_out, "you are standing off the chimney, not inside it")
+	var was: Vector3 = world._at
+	world._at = world._on_bearing(92.0, 30.0)   # over at the pump house
+	_check(world._range() > 25.0, "and you can walk right out to the pump house, 30 m away")
+	_check(world._aimed_cell().is_empty(), "from where you cannot reach the brickwork")
+	world._at = was
+
 	# --- a prop will not go in in front of the cut ------------------------------------------------
 	var seg := _seg_at(ring, peg)
 	_check(not jack.gob_prop(seg), "a prop will not stand where nothing has been cut")
@@ -96,8 +105,38 @@ func _init() -> void:
 	_check(world._dust != null and world._dust.emitting,
 		"the gob is shedding dust, which is what the ticking looks like (rule 8)")
 
+	# --- Act 1, the survey, which costs five minutes and buys nine degrees ------------------------
+	_check(not world.surveyed(), "you start not knowing the lean — it is not written on the chimney")
+	var blind: float = float(jack.fell_predict(peg, 0.0, false).get("accuracy", 0.0))
+	world._at = world._on_bearing(20.0, 18.0)
+	world._plumb()
+	_check(not world.surveyed(), "one plumb reading is not a survey")
+	world._at = world._on_bearing(35.0, 18.0)
+	world._plumb()
+	_check(not world.surveyed(), "and neither are two from nearly the same place")
+	world._at = world._on_bearing(140.0, 18.0)
+	world._plumb()
+	_check(world.surveyed(), "two readings well apart, and you have her lean")
+	var known: float = float(jack.fell_predict(peg, 0.0, true).get("accuracy", 0.0))
+	_check(absf(blind - known - jack.tuning_f("fallAccuracyUnsurveyedDegrees", 0.0)) < 0.01,
+		"which is worth %.0f degrees of cone" % (blind - known))
+
+	# --- the pegs are the commitment ---------------------------------------------------------------
+	world._pegs.clear()
+	world._at = world._on_bearing(peg, 20.0)
+	world._drive_peg()
+	_check(world._pegs.size() == 1, "one peg in")
+	world._at = world._on_bearing(peg, 22.0)
+	world._drive_peg()
+	_check(world._pegs.size() == 1, "a second peg two metres from the first is not a line")
+	world._at = world._on_bearing(peg, 46.0)
+	world._drive_peg()
+	_check(world._pegs.size() == 2, "two pegs, well apart, and the line is in")
+	_check(abs(_delta(world._peg, peg)) < 1.0,
+		"and it runs out from the chimney at %03d deg" % world._peg)
+
 	# --- what it will do, before you light it ------------------------------------------------------
-	var pred: Dictionary = jack.fell_predict(peg, 0.0)
+	var pred: Dictionary = jack.fell_predict(peg, 0.0, world.surveyed())
 	_check(abs(_delta(float(pred.get("fall_bearing", 0.0)), peg)) < 20.0,
 		"it is predicted to land %03d deg, %.1f off the pegs"
 			% [pred.get("fall_bearing", 0.0), pred.get("error", 0.0)])

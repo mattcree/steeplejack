@@ -66,11 +66,19 @@ struct FellSite
     uint32_t seed{};
 };
 
-// What the player committed to: where the pegs are, and what they took off the top first.
+// What the player committed to: where the pegs are, what they took off the top first, and whether
+// they did the survey at all.
+//
+// `surveyed` is the whole of Act 1. A chimney's lean is not written on it — you read it with a
+// plumb bob from two positions round the base, and until you have, you are guessing at the one
+// thing that decides which way it wants to go. You can fell without surveying. It costs you
+// `fallAccuracyUnsurveyedDegrees` of cone, and the design's whole first act is the argument for
+// spending five minutes not doing that.
 struct FellPlan
 {
     float pegBearingDeg{};
     float heightRemovedM{};
+    bool  surveyed{true};
 };
 
 enum class FellGrade : uint8_t { Wild, Acceptable, Good, Perfect };

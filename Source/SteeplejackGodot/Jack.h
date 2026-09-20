@@ -289,12 +289,14 @@ public:
 	 * `{fall_bearing, error, accuracy, debris_half_angle, debris_length, threatened}` — call it
 	 * while the player cuts, which is what makes the gob legible.
 	 */
-	godot::Dictionary fell_predict(double peg_bearing_deg, double height_removed_m) const;
+	godot::Dictionary fell_predict(double peg_bearing_deg, double height_removed_m,
+	                               bool surveyed) const;
 	/**
 	 * Light it. `{fall_bearing, error, grade, grade_name, fractures, chunks, clean_break, struck,
 	 * catastrophe, bonus, penalty}`.
 	 */
-	godot::Dictionary fell_run(double peg_bearing_deg, double height_removed_m) const;
+	godot::Dictionary fell_run(double peg_bearing_deg, double height_removed_m,
+	                           bool surveyed) const;
 
 	/** A tuned number, for the presentation layer to read rather than invent. */
 	double tuning_f(const godot::String& key, double fallback) const;

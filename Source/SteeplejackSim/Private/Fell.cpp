@@ -90,6 +90,10 @@ FellPrediction Fell::Predict(const FellSite& site, const Gob& gob, const FellPla
     {
         acc += t.GetF("fallAccuracyNarrowGobDegrees");
     }
+    if (!plan.surveyed)
+    {
+        acc += t.GetF("fallAccuracyUnsurveyedDegrees");
+    }
     out.accuracyDegrees = std::max(acc, t.GetF("fallAccuracyBaseDegrees"));
 
     out.debrisHalfAngleDeg = t.GetF("fallDebrisHalfAngleDegrees");
