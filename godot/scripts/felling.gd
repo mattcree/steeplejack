@@ -63,6 +63,8 @@ var _stripped := false
 ## to the office and looking at it.
 var _read_the_board := false
 var _struck_a_train := false
+## True when she came down because the gob was cut too far, rather than because it was lit.
+var _went_early := false
 
 # Working a cell out is a held action, not a click. Fifty-six clicks is not the act the design
 # calls the heart of it, and it is the only way the mortar a level authors can reach your hands.
@@ -408,6 +410,12 @@ func _telegraph(dt: float) -> void:
 		if status == "CRITICAL" or status == "COLLAPSE":
 			foley.cue("crack", 0.85)
 
+	# "COLLAPSE margin < 0.10 m — it goes. Now. Wherever it wants." The whole of Act 3 is not
+	# cutting past this line, and until now crossing it only turned a word on a panel red. CRITICAL
+	# is the telegraph — the groan, the shake, the dust — and it is the only one you get.
+	if status == "COLLAPSE" and not _fired:
+		_she_goes_early()
+
 	# Mortar ticking, and the dust that is its visual fallback.
 	var rate: float = TICKS_PER_SECOND.get(status, 0.0)
 	if _dust != null:
@@ -484,6 +492,7 @@ func _after_the_fall(dt: float) -> void:
 		foley.cue("cheer")
 		hud.outcome = _outcome
 		hud.settlement = _settlement
+		hud.went_early = _went_early
 
 
 func mouse_captured() -> bool:
@@ -844,6 +853,20 @@ func _fire() -> void:
 		% int(_authored["safe_line"]), 6.0)
 
 
+## She goes while you are still cutting. Not lit, not packed, not pegged — and you are standing in
+## the hole, because that is where the work is.
+func _she_goes_early() -> void:
+	if _fired:
+		return
+	hud.say("SHE'S GOING —", 10.0)
+	foley.cue("crack")
+	foley.cue("roar", 0.78)
+	_act4 = BURNING          # so _props_burn_through does its work
+	_burn_left = 0.0
+	_went_early = true
+	_props_burn_through()
+
+
 ## When the props go. Either you are behind the line or you are not.
 func _props_burn_through() -> void:
 	_fired = true
@@ -868,6 +891,8 @@ func _props_burn_through() -> void:
 	# Settled through the sim on the same plan, so the money and the verdict cannot disagree.
 	_settlement = jack.career_settle(_authored["id"], _authored["fee"], _peg, _height_removed,
 		surveyed(), _packing_quality)
+	if _went_early:
+		_settlement["went_early"] = true
 	if _caught:
 		# Not a scoring modifier. The job may have gone perfectly and you are still under it.
 		_settlement["injured"] = jack.career_injured()

@@ -60,6 +60,7 @@ var state := {}
 var prediction := {}
 var outcome := {}
 var settlement := {}
+var went_early := false
 var peg_bearing := 0.0
 var height_removed := 0.0
 var aim_seg := -1
@@ -464,11 +465,11 @@ func _draw_gob() -> void:
 # ---------------------------------------------------------------- the verdict
 
 func _draw_verdict() -> void:
-	var grade := String(outcome.get("grade_name", "WILD"))
+	var grade := "SHE WENT EARLY" if went_early else String(outcome.get("grade_name", "WILD"))
 	var colour: Color = {
 		"PERFECT": Color(0.55, 0.85, 0.50), "GOOD": Color(0.80, 0.85, 0.45),
 		"ACCEPTABLE": Color(0.90, 0.78, 0.35), "WILD": HAZARD,
-	}.get(grade, INK)
+	}.get(grade, HAZARD if went_early else INK)
 	var lines := _verdict_lines()
 
 	# Sized from what it has to say, not from a number written down once. Three separate times
@@ -494,13 +495,16 @@ func _draw_verdict() -> void:
 ## What the job did, in the order you would want to hear it: where it went, how it broke, what it
 ## touched, what it paid, and only then what it cost you.
 func _verdict_lines() -> Array:
-	var lines := [
+	var lines := []
+	if went_early:
+		lines.append("you cut past her and she came down on her own, where the hole pointed")
+	lines.append_array([
 		"it went to %03d°, %.1f° off your pegs" % [
 			float(outcome.get("fall_bearing", 0.0)), float(outcome.get("error", 0.0))],
 		"broke into %d, %s" % [int(outcome.get("chunks", 1)),
 			"she broke up nicely" if bool(outcome.get("clean_break", false))
 				else "one piece, harder to clear"],
-	]
+	])
 	var struck: Array = outcome.get("struck", [])
 	if struck.is_empty():
 		lines.append("nothing in the fan was touched")
