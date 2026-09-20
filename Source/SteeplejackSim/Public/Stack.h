@@ -62,6 +62,43 @@ struct StackEvents
     float                buckleSecondsLeft{-1.0f};
 };
 
+// What a survey of the whole stack found — CLIMB-007.
+//
+// Everything else in this module answers "what is happening to the section he is standing on".
+// Nothing answered the question a jack actually asks, which is **"am I happy on this ladder?"** —
+// a judgement about the whole structure, made by looking down it, not by standing on one rung of
+// it. A stack can be perfectly quiet under a climber and still be one dog away from coming down.
+//
+// The question is made concrete by asking the only one that matters: **if he came off the top,
+// what would happen?** That is a cascade, and the cascade model is already here and deterministic,
+// so the survey is a read-only walk of it.
+enum class StackVerdict : uint8_t { Sound, Working, NotRight };
+
+struct StackSurvey
+{
+    StackVerdict verdict{StackVerdict::Sound};
+
+    // The dog that would go first in a fall from the top, and the arithmetic that decides it.
+    int32_t firstToGo{-1};
+    float   firstToGoHeightM{};
+    float   firstToGoCapacityKN{};
+    float   shockAtTopKN{};
+
+    // How far the cascade would run, and what it would cost.
+    int32_t cascadeDepth{};
+    float   wouldFallToM{};      // the height the stack would be left standing at
+
+    // What is wrong with it as a structure, whether or not he ever falls.
+    int32_t longestSection{-1};
+    float   longestSpanM{};
+    SpanBand worstBand{SpanBand::Rigid};
+    int32_t hitches{};           // quick hitches still in the stack
+    int32_t poorAnchors{};       // dogs in the structure that a fall from the top would pull
+
+    // `Sound` means the stack would hold a fall from the top and has nothing marginal in it.
+    bool HoldsAFall() const noexcept { return firstToGo < 0; }
+};
+
 class SJ_API Stack
 {
 public:
@@ -103,6 +140,13 @@ public:
     // Share of `totalKN` carried by each anchor, for a climber on `atSection`. Indexed by anchor;
     // anchors above him, or failed, carry nothing. Sums to totalKN.
     std::vector<float> Shares(int32_t atSection, float totalKN, const Tuning& t) const;
+
+    // Look down the whole thing and say whether it is right — CLIMB-007. Read-only: it walks the
+    // same cascade `Shock` would, on a copy, and changes nothing.
+    //
+    // `loadKN` is the climber. The shock it tests with is `loadKN * dynamicLoadFactor`, which is
+    // the number that decides every fall in this game and which the player has never been shown.
+    StackSurvey Survey(float loadKN, const Tuning& t) const;
 
     // One fixed step with a climber of `loadKN` on `loadedSection` (-1 for nobody). Runs
     // buckling, walking and anchor loading, and any cascade that follows. Deterministic.

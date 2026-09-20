@@ -4,6 +4,7 @@
 // it is transcribed here term for term, because a nerve curve that quietly differs from the design
 // doc is a game that is harder or easier than anyone decided.
 
+#include "Anchor.h"
 #include "Meters.h"
 
 #include "Tuning.h"
@@ -74,8 +75,11 @@ float ExposureFactor(Exposure exposure, const Tuning& t) noexcept
 
 float DrainRate(const Meters& m, const MeterContext& ctx, const Tuning& t) noexcept
 {
+    // The span term is the one that was missing. A ladder swaying under you is frightening in a
+    // way a height number cannot express, `spanDangerNerveMultiplier` has said 2.0 since
+    // CLIMB-001, and nothing ever multiplied by it.
     return t.GetF("nerveBaseDrainPerSecond") * HeightFactor(ctx, t) * WindFactor(ctx, t) *
-           ExposureFactor(m.exposure, t);
+           ExposureFactor(m.exposure, t) * anchor::NerveDrainMultiplier(ctx.span, t);
 }
 
 void Step(Meters& m, float dt, const MeterContext& ctx, const Tuning& t) noexcept

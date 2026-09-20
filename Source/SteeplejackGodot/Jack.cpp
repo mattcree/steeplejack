@@ -223,6 +223,7 @@ void Jack::_bind_methods()
 	                     &Jack::career_settle, DEFVAL(1.0), DEFVAL(0.0));
 	ClassDB::bind_method(D_METHOD("career_settle_climb", "job_id", "fee_gbp", "reached_top"),
 	                     &Jack::career_settle_climb);
+	ClassDB::bind_method(D_METHOD("stack_survey"), &Jack::stack_survey);
 	ClassDB::bind_method(D_METHOD("tuning_f", "key", "fallback"), &Jack::tuning_f, DEFVAL(0.0));
 }
 
@@ -361,6 +362,19 @@ void Jack::set_context(double height, double wind_speed, bool carrying_ladder, b
 	context.windSpeed = static_cast<float>(wind_speed);
 	context.carryingLadder = carrying_ladder;
 	context.working = working;
+	// Which section he is on, and therefore how much the ladder is moving under him. Derived here
+	// rather than passed in: the stack knows which section a height is on and a .gd file would
+	// only be guessing at it — and this is the term that had been missing from the meters
+	// entirely, which is why a long span used to cost nothing.
+	context.span = sj::SpanBand::Rigid;
+	if (tuning)
+	{
+		const int32_t section = stack.SectionAt(context.height);
+		if (section >= 0)
+		{
+			context.span = stack.Band(section, *tuning);
+		}
+	}
 }
 
 void Jack::set_exposure(int exposure)
@@ -1519,6 +1533,68 @@ Dictionary Jack::career_settle_climb(const String& job_id, double fee_gbp, bool 
 	d["reputation_delta"] = static_cast<int64_t>(s.reputationDelta);
 	d["failed"] = s.failed;
 	d["first_time"] = s.firstTime;
+	return d;
+}
+
+Dictionary Jack::stack_survey() const
+{
+	Dictionary d;
+	if (!tuning) { return d; }
+	try
+	{
+		static const char* kNames[] = {"SOUND", "WORKING", "NOT RIGHT"};
+		const sj::StackSurvey v = stack.Survey(tuning->GetF("playerLoadKN"), *tuning);
+		d["verdict"] = static_cast<int64_t>(v.verdict);
+		d["verdict_name"] = String(kNames[static_cast<int>(v.verdict)]);
+		d["holds_a_fall"] = v.HoldsAFall();
+		d["shock_kn"] = static_cast<double>(v.shockAtTopKN);
+		d["first_to_go"] = static_cast<int64_t>(v.firstToGo);
+		d["first_to_go_height"] = static_cast<double>(v.firstToGoHeightM);
+		d["first_to_go_capacity"] = static_cast<double>(v.firstToGoCapacityKN);
+		d["cascade_depth"] = static_cast<int64_t>(v.cascadeDepth);
+		d["would_fall_to"] = static_cast<double>(v.wouldFallToM);
+		d["longest_span"] = static_cast<double>(v.longestSpanM);
+		d["worst_band"] = static_cast<int64_t>(v.worstBand);
+		d["hitches"] = static_cast<int64_t>(v.hitches);
+		d["poor_anchors"] = static_cast<int64_t>(v.poorAnchors);
+		// The one sentence. Worst first, because a stack has only one worst thing wrong with it
+		// and a list of four is a list nobody reads while they are forty metres up.
+		godot::String why;
+		if (!v.HoldsAFall())
+		{
+			why = String("a fall from the top would pull the dog at ") +
+			      String::num(static_cast<double>(v.firstToGoHeightM), 0) + " m";
+			if (v.cascadeDepth > 1)
+			{
+				why += String(" and ") + String::num_int64(v.cascadeDepth - 1) + " below it";
+			}
+		}
+		else if (static_cast<int>(v.worstBand) >= static_cast<int>(sj::SpanBand::Sway))
+		{
+			why = String("a ") + String::num(static_cast<double>(v.longestSpanM), 1) +
+			      " m span in it";
+		}
+		else if (v.poorAnchors > 0)
+		{
+			why = String::num_int64(v.poorAnchors) + " dog" + (v.poorAnchors == 1 ? "" : "s") +
+			      " that a fall would pull";
+		}
+		else if (v.hitches > 0)
+		{
+			why = String::num_int64(v.hitches) + " quick hitch" + (v.hitches == 1 ? "" : "es") +
+			      " still in it";
+		}
+		else if (v.worstBand == sj::SpanBand::Flex)
+		{
+			why = String("a ") + String::num(static_cast<double>(v.longestSpanM), 1) +
+			      " m span, flexing";
+		}
+		d["reason"] = why;
+	}
+	catch (const std::exception& e)
+	{
+		UtilityFunctions::push_error("jack: ", String(e.what()));
+	}
 	return d;
 }
 

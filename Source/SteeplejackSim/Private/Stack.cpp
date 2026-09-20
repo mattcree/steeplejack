@@ -260,6 +260,99 @@ void Stack::FailAnchor(int32_t i)
     }
 }
 
+StackSurvey Stack::Survey(float loadKN, const Tuning& t) const
+{
+    StackSurvey out;
+    out.shockAtTopKN = loadKN * t.GetF("dynamicLoadFactor");
+
+    // Everything in the structure, highest first. A dog nobody lashed to is not holding anything
+    // up and is not part of this judgement.
+    std::vector<int32_t> chain;
+    for (int32_t i = 0; i < AnchorCount(); ++i)
+    {
+        if (InStructure(i))
+        {
+            chain.push_back(i);
+        }
+    }
+    std::sort(chain.begin(), chain.end(), [&](int32_t a, int32_t b) {
+        return anchors_[static_cast<std::size_t>(a)].height > anchors_[static_cast<std::size_t>(b)].height;
+    });
+
+    // The sections, as structure rather than as the one he happens to be standing on. This is the
+    // half of the survey that is true whether or not he ever falls.
+    for (int32_t i = 0; i < SectionCount(); ++i)
+    {
+        if (SectionFailed(i))
+        {
+            continue;
+        }
+        const float span = SpanOf(i);
+        if (span > out.longestSpanM)
+        {
+            out.longestSpanM = span;
+            out.longestSection = i;
+        }
+        const SpanBand band = Band(i, t);
+        if (static_cast<int>(band) > static_cast<int>(out.worstBand))
+        {
+            out.worstBand = band;
+        }
+        out.hitches += (SectionAt(i).lashing == Lashing::Hitch) ? 1 : 0;
+    }
+
+    // And the half that is about coming off the top of it. The line catches him at the highest
+    // dog, so that is where the shock arrives; from there it is the cascade, walked without
+    // touching anything.
+    const float retained = t.GetF("cascadeShockRetained");
+    float shock = out.shockAtTopKN;
+    float standingAt = 0.0f;
+    bool falling = true;
+    for (int32_t i : chain)
+    {
+        if (i == 0)
+        {
+            break;   // the ground takes anything
+        }
+        const Anchor& a = anchors_[static_cast<std::size_t>(i)];
+        if (a.capacityKN < out.shockAtTopKN)
+        {
+            ++out.poorAnchors;   // this one could not take a fall, wherever the fall started
+        }
+        if (!falling)
+        {
+            continue;
+        }
+        if (shock <= a.capacityKN)
+        {
+            falling = false;
+            standingAt = a.height;
+            continue;
+        }
+        if (out.firstToGo < 0)
+        {
+            out.firstToGo = i;
+            out.firstToGoHeightM = a.height;
+            out.firstToGoCapacityKN = a.capacityKN;
+        }
+        ++out.cascadeDepth;
+        shock *= retained;
+    }
+    out.wouldFallToM = standingAt;
+
+    // The verdict. A stack that would come down if he came off it is not right, whatever else is
+    // true of it; a swaying or buckling span is not right either, because he has to climb it.
+    if (out.firstToGo >= 0 || static_cast<int>(out.worstBand) >= static_cast<int>(SpanBand::Sway))
+    {
+        out.verdict = StackVerdict::NotRight;
+    }
+    else if (out.worstBand == SpanBand::Flex || out.hitches > 0 || out.poorAnchors > 0)
+    {
+        out.verdict = StackVerdict::Working;
+    }
+    return out;
+}
+
 std::vector<int32_t> Stack::Cascade(int32_t failed, float shockKN, const Tuning& t)
 {
     std::vector<int32_t> order;

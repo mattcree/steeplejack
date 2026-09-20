@@ -4,6 +4,7 @@
 // is the difficulty dial for the whole game, and a designer has to be able to move it during a
 // playtest without a programmer (CORE-007's hot reload is the other half of that).
 
+#include "Anchor.h"
 #include "Meters.h"
 
 #include "Tuning.h"
@@ -98,6 +99,9 @@ float DrainRate(Stance stance, const MeterContext& ctx, const Tuning& t) noexcep
         // Gloves cost tap-test resolution, which is VERB-001's side of the same trade.
         rate *= t.GetF("gripModifiers.gloves");
     }
+    // A ladder that is moving under you is one you hold harder. CLIMB-001 wrote this number and
+    // nothing ever read it, which is why a long span used to be free.
+    rate *= anchor::GripDrainMultiplier(ctx.span, t);
     return rate;
 }
 

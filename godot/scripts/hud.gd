@@ -12,6 +12,34 @@
 
 extends Control
 
+# ---------------------------------------------------------------- the palette
+#
+# There was not one. Every colour in this file was written where it was used, so the red that means
+# "this is about to kill you" and the red that means "you have no dogs left" were different reds,
+# and nothing was reliably louder than anything else. Colour, weight and size are the only three
+# things a HUD has to say "look here first", and a HUD that spends them at random has none of them.
+#
+# Four levels of voice, and three meanings. Nothing outside this block should name a colour.
+const INK := Color(0.96, 0.94, 0.90)          ## the thing you are meant to read
+const DIM := Color(0.82, 0.80, 0.77)          ## context for it
+const FAINT := Color(0.70, 0.68, 0.66)        ## there if you look, quiet if you do not
+const GHOST := Color(0.62, 0.60, 0.58)        ## present but unavailable
+
+const GOOD := Color(0.56, 0.80, 0.50)         ## it is right
+const WATCH := Color(0.95, 0.76, 0.33)        ## it is working, and you should know
+const DANGER := Color(0.95, 0.33, 0.25)       ## it is wrong, now
+
+const GRIP_COL := Color(0.88, 0.76, 0.44)
+const NERVE_COL := Color(0.44, 0.60, 0.80)
+const CHALK := Color(0.92, 0.88, 0.80)
+
+## A type scale, so size means importance instead of meaning whatever was typed.
+const H1 := 30      ## the one thing on the screen
+const H2 := 19      ## a heading, or a verdict
+const BODY := 15
+const SMALL := 13
+const TINY := 11
+
 const HAND := Vector2(96, -104)
 const GRIP_R := 44.0
 const NERVE_R := 56.0
@@ -81,18 +109,20 @@ func _draw() -> void:
 	# on screen disagreed with every number in the level file.
 	# Floored at zero: standing on the ground printed "-0 m", and a negative height is the kind of
 	# small wrongness that makes a player stop trusting every other number on the screen.
-	_label("%.0f m" % maxf(player.height_m(), 0.0), Vector2(info_x, hand.y - 20), Color(0.94, 0.92, 0.88, 0.92))
+	_label("%.0f m" % maxf(player.height_m(), 0.0), Vector2(info_x, hand.y - 20), Color(INK, 0.95),
+		H2)
 	if player.on_ladder:
 		var where: String = jack.stance_name()
 		var band: String = jack.band_type_at(player.height_m())
 		if band != "":
 			where += "  ·  " + band
-		_label(where, Vector2(info_x, hand.y), Color(0.80, 0.78, 0.74, 0.70), 13)
+		_label(where, Vector2(info_x, hand.y), Color(FAINT, 0.85), SMALL)
 
 	var stock := "%s   %d dogs in the bag   top %.0fm" % [
 		"ladder on your shoulder" if player.carrying_ladder else "no ladder",
 		player.dogs_carried, player.ladder_top]
-	_label(stock, Vector2(info_x, hand.y + 22), Color(0.78, 0.76, 0.72, 0.85), 13)
+	_label(stock, Vector2(info_x, hand.y + 22), Color(DIM, 0.85), SMALL)
+	_draw_ladder_verdict(jack, Vector2(info_x, hand.y + 48))
 
 	# Only once there is something to span *from*. With no dogs driven, the span is measured from
 	# the ground and reads "62.0 m span — about to buckle" at the top of a ladder that is lashed all
@@ -711,6 +741,41 @@ func _draw_top() -> void:
 ## The stack's warnings. The fairness table: "Ladder buckled — fair, because the span was over 8 m
 ## and the HUD said so." So the HUD says so, loudly, for the whole of the 8 seconds, with the time
 ## left as a bar that empties — and says the one thing to do about it.
+## "Am I happy on this ladder?" — CLIMB-007, on screen.
+##
+## Every other warning in this HUD is about the section under his feet this second. This is the
+## whole structure, judged the way a jack judges it: by looking down it and asking what would
+## happen if he came off the top. It is always there, it is one line, and it is the only place in
+## the game that has ever said a stack is wrong before it proves it.
+func _draw_ladder_verdict(jack: Jack, at: Vector2) -> void:
+	if jack.anchor_count() <= 0:
+		return
+	var v: Dictionary = jack.stack_survey()
+	if v.is_empty():
+		return
+	var name_ := String(v.get("verdict_name", "SOUND"))
+	var colour := GOOD
+	if name_ == "NOT RIGHT":
+		colour = DANGER
+	elif name_ == "WORKING":
+		colour = WATCH
+
+	# A bar of the colour, then the word, then why. The bar is there because a word in a colour is
+	# a word you have to read; a bar is a thing you see.
+	draw_rect(Rect2(at.x, at.y - 11.0, 3.0, 14.0), colour)
+	_label("the ladder: %s" % name_, Vector2(at.x + 10.0, at.y), colour, BODY)
+	var why := String(v.get("reason", ""))
+	if why != "":
+		_label(why, Vector2(at.x + 10.0, at.y + 18.0), Color(colour, 0.72), SMALL)
+
+	# The number that decides every fall in this game, which used to appear nowhere until after it
+	# had already decided one.
+	if not bool(v.get("holds_a_fall", true)):
+		_label("a fall puts %.1f kN on a dog rated %.1f" % [
+			float(v.get("shock_kn", 0.0)), float(v.get("first_to_go_capacity", 0.0))],
+			Vector2(at.x + 10.0, at.y + 36.0), Color(DANGER, 0.85), SMALL)
+
+
 func _draw_stack_warnings() -> void:
 	var st: Dictionary = player.stack_info
 	if st.is_empty():

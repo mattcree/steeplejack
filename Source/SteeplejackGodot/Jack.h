@@ -362,6 +362,14 @@ public:
 	godot::Dictionary career_settle_climb(const godot::String& job_id, double fee_gbp,
 	                                      bool reached_top);
 
+	/**
+	 * "Am I happy on this ladder?" — CLIMB-007. A judgement about the whole stack rather than
+	 * about the section underfoot: `{verdict, verdict_name, reason, holds_a_fall, shock_kn,
+	 * first_to_go, first_to_go_height, first_to_go_capacity, cascade_depth, would_fall_to,
+	 * longest_span, worst_band, hitches, poor_anchors}`.
+	 */
+	godot::Dictionary stack_survey() const;
+
 	/** A tuned number, for the presentation layer to read rather than invent. */
 	double tuning_f(const godot::String& key, double fallback) const;
 

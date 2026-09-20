@@ -126,6 +126,22 @@ func _init() -> void:
 	if solid != null:
 		_check(solid.get_child_count() > 0, "with a shape for each band (%d)" % solid.get_child_count())
 
+	# --- "am I happy on this ladder?" — CLIMB-007 -------------------------------------------------
+	# The whole-stack verdict, which is the only thing in the game that judges the structure rather
+	# than the rung underfoot. The arithmetic is tested in test_survey.cpp; this is the wiring, and
+	# the one number it has to carry: the shock a fall puts through the top dog.
+	var v: Dictionary = player.jack.stack_survey()
+	_check(not v.is_empty(), "the stack can be surveyed from the game layer")
+	_check(v.has("verdict_name") and v.has("reason"), "with a verdict and a reason for it")
+	var shock: float = float(v.get("shock_kn", 0.0))
+	_check(absf(shock - player.jack.tuning_f("playerLoadKN", 0.0)
+			* player.jack.tuning_f("dynamicLoadFactor", 0.0)) < 0.01,
+		"carrying the %.1f kN a fall puts through the top dog" % shock)
+	_check(shock > player.jack.tuning_f("anchorCapacityKN.fair", 0.0),
+		"which is more than a Fair dog is rated for — the fact the game never used to say")
+	_check(String(v["verdict_name"]) in ["SOUND", "WORKING", "NOT RIGHT"],
+		"and it reads '%s'" % v["verdict_name"])
+
 	print("LADDER: %s" % ("ok" if failures == 0 else "%d failure(s)" % failures))
 	quit(0 if failures == 0 else 1)
 

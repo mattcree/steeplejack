@@ -111,6 +111,17 @@ struct MeterContext
     // Seconds of work done this shift. Only the cold cap reads it: max grip is held at
     // gripModifiers.coldMaxCap until coldWarmupSeconds of work have been done.
     float       workedSeconds{};
+
+    // The section he is standing on. A flexing ladder is harder to hold and a swaying one is
+    // frightening, and `climbing.json` has said so since CLIMB-001 —
+    // `spanWarnGripDrainMultiplier` 1.3 and `spanDangerNerveMultiplier` 2.0. Both numbers were
+    // computed by `anchor::GripDrainMultiplier`/`NerveDrainMultiplier` and then passed to nothing
+    // at all, so until now a long span cost the player exactly nothing except a 1.4x on anchor
+    // load — which, at the ~1 kN a climber ever puts on a dog, almost never mattered either.
+    //
+    // Rigid by default, so a zero-initialised context is a climber on a short section rather than
+    // one being punished for a span nobody told it about.
+    SpanBand    span{SpanBand::Rigid};
 };
 
 // One hammer blow's effect on a joint. `seated` is the terminal success; `bent` is the
