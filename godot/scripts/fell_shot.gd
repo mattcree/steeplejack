@@ -17,7 +17,7 @@
 #   watch <deg>    stand at that angle to the fall line, to see it side on
 #   look <deg>     turn the camera by that much from facing the chimney
 #   pitch <deg>    tilt it (negative is down)
-#   fire           light it
+#   fire           pack it, light it and let the props go, all at once
 #   wait <s>       let it run
 #   shot <name>    write docs/shots/<name>.png
 
@@ -59,7 +59,15 @@ func _init() -> void:
 					world._face_the_chimney()
 			"look": world._yaw = deg_to_rad(world._around() + arg)
 			"pitch": world._pitch = deg_to_rad(arg)
-			"fire": world._fire()
+			"fire":
+					# Packed full, lit, and the props already gone: a shot wants the fall, not
+					# the ninety seconds of running before it.
+					world._packing = world.PACK_SECONDS
+					world._packing_quality = 1.0
+					world._act4 = world.MATCH
+					world._strike_a_match()
+					world._burn_left = 0.0
+					world._act4_step(0.05)
 			"wait": await _wait(int(arg * 60.0))
 			"shot": await _shot(bits[1] if bits.size() > 1 else "felling")
 			_: printerr("fell_shot: no such command: %s" % bits[0])

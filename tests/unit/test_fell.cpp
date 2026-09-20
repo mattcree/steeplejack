@@ -307,6 +307,55 @@ TEST_CASE("Fell: accuracy is bought with daylight, and there is no other currenc
           doctest::Approx(Tune().GetF("fellMaxHeightReductionM")));   // capped on a tall one
 }
 
+TEST_CASE("Fell: Act 4, a badly packed gob costs you twice")
+{
+    // "Poor packing = slow burn = the chimney drops before the props are fully gone = worse
+    // accuracy." Longer to burn, which is more time to get clear, and wider when it lands.
+    FellSite site = Waterside();
+    const Gob g = CutOn(284.0f);
+    FellPlan good, bad;
+    good.pegBearingDeg = bad.pegBearingDeg = 284.0f;
+    bad.packingQuality = 0.0f;
+
+    const float tight = Fell::Predict(site, g, good, Tune()).accuracyDegrees;
+    const float wide = Fell::Predict(site, g, bad, Tune()).accuracyDegrees;
+    CHECK(wide - tight == doctest::Approx(Tune().GetF("fallAccuracyPoorPackingDegrees")).epsilon(0.01));
+
+    // The level authors the range; packing decides where in it you land.
+    CHECK(Fell::BurnSeconds(1.0f, 45.0f, 90.0f) == doctest::Approx(45.0f));
+    CHECK(Fell::BurnSeconds(0.0f, 45.0f, 90.0f) == doctest::Approx(90.0f));
+    CHECK(Fell::BurnSeconds(0.5f, 45.0f, 90.0f) == doctest::Approx(67.5f));
+    CHECK(Fell::BurnSeconds(2.0f, 45.0f, 90.0f) == doctest::Approx(45.0f));   // clamped
+}
+
+TEST_CASE("Fell: the match, and the wind that kills it")
+{
+    // Deterministic on the seed: a level's match behaves the same way every time you play it.
+    // Sheltering it with your body is most of the difference in a wind that matters.
+    const uint32_t seed = 60001u;
+    int32_t openTakes = 0, shelteredTakes = 0;
+    for (int32_t attempt = 0; attempt < 200; ++attempt)
+    {
+        openTakes += Fell::MatchTakes(11.0f, false, seed, attempt, Tune()) ? 1 : 0;
+        shelteredTakes += Fell::MatchTakes(11.0f, true, seed, attempt, Tune()) ? 1 : 0;
+    }
+    CAPTURE(openTakes);
+    CAPTURE(shelteredTakes);
+    CHECK(shelteredTakes > openTakes);
+    CHECK(openTakes > 0);                 // never hopeless
+    CHECK(openTakes < 200);               // and never free, in an 11 m/s wind
+
+    // Still weather, and it just lights.
+    CHECK(Fell::MatchTakes(0.0f, false, seed, 0, Tune()));
+
+    // The same attempt on the same level always goes the same way.
+    for (int32_t attempt = 0; attempt < 8; ++attempt)
+    {
+        CHECK(Fell::MatchTakes(9.0f, false, seed, attempt, Tune()) ==
+              Fell::MatchTakes(9.0f, false, seed, attempt, Tune()));
+    }
+}
+
 TEST_CASE("Fell: a felling scores on how far off the pegs it landed")
 {
     FellSite site = Waterside();

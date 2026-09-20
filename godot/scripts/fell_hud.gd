@@ -18,7 +18,8 @@ const STEPS := [
 	"Cut the gob on the fall line — hold the chimney's own lean in mind",
 	"Prop behind you as you go — the prop goes in BEFORE the last course comes out",
 	"Watch the margin. Finish UNEASY, not SAFE — safe does not fall",
-	"Drive two pegs down the line you want [P], then light it [F]",
+	"Drive two pegs down the line you want [P]",
+	"Pack the gob [hold F], light it [L], and RUN",
 ]
 
 ## What a felling costs you in daylight, and the one thing you can spend it on for accuracy.
@@ -72,6 +73,12 @@ var pegs := 0
 var standing_at := Vector2.ZERO
 var level_name := ""
 var shift := {}
+var act4 := 0
+var packing := 0.0
+var burn_left := 0.0
+var safe_line := 0.0
+var range_out := 0.0
+var caught := false
 
 var _font: Font
 var _plan_scale := 1.0
@@ -97,6 +104,7 @@ func _draw() -> void:
 	_draw_steps()
 	_draw_state()
 	_draw_aim()
+	_draw_act4()
 	_draw_plan()
 	_draw_message()
 	if not outcome.is_empty():
@@ -105,10 +113,16 @@ func _draw() -> void:
 
 # ---------------------------------------------------------------- panels
 
+## Where the step list ends and the state panel starts. Derived rather than written down: the list
+## grew by one when Act 4 landed and the hard-coded divider ended up through the middle of it.
+func _state_top() -> float:
+	return 50.0 + 19.0 * float(STEPS.size()) + 16.0
+
+
 func _draw_steps() -> void:
 	# A scrim. The first render of this put pale text straight onto a bright sky and half of it
 	# could not be read, which for a panel whose whole job is telling you what to do is fatal.
-	draw_rect(Rect2(0, 0, 620, 366), Color(0.05, 0.05, 0.06, 0.55))
+	draw_rect(Rect2(0, 0, 620, _state_top() + 240.0), Color(0.05, 0.05, 0.06, 0.55))
 	var y := 26.0
 	draw_string(_font, Vector2(24, y), "FELLING — %s" % level_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK)
 	y += 24.0
@@ -127,7 +141,7 @@ func _draw_state() -> void:
 		return
 	var name_ := String(state.get("status_name", "SAFE"))
 	var colour: Color = BAND_COLOUR.get(name_, INK)
-	var y := 138.0
+	var y := _state_top()
 	draw_rect(Rect2(24, y, 320, 3), colour)
 	y += 24.0
 	draw_string(_font, Vector2(24, y), "%s — %s" % [name_, BAND_WORDS.get(name_, "")],
@@ -201,8 +215,53 @@ func _draw_aim() -> void:
 func _draw_message() -> void:
 	if message == "" or Time.get_ticks_msec() / 1000.0 > message_until:
 		return
-	draw_string(_font, Vector2(size.x * 0.5 - 300, size.y - 120), message,
+	# Out of the way of the run panel, which is the only thing that matters while it is up.
+	var y: float = size.y - (232.0 if act4 == BURNING else 120.0)
+	draw_string(_font, Vector2(size.x * 0.5 - 300, y), message,
 		HORIZONTAL_ALIGNMENT_CENTER, 600, 16, INK)
+
+
+# ---------------------------------------------------------------- Act 4
+#
+# Pack, light, run. The burn is the timer and the safe line is the finish, and both have to be on
+# the screen while you are sprinting away from a chimney with your back to it.
+
+const PACKING := 1
+const MATCH := 2
+const BURNING := 3
+
+
+func _draw_act4() -> void:
+	var c := Vector2(size.x * 0.5, size.y - 150.0)
+	if act4 == PACKING:
+		draw_string(_font, Vector2(c.x - 220, c.y), "packing the gob — hold F",
+			HORIZONTAL_ALIGNMENT_CENTER, 440, 16, INK)
+		draw_rect(Rect2(c.x - 160, c.y + 12, 320, 8), Color(0.2, 0.19, 0.18))
+		draw_rect(Rect2(c.x - 160, c.y + 12, 320 * clampf(packing, 0.0, 1.0), 8), TIMBER)
+		draw_string(_font, Vector2(c.x - 220, c.y + 42),
+			"a full gob burns fast and clean; a light one smoulders, and it costs you the fall",
+			HORIZONTAL_ALIGNMENT_CENTER, 440, 12, DIM)
+	elif act4 == MATCH:
+		draw_string(_font, Vector2(c.x - 260, c.y), "[L] strike a match",
+			HORIZONTAL_ALIGNMENT_CENTER, 520, 18, INK)
+		draw_string(_font, Vector2(c.x - 260, c.y + 26),
+			"the wind will have it unless you put yourself between",
+			HORIZONTAL_ALIGNMENT_CENTER, 520, 13, DIM)
+	elif act4 == BURNING:
+		# The two numbers that matter, large, because you are running.
+		var clear: bool = range_out >= safe_line
+		var colour := Color(0.55, 0.85, 0.50) if clear else HAZARD
+		draw_string(_font, Vector2(c.x - 300, c.y - 30), "RUN",
+			HORIZONTAL_ALIGNMENT_CENTER, 600, 40, HAZARD)
+		draw_string(_font, Vector2(c.x - 300, c.y + 6),
+			"%0.0f s        %0.0f m of %0.0f" % [maxf(burn_left, 0.0), range_out, safe_line],
+			HORIZONTAL_ALIGNMENT_CENTER, 600, 22, colour)
+		draw_string(_font, Vector2(c.x - 300, c.y + 34),
+			"behind the line" if clear else "still inside the line",
+			HORIZONTAL_ALIGNMENT_CENTER, 600, 14, colour)
+	if caught and not outcome.is_empty():
+		draw_string(_font, Vector2(size.x * 0.5 - 340, 320), "YOU WERE INSIDE THE LINE",
+			HORIZONTAL_ALIGNMENT_CENTER, 680, 26, HAZARD)
 
 
 # ---------------------------------------------------------------- the two plans
@@ -299,6 +358,14 @@ func _draw_site() -> void:
 		for edge in [bearing - acc, bearing + acc]:
 			draw_line(_at(o, Vector2.ZERO, scale), _at(o, _on_bearing(edge, reach * 0.9), scale),
 				Color(0.95, 0.82, 0.35, 0.5), 1.0)
+
+	# The line you have to be behind, and where you are relative to it.
+	if safe_line > 0.0:
+		var ring := PackedVector2Array()
+		for i in 49:
+			ring.push_back(_at(o, _on_bearing(360.0 * float(i) / 48.0, safe_line), scale))
+		for i in 48:
+			draw_line(ring[i], ring[i + 1], Color(0.92, 0.84, 0.40, 0.45), 1.0)
 
 	# The chimney, to scale, so the fan has something to come out of.
 	draw_circle(_at(o, Vector2.ZERO, scale), maxf(radius * scale, 2.0), Color(0.52, 0.40, 0.33))

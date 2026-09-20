@@ -192,9 +192,14 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("gob_prop_at", "seg"), &Jack::gob_prop_at);
 	ClassDB::bind_method(D_METHOD("fell_site", "wind_ms", "wind_bearing_deg", "safe_line_m", "seed",
 	                               "exclusions"), &Jack::fell_site);
-	ClassDB::bind_method(D_METHOD("fell_predict", "peg_bearing_deg", "height_removed_m", "surveyed"),
-	                     &Jack::fell_predict);
-	ClassDB::bind_method(D_METHOD("fell_run", "peg_bearing_deg", "height_removed_m", "surveyed"), &Jack::fell_run);
+	ClassDB::bind_method(D_METHOD("fell_predict", "peg_bearing_deg", "height_removed_m", "surveyed",
+	                               "packing_quality"), &Jack::fell_predict, DEFVAL(1.0));
+	ClassDB::bind_method(D_METHOD("fell_run", "peg_bearing_deg", "height_removed_m", "surveyed",
+	                               "packing_quality"), &Jack::fell_run, DEFVAL(1.0));
+	ClassDB::bind_method(D_METHOD("fell_burn_seconds", "packing_quality", "min_s", "max_s"),
+	                     &Jack::fell_burn_seconds);
+	ClassDB::bind_method(D_METHOD("fell_match_takes", "wind_ms", "sheltered", "attempt"),
+	                     &Jack::fell_match_takes);
 	ClassDB::bind_method(D_METHOD("fell_shift", "height_removed_m"), &Jack::fell_shift);
 	ClassDB::bind_method(D_METHOD("career_load", "json"), &Jack::career_load);
 	ClassDB::bind_method(D_METHOD("career_json"), &Jack::career_json);
@@ -204,7 +209,8 @@ void Jack::_bind_methods()
 	                     &Jack::career_reachable_stars);
 	ClassDB::bind_method(D_METHOD("career_done", "job_id"), &Jack::career_done);
 	ClassDB::bind_method(D_METHOD("career_settle", "job_id", "fee_gbp", "peg_bearing_deg",
-	                               "height_removed_m", "surveyed"), &Jack::career_settle);
+	                               "height_removed_m", "surveyed", "packing_quality"),
+	                     &Jack::career_settle, DEFVAL(1.0));
 	ClassDB::bind_method(D_METHOD("career_settle_climb", "job_id", "fee_gbp", "reached_top"),
 	                     &Jack::career_settle_climb);
 	ClassDB::bind_method(D_METHOD("tuning_f", "key", "fallback"), &Jack::tuning_f, DEFVAL(0.0));
@@ -1215,8 +1221,8 @@ void Jack::fell_site(double wind_ms, double wind_bearing_deg, double safe_line_m
 	}
 }
 
-Dictionary Jack::fell_predict(double peg_bearing_deg, double height_removed_m,
-                              bool surveyed) const
+Dictionary Jack::fell_predict(double peg_bearing_deg, double height_removed_m, bool surveyed,
+                              double packing_quality) const
 {
 	Dictionary d;
 	if (!gob || !tuning) { return d; }
@@ -1226,6 +1232,7 @@ Dictionary Jack::fell_predict(double peg_bearing_deg, double height_removed_m,
 		plan.pegBearingDeg = static_cast<float>(peg_bearing_deg);
 		plan.heightRemovedM = static_cast<float>(height_removed_m);
 		plan.surveyed = surveyed;
+		plan.packingQuality = static_cast<float>(packing_quality);
 		const sj::FellPrediction p = sj::Fell::Predict(fell, *gob, plan, *tuning);
 		Array threatened;
 		for (const sj::Exclusion& e : fell.exclusions)
@@ -1246,7 +1253,8 @@ Dictionary Jack::fell_predict(double peg_bearing_deg, double height_removed_m,
 	return d;
 }
 
-Dictionary Jack::fell_run(double peg_bearing_deg, double height_removed_m, bool surveyed) const
+Dictionary Jack::fell_run(double peg_bearing_deg, double height_removed_m, bool surveyed,
+                          double packing_quality) const
 {
 	Dictionary d;
 	if (!gob || !tuning) { return d; }
@@ -1257,6 +1265,7 @@ Dictionary Jack::fell_run(double peg_bearing_deg, double height_removed_m, bool 
 		plan.pegBearingDeg = static_cast<float>(peg_bearing_deg);
 		plan.heightRemovedM = static_cast<float>(height_removed_m);
 		plan.surveyed = surveyed;
+		plan.packingQuality = static_cast<float>(packing_quality);
 		const sj::FellOutcome o = sj::Fell::Run(fell, *gob, plan, *tuning);
 		Array fractures;
 		for (float h : o.fractureHeightsM) { fractures.push_back(static_cast<double>(h)); }
@@ -1279,6 +1288,20 @@ Dictionary Jack::fell_run(double peg_bearing_deg, double height_removed_m, bool 
 		UtilityFunctions::push_error("jack: ", String(e.what()));
 	}
 	return d;
+}
+
+double Jack::fell_burn_seconds(double packing_quality, double min_s, double max_s) const
+{
+	return static_cast<double>(sj::Fell::BurnSeconds(static_cast<float>(packing_quality),
+	                                                 static_cast<float>(min_s),
+	                                                 static_cast<float>(max_s)));
+}
+
+bool Jack::fell_match_takes(double wind_ms, bool sheltered, int64_t attempt) const
+{
+	if (!tuning) { return true; }
+	return sj::Fell::MatchTakes(static_cast<float>(wind_ms), sheltered, fell.seed,
+	                            static_cast<int32_t>(attempt), *tuning);
 }
 
 Dictionary Jack::fell_shift(double height_removed_m) const
@@ -1393,7 +1416,7 @@ bool Jack::career_done(const String& job_id) const
 }
 
 Dictionary Jack::career_settle(const String& job_id, double fee_gbp, double peg_bearing_deg,
-                               double height_removed_m, bool surveyed)
+                               double height_removed_m, bool surveyed, double packing_quality)
 {
 	Dictionary d;
 	if (!gob || !tuning)
@@ -1406,6 +1429,7 @@ Dictionary Jack::career_settle(const String& job_id, double fee_gbp, double peg_
 		plan.pegBearingDeg = static_cast<float>(peg_bearing_deg);
 		plan.heightRemovedM = static_cast<float>(height_removed_m);
 		plan.surveyed = surveyed;
+		plan.packingQuality = static_cast<float>(packing_quality);
 		const sj::FellOutcome o = sj::Fell::Run(fell, *gob, plan, *tuning);
 		const sj::Settlement s = career.Settle(job_id.utf8().get_data(),
 		                                       static_cast<float>(fee_gbp), o, *tuning);

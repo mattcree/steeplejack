@@ -79,6 +79,10 @@ struct FellPlan
     float pegBearingDeg{};
     float heightRemovedM{};
     bool  surveyed{true};
+    // How well the gob was packed with waste timber before it was lit, 0-1. "Poor packing = slow
+    // burn = the chimney drops before the props are fully gone = worse accuracy." So it costs you
+    // twice: a badly packed gob burns longer, which is more time to get clear, and lands wider.
+    float packingQuality{1.0f};
 };
 
 enum class FellGrade : uint8_t { Wild, Acceptable, Good, Perfect };
@@ -143,6 +147,17 @@ public:
                                   const Tuning& t);
     // The most you are allowed to take off by hand: the perished top, not the whole chimney.
     static float MaxHeightReductionM(float heightM, const Tuning& t);
+
+    // How long the packing burns before the props go, between the level's authored range. A gob
+    // packed well burns fast and clean; one packed badly smoulders, and the design is explicit
+    // that the smoulder is what costs you the fall. The seconds are the player's to run in.
+    static float BurnSeconds(float packingQuality, float minSeconds, float maxSeconds);
+
+    // Whether a match will take, in this wind, sheltered or not. Deterministic on the seed, so a
+    // level's match behaves the same way every time you play it — a coin flip you cannot learn is
+    // not tension, it is a coin flip.
+    static bool MatchTakes(float windMps, bool sheltered, uint32_t seed, int32_t attempt,
+                           const Tuning& t);
 
     // Signed difference between two bearings, in (-180, 180].
     static float BearingDelta(float fromDeg, float toDeg) noexcept;

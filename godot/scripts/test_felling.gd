@@ -172,9 +172,37 @@ func _init() -> void:
 	_check(float(pred.get("debris_length", 0.0)) > float(jack.structure().get("height", 70.0)),
 		"and a fan that throws further than the chimney is tall (%.0f m)" % pred.get("debris_length", 0.0))
 
-	# --- light it ---------------------------------------------------------------------------------
-	world._fire()
+	# --- Act 4: pack it, light it, run ------------------------------------------------------------
+	# It was one keypress. It is four things now, and each of them can go wrong.
+	# Within arm's reach of the wall: you pack a gob by hand, standing in it.
+	world._at = world._on_bearing(peg, float(jack.structure().get("base_radius", 3.2)) + 3.0)
+	world._begin_packing()
+	_check(world._act4 == world.PACKING, "packing the gob")
+	world._packing = world.PACK_SECONDS * 0.5         # half a gob's worth of timber
+	world._packing_quality = 0.5
+	world._act4 = world.MATCH
+	var half: float = float(world.jack.fell_burn_seconds(0.5,
+		world._authored["burn_min"], world._authored["burn_max"]))
+	var full: float = float(world.jack.fell_burn_seconds(1.0,
+		world._authored["burn_min"], world._authored["burn_max"]))
+	_check(half > full, "a half-packed gob smoulders for %.0f s against %.0f" % [half, full])
+	var smoulder: float = float(jack.fell_predict(peg, 0.0, true, 0.5).get("accuracy", 0.0))
+	var clean: float = float(jack.fell_predict(peg, 0.0, true, 1.0).get("accuracy", 0.0))
+	_check(smoulder > clean,
+		"and lands wider for it, +-%.1f against +-%.1f" % [smoulder, clean])
+
+	world._strike_a_match()
+	_check(world._act4 == world.BURNING, "the match took and it is burning")
+	_check(world._burn_left > 0.0, "with %.0f seconds to get clear" % world._burn_left)
+	_check(not world._fired, "and it has not gone yet — that is what the running is for")
+
+	# Run. Then the props go.
+	world._at = world._on_bearing(peg + 50.0, float(world._authored["safe_line"]) + 12.0)
+	world._burn_left = 0.01
+	world._act4_step(0.05)
 	await physics_frame
+	_check(world._fired, "the props burned through and she went")
+	_check(not world._caught, "and he was behind the line when she did")
 	var out: Dictionary = world._outcome
 	_check(not out.is_empty(), "it went")
 	_check(hud.outcome.is_empty(),

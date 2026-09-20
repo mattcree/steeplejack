@@ -296,13 +296,17 @@ public:
 	 * while the player cuts, which is what makes the gob legible.
 	 */
 	godot::Dictionary fell_predict(double peg_bearing_deg, double height_removed_m,
-	                               bool surveyed) const;
+	                               bool surveyed, double packing_quality = 1.0) const;
 	/**
 	 * Light it. `{fall_bearing, error, grade, grade_name, fractures, chunks, clean_break, struck,
 	 * catastrophe, bonus, penalty}`.
 	 */
 	godot::Dictionary fell_run(double peg_bearing_deg, double height_removed_m,
-	                           bool surveyed) const;
+	                           bool surveyed, double packing_quality = 1.0) const;
+	/** How long the packing burns, between the level's authored seconds. */
+	double fell_burn_seconds(double packing_quality, double min_s, double max_s) const;
+	/** Whether this attempt at a match takes, in this wind. Deterministic on the level's seed. */
+	bool fell_match_takes(double wind_ms, bool sheltered, int64_t attempt) const;
 
 	/**
 	 * What the day has cost so far and what is left of it: `{spent, shift, left, per_metre,
@@ -335,7 +339,8 @@ public:
 	 * first_time}`. Uses the outcome the sim produced, not one a script made up.
 	 */
 	godot::Dictionary career_settle(const godot::String& job_id, double fee_gbp,
-	                                double peg_bearing_deg, double height_removed_m, bool surveyed);
+	                                double peg_bearing_deg, double height_removed_m, bool surveyed,
+	                                double packing_quality = 1.0);
 	/** Settle the climbing half: you got to the top of it, or you did not. Same shape. */
 	godot::Dictionary career_settle_climb(const godot::String& job_id, double fee_gbp,
 	                                      bool reached_top);

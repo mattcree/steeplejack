@@ -94,6 +94,9 @@ FellPrediction Fell::Predict(const FellSite& site, const Gob& gob, const FellPla
     {
         acc += t.GetF("fallAccuracyUnsurveyedDegrees");
     }
+    // A gob that smoulders drops the chimney before the props are fully gone, and it goes where
+    // the half-burnt props leave it rather than where you cut it.
+    acc += t.GetF("fallAccuracyPoorPackingDegrees") * (1.0f - std::clamp(plan.packingQuality, 0.0f, 1.0f));
     out.accuracyDegrees = std::max(acc, t.GetF("fallAccuracyBaseDegrees"));
 
     out.debrisHalfAngleDeg = t.GetF("fallDebrisHalfAngleDegrees");
@@ -152,6 +155,26 @@ float Fell::MaxHeightReductionM(float heightM, const Tuning& t)
     // morning, not demolishing it twice.
     return std::min(heightM * t.GetF("fellMaxHeightReductionFraction"),
                     t.GetF("fellMaxHeightReductionM"));
+}
+
+float Fell::BurnSeconds(float packingQuality, float minSeconds, float maxSeconds)
+{
+    const float q = std::clamp(packingQuality, 0.0f, 1.0f);
+    return maxSeconds + (minSeconds - maxSeconds) * q;
+}
+
+bool Fell::MatchTakes(float windMps, bool sheltered, uint32_t seed, int32_t attempt,
+                      const Tuning& t)
+{
+    float chance = 1.0f - windMps * t.GetF("fellMatchFailPerMetreSecond");
+    if (sheltered)
+    {
+        chance += (1.0f - chance) * t.GetF("fellMatchShelterFraction");
+    }
+    chance = std::clamp(chance, t.GetF("fellMatchWorstChance"), 1.0f);
+    Rng rng(seed);
+    Rng attemptRng = rng.Fork(static_cast<uint32_t>(attempt));
+    return attemptRng.NextFloat() < chance;
 }
 
 FellOutcome Fell::Run(const FellSite& site, const Gob& gob, const FellPlan& plan, const Tuning& t)

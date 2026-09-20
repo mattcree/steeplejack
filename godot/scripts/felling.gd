@@ -43,6 +43,12 @@ var _peg := 284.0
 var _height_removed := 0.0
 var _step := 0
 var _fired := false
+var _act4 := READY
+var _packing := 0.0            ## how much has gone in, 0..PACK_SECONDS
+var _packing_quality := 0.0
+var _match_attempt := 0
+var _burn_left := 0.0
+var _caught := false
 var _fall: FellFall
 var _outcome := {}
 var _settlement := {}
@@ -56,6 +62,10 @@ const GROAN_EVERY := {"SAFE": 0.0, "UNEASY": 7.0, "CRITICAL": 2.6, "COLLAPSE": 1
 const SHAKE_M := {"SAFE": 0.0, "UNEASY": 0.004, "CRITICAL": 0.022, "COLLAPSE": 0.06}
 const SHAKE_HZ := 2.8          ## rule 20: nothing on screen moves faster than 3 Hz
 const CHEER_AFTER := 4.6       ## "then - after four or five seconds - a distant cheer"
+
+# Act 4: pack, light, run, watch. It was one keypress, which is a third of a felling missing.
+enum { READY, PACKING, MATCH, BURNING, GOING }
+const PACK_SECONDS := 6.0      ## to pack it properly, by hand, with waste timber and straw
 
 var _tick_due := 0.0
 var _groan_due := 0.0
@@ -175,6 +185,9 @@ func _read_level() -> Dictionary:
 		out["mortar_bearing"] = float(asym.get("bearing", 0.0))
 		out["mortar_bias"] = float(asym.get("strengthBias", 0.0))
 	out["required_reduction"] = float(mission.get("requiredHeightReduction", 0.0))
+	var burn: Array = gob.get("burnSecondsRange", [45, 90])
+	out["burn_min"] = float(burn[0]) if burn.size() > 0 else 45.0
+	out["burn_max"] = float(burn[1]) if burn.size() > 1 else 90.0
 	out["fee"] = float(doc.get("fee", 0.0))
 	out["id"] = String(doc.get("id", ""))
 	var site_block: Dictionary = doc.get("site", {})
@@ -268,7 +281,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_BRACKETRIGHT: _take_off(2.0)
 			KEY_P: _drive_peg()
 			KEY_R: _pull_pegs()
-			KEY_F: _fire()
+			KEY_F: _begin_packing()
+			KEY_L: _strike_a_match()
 			KEY_ENTER, KEY_KP_ENTER: _back_to_the_board()
 			KEY_R when _fired: _again()
 			KEY_ESCAPE:
@@ -300,8 +314,29 @@ func _process(dt: float) -> void:
 		if out >= keep_out and out <= _authored["safe_line"] * 2.2:
 			_at = want
 	_place_camera()
+	_act4_step(dt)
 	_telegraph(dt)
 	_update_hud()
+
+
+## Packing, and then the burn running down while you run.
+func _act4_step(dt: float) -> void:
+	if _act4 == PACKING:
+		if Input.is_key_pressed(KEY_F) and _range() - float(
+				jack.structure().get("base_radius", 3.2)) <= REACH:
+			_packing = minf(_packing + dt, PACK_SECONDS)
+			_packing_quality = _packing / PACK_SECONDS
+			if is_equal_approx(_packing, PACK_SECONDS):
+				_act4 = MATCH
+				hud.say("Packed full. [L] to light it.", 5.0)
+		elif _packing > 0.0:
+			_act4 = MATCH
+			hud.say("That is what is going in. [L] to light it%s." % (
+				"" if _packing_quality > 0.7 else " — though it will smoulder"), 6.0)
+	elif _act4 == BURNING:
+		_burn_left -= dt
+		if _burn_left <= 0.0:
+			_props_burn_through()
 
 
 ## What the chimney is telling you, in dust, timber and noise. The words on the panel are the last
@@ -599,6 +634,46 @@ func _delta(from: float, to: float) -> float:
 	return d - 360.0 if d > 180.0 else d
 
 
+## Act 4, step 1. "Pack the gob with waste timber and straw (a placement action — poor packing =
+## slow burn = the chimney drops before the props are fully gone = worse accuracy)."
+func _begin_packing() -> void:
+	if _fired or _act4 == BURNING or _act4 == GOING:
+		return
+	var st: Dictionary = jack.gob_state()
+	if float(st.get("cut_arc", 0.0)) <= 0.0:
+		hud.say("There is no gob to pack. Cut one first.")
+		return
+	if _range() - float(jack.structure().get("base_radius", 3.2)) > REACH:
+		hud.say("You have to be at the gob to pack it.")
+		return
+	if _act4 == MATCH:
+		hud.say("It is packed. [L] to light it.", 3.0)
+		return
+	_act4 = PACKING
+	hud.say("Packing the gob. Hold F. The more that goes in, the cleaner it burns.", 5.0)
+
+
+## Act 4, step 2. "Light it. Wind can kill the match; shelter it with your body."
+func _strike_a_match() -> void:
+	if _act4 != MATCH:
+		if _act4 == PACKING or _act4 == READY:
+			hud.say("Pack it first — hold F at the gob.", 4.0)
+		return
+	_match_attempt += 1
+	# Standing between the wind and the gob is sheltering it, which is exactly what a jack does.
+	var wind: float = jack.wind_at(1.5)
+	var sheltered := absf(_delta(_around(), fmod(_wind_bearing() + 180.0, 360.0))) < 60.0
+	if not jack.fell_match_takes(wind, sheltered, _match_attempt):
+		foley.cue("mortarTick", 1.4)
+		hud.say("The wind had it. Get between it and the gob and strike another.", 4.0)
+		return
+	_fire()
+
+
+func _wind_bearing() -> float:
+	return float(jack.structure().get("lean_bearing", 0.0))
+
+
 func _fire() -> void:
 	if _fired:
 		return
@@ -606,26 +681,39 @@ func _fire() -> void:
 	if float(st.get("cut_arc", 0.0)) <= 0.0:
 		hud.say("There is no gob to light. Cut one first.")
 		return
+	# Lit. Now run: the burn is the timer and the safe line is the finish.
+	_act4 = BURNING
+	_burn_left = jack.fell_burn_seconds(_packing_quality, _authored["burn_min"],
+		_authored["burn_max"])
+	foley.cue("mortarTick", 0.7)
+	hud.say("Lit. RUN — behind the line, %d m out. Shift to sprint."
+		% int(_authored["safe_line"]), 6.0)
+
+
+## When the props go. Either you are behind the line or you are not.
+func _props_burn_through() -> void:
 	_fired = true
+	_act4 = GOING
+	_caught = _range() < _authored["safe_line"]
 	_capture(false)
 	# The tin comes along to the job, because what the felling pays is part of the felling.
 	_load_career()
-	var out: Dictionary = jack.fell_run(_peg, _height_removed, surveyed())
+	var out: Dictionary = jack.fell_run(_peg, _height_removed, surveyed(), _packing_quality)
 	_outcome = out
 	# Settled through the sim on the same plan, so the money and the verdict cannot disagree.
 	_settlement = jack.career_settle(_authored["id"], _authored["fee"], _peg, _height_removed,
-		surveyed())
+		surveyed(), _packing_quality)
 	_save_career()
-	# Act 4: you run. A hard sprint to the safe line at 1.5 x height, and then you turn round and
-	# watch. The prototype does not make you run it yet, but it does put you where you would be.
-	_at = _on_bearing(fmod(float(out.get("fall_bearing", 0.0)) + 55.0, 360.0), _authored["safe_line"])
+	# You stand where you ran to. If that was not far enough, you were inside the line when it went.
 	_pitch = 0.22
 	_face_the_chimney()
+	if _caught:
+		hud.say("You were still inside the line when she went. That is how jacks are killed.", 9.0)
 	ring.drop()
 	chimney.visible = false
 	_fall = FellFall.new()
 	add_child(_fall)
-	var centroid: Vector2 = st.get("support_centroid", Vector2.ZERO)
+	var centroid: Vector2 = jack.gob_state().get("support_centroid", Vector2.ZERO)
 	var s: Dictionary = jack.structure()
 	foley.cue("crack")
 	foley.cue("roar", 0.9)
@@ -701,7 +789,7 @@ func _after_change() -> void:
 func _update_hud() -> void:
 	var st: Dictionary = jack.gob_state()
 	hud.state = st
-	hud.prediction = jack.fell_predict(_peg, _height_removed, surveyed())
+	hud.prediction = jack.fell_predict(_peg, _height_removed, surveyed(), _packing_quality)
 	hud.peg_bearing = _peg
 	hud.height_removed = _height_removed
 	hud.step = _step
@@ -710,6 +798,12 @@ func _update_hud() -> void:
 	hud.pegs = _pegs.size()
 	hud.standing_at = Vector2(_at.x, _at.z)
 	hud.shift = jack.fell_shift(_height_removed)
+	hud.act4 = _act4
+	hud.packing = _packing / PACK_SECONDS
+	hud.burn_left = _burn_left
+	hud.safe_line = _authored["safe_line"]
+	hud.range_out = _range()
+	hud.caught = _caught
 	hud.height_removed = _height_removed
 	var cell := _aimed_cell()
 	if cell.is_empty() or _fired:
