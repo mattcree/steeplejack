@@ -15,6 +15,9 @@ extends Node3D
 
 const WALK := 5.2                ## metres per second, walking the site
 const SPRINT := 9.0              ## Act 4 step 3: "a hard sprint to the safe line"
+const BOOM := 4.6                ## how far behind him the camera sits during the run
+const BOOM_UP := 1.9
+const RUN_CLIP_SPEED := 2.37     ## metres a second the run clip covers, as player.gd has it
 const LOOK := 0.0022             ## radians per pixel
 const EYE := 1.62
 const REACH := 4.5               ## how far you can reach into the brickwork
@@ -29,6 +32,7 @@ const PEG_MIN_APART_M := 6.0     ## two pegs closer together than this are not a
 @onready var ring: GobRing = $GobRing
 @onready var hud: Control = $HUD
 @onready var camera: Camera3D = $Camera
+@onready var body: Node3D = $Body
 @onready var foley: Node = $Foley
 @onready var site: FellSite = $Site
 
@@ -49,6 +53,8 @@ var _packing_quality := 0.0
 var _match_attempt := 0
 var _burn_left := 0.0
 var _caught := false
+var _moving := 0.0             ## metres per second, for the run clip
+var _facing := 0.0             ## which way he is pointed, radians
 ## Act 2, done on another day in the other half of the game. Until it is, there is a conductor
 ## down the side of this chimney and three iron bands round it, and you do not cut into that.
 var _stripped := false
@@ -130,6 +136,7 @@ func _ready() -> void:
 	_face_the_chimney()
 	_peg_marks = Node3D.new()
 	add_child(_peg_marks)
+	_place_body()
 	_load_career()
 	_stripped = jack.career_stripped(_authored["id"]) or _authored["strip_out"].is_empty()
 	_step = 1 if _stripped else 0
@@ -331,11 +338,14 @@ func _process(dt: float) -> void:
 	# the pump house.
 	var side := Input.get_axis("ui_left", "ui_right")
 	var fwd := Input.get_axis("ui_down", "ui_up")
+	_moving = maxf(_moving - dt * 24.0, 0.0)
 	if side != 0.0 or fwd != 0.0:
 		var pace: float = SPRINT if Input.is_key_pressed(KEY_SHIFT) else WALK
 		var f := Vector3(-sin(_yaw), 0.0, -cos(_yaw))
 		var r := Vector3(cos(_yaw), 0.0, -sin(_yaw))
 		var step := (f * fwd + r * side).normalized() * pace * dt
+		_moving = pace
+		_facing = atan2(step.x, step.z)
 		var want := _at + step
 		# You cannot walk into the chimney, and you cannot walk off the site.
 		var out: float = Vector2(want.x, want.z).length()
@@ -419,7 +429,33 @@ func _face_the_chimney() -> void:
 	_place_camera()
 
 
+## Where he is standing, and which way he is pointed. In first person you only see his shadow,
+## which is most of what presence is on a bright day in an empty field.
+func _place_body() -> void:
+	if body == null:
+		return
+	body.position = _at
+	body.rotation.y = _facing if _moving > 0.1 else _yaw
+	var anim := body.get_node_or_null("AnimationPlayer")
+	if anim == null:
+		return
+	var want := "run" if _moving > 0.5 else "idle"
+	if anim.has_animation(want):
+		if anim.current_animation != want:
+			anim.get_animation(want).loop_mode = Animation.LOOP_LINEAR
+			anim.play(want, 0.15)
+		anim.speed_scale = clampf(_moving / RUN_CLIP_SPEED, 0.6, 1.9) if _moving > 0.5 else 1.0
+
+
 func _place_camera() -> void:
+	_place_body()
+	# "RUN. A hard sprint to the safe line. The camera stays behind them." It is the only running
+	# in the game and it is meant to be exhilarating, which it cannot be from inside his head.
+	if _act4 == BURNING:
+		var back := Vector3(-sin(_yaw), 0.0, -cos(_yaw))
+		camera.position = _at - back * BOOM + Vector3(0.0, BOOM_UP, 0.0)
+		camera.rotation = Vector3(_pitch - 0.12, _yaw, 0.0)
+		return
 	camera.position = _at + Vector3(0.0, EYE, 0.0)
 	if _shake > 0.0:
 		var t := Time.get_ticks_msec() / 1000.0 * TAU * SHAKE_HZ
