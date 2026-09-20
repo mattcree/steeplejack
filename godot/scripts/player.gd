@@ -1264,6 +1264,10 @@ func _step_sim(dt: float) -> void:
 func _update_face() -> void:
 	if face == null:
 		return
+	# Where the ladder actually reaches, so the face knows which joints are behind one and which
+	# are in clear air above it. Without this every joint on the climbing line was hidden at every
+	# height and the dogs were driven off to one side of the ladder they hold up.
+	face.ladder_top = ladder_top
 	face.update_for(maxf(height_m(), 0.0))
 	if work_mode:
 		face.set_target(work_joint)

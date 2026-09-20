@@ -34,6 +34,21 @@ than the implementer should look at.
 | The shift, across all three fellings | The most a felling can spend is 58–75 minutes of a 120–150 minute shift, so **the daylight cannot run out**, the before-dark bonus is always paid and the "the light went before you did" line is unreachable | Left as it is, and said so. Closing it means pricing Act 2's climb into the same clock, and that needs a number nobody has decided: the gob costs 28 shift-seconds a cell for 1.4 seconds of play, a fiction multiplier of about twenty, while a climb would be roughly 1:1. **How long is a game minute** is a design question, not an implementation one |
 | `economy.json` vs the level set | Every felling is gated at three stars or more; doing all five levels that have data, perfectly, comes to two. The demolition half was unreachable | Kept the gates, and taught the career to tell "not earned" from "not buildable yet" (`Career::StarsAfter`). Gates above what the content can reach are marked and let through, and start enforcing themselves the moment the levels between land |
 
+## Raised 2026-09-20 by research into the real trade
+
+Period sources on how a chimney is actually laddered, written up in
+[`16-how-it-was-actually-done.md`](docs/01-gdd/16-how-it-was-actually-done.md). One of the gaps was
+a bug and is fixed (dogs were being driven 0.3-0.5 m to one side of the ladder they hold up). The
+rest are design calls, and the first is large.
+
+| The gap | The trade | The game | Recommendation |
+|---|---|---|---|
+| **Dog spacing** | **five feet**, every time, stated outright and never varied | 2.5-6.0 m suggested, `spanWarnMetres` 6.0, and the entire Rigid/Flex/Sway/Buckle economy built on spans the trade would not take | **Needs a designer.** Faithful spacing is ~36 dogs on the Grey Box instead of ~11: four times the actions for the same height. That is either the texture of the job or a chore, and it also invalidates the reachability gate and every level's ladder allowance. I would not change it without you |
+| **Two lashings per ladder** | every ladder held at **two** dogs, and one dog splices the top of one ladder to the bottom of the next | one lashing, one dog per section | Worth doing — it is where the trade's redundancy lives, and the game's cascade is harsher than reality partly because of it |
+| **The wooden plug** | hole → **wooden plug** → dog driven into the plug | dog driven straight into mortar | Worth doing: it is a second thing to get right or wrong, and it is what the dog's hold actually comes from |
+| **The pulley** | **every** ladder goes up on it, leapfrogged up the stack | he carries sections on his back; the gin wheel is optional | A real change to the ascent loop. Raise as its own task if wanted |
+| **Packing** | a block under the third rung holds the ladder off the wall *so boots fit on the rungs* | not modelled; the drawn body's standoff does the same job by accident | Cosmetic but cheap, and it explains on screen why the body hangs back |
+
 ## Standing decisions the lead owes the project
 
 These are not agent escalations — they are preflight items that nothing can proceed past.

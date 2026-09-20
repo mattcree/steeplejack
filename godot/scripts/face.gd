@@ -156,11 +156,29 @@ func _ready() -> void:
 	_bent = _bank_box(Vector3(0.045, 0.045, 0.16), _lit(Color(0.30, 0.20, 0.14), 0.7))
 
 
-## Whether a joint is hidden behind the ladder: closer than `ladderCoversMetres` to its centre line.
-## The stiles are 0.44 m apart and a hammer cannot reach past them, and a dog there would be one the
-## ladder cannot be lashed to — the lashing runs from a stile out to a lug beside it.
+## How high the ladder actually reaches. Set by the player each frame; -1 means "no ladder yet",
+## in which case nothing is behind one.
+var ladder_top := -1.0
+
+
+## Whether a ladder is physically in front of this joint.
+##
+## It used to ask only how far round the face the joint was, and not how high it was — so a joint
+## on the climbing line was excluded at *every* height, including above the top of the ladder where
+## there is no ladder at all. That is exactly where the next dog goes, so every dog in the game was
+## pushed 0.3-0.5 m off to one side of the ladder it was about to hold up.
+##
+## Which is not how it is done. In the trade the next hole is drilled "plumb straight above the one
+## below as you can get it", and the lashing goes round one cheek of the ladder, under the rung,
+## round the dog, round the other cheek — so the dog is on the ladder's line, within a five-foot
+## rope of it. Keeping that line straight is itself part of the craft: wander to one side on the
+## way up and the staging at the top comes out, in the trade's own words, an erratic effort with
+## everything out of line and out of square.
 func under_ladder(j: Dictionary) -> bool:
 	if jack == null:
+		return false
+	# Above the ladder there is nothing to be behind.
+	if ladder_top >= 0.0 and float(j["height"]) > ladder_top:
 		return false
 	var n: Vector3 = j["normal"]
 	# How far round the face from the climbing line, in metres: the chord between this joint's

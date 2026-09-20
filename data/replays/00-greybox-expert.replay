@@ -1,12 +1,12 @@
 {
   "level": "The Grey Box",
   "reached_top": true,
-  "game_seconds": 961.6,
+  "game_seconds": 968.6,
   "sections": 12,
   "hauls": 11,
   "dogs": 12,
   "grip_at_end": 100.0,
-  "nerve_at_end": 41.8,
+  "nerve_at_end": 39.5,
   "anchors": [
     {
       "height": 4.75,
@@ -35,7 +35,7 @@
     },
     {
       "height": 27.25,
-      "rating": "poor",
+      "rating": "fair",
       "failed": false
     },
     {
@@ -45,7 +45,7 @@
     },
     {
       "height": 36.25,
-      "rating": "sound",
+      "rating": "fair",
       "failed": false
     },
     {
