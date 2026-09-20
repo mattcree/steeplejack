@@ -22,7 +22,13 @@ const ARM_REACH := 0.85          ## shoulder to hammer face
 const LEAN_MAX := 0.75           ## the most he shifts on the rungs to get there
 const LEAN_RATE := 14.0          ## fast enough to arrive before the tap's contact at 0.16 s
 const CHECKPOINT_EVERY := 2.0    ## seconds between looks at whether the stack changed
-const CLIMB_IN := 0.10           ## how much closer to the rungs the drawn body hangs on the ladder
+## How much closer to the rungs the drawn body hangs than the capsule does.
+##
+## Small on purpose. A climber's hips hang *back* off a ladder — that is how the knees stay on
+## their own side of the rungs and how the arms stay bent enough to pull on. Pulling the body in
+## to 0.30 m made the legs nearly straight and drove the bent one through the rails; rung_grip.gd
+## now lowers the hips to suit whatever standoff this leaves, so the two cannot disagree.
+const CLIMB_IN := 0.03
 const RAIL_HALF := 0.22          ## half the gap between the stiles; chimney.gd's RAIL_GAP / 2
 const WALL_FOLLOW_DELAY := 1.5   ## seconds after the mouse last moved before the ladder view squares up
 const WALL_FOLLOW_RATE := 1.2    ## how fast it does, per second — a drift, not a snap
@@ -57,6 +63,12 @@ const AIM_SLACK := 0.8
 
 const LADDER_REACH := 0.9        ## You are on a ladder when you can hold it.
 const BODY_OFF_LADDER := 0.40
+
+## Where a carried section rides. On the shoulder for walking; `_stow_carried_ladder()` stands it
+## up his back the moment he is on a ladder, because five metres held out sideways at height goes
+## through the chimney.
+const CARRY_ON_SHOULDER := Vector3(-0.20, 0.30, 0.0)
+const CARRY_TILT := Vector3(1.361, 0.0, 0.0)   ## 78 degrees: nearly level, front end a little up
 const MOUNT_HEIGHT := 1.6        ## You get on a ladder from the ground, not by brushing past it.
 const SHUFFLE_SPEED := 1.3       ## Metres per second sideways along the face.
 const SHUFFLE_OFF := 0.7         ## Shuffle this far and you are off it.
@@ -805,6 +817,7 @@ func _physics_process(dt: float) -> void:
 		# On his back whenever he has one and is not holding it up to lash it — then it is the
 		# translucent section on the stack instead, and it cannot be in two places.
 		_carried_ladder.visible = carrying_ladder and not lashing
+		_stow_carried_ladder()
 	_animate()
 	_update_lean(dt)
 	_update_grip(dt)
@@ -2006,8 +2019,8 @@ func _make_carried_ladder(skel: Skeleton3D) -> Node3D:
 	var root := Node3D.new()
 	# On the right shoulder, running fore and aft along the way he walks, front end a little up so it
 	# clears the ground. Slung across his back it swept the ground behind him like a boom.
-	root.position = Vector3(-0.20, 0.30, 0.0)
-	root.rotation = Vector3(deg_to_rad(78.0), 0.0, 0.0)
+	root.position = CARRY_ON_SHOULDER
+	root.rotation = CARRY_TILT
 	att.add_child(root)
 
 	var wood := StandardMaterial3D.new()
@@ -2034,6 +2047,32 @@ func _make_carried_ladder(skel: Skeleton3D) -> Node3D:
 		h += 0.28
 	att.visible = false
 	return att
+
+
+## Where the section he is carrying sits, which depends entirely on whether his feet are on the
+## ground or on a ladder.
+##
+## **On the ground** it goes on the right shoulder, fore and aft, front end up — the way anything
+## long is carried by one man.
+##
+## **On a ladder it stands up his back**, and that is not a compromise, it is the only thing that
+## works. Five metres of ladder held out sideways at 20 m swept through the brickwork, through the
+## ladder he was standing on, and out over the town — because a boom on a shoulder rotates with the
+## shoulder, and his shoulders are square to a wall. A jack going up with a section has it on his
+## back and parallel to everything else, or he has it on a rope, and the rope is what the gin wheel
+## is for.
+func _stow_carried_ladder() -> void:
+	if _carried_ladder == null or not _carried_ladder.visible:
+		return
+	var root: Node3D = _carried_ladder.get_child(0)
+	if root == null:
+		return
+	var climbing := on_ladder and not falling and not at_top
+	# Upright and tight to his spine, offset to the right so it clears the rails he is holding.
+	var want_pos := Vector3(-0.26, 0.10, -0.16) if climbing else CARRY_ON_SHOULDER
+	var want_rot := Vector3(0.0, 0.0, deg_to_rad(-4.0)) if climbing else CARRY_TILT
+	root.position = root.position.lerp(want_pos, 0.25)
+	root.rotation = root.rotation.lerp(want_rot, 0.25)
 
 
 ## A hammer in his right hand. He was tapping and driving with nothing in it.

@@ -25,7 +25,8 @@ const FOOT_LIFT := 0.06                 ## the ankle sits above the rung the sol
 const HAND_ON_WALL_ABOVE_FEET := 1.55   ## at the head of the ladder, where a hand goes on the brick
 const WALL_PALM := 0.06                 ## the wrist, off the face of the brick
 const MIN_ANKLE_ABOVE_FEET := 0.20     ## the lowest a straight leg puts the ankle, plus a little bend
-const HIPS_ABOVE_RUNG := 0.76           ## hips over the rung he stands on: a leg is 0.84, so nearly straight
+const LEG := 0.84                       ## hip to sole on the rig
+const LEG_SLACK := 0.04                 ## a climbing leg is never locked straight
 const HIP_ABOVE_FEET := 0.95            ## the rig's hips, above its feet
 const MAX_DROP := 0.40                  ## the body never settles further than this below the capsule
 const MAX_RISE := 0.16                  ## nor further above it than half a rung                  ## the most the drawn body settles at the head of the ladder
@@ -138,16 +139,36 @@ func body_drop() -> float:
 	return _drop
 
 
-## Where the drawn body should sit: HIPS_ABOVE_RUNG over the rung his weight is on.
+## Where the drawn body should sit: `_hips_above_rung()` over the rung his weight is on.
 ##
 ## The rungs are the ladder's and do not move, so the body has to. Fixing the body to the capsule
 ## instead left the bearing leg folded to half its length — a permanent squat — because which rung
 ## he was standing on shifted by up to half a rung as he climbed. Now the lower foot's rung sets
 ## his height, which is also what makes him rise as he pushes up on it: the step is the climb.
+## How high the hips sit over the rung the weight is on — derived, not chosen.
+##
+## A leg is a fixed length, so how far out from the ladder the body stands and how high the hips
+## can be are the same number asked twice. Standing 0.30 m out the hips can be 0.78 up; standing
+## 0.38 m out they can only be 0.73, and a body that insists on both is a body whose feet cannot
+## reach the rung they are supposed to be standing on.
+##
+## This is why a climber further from the ladder is also lower and more folded, and it is the whole
+## reason the legs stopped passing through the rails: they are not straight enough to any more.
+func _hips_above_rung() -> float:
+	var reach := maxf(LEG - LEG_SLACK, 0.1)
+	var out := _standoff()
+	return sqrt(maxf(reach * reach - out * out, 0.04))
+
+
+## How far the drawn body stands off the ladder's line. The player owns both halves of it.
+func _standoff() -> float:
+	return float(player.BODY_OFF_LADDER) - float(player.CLIMB_IN)
+
+
 func _wanted_drop() -> float:
 	var lower := 2 if _rung[2] <= _rung[3] else 3
 	var rung_h: float = maxf(_rung[lower], 0) * chimney.RUNG_GAP
-	var want_feet := rung_h + FOOT_LIFT + HIPS_ABOVE_RUNG - HIP_ABOVE_FEET
+	var want_feet := rung_h + FOOT_LIFT + _hips_above_rung() - HIP_ABOVE_FEET
 	return clampf(float(player.call("height_m")) - want_feet, -MAX_RISE, MAX_DROP)
 
 
@@ -231,7 +252,7 @@ func _place(limb: int, _dt: float) -> void:
 		var u: float = smoothstep(0.0, 1.0, _step_t)
 		at = (_from[limb] as Vector3).lerp(to, u) + _out() * STEP_ARC * sin(PI * _step_t)
 	_target[limb].global_position = at
-	# Elbows low and a little out, knees towards the ladder: the bend a body on a ladder makes. The
+	# Elbows low and a little out; knees down and AWAY from the ladder. The
 	# first poles sat beside and behind the shoulders and put the elbows up by his ears.
 	var out := _out()
 	var along: Vector3 = Vector3(0, 0, 1) * float(SIDE[limb])
@@ -239,11 +260,15 @@ func _place(limb: int, _dt: float) -> void:
 		skeleton.find_bone(CHAINS[limb][0])).origin
 	# Well off the limb's own line, or the bend has no plane to happen in and the joint flips to
 	# whichever side it likes: that is what put his knees out sideways and his elbows behind him.
-	# An elbow goes down, out and back from the shoulder; a knee goes towards the ladder.
+	#
+	# An elbow goes down, out and back from the shoulder. A knee goes down and *away* from the
+	# brickwork — this pole used to sit half a metre towards the wall, which drove the bent leg's
+	# knee straight through the rungs it was climbing. You keep your knees on your side of a
+	# ladder; that is why your hips hang back off it.
 	if limb < 2:
 		_pole[limb].global_position = root + along * 0.55 + out * 0.45 - Vector3.UP * 0.35
 	else:
-		_pole[limb].global_position = root - out * 0.5 + along * 0.2 - Vector3.UP * 0.15
+		_pole[limb].global_position = root + out * 0.55 + along * 0.15 - Vector3.UP * 0.55
 
 
 ## For tests: the world position a limb's target is at, and whether that limb is mid-reach.
