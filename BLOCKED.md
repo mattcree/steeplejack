@@ -47,6 +47,22 @@ rest are design calls, and the first is large.
 | **Two lashings per ladder** | every ladder held at **two** dogs, and one dog splices the top of one ladder to the bottom of the next | one lashing, one dog per section | Worth doing — it is where the trade's redundancy lives, and the game's cascade is harsher than reality partly because of it |
 | **The wooden plug** | hole → **wooden plug** → dog driven into the plug | dog driven straight into mortar | Worth doing: it is a second thing to get right or wrong, and it is what the dog's hold actually comes from |
 | **The pulley** | **every** ladder goes up on it, leapfrogged up the stack | he carries sections on his back; the gin wheel is optional | A real change to the ascent loop. Raise as its own task if wanted |
+
+## Raised 2026-09-20 by the long-game audit
+
+From [`17-the-long-game.md`](docs/01-gdd/17-the-long-game.md), which audited the designed meta layer
+against the built game. None of these are implementation questions; all four set scope or numbers.
+
+| The question | Why it is yours | Recommendation |
+|---|---|---|
+| **Does a job have a last act?** Today the level ends when he reaches the cap. Striking the stack — lowering each section on the gin wheel, drawing the dogs, plugging the holes — is the trade's own ending and the game does not have it | It is a whole stage of every level, and it changes how long a job takes | **Build it.** It reuses every verb already shipped, run backwards on spent meters, past lashings the player rushed on the way up. Nothing else in the backlog gives that much for that little |
+| **Is gear left up there gear you lose?** A dog you did not draw is a dog missing from the van on Thursday | It converts the loadout screen into a running account across the campaign, which is an economy decision | **Yes, and it is the reason striking is worth playing.** But it can make a bad job compound into a worse one, and whether that is pressure or punishment is your call |
+| **Does wind drain grip, or only nerve?** `MeterContext` carries `windSpeed` and only `MetersNerve` reads it. Grip reads carrying, wet, gloves, cold and span — not wind, not height | It is a tuning number on the meter the whole game rests on | **It should.** In the trade, wind plus height *is* why grip is a resource. The input is already in the struct; it wants a multiplier in `climbing.json` and a number from you |
+| **Which archetype is built second?** Seven of nine in [`05-mission-types.md`](docs/01-gdd/05-mission-types.md) are paper | It sets the next month of work | **CONDUCTOR.** Its fiddly bit *is* the descent, so it builds the missing last act as a side effect; it needs almost no new art; and it reuses the hammer verb the playtest singled out as the thing that feels like a sim |
+
+One thing in the same audit is **not** a question and is worth stating plainly: every level file has
+authored `shiftMinutes` and `targetMinutes` since the first one, and nothing in the climb reads
+either. The day clock the meta layer needs already has its data.
 | **Packing** | a block under the third rung holds the ladder off the wall *so boots fit on the rungs* | not modelled; the drawn body's standoff does the same job by accident | Cosmetic but cheap, and it explains on screen why the body hangs back |
 
 ## Standing decisions the lead owes the project
