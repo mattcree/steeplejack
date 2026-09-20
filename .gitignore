@@ -35,3 +35,4 @@ godot/bin/
 .deps/
 godot/.godot/
 build-godot/
+.hud-canvas/
