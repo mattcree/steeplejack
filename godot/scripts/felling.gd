@@ -309,10 +309,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_ENTER, KEY_KP_ENTER: _back_to_the_board()
 			KEY_R when _fired: _again()
 			KEY_ESCAPE:
-				if _fired or not mouse_captured():
+				if _fired:
+					_back_to_the_board()
+				elif not mouse_captured():
 					_leave_the_job()
 				else:
 					_capture(false)
+					# Rule 7: the next press walks off a job you took, and that costs you. Nobody
+					# should find that out by doing it.
+					hud.say("Mouse free. Esc again walks off the job — and walking off a job you "
+						+ "took costs you your name.", 6.0)
 
 
 func _process(dt: float) -> void:
