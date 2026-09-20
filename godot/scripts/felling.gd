@@ -325,11 +325,19 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_BRACKETLEFT: _take_off(-2.0)
 			KEY_BRACKETRIGHT: _take_off(2.0)
 			KEY_P: _drive_peg()
-			KEY_R: _pull_pegs()
 			KEY_F: _begin_packing()
 			KEY_L: _strike_a_match()
-			KEY_ENTER, KEY_KP_ENTER: _back_to_the_board()
-			KEY_R when _fired: _again()
+			# One R, two jobs. `match` takes the first pattern that fits, so a bare `KEY_R` above a
+			# `KEY_R when _fired` makes the second one unreachable — and the verdict panel was
+			# advertising "R — the same chimney again" for a key that did nothing.
+			KEY_R:
+				if _fired:
+					_again()
+				else:
+					_pull_pegs()
+			# Leaving by the front door costs the same as leaving by the back one. Enter used to
+			# skip the abandon penalty that Esc charges, which made the telegraph a lie.
+			KEY_ENTER, KEY_KP_ENTER: _leave_the_job()
 			KEY_ESCAPE:
 				if _fired:
 					_back_to_the_board()

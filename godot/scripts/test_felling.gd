@@ -303,6 +303,20 @@ func _init() -> void:
 	_check(_tin_reputation() < before_rep,
 		"walking off a job you took costs you: %d -> %d" % [before_rep, _tin_reputation()])
 
+	# --- the keys the verdict advertises actually do those things ---------------------------------
+	# "R — the same chimney again" was advertised on the panel for a key that did nothing, because
+	# a bare KEY_R sat above a KEY_R-when-fired in the same match and made it unreachable.
+	var before_scenes := root.get_child_count()
+	world._again()
+	await physics_frame
+	await physics_frame
+	var restarted: Node = root.get_child(root.get_child_count() - 1)
+	_check(restarted.has_method("_plumb") and not restarted._fired,
+		"R starts the same chimney again, unlit and uncut")
+	_check(root.get_child_count() >= before_scenes, "on a fresh scene")
+	restarted.queue_free()
+	await physics_frame
+
 	# --- and the loop closes ---	# --- and the loop closes -----------------------------------------------------------------------
 	# A mode you can only leave by killing the process is a scene, not a job.
 	world._back_to_the_board()
