@@ -96,6 +96,11 @@ public:
     Settlement SettleClimb(const std::string& levelId, float feeGbp, bool reachedTop,
                            const Tuning& t);
 
+    // You were inside the line when it went, or you came off a ladder. Separate from settling a
+    // job because being hurt is not a grade — it happens to a job that otherwise went perfectly,
+    // and it is the one thing in here that has nothing to do with how well you did the work.
+    int32_t Injured(const Tuning& t);
+
     // Round trip, as JSON, because everything this project persists is text somebody can read.
     std::string ToJson() const;
     static Career FromJson(const std::string& json, const std::string& origin);

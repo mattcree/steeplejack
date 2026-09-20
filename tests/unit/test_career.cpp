@@ -229,6 +229,21 @@ TEST_CASE("Career: a gate above what the built content can reach is a gap, not a
     CHECK(c.StarsAfter(perfect * 12, Tune()) >= 3);
 }
 
+TEST_CASE("Career: getting hurt costs you, whatever the job did")
+{
+    // Being inside the safe line when a chimney goes is not a grade. It can happen on a felling
+    // that was otherwise perfect, and it costs the same either way.
+    Career c;
+    c.Settle("06-waterside", 1100.0f, Perfect(), Tune());
+    const int32_t well = c.Reputation();
+    const int32_t delta = c.Injured(Tune());
+    CHECK(delta == Tune().GetI("reputation.injured"));
+    CHECK(delta < 0);
+    CHECK(c.Reputation() == well + delta);
+    CHECK(c.MoneyGbp() > 0.0f);   // the job still paid; it is your name and your legs that suffer
+    CHECK(c.Done("06-waterside"));
+}
+
 TEST_CASE("Career: it round-trips through text a person could read")
 {
     Career c;

@@ -203,6 +203,7 @@ func _init() -> void:
 	await physics_frame
 	_check(world._fired, "the props burned through and she went")
 	_check(not world._caught, "and he was behind the line when she did")
+	_check(not world._settlement.has("injured"), "so nothing came down on him")
 	var out: Dictionary = world._outcome
 	_check(not out.is_empty(), "it went")
 	_check(hud.outcome.is_empty(),

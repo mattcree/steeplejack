@@ -149,6 +149,13 @@ Settlement Career::SettleClimb(const std::string& levelId, float feeGbp, bool re
     return s;
 }
 
+int32_t Career::Injured(const Tuning& t)
+{
+    const int32_t delta = Rep(t, "injured");
+    reputation_ = std::clamp(reputation_ + delta, 0, t.GetI("reputation.max"));
+    return delta;
+}
+
 std::string Career::ToJson() const
 {
     std::ostringstream out;

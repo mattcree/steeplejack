@@ -479,6 +479,9 @@ func _draw_verdict() -> void:
 			int(float(settlement.get("fee", 0.0))), int(float(settlement.get("bonus", 0.0))),
 			int(float(settlement.get("damages", 0.0))), name_])
 		lines.append("£%d in the tin" % int(float(settlement.get("paid", 0.0))))
+	if settlement.has("injured"):
+		lines.append("and you were under it when it came down — %d off your name, and you were lucky"
+			% -int(settlement.get("injured", 0)))
 		if not bool(settlement.get("first_time", true)):
 			lines.append("(a job you have done before — it pays, but it does not make your name)")
 	for line in lines:

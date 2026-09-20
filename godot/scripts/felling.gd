@@ -703,6 +703,9 @@ func _props_burn_through() -> void:
 	# Settled through the sim on the same plan, so the money and the verdict cannot disagree.
 	_settlement = jack.career_settle(_authored["id"], _authored["fee"], _peg, _height_removed,
 		surveyed(), _packing_quality)
+	if _caught:
+		# Not a scoring modifier. The job may have gone perfectly and you are still under it.
+		_settlement["injured"] = jack.career_injured()
 	_save_career()
 	# You stand where you ran to. If that was not far enough, you were inside the line when it went.
 	_pitch = 0.22

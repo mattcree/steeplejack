@@ -207,6 +207,7 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("career_can_take", "gate_stars"), &Jack::career_can_take);
 	ClassDB::bind_method(D_METHOD("career_reachable_stars", "job_ids"),
 	                     &Jack::career_reachable_stars);
+	ClassDB::bind_method(D_METHOD("career_injured"), &Jack::career_injured);
 	ClassDB::bind_method(D_METHOD("career_done", "job_id"), &Jack::career_done);
 	ClassDB::bind_method(D_METHOD("career_settle", "job_id", "fee_gbp", "peg_bearing_deg",
 	                               "height_removed_m", "surveyed", "packing_quality"),
@@ -1408,6 +1409,11 @@ int64_t Jack::career_reachable_stars(const Array& job_ids) const
 		}
 	}
 	return static_cast<int64_t>(career.StarsAfter(extra, *tuning));
+}
+
+int64_t Jack::career_injured()
+{
+	return tuning ? static_cast<int64_t>(career.Injured(*tuning)) : 0;
 }
 
 bool Jack::career_done(const String& job_id) const

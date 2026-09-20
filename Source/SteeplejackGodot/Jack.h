@@ -332,6 +332,8 @@ public:
 	 * than something the player has failed to earn — see Career.h.
 	 */
 	int64_t career_reachable_stars(const godot::Array& job_ids) const;
+	/** Inside the line when it went, or off a ladder. Returns the reputation it cost. */
+	int64_t career_injured();
 	/** Whether this job has been done successfully before. */
 	bool career_done(const godot::String& job_id) const;
 	/**
