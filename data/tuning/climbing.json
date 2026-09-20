@@ -3,14 +3,12 @@
   "climbAccelSeconds": 0.25,
   "slideSpeedMetresPerSecond": 6.0,
   "ladderCarrySpeedMultiplier": 0.7,
-
   "ladderLengthMetres": 5.0,
   "ladderMinOverlapMetres": 1.0,
   "ladderMassKg": 18.0,
   "climberShoulderAboveFeetMetres": 1.45,
   "climberWallStandoffMetres": 0.65,
-  "ladderCoversMetres": 0.30,
-
+  "ladderCoversMetres": 0.3,
   "spanSoftMetres": 4.0,
   "spanWarnMetres": 6.0,
   "spanDangerMetres": 8.0,
@@ -19,19 +17,21 @@
   "spanDangerNerveMultiplier": 2.0,
   "spanDangerDynamicLoadMultiplier": 1.4,
   "buckleSecondsUnderLoad": 8.0,
-
   "playerLoadKN": 1.2,
   "dynamicLoadFactor": 2.5,
-  "anchorCapacityKN": { "sound": 5.0, "fair": 2.5, "poor": 1.0, "failed": 0.0 },
+  "anchorCapacityKN": {
+    "sound": 5.0,
+    "fair": 2.5,
+    "poor": 1.0,
+    "failed": 0.0
+  },
   "loadShareFalloff": 0.55,
   "anchorCreakLoadFraction": 0.7,
   "fixtureRustMin": 0.05,
   "fixtureRustMax": 0.45,
   "cascadeShockRetained": 0.65,
-
-  "ladderFlexCoeffMPerKN": 0.0000447,
+  "ladderFlexCoeffMPerKN": 4.47e-05,
   "ladderFlexExponent": 4.5,
-
   "dogSeatDepthFraction": 0.8,
   "hammerMaxAngleErrorDegrees": 12.0,
   "hammerBaseWobbleDegrees": 1.5,
@@ -39,10 +39,8 @@
   "hammerSpallRiskScale": 1.0,
   "hammerSoftnessFloor": 0.34,
   "hammerStrikeCooldownSeconds": 0.55,
-
   "tapTestSeconds": 0.8,
   "tapTestMaxRangeMetres": 2.5,
-
   "lashWrapsQuickHitch": 3,
   "lashWrapsFull": 6,
   "lashSecondsPerWrapIdeal": 1.4,
@@ -53,25 +51,36 @@
   "lashHitchWalkOffCm": 15.0,
   "lashMashTurnsPerPress": 0.25,
   "lashHoldTurnsPerSecond": 0.55,
-
   "haulSpeedMetresPerSecond": 0.9,
   "haulSwingGainPerSpeed": 1.9,
   "haulSwingDampPerSteerInput": 4.6,
   "haulFoulAmplitudeDegrees": 22.0,
   "haulAirDampingPerSecond": 0.04,
   "haulWindDegPerS2PerMs": 0.12,
-
   "shimSeconds": 4.0,
   "clipOnSeconds": 3.0,
   "beltOnSeconds": 5.0,
   "chairRigSeconds": 20.0,
   "chairRigSecondsUpgraded": 12.0,
-
   "slipSaveWindowMs": 900,
   "slipSaveCooldownSeconds": 60.0,
   "slipSaveGripFraction": 0.15,
-
-  "jointQualityTierBounds": { "cracked": 0.14, "perished": 0.39, "fair": 0.69 },
-
-  "jointTellNoise": 0.15
+  "jointQualityTierBounds": {
+    "cracked": 0.14,
+    "perished": 0.39,
+    "fair": 0.69
+  },
+  "jointTellNoise": 0.15,
+  "windPushCalmMetresPerSecond": 6.0,
+  "windPushMetresPerSecondAbeam": 0.26,
+  "windPushReferenceExcessMetresPerSecond": 8.0,
+  "windPushMaxLeanMetres": 0.3,
+  "windPushCorrectMetresPerSecond": 0.42,
+  "windPushLeanGripDrainMultiplier": 1.8,
+  "windPushOneHandMultiplier": 1.0,
+  "windPushHookedLegMultiplier": 0.5,
+  "windPushClippedMultiplier": 0.3,
+  "windPushBeltedMultiplier": 0.15,
+  "windPushChairMultiplier": 0.75,
+  "windPushMaxMetresPerSecond": 0.3
 }

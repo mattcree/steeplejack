@@ -379,6 +379,10 @@ public:
 	godot::Dictionary wind_state(double height) const;
 
 	/** A tuned number, for the presentation layer to read rather than invent. */
+	// How far off his line the wind has him, 0 to 1 of the allowed drift.
+	void set_wind_lean(double fraction);
+	// Metres a second the wind is shoving him along the rung; positive is to his right.
+	double wind_side_push(double height, double facing_deg) const;
 	double tuning_f(const godot::String& key, double fallback) const;
 
 protected:

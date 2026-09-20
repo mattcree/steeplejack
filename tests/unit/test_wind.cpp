@@ -276,3 +276,107 @@ TEST_CASE("Wind: the same seed gusts at the same moments")
     CHECK(run(1234) == run(1234));
     CHECK(run(1234) != run(9999));
 }
+
+// --- the side push -------------------------------------------------------------------------
+//
+// The wind used to reach the player only as a nerve drain and a reticle wobble — it frightened him
+// and spoiled his aim, and his body never felt it. These pin the shape of the force that fixes
+// that, because "subtly moves you sideways" is the kind of feel that rots into "flings you off" the
+// first time somebody edits a number without a test watching.
+
+TEST_CASE("Wind: a breeze below the calm threshold pushes nobody anywhere")
+{
+    const Tuning t = Tuning::LoadAll(DataDir("tuning"));
+    const float calm = t.GetF("windPushCalmMetresPerSecond");
+
+    // Dead abeam, the worst possible bearing, one hand on the rung: still nothing.
+    CHECK(sj::SidePushMetresPerSecond(calm, 90.0f, sj::Stance::OneHand, t) == doctest::Approx(0.0f));
+    CHECK(sj::SidePushMetresPerSecond(calm - 1.0f, 90.0f, sj::Stance::OneHand, t)
+          == doctest::Approx(0.0f));
+    CHECK(sj::SidePushMetresPerSecond(0.0f, 90.0f, sj::Stance::OneHand, t) == doctest::Approx(0.0f));
+}
+
+TEST_CASE("Wind: straight into the brickwork moves him sideways not at all")
+{
+    const Tuning t = Tuning::LoadAll(DataDir("tuning"));
+    const float hard = t.GetF("windPushCalmMetresPerSecond")
+                       + t.GetF("windPushReferenceExcessMetresPerSecond");
+
+    // Head-on and dead astern both press him along the ladder's own line, not across it.
+    CHECK(sj::SidePushMetresPerSecond(hard, 0.0f, sj::Stance::OneHand, t) == doctest::Approx(0.0f));
+    CHECK(sj::SidePushMetresPerSecond(hard, 180.0f, sj::Stance::OneHand, t)
+          == doctest::Approx(0.0f).epsilon(0.01));
+}
+
+TEST_CASE("Wind: abeam at the reference speed is exactly the tuned number")
+{
+    const Tuning t = Tuning::LoadAll(DataDir("tuning"));
+    const float hard = t.GetF("windPushCalmMetresPerSecond")
+                       + t.GetF("windPushReferenceExcessMetresPerSecond");
+
+    // The whole point of scaling by the reference excess: one tuning value is the feel of the
+    // push at the speed the trade calls a working limit, readable without doing the algebra.
+    CHECK(sj::SidePushMetresPerSecond(hard, 90.0f, sj::Stance::OneHand, t)
+          == doctest::Approx(t.GetF("windPushMetresPerSecondAbeam")));
+}
+
+TEST_CASE("Wind: the push has a side, and the two sides are mirror images")
+{
+    const Tuning t = Tuning::LoadAll(DataDir("tuning"));
+    const float hard = t.GetF("windPushCalmMetresPerSecond") + 6.0f;
+
+    const float right = sj::SidePushMetresPerSecond(hard, 90.0f, sj::Stance::OneHand, t);
+    const float left = sj::SidePushMetresPerSecond(hard, -90.0f, sj::Stance::OneHand, t);
+    CHECK(right > 0.0f);
+    CHECK(left == doctest::Approx(-right));
+}
+
+TEST_CASE("Wind: it goes with the square of the speed, the way drag does")
+{
+    const Tuning t = Tuning::LoadAll(DataDir("tuning"));
+    const float calm = t.GetF("windPushCalmMetresPerSecond");
+
+    const float single = sj::SidePushMetresPerSecond(calm + 4.0f, 90.0f, sj::Stance::OneHand, t);
+    const float twice = sj::SidePushMetresPerSecond(calm + 8.0f, 90.0f, sj::Stance::OneHand, t);
+    // Twice the excess, four times the shove — which is why a stiff day is a different job and
+    // not just a slightly worse one.
+    CHECK(twice == doctest::Approx(single * 4.0f));
+}
+
+TEST_CASE("Wind: a better stance takes less of it, and belted takes least")
+{
+    const Tuning t = Tuning::LoadAll(DataDir("tuning"));
+    const float hard = t.GetF("windPushCalmMetresPerSecond") + 7.0f;
+
+    const float one = sj::SidePushMetresPerSecond(hard, 90.0f, sj::Stance::OneHand, t);
+    const float leg = sj::SidePushMetresPerSecond(hard, 90.0f, sj::Stance::HookedLeg, t);
+    const float clipped = sj::SidePushMetresPerSecond(hard, 90.0f, sj::Stance::Clipped, t);
+    const float belted = sj::SidePushMetresPerSecond(hard, 90.0f, sj::Stance::Belted, t);
+
+    CHECK(one > leg);
+    CHECK(leg > clipped);
+    CHECK(clipped > belted);
+    CHECK(belted > 0.0f);   // never nothing: belted on, it is a nuisance, not an exemption
+}
+
+TEST_CASE("Wind: a quartering wind pushes less than an abeam one")
+{
+    const Tuning t = Tuning::LoadAll(DataDir("tuning"));
+    const float hard = t.GetF("windPushCalmMetresPerSecond") + 8.0f;
+
+    const float abeam = sj::SidePushMetresPerSecond(hard, 90.0f, sj::Stance::OneHand, t);
+    const float quartering = sj::SidePushMetresPerSecond(hard, 45.0f, sj::Stance::OneHand, t);
+    CHECK(quartering < abeam);
+    CHECK(quartering > 0.0f);
+}
+
+TEST_CASE("Wind: the player can always out-pull the push at a sane speed")
+{
+    const Tuning t = Tuning::LoadAll(DataDir("tuning"));
+
+    // The fairness property for this force. However hard it blows, holding your line has to be
+    // *possible* — a drift the correction rate cannot beat is not a difficulty, it is a cutscene.
+    // 25 m/s is well past the point the trade stops work, so if it holds there it holds anywhere.
+    const float worst = sj::SidePushMetresPerSecond(25.0f, 90.0f, sj::Stance::OneHand, t);
+    CHECK(worst < t.GetF("windPushCorrectMetresPerSecond"));
+}

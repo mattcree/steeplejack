@@ -226,6 +226,8 @@ void Jack::_bind_methods()
 	                     &Jack::career_settle_climb);
 	ClassDB::bind_method(D_METHOD("stack_survey"), &Jack::stack_survey);
 	ClassDB::bind_method(D_METHOD("wind_state", "height"), &Jack::wind_state);
+	ClassDB::bind_method(D_METHOD("wind_side_push", "height", "facing_deg"), &Jack::wind_side_push);
+	ClassDB::bind_method(D_METHOD("set_wind_lean", "fraction"), &Jack::set_wind_lean);
 	ClassDB::bind_method(D_METHOD("tuning_f", "key", "fallback"), &Jack::tuning_f, DEFVAL(0.0));
 }
 
@@ -1618,6 +1620,28 @@ Dictionary Jack::wind_state(double height) const
 	d["tell_progress"] = static_cast<double>(wind.TellProgress(*tuning));
 	d["seconds_to_gust"] = static_cast<double>(wind.SecondsToNextGust());
 	return d;
+}
+
+// The sideways shove, for a man facing `facing_deg`. Kept here rather than worked out in GDScript
+// because it decides how hard the climb is, and a difficulty rule that lives in the scene is a
+// difficulty rule no test can see.
+// How far off his line he is, 0 to 1. The scene integrates the drift because the drift is motion;
+// what it costs him is the sim's business, so it is reported here rather than drained there.
+void Jack::set_wind_lean(double fraction)
+{
+	context.windLean = static_cast<float>(std::clamp(fraction, 0.0, 1.0));
+}
+
+double Jack::wind_side_push(double height, double facing_deg) const
+{
+	if (!tuning || !level) { return 0.0; }
+	const sj::WeatherSpec& w = level->Weather();
+	const float speed = wind.SpeedAt(static_cast<float>(height), w, *tuning);
+	// Where it is coming FROM, measured off the way he is facing. The wind blows towards the
+	// opposite of its bearing, so the angle that matters is the difference between the two.
+	const double relative = facing_deg - static_cast<double>(wind.BearingDeg(w, *tuning));
+	return static_cast<double>(sj::SidePushMetresPerSecond(
+		speed, static_cast<float>(relative), meters.stance, *tuning));
 }
 
 double Jack::tuning_f(const String& key, double fallback) const

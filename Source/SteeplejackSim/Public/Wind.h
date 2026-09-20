@@ -29,6 +29,7 @@
 // and the reason `Step` takes an `Rng&` rather than reaching for one.
 
 #include "Export.h"
+#include "Types.h"
 
 #include <cstdint>
 
@@ -96,5 +97,22 @@ private:
     float     elapsed_{0.0f};       // seconds of shift, for the veer
     float     gustSwingDeg_{0.0f};  // this gust's quarter, drawn when it is armed
 };
+
+// How hard the wind is shoving him along the rung, in metres of drift a second.
+//
+// Until now the wind was a nerve drain and a reticle wobble: it frightened him and it spoiled his
+// aim, and his body never felt it. A playtest put it plainly — the climb shifts side to side and
+// nothing explains why. This is the why. Wind across the face of a chimney pushes a man sideways
+// off his line, and holding that line is work.
+//
+// `relativeBearingDeg` is the wind's bearing measured off the way he is facing, so 0 is straight
+// into the brickwork — which presses him onto the ladder and moves him nowhere — and 90 is dead
+// abeam, which is the whole of the push. The sign carries which way: positive drifts him right.
+//
+// Speed enters squared, because drag does, and only the excess over `windPushCalmMetresPerSecond`
+// counts: a man is not fighting a four-metre breeze. Stance decides how much of it reaches him —
+// belted on, it is a nuisance; one hand on a rung, it is the thing that takes you off.
+SJ_API float SidePushMetresPerSecond(float speedAtHeight, float relativeBearingDeg, Stance stance,
+                                     const Tuning& t) noexcept;
 
 }  // namespace sj

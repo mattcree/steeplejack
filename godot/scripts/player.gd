@@ -214,6 +214,14 @@ var grip: RungGrip                ## hands and feet on the rungs
 var _gear: Node3D                ## the stance, made visible: clip line, belt, chair
 var _body_base := Vector3.ZERO   ## the body's resting place under the player; the lean is added to it
 var _lean := Vector3.ZERO        ## world-space shift towards the joint being tapped or worked
+
+## How far the wind has shoved him off his line, in metres along the rung. Positive is to his
+## right. A playtest asked the fair question — the climb shifts side to side and nothing explains
+## why — and this is the answer: on a chimney the wind comes across the face and moves you, and
+## holding your line is work you are doing all the time without being told to.
+var wind_lean := 0.0
+## What the player is doing about it this frame, -1 to 1, set from A and D.
+var _hold_line := 0.0
 var _mouse_at := -100.0          ## When the player last turned the view; the ladder camera waits for them.
 var _pitch := -0.1
 var _spawn := Vector3.ZERO
@@ -471,8 +479,14 @@ func _level_id() -> String:
 ## works for someone who cannot hold a mouse steady — and it does not pause, because the climb has
 ## no pause either: open it on the ground, or belted on.
 func _options_input(event: InputEvent) -> bool:
+	if options_open and (event is InputEventMouseButton or event is InputEventMouseMotion):
+		# It used to swallow these and do nothing with them, which is the worst of both: the panel
+		# looks like a list of clickable rows, the pointer is free because the climb released it,
+		# and a click went nowhere at all. Keyboard stays the whole way round — that is an
+		# accessibility promise, not a restriction on everyone else.
+		return _options_mouse(event)
 	if not (event is InputEventKey and event.pressed):
-		return options_open and (event is InputEventMouseButton or event is InputEventMouseMotion)
+		return false
 	var key: int = event.keycode
 	if key == KEY_F1 and not event.echo:
 		options_open = not options_open
@@ -492,6 +506,22 @@ func _options_input(event: InputEvent) -> bool:
 		KEY_RIGHT, KEY_D, KEY_ENTER, KEY_SPACE:
 			settings.step(GameSettings.ROWS[options_row][0], 1)
 	return true   # while it is open, nothing reaches the climb
+
+
+## Hover picks the row under the pointer; a click on the label picks it too, and a click on the
+## left or right half of the value steps it, which is the ‹ and › already drawn there.
+func _options_mouse(event: InputEvent) -> bool:
+	var hud := get_node_or_null("../HUD")
+	if hud == null:
+		return true
+	var hit: Dictionary = hud.options_hit(event.position)
+	if hit.is_empty():
+		return true
+	options_row = int(hit["row"])
+	if event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT and int(hit["step"]) != 0:
+		settings.step(GameSettings.ROWS[options_row][0], int(hit["step"]))
+	return true
 
 
 ## The options, applied now — acceptance 4 is "without a restart".
@@ -824,6 +854,7 @@ func _physics_process(dt: float) -> void:
 		_carried_ladder.visible = carrying_ladder and not lashing
 		_stow_carried_ladder()
 	_animate()
+	_update_wind_lean(dt)
 	_update_lean(dt)
 	_update_grip(dt)
 	_update_guides()
@@ -1124,6 +1155,31 @@ func _face(dir: Vector3) -> float:
 ## along the wall, up or across towards the joint, by what the arm cannot cover, so the hammer
 ## arrives where the sound comes from. It is drawn only. The sim's position does not move, and
 ## nothing about reach, grip or the ladder changes.
+## Which way a rung runs, in the world: across the face of the stack, level.
+func _along_rung() -> Vector3:
+	var out := _wall_out()
+	return Vector3(-out.z, 0.0, out.x).normalized()
+
+
+## The wind pushes, the player holds. Neither is a cutscene: the sim caps the push below what the
+## correction can beat (Wind.cpp, and `the player can always out-pull the push` in test_wind), so
+## a steady hand always wins — it just costs a hand that could have been doing something else.
+func _update_wind_lean(dt: float) -> void:
+	# A and D, free on the ladder until now — nothing strafes while you are on a rung.
+	_hold_line = _key(KEY_D) - _key(KEY_A)
+	if jack == null or not on_ladder or falling or at_top:
+		wind_lean = move_toward(wind_lean, 0.0, dt * 0.6)
+		return
+	var limit: float = jack.tuning_f("windPushMaxLeanMetres", 0.30)
+	var push: float = jack.wind_side_push(maxf(height_m(), 0.0), rad_to_deg(_yaw))
+	var correct: float = jack.tuning_f("windPushCorrectMetresPerSecond", 0.42)
+	wind_lean = clampf(wind_lean + (push - _hold_line * correct) * dt, -limit, limit)
+	# Off his line far enough and the hand takes the difference. Past halfway only, so an ordinary
+	# working correction is free and a hard lean is not — and it is reported to the meters rather
+	# than drained here, because grip belongs to the sim and two places draining it is two stories.
+	jack.set_wind_lean(absf(wind_lean) / maxf(limit, 0.01))
+
+
 func _update_lean(dt: float) -> void:
 	if body == null:
 		return
@@ -1157,7 +1213,11 @@ func _update_lean(dt: float) -> void:
 		climb_in = -_wall_out() * CLIMB_IN
 		if grip != null:
 			climb_in -= Vector3.UP * grip.body_drop()   # settled onto the top rung (rung_grip.gd)
-	body.position = _body_base + global_transform.basis.inverse() * (_lean + climb_in)
+	# And the wind's own shove, across the face of the stack. It moves the drawn body only: his
+	# hands and feet stay on the rungs they are holding, because that is what being blown about on
+	# a ladder is — the ladder does not move, you do, and your grip is what stops it mattering.
+	var blown := _along_rung() * wind_lean
+	body.position = _body_base + global_transform.basis.inverse() * (_lean + climb_in + blown)
 
 
 func _animate() -> void:

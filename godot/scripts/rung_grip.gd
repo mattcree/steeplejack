@@ -28,7 +28,7 @@ const MIN_ANKLE_ABOVE_FEET := 0.20     ## the lowest a straight leg puts the ank
 const LEG := 0.84                       ## hip to sole on the rig
 const SHIN := 0.42                      ## ankle to knee: half the leg, and how high above a rung
                                         ## the knee wants to sit if the shin is to stand up straight
-const KNEE_PROUD := 0.05                ## and how far it leads the foot, off the brickwork
+const KNEE_PROUD := 0.13                ## and how far it leads the foot, off the brickwork
 const LEG_SLACK := 0.12                 ## a climbing leg is never locked straight. At 0.04 the
                                         ## measured lower leg came out 0.997 of its own bone length
                                         ## — a locked knee — because the two feet sit a rung apart

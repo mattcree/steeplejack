@@ -14,6 +14,8 @@ namespace sj {
 namespace {
 
 constexpr float kFullTurn = 360.0f;          // literal: degrees in a turn
+constexpr float kHalfTurn = 180.0f;          // literal: degrees in a half turn
+constexpr float kPi       = 3.14159265f;     // literal: pi, for degrees to radians
 constexpr float kSecondsPerHour = 3600.0f;   // literal: seconds in an hour
 // How far off the prevailing quarter a gust can come from. Not tuned: a gust that arrives from the
 // same bearing as the wind is not a gust, it is more wind, and the swing is most of what makes one
@@ -166,6 +168,52 @@ float WindModel::Trend() const noexcept
     default:
         return 0.0f;
     }
+}
+
+namespace {
+
+float StanceShare(Stance stance, const Tuning& t) noexcept
+{
+    switch (stance)
+    {
+        case Stance::HookedLeg: return t.GetF("windPushHookedLegMultiplier");
+        case Stance::Clipped:   return t.GetF("windPushClippedMultiplier");
+        case Stance::Belted:    return t.GetF("windPushBeltedMultiplier");
+        case Stance::Chair:     return t.GetF("windPushChairMultiplier");
+        case Stance::OneHand:
+        default:                return t.GetF("windPushOneHandMultiplier");
+    }
+}
+
+}  // namespace
+
+float SidePushMetresPerSecond(float speedAtHeight, float relativeBearingDeg, Stance stance,
+                              const Tuning& t) noexcept
+{
+    const float calm = t.GetF("windPushCalmMetresPerSecond");
+    const float over = speedAtHeight - calm;
+    if (over <= 0.0f)
+    {
+        return 0.0f;
+    }
+    const float reference = t.GetF("windPushReferenceExcessMetresPerSecond");
+    if (reference <= 0.0f)
+    {
+        return 0.0f;
+    }
+    // Squared, like drag, and scaled so that a wind `reference` above calm and dead abeam pushes a
+    // one-handed man at exactly `windPushMetresPerSecondAbeam`. That keeps the tuning readable:
+    // one number is the whole feel of it at the speed the trade calls a working limit.
+    const float strength = t.GetF("windPushMetresPerSecondAbeam") * (over * over)
+                           / (reference * reference);
+    // Capped, and the cap is a fairness rule rather than a taste one. Squared growth means that by
+    // 25 m/s the raw figure is four times what a man can pull back against, and a drift the
+    // correction rate cannot beat is not a difficulty — it is a cutscene with a controller
+    // attached. Above the cap the wind stops getting stronger and starts being the reason the
+    // trade says no fixing work should be in progress at all.
+    const float capped = std::min(strength, t.GetF("windPushMaxMetresPerSecond"));
+    const float across = std::sin(relativeBearingDeg * kPi / kHalfTurn);
+    return capped * across * StanceShare(stance, t);
 }
 
 }  // namespace sj

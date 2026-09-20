@@ -122,6 +122,11 @@ struct MeterContext
     // Rigid by default, so a zero-initialised context is a climber on a short section rather than
     // one being punished for a span nobody told it about.
     SpanBand    span{SpanBand::Rigid};
+
+    // How far the wind has him off his line, 0 at centre and 1 at the furthest he is allowed to
+    // drift. Grip reads it past halfway: a working correction is free, holding a hard lean is not.
+    // Zero by default, which is a man standing square — the safe reading, as with `span`.
+    float       windLean{};
 };
 
 // One hammer blow's effect on a joint. `seated` is the terminal success; `bent` is the

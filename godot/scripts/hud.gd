@@ -124,6 +124,7 @@ func _draw() -> void:
 	_label(stock, Vector2(info_x, hand.y + 22), Color(DIM, 0.85), SMALL)
 	_draw_ladder_verdict(jack, Vector2(info_x, hand.y + 48))
 	_draw_wind(jack, Vector2(HAND.x, hand.y - NERVE_R - 58.0))
+	_draw_hold_line()
 
 	# Only once there is something to span *from*. With no dogs driven, the span is measured from
 	# the ground and reads "62.0 m span — about to buckle" at the top of a ladder that is lashed all
@@ -825,6 +826,43 @@ func _north_label_at(at: Vector2) -> Vector2:
 	return at + u * (ROSE_R - 15.0) - Vector2(3.5, -4.0)
 
 
+## Which way the wind has him, and which way to pull. Rule 7: the drift costs grip past halfway, so
+## it has to be readable before halfway — and it has to say what to DO about it, because the first
+## playtest of the sideways shift asked, fairly, why he was moving at all.
+##
+## Drawn under the crosshair rather than in a corner, because it is something you correct while
+## looking at the wall, not a stat you consult.
+const LINE_W := 92.0
+const LINE_FREE := 0.5      ## the share of the drift that costs nothing (MetersGrip.cpp agrees)
+
+
+func _draw_hold_line() -> void:
+	if player.jack == null or not player.on_ladder or player.falling or player.at_top:
+		return
+	var limit: float = player.jack.tuning_f("windPushMaxLeanMetres", 0.30)
+	var off: float = clampf(player.wind_lean / maxf(limit, 0.01), -1.0, 1.0)
+	if absf(off) < 0.04:
+		return
+	var mid := Vector2(size.x * 0.5, size.y * 0.5 + 84.0)
+
+	# The track, and the two points on it where holding stops being free.
+	draw_line(mid - Vector2(LINE_W, 0.0), mid + Vector2(LINE_W, 0.0), Color(GHOST, 0.3), 2.0)
+	for sgn in [-1.0, 1.0]:
+		var x: float = mid.x + sgn * LINE_W * LINE_FREE
+		draw_line(Vector2(x, mid.y - 4.0), Vector2(x, mid.y + 4.0), Color(WATCH, 0.4), 1.0)
+
+	var past: float = maxf(absf(off) - LINE_FREE, 0.0) / (1.0 - LINE_FREE)
+	var col := FAINT.lerp(DANGER, past)
+	var at := Vector2(mid.x + off * LINE_W, mid.y)
+	draw_line(mid, at, Color(col, 0.5 + 0.5 * past), 3.0)
+	draw_circle(at, 5.0, Color(col, 0.7 + 0.3 * past))
+
+	# The instruction, and only once it is worth acting on. A prompt that is always there is
+	# wallpaper by the second chimney.
+	if past > 0.0:
+		var key := "A" if off > 0.0 else "D"
+		_centre("[%s]  hold your line" % key, mid.y + 26.0, Color(col, 0.55 + 0.45 * past), SMALL)
+
 ## "Am I happy on this ladder?" — CLIMB-007, on screen.
 ##
 ## Every other warning in this HUD is about the section under his feet this second. This is the
@@ -1172,15 +1210,50 @@ func _draw_vignette(jack: Jack) -> void:
 
 
 ## The motion options, F1. A plain list: the one being changed is bright, and the keys are said.
+## The options panel's geometry, in one place.
+##
+## It is here rather than inline in the drawing because the input code has to hit-test exactly the
+## rectangles that get drawn. Two copies of "the third row is 70 + 26i pixels down" drift apart the
+## first time a row is added, and a menu whose clicks land one row off is worse than one that
+## ignores the mouse — which is what this one did.
+const OPT_W := 460.0
+const OPT_ROW_H := 26.0
+const OPT_FIRST_Y := 70.0
+const OPT_VALUE_W := 150.0   ## the right-hand strip where the ‹ value › sits
+
+
+func _options_rect() -> Rect2:
+	var h := 64.0 + OPT_ROW_H * float(GameSettings.ROWS.size()) + 40.0
+	return Rect2(Vector2((size.x - OPT_W) * 0.5, (size.y - h) * 0.5), Vector2(OPT_W, h))
+
+
+## What is under a point: `{row, step}`, where step is -1 or +1 if the point is on the value's left
+## or right half and 0 if it is on the label. Empty when the point is off the panel entirely.
+func options_hit(p: Vector2) -> Dictionary:
+	var r := _options_rect()
+	if not r.has_point(p):
+		return {}
+	for i in GameSettings.ROWS.size():
+		var y: float = r.position.y + OPT_FIRST_Y + OPT_ROW_H * float(i)
+		if p.y >= y - 18.0 and p.y <= y + 6.0:
+			var value_left: float = r.position.x + OPT_W - 24.0 - OPT_VALUE_W
+			var step := 0
+			if p.x >= value_left:
+				step = 1 if p.x >= value_left + OPT_VALUE_W * 0.5 else -1
+			return {"row": i, "step": step}
+	return {}
+
+
 func _draw_options() -> void:
 	var rows: Array = GameSettings.ROWS
-	var w := 460.0
-	var h := 64.0 + 26.0 * rows.size() + 40.0
-	var at := Vector2((size.x - w) * 0.5, (size.y - h) * 0.5)
-	draw_rect(Rect2(at, Vector2(w, h)), Color(0.05, 0.05, 0.06, 0.86))
+	var r := _options_rect()
+	var w: float = r.size.x
+	var h: float = r.size.y
+	var at: Vector2 = r.position
+	draw_rect(r, Color(0.05, 0.05, 0.06, 0.86))
 	_label("Motion and vertigo", at + Vector2(24, 36), Color(0.96, 0.94, 0.90, 0.95), 18)
 	for i in rows.size():
-		var y := at.y + 70.0 + 26.0 * i
+		var y: float = at.y + OPT_FIRST_Y + OPT_ROW_H * float(i)
 		var on: bool = i == player.options_row
 		var col := Color(0.98, 0.96, 0.92, 0.98) if on else Color(0.78, 0.76, 0.72, 0.8)
 		if on:
@@ -1189,5 +1262,6 @@ func _draw_options() -> void:
 		var v: String = player.settings.shown(rows[i][0])
 		var vw := _font.get_string_size(v, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
 		_label(("‹ %s ›" % v) if on else v, Vector2(at.x + w - 24 - vw - (14.0 if on else 0.0), y), col, 14)
-	_label("↑↓ choose   ←→ change   F1 close  ·  saved as you go", Vector2(at.x + 24, at.y + h - 16),
+	_label("↑↓ or click   ←→ or click the value   F1 close  ·  saved as you go",
+		Vector2(at.x + 24, at.y + h - 16),
 		Color(0.70, 0.68, 0.64, 0.75), 12)

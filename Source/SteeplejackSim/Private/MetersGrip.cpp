@@ -102,6 +102,16 @@ float DrainRate(Stance stance, const MeterContext& ctx, const Tuning& t) noexcep
     // A ladder that is moving under you is one you hold harder. CLIMB-001 wrote this number and
     // nothing ever read it, which is why a long span used to be free.
     rate *= anchor::GripDrainMultiplier(ctx.span, t);
+
+    // And the wind, at last, in the hand rather than only in the nerve. Past halfway off his line
+    // the arm is holding him on as well as holding him up, and it costs. Below halfway it is free,
+    // so the constant small corrections of an ordinary windy day are not a slow bleed.
+    constexpr float kFree = 0.5f;   // literal: half the allowed drift is an ordinary correction
+    if (ctx.windLean > kFree)
+    {
+        const float past = (ctx.windLean - kFree) / (1.0f - kFree);
+        rate *= 1.0f + past * (t.GetF("windPushLeanGripDrainMultiplier") - 1.0f);
+    }
     return rate;
 }
 
