@@ -40,7 +40,17 @@ make check                          # the sim's rules, ~1 s, no engine
 make godot-test                     # the real scene, driven and asserted on, ~3 min
 ```
 
-## How to play
+## The two halves
+
+`make run` opens a **job board**: the letters that have come in, what each pays, and what anyone
+thinks of you so far. Taking a job starts the half of the game it belongs to, and finishing it puts
+money in the tin and moves your name. What you have earned decides which letters arrive.
+
+* **SURVEY jobs — you climb it.** Get to the top. You can only climb as high as you have built.
+* **FELL jobs — you take it down.** Walk the site, read the lean, cut a hole in one side of the
+  base, prop it as you go, peg the line, pack it, light it and run.
+
+## How to play: the climb
 
 **Get to the top. You can only climb as high as you have built.**
 
@@ -83,6 +93,33 @@ the tap is not: that is the point of tapping.
 with you at the foot of them and a fresh shift. Reaching the top clears it. To start a job over,
 run with `-- --fresh`.
 
+## How to play: the felling
+
+**Drop it down the corridor, and do not hit the chapel.** `make fell`, or take one off the board.
+
+| Key | |
+|---|---|
+| **WASD** | walk the site — hold **shift** to run |
+| **mouse** | look; the crosshair picks the cell of brickwork you are pointing at |
+| **B** | read the lean with the plumb bob. Twice, from at least 55° apart, or you are guessing |
+| **P** / **R** | drive a peg where you stand (two of them make the fall line) / pull them up |
+| **[** and **]** | take metres off the top by hand: a tighter cone, and less of your daylight |
+| **left mouse** / **E** | cut the cell you are pointing at out of the ring |
+| **right mouse** / **Q** | stand a prop at that segment — **before** the last course comes out |
+| **hold F** | pack the gob with waste timber. A full one burns clean; a light one smoulders |
+| **L** | strike a match. Put yourself between the wind and the gob or it will have it |
+| **enter** / **esc** | back to the board |
+
+It stands while its centre of gravity is inside what is still holding it up. The plan view bottom
+right draws that polygon — the sim's own, not a picture of it — and the **margin** is the distance
+from the weight to the nearest edge of it. Finish **UNEASY**, not SAFE: a chimney that feels safe
+will not fall.
+
+Brickwork arches over the hole, which is the only reason a 40 kN prop is any use under a thousand
+tons. What a prop carries is the wall directly above it, about five metres of it. One unpropped
+hole beside a prop takes it to 33 kN and it stands; two takes it to 44 and it splits, and its load
+goes to the next one. **You may run one segment ahead of your props. You may not run two.**
+
 ## What is in the build
 
 Everything on the MVP's list except where noted: the joint grid from each band's own distribution,
@@ -93,9 +130,16 @@ the fall and resume-at-stack; wind and gusts with the 1.2 s tell; the climbing, 
 and fall cameras; the HUD; fog and a town silhouette; the four tap sounds, the hammer, the wind and the
 height mix.
 
-**Not yet:** hand IK onto the rungs (CLIMB-005); the character (ART-020). Each is a task. And
-LVL-001 — whether the Grey Box's four bands actually play as four experiences — is a judgement that
-needs someone who did not build it to climb it twice.
+And the demolition half: the gob's statics, the fall, three felling levels (Waterside, Kershaw's
+Yard, the Great Aire Chimney), the survey, the shift the job costs you, the fire-and-run, and a
+career that carries money and reputation between jobs and decides which letters arrive.
+
+**Not yet:** the character (ART-020), and the strip-out that should join the two halves — a felling
+level has ascent bands and an Act 2 that you currently skip, which is the largest single gap in the
+game. The CONDUCTOR, GILD, BAND and TOP jobs are designed and not built, so levels 2 to 5 and 8 to
+11 have no data: there would be nothing to do on them but climb. LVL-001 — whether the Grey Box's
+four bands actually play as four experiences — is a judgement that needs someone who did not build
+it to climb it twice.
 
 ## The three pillars
 
