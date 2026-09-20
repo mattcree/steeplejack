@@ -179,6 +179,23 @@ Salvage         bricks recovered from L5-style hand work
 
 ---
 
+## What the shift costs, and what it does not yet cost (2026-09-20)
+
+Every cell out, every prop in and every metre taken off the top is priced in seconds of shift
+(`Fell::ShiftCostSeconds`), and the level's `shiftMinutes` is read at last. A worked gob is about
+45 minutes of Waterside's 120.
+
+**But the daylight cannot run out.** The most any of the three fellings can spend is 58–75 minutes
+of the shift it is given, because Act 2's climb is not on the same clock. That makes the
+before-dark bonus automatic and the height-for-accuracy trade free, which is the one thing this
+document promises and the build does not deliver.
+
+Putting the climb on the clock needs a decision nobody has made: the gob costs 28 shift-seconds a
+cell for 1.4 seconds of play — a fiction multiplier of about twenty — while a climb measured
+directly would be about 1:1. **How long a game minute is** is a design question. Until it is
+answered, the arithmetic is right and the pressure is not there, and it is better to say so than
+to invent a multiplier and call it tension.
+
 ## Authoring a felling level
 
 A level author sets:
