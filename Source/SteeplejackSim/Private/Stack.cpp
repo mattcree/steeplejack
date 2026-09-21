@@ -662,15 +662,24 @@ bool Stack::DrawAnchor(int32_t anchor, float fromHeight, bool& bent) noexcept
     return true;
 }
 
+bool Stack::AnchorLeftIn(int32_t i) const noexcept
+{
+    if (i < 1 || i >= AnchorCount())
+    {
+        return false;
+    }
+    const auto u = static_cast<std::size_t>(i);
+    const bool drawn = u < anchorDrawn_.size() && anchorDrawn_[u];
+    const bool snapped = u < anchorBent_.size() && anchorBent_[u];
+    return (!drawn || snapped) && !anchorFailed_[u];
+}
+
 int32_t Stack::AnchorsLeftIn() const noexcept
 {
     int32_t left = 0;
     for (int32_t i = 1; i < AnchorCount(); ++i)
     {
-        const auto u = static_cast<std::size_t>(i);
-        const bool drawn = u < anchorDrawn_.size() && anchorDrawn_[u];
-        const bool snapped = u < anchorBent_.size() && anchorBent_[u];
-        if ((!drawn || snapped) && !anchorFailed_[u])
+        if (AnchorLeftIn(i))
         {
             ++left;
         }

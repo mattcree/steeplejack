@@ -366,6 +366,14 @@ public:
 	/** The run as it stands, judged from `height`. */
 	godot::Dictionary conductor_state(double height) const;
 
+	// --- what the district remembers ----------------------------------------------------------
+	/** Heights of the dogs you left in this chimney last time. */
+	godot::PackedFloat32Array career_left_in(const godot::String& job_id) const;
+	/** Remember what is still in it now — every dog not drawn, plus the ones that snapped. */
+	void career_remember_left_in(const godot::String& job_id);
+	/** Put the ones you left last time back in the wall, rustier. Returns how many went in. */
+	int64_t plant_left_in(const godot::String& job_id, double rust);
+
 	/** The yard: advance the calendar, and buy a part for the engine. */
 	void career_sleep();
 	bool career_buy_engine_part(double cost);

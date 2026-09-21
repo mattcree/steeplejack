@@ -28,6 +28,7 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace sj {
@@ -71,6 +72,18 @@ public:
     // a split save is the kind of thing that rots the first time one half is written and the other
     // is not, and a career whose money says one thing and whose calendar says another is not
     // recoverable by anybody.
+
+    // --- what you left on the chimney -----------------------------------------------------
+    //
+    // Dogs you did not draw, remembered per job. Come back to that stack and they are still in it,
+    // a season more corroded, and so are the holes. The trade did exactly this — jacks with a
+    // standing contract left their dogs in — and the consequence is the one the record actually
+    // reports: the next crew "had used the old dog holes and it wandered a bit".
+    //
+    // It is also the cheapest version of the idea 17-the-long-game.md argues is the most valuable
+    // thing in the backlog: the district should remember you.
+    const std::vector<float>& LeftIn(const std::string& levelId) const noexcept;
+    void RememberLeftIn(const std::string& levelId, const std::vector<float>& heights);
 
     // Days since the season started. The board shows weather by the day and some jobs have
     // deadlines, so this is the clock the whole meta layer hangs off.
@@ -140,6 +153,7 @@ private:
     float   money_{};
     int32_t day_{};
     int32_t engineParts_{};
+    std::vector<std::pair<std::string, std::vector<float>>> leftIn_;
     int32_t reputation_{};
     std::vector<JobRecord> jobs_;
     std::vector<std::string> stripped_;

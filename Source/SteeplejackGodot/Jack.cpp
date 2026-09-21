@@ -216,6 +216,11 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("conductor_earth", "plate_square_feet", "wet", "coke"),
 	                     &Jack::conductor_earth);
 	ClassDB::bind_method(D_METHOD("conductor_state", "height"), &Jack::conductor_state);
+	ClassDB::bind_method(D_METHOD("career_left_in", "job_id"), &Jack::career_left_in);
+	ClassDB::bind_method(D_METHOD("plant_left_in", "job_id", "rust"), &Jack::plant_left_in,
+	                     DEFVAL(0.55));
+	ClassDB::bind_method(D_METHOD("career_remember_left_in", "job_id"),
+	                     &Jack::career_remember_left_in);
 	ClassDB::bind_method(D_METHOD("career_sleep"), &Jack::career_sleep);
 	ClassDB::bind_method(D_METHOD("career_buy_engine_part", "cost"),
 	                     &Jack::career_buy_engine_part);
@@ -1583,6 +1588,56 @@ Dictionary Jack::conductor_state(double height) const
 	d["earth_ohms"] = static_cast<double>(v.earthOhms);
 	d["terminal"] = v.terminalSet;
 	return d;
+}
+
+PackedFloat32Array Jack::career_left_in(const String& job_id) const
+{
+	PackedFloat32Array out;
+	for (const float h : career.LeftIn(job_id.utf8().get_data()))
+	{
+		out.push_back(h);
+	}
+	return out;
+}
+
+void Jack::career_remember_left_in(const String& job_id)
+{
+	std::vector<float> heights;
+	for (int32_t i = 1; i < stack.AnchorCount(); ++i)
+	{
+		// Everything still physically in the brickwork: never drawn, or snapped off coming out.
+		// The same predicate the counter uses, so the number and the list cannot disagree.
+		if (stack.AnchorLeftIn(i))
+		{
+			heights.push_back(stack.AnchorAt(i).height);
+		}
+	}
+	career.RememberLeftIn(job_id.utf8().get_data(), heights);
+}
+
+int64_t Jack::plant_left_in(const String& job_id, double rust)
+{
+	if (!tuning || !grid) { return 0; }
+	int64_t planted = 0;
+	for (const float h : career.LeftIn(job_id.utf8().get_data()))
+	{
+		const int32_t jid = joint_id_at(static_cast<double>(h));
+		if (jid < 0) { continue; }
+		const sj::Joint& j = grid->ById(jid);
+		if (j.occupied) { continue; }
+		// Driven full depth, because you drove it properly the first time — but a season of
+		// weather on it, so what it will hold now is not what it held then. That is the whole of
+		// the idea: the chimney is carrying your own work, older.
+		sj::Anchor a = sj::anchor::Make(j, 1.0f, static_cast<float>(rust), *tuning);
+		a.jointId = jid;
+		a.height = j.height;
+		a.freeFixture = true;
+		const int32_t idx = stack.AddAnchor(a);
+		grid->SetOccupied(jid, true);
+		fixture_rust[idx] = static_cast<float>(rust);
+		++planted;
+	}
+	return planted;
 }
 
 void Jack::career_sleep()

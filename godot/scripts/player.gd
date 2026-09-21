@@ -348,6 +348,10 @@ func _ready() -> void:
 		ladders_at_base = jack.loadout_ladders()
 	if jack.loadout_dogs() > 0:
 		dogs_at_base = jack.loadout_dogs()
+	# What you left in this chimney last time, still in it. The trade did exactly this — jacks
+	# with a standing contract left their dogs in — and the consequence the record reports is the
+	# one that matters here: the next crew "had used the old dog holes and it wandered a bit".
+	_plant_what_you_left()
 	_conductor_setup()
 	var tree_root := get_tree().root
 	if tree_root.has_meta("job_ladders"):
@@ -477,6 +481,43 @@ func _level_fee() -> float:
 	return float(fee) if typeof(fee) == TYPE_FLOAT or typeof(fee) == TYPE_INT else 0.0
 
 
+## What is still in that chimney as you drive away — every dog not drawn, and the ones that
+## snapped off coming out. Written on the way home rather than at settlement, because leaving is
+## leaving whether the job went well or not.
+func _remember_what_you_left() -> void:
+	var text := ""
+	if FileAccess.file_exists(career_path):
+		var f := FileAccess.open(career_path, FileAccess.READ)
+		if f != null:
+			text = f.get_as_text()
+			f.close()
+	if text.strip_edges().is_empty():
+		return
+	jack.career_load(text)
+	jack.career_remember_left_in(_level_id())
+	var out := FileAccess.open(career_path, FileAccess.WRITE)
+	if out != null:
+		out.store_string(jack.career_json())
+		out.close()
+
+
+## Your own ironwork, a season older. Read out of the tin before anything else touches the stack,
+## so the dogs are in the wall before the first joint is sounded.
+func _plant_what_you_left() -> void:
+	var text := ""
+	if FileAccess.file_exists(career_path):
+		var f := FileAccess.open(career_path, FileAccess.READ)
+		if f != null:
+			text = f.get_as_text()
+			f.close()
+	if text.strip_edges().is_empty():
+		return
+	jack.career_load(text)
+	var n: int = int(jack.plant_left_in(_level_id(), 0.55))
+	if n > 0:
+		_say("your own dogs are still in her — %d of them, a winter rustier" % n)
+
+
 ## Home, once the job is done — the yard, not the board.
 ##
 ## It used to go straight back to the wall of letters, which meant the money you had just earned
@@ -484,6 +525,7 @@ func _level_fee() -> float:
 ## no day ever passed between one chimney and the next. A career that never goes home is a list.
 func back_to_the_board() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	_remember_what_you_left()
 	var yard: Node = load("res://scenes/yard.tscn").instantiate()
 	get_tree().root.add_child(yard)
 	get_tree().current_scene = yard

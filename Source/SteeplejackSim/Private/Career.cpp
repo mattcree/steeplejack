@@ -169,6 +169,34 @@ int32_t Career::Injured(const Tuning& t)
     return delta;
 }
 
+const std::vector<float>& Career::LeftIn(const std::string& levelId) const noexcept
+{
+    static const std::vector<float> none;
+    for (const auto& entry : leftIn_)
+    {
+        if (entry.first == levelId)
+        {
+            return entry.second;
+        }
+    }
+    return none;
+}
+
+void Career::RememberLeftIn(const std::string& levelId, const std::vector<float>& heights)
+{
+    for (auto& entry : leftIn_)
+    {
+        if (entry.first == levelId)
+        {
+            // Replaced rather than added to: what is in that chimney now is what you left this
+            // time, not the sum of every visit. A dog you went back for is a dog that is gone.
+            entry.second = heights;
+            return;
+        }
+    }
+    leftIn_.emplace_back(levelId, heights);
+}
+
 bool Career::BuyEnginePart(float costGbp) noexcept
 {
     if (costGbp < 0.0f || costGbp > money_)
@@ -193,7 +221,17 @@ std::string Career::ToJson() const
             << ", \"error\": " << j.errorDegrees << ", \"failed\": " << (j.failed ? "true" : "false")
             << "}";
     }
-    out << (jobs_.empty() ? "" : "\n  ") << "],\n  \"stripped\": [";
+    out << (jobs_.empty() ? "" : "\n  ") << "],\n  \"leftIn\": [";
+    for (std::size_t i = 0; i < leftIn_.size(); ++i)
+    {
+        out << (i ? ",\n    " : "\n    ") << "{\"id\": \"" << leftIn_[i].first << "\", \"at\": [";
+        for (std::size_t k = 0; k < leftIn_[i].second.size(); ++k)
+        {
+            out << (k ? ", " : "") << leftIn_[i].second[k];
+        }
+        out << "]}";
+    }
+    out << (leftIn_.empty() ? "" : "\n  ") << "],\n  \"stripped\": [";
     for (std::size_t i = 0; i < stripped_.size(); ++i)
     {
         out << (i ? ", " : "") << "\"" << stripped_[i] << "\"";
@@ -216,6 +254,18 @@ Career Career::FromJson(const std::string& json, const std::string& origin)
     if (doc.Has("engineParts"))
     {
         c.engineParts_ = static_cast<int32_t>(doc.At("engineParts").AsNumber());
+    }
+    if (doc.Has("leftIn"))
+    {
+        for (const JsonValue& e : doc.At("leftIn").Elements())
+        {
+            std::vector<float> at;
+            for (const JsonValue& v : e.At("at").Elements())
+            {
+                at.push_back(static_cast<float>(v.AsNumber()));
+            }
+            c.leftIn_.emplace_back(e.At("id").AsString(), at);
+        }
     }
     if (doc.Has("jobs"))
     {

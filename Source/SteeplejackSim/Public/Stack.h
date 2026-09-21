@@ -176,6 +176,9 @@ public:
     // out. A sheared dog stops holding anything the moment its lashing is off, so structurally it
     // is gone — but it is still in the wall, and "gear left up there" has to mean what it says.
     int32_t AnchorsLeftIn() const noexcept;
+    // Whether this one in particular is: never drawn, or snapped off coming out. The counter and
+    // anything that wants their heights both go through here, so the two cannot drift apart.
+    bool AnchorLeftIn(int32_t i) const noexcept;
     // And whether there is any ladder left on the chimney at all.
     bool AllStruck() const noexcept;
 
