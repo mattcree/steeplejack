@@ -151,7 +151,13 @@ func _input(event: InputEvent) -> void:
 		KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
 			_take_it()
 		KEY_ESCAPE:
-			get_tree().quit()
+			# Back to the yard rather than out of the game. Escape quitting the process from the
+			# middle of a career is the kind of thing that only ever happens by accident.
+			var yard: Node = load("res://scenes/yard.tscn").instantiate()
+			yard.career_path = career_path
+			get_tree().root.add_child(yard)
+			get_tree().current_scene = yard
+			queue_free()
 
 
 ## Which half of the game a job belongs to. A chimney you are surveying is one you climb; a chimney

@@ -459,12 +459,16 @@ func _level_fee() -> float:
 	return float(fee) if typeof(fee) == TYPE_FLOAT or typeof(fee) == TYPE_INT else 0.0
 
 
-## Back to the board, once the job is done.
+## Home, once the job is done — the yard, not the board.
+##
+## It used to go straight back to the wall of letters, which meant the money you had just earned
+## appeared as a number on a card for the next job rather than as something in your own yard, and
+## no day ever passed between one chimney and the next. A career that never goes home is a list.
 func back_to_the_board() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-	var board: Node = load("res://scenes/jobs.tscn").instantiate()
-	get_tree().root.add_child(board)
-	get_tree().current_scene = board
+	var yard: Node = load("res://scenes/yard.tscn").instantiate()
+	get_tree().root.add_child(yard)
+	get_tree().current_scene = yard
 	get_parent().queue_free()
 
 

@@ -335,7 +335,8 @@ func _init() -> void:
 	await physics_frame
 	await physics_frame
 	var now: Node = root.get_child(root.get_child_count() - 1)
-	_check(now.has_method("scene_for"), "enter takes you back to the board")
+	# Home, not the board: a job now ends where the money lands and the day passes.
+	_check(now.has_method("stage_index"), "enter takes you back to the yard")
 
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SCRATCH_TIN))
 	if failures > 0:

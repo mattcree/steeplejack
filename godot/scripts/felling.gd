@@ -528,7 +528,7 @@ func _leave_the_job() -> void:
 ## Back to the board. The loop has to close or it is not a game, it is a scene you can reach.
 func _back_to_the_board() -> void:
 	_capture(false)
-	var board: Node = load("res://scenes/jobs.tscn").instantiate()
+	var board: Node = load("res://scenes/yard.tscn").instantiate()
 	get_tree().root.add_child(board)
 	get_tree().current_scene = board
 	queue_free()
