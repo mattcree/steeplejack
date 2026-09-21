@@ -152,10 +152,19 @@ func _draw_state() -> void:
 	y += 24.0
 	draw_string(_font, Vector2(24, y), "%s — %s" % [name_, BAND_WORDS.get(name_, "")],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, colour)
-	y += 22.0
+	# The margin, big, because it is the number that decides whether she stands up while you are
+	# still cutting. It was thirteen pixels in the middle of a sentence with the prop count, which
+	# is the same fault the climbing HUD had: everything the same size means nothing is important.
+	y += 30.0
+	var margin: float = float(state.get("margin", 0.0))
+	draw_string(_font, Vector2(24, y), "%+.2f" % margin, HORIZONTAL_ALIGNMENT_LEFT, -1, 34, colour)
+	var mw: float = _font.get_string_size("%+.2f" % margin, HORIZONTAL_ALIGNMENT_LEFT, -1, 34).x
+	draw_string(_font, Vector2(24 + mw + 8, y), "m of margin", HORIZONTAL_ALIGNMENT_LEFT, -1, 14,
+		Color(colour, 0.75))
+	y += 20.0
 	draw_string(_font, Vector2(24, y),
-		"margin %.2f m    gob %.0f° on %03d°    props %d left, %d standing" % [
-			float(state.get("margin", 0.0)), float(state.get("cut_arc", 0.0)),
+		"gob %.0f° on %03d°    props %d left, %d standing" % [
+			float(state.get("cut_arc", 0.0)),
 			int(state.get("cut_centre", 0.0)), int(state.get("props_left", 0)),
 			int(state.get("props_standing", 0))],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, DIM)
@@ -202,15 +211,26 @@ func _draw_state() -> void:
 		var w: float = 320.0
 		draw_rect(Rect2(24, y + 8, w, 4), Color(0.25, 0.24, 0.23))
 		draw_rect(Rect2(24, y + 8, w * clampf(left / whole, 0.0, 1.0), 4), clock)
-		y += 16.0
+		# Clear of the bar. At +16 the note was drawn straight through it.
+		y += 26.0
 		draw_string(_font, Vector2(24, y), TRADE, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, DIM)
 
 	if not prediction.is_empty():
-		y += 22.0
+		# And the other number the whole job is scored on: how far off your own line she will go.
+		# The prediction and the pegs stay small; the error between them is the answer.
+		y += 32.0
+		var err: float = float(prediction.get("error", 0.0))
+		var acc: float = float(prediction.get("accuracy", 0.0))
+		var ecol := Color(0.55, 0.78, 0.50) if err <= acc * 0.5 else (
+			PEGS if err <= acc else HAZARD)
+		draw_string(_font, Vector2(24, y), "%.1f°" % err, HORIZONTAL_ALIGNMENT_LEFT, -1, 28, ecol)
+		var ew: float = _font.get_string_size("%.1f°" % err, HORIZONTAL_ALIGNMENT_LEFT, -1, 28).x
+		draw_string(_font, Vector2(24 + ew + 8, y), "off the line you pegged",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(ecol, 0.75))
+		y += 18.0
 		draw_string(_font, Vector2(24, y),
-			"predicted %03d° ±%.1f°    pegged %03d°    off by %.1f°" % [
-				int(prediction.get("fall_bearing", 0.0)), float(prediction.get("accuracy", 0.0)),
-				int(peg_bearing), float(prediction.get("error", 0.0))],
+			"predicted %03d° ±%.1f°    pegged %03d°" % [
+				int(prediction.get("fall_bearing", 0.0)), acc, int(peg_bearing)],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, PEGS)
 		var threatened: Array = prediction.get("threatened", [])
 		if not threatened.is_empty():
