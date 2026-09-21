@@ -1,0 +1,16 @@
+{
+  "_straighten_comment": "Bringing a leaning chimney back upright. The method and every figure with a source is from an 1885 survey of eighty-odd shafts and the case studies in it: cut a course from the convex side, hold it on graduated wedges, withdraw the smallest first, refill thinner, and let gravity do it.",
+  "_straighten_leverage": "The arithmetic the trade did: on a 132 ft octagonal shaft cut at 40 ft, 'it had been calculated that 1/4 inch would bring the stack back 7 inches at top'. Closing a wedge of thickness t across a width w tilts everything above it by t/w, so the top moves (H - h) * t / w. That is geometry rather than balance and should not be tuned.",
+  "straightenCutMinHeightM": 1.2,
+  "straightenCutMaxShare": 0.75,
+  "_straighten_risk": "Cut high and a little goes a long way \u2014 and the oscillation while she settles gets worse the higher the cut is. At the highest cut on one real job 'the oscillations frightened the masons, and they left the work'.",
+  "straightenRiskAtTopShare": 0.9,
+  "straightenSwayCmAtFullRisk": 1.9,
+  "straightenCollapseRisk": 0.82,
+  "_straighten_settle": "18 to 36 hours to come back onto herself, per the recorded cases.",
+  "straightenSettleHours": 26.0,
+  "_straighten_overshoot": "'The chimney continued during several weeks to settle slightly in the direction opposite to its former inclination. This circumstance had to be carefully considered beforehand, or else the slits would have been made too wide.' So the aim is not plumb, it is a little short of plumb.",
+  "straightenOvershootShare": 0.14,
+  "straightenUprightToleranceM": 0.05,
+  "straightenShortToleranceM": 0.25
+}
