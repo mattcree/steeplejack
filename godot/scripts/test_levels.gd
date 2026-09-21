@@ -75,8 +75,39 @@ func _open(id: String) -> void:
 		why = "spawned inside her (%.1f m from the axis, radius %.1f)" % [
 			flat.length(), chimney.radius_at(0.0)]
 
-	# And the archetype has to be one the game can actually run.
 	var arch := String(jack.level_archetype())
+
+	# Everything a job needs must be reachable from somewhere the player can actually be. This is
+	# the general form of two bugs found tonight — one bolt of eight in reach on a banding job,
+	# and a job that could be finished but not left — and it is the cheapest possible guard
+	# against the next one.
+	if ok and arch == "SURVEY":
+		var defects: Array = jack.survey_defects()
+		for d in defects:
+			var one := d as Dictionary
+			var dh: float = float(one.get("height", 0.0))
+			if dh > float(jack.total_height()) + 0.1:
+				ok = false
+				why = "a defect at %.1f m on a %.0f m chimney" % [dh, jack.total_height()]
+				break
+			# How far round he can lean at that height before he steps off the ladder.
+			var r: float = maxf(float(chimney.radius_at(dh)), 0.1)
+			var reach: float = rad_to_deg(player.SHUFFLE_OFF / r)
+			if absf(float(one.get("bearing", 0))) > reach:
+				ok = false
+				why = "'%s' is %d deg round and he can only lean %.0f" % [
+					one.get("id", ""), int(one.get("bearing", 0)), reach]
+				break
+	if ok and arch == "BAND":
+		var bands: Array = player._mission().get("bands", []) as Array
+		for b in bands:
+			var bh: float = float((b as Dictionary).get("height", 0.0))
+			if bh > float(jack.total_height()) - 0.5:
+				ok = false
+				why = "a band at %.1f m on a %.0f m chimney" % [bh, jack.total_height()]
+				break
+
+	# And the archetype has to be one the game can actually run.
 	if ok and not (arch in ["SURVEY", "FELL", "CONDUCTOR", "BAND", "STRAIGHTEN"]):
 		ok = false
 		why = "archetype %s has no code behind it" % arch
