@@ -109,6 +109,7 @@ func _draw() -> void:
 	_draw_stack_gauge(jack)
 	_draw_wind(jack, Vector2(size.x - 108.0, 86.0))
 	_draw_hold_line()
+	_draw_conductor(jack)
 
 	# Only once there is something to span *from*. With no dogs driven, the span is measured from
 	# the ground and reads "62.0 m span — about to buckle" at the top of a ladder that is lashed all
@@ -1125,6 +1126,78 @@ func _draw_slip(jack: Jack) -> void:
 	if not jack.can_slip_save():
 		_centre("nothing left to catch with", eye.y + r + 56.0, Color(0.95, 0.45, 0.35, 0.85), 14)
 
+
+
+## The conductor run, on screen — the instrument for the archetype.
+##
+## The verb shipped before this did and the job was unplayable for it: you could pay out tape,
+## clip it and pass or fail an inspection with nothing on screen telling you how much tape was
+## left, how far the run had wandered, or that it would not pass until the pit was dug. Rule 7
+## wants every failure telegraphed, and "the run is already too long" is a failure you can only
+## act on if you can watch it coming.
+const RUN_W := 210.0
+
+
+func _draw_conductor(jack: Jack) -> void:
+	if not player.conductor_job:
+		return
+	var st: Dictionary = jack.conductor_state(maxf(player.height_m(), 0.0))
+	if st.is_empty():
+		return
+	var at := Vector2(size.x - RUN_W - 44.0, 150.0)
+
+	draw_rect(Rect2(at - Vector2(14.0, 26.0), Vector2(RUN_W + 28.0, 162.0)),
+		Color(0.05, 0.04, 0.03, 0.5))
+	_label("THE RUN", at, Color(GHOST, 0.8), TINY)
+
+	# Tape, which is the resource and the clock. A 25 m reel does not reach the bottom of a 28 m
+	# chimney and the player is supposed to find that out with time to think about it.
+	var left: float = float(st.get("tape_left", 0.0))
+	var need: float = maxf(player.height_m(), 0.0)
+	var col := GOOD if left > need * 1.15 else (WATCH if left > need else DANGER)
+	_label("%.0f m of tape" % left, at + Vector2(0.0, 24.0), col, H2)
+	_label("%.0f m still to go down" % need, at + Vector2(0.0, 42.0), Color(FAINT, 0.85), SMALL)
+	var frac: float = clampf(left / maxf(need + left, 0.01), 0.0, 1.0)
+	draw_rect(Rect2(at + Vector2(0.0, 50.0), Vector2(RUN_W, 6.0)), Color(0.05, 0.04, 0.03, 0.6))
+	draw_rect(Rect2(at + Vector2(0.0, 50.0), Vector2(RUN_W * frac, 6.0)), col)
+
+	# The Code's curvature rule, as a bar with its own limit drawn on it. "No more than half as
+	# long again as the straight line joining them" is a ratio, so it can be a gauge.
+	var wander: float = float(st.get("wander", 1.0))
+	var fail: float = player.jack.tuning_f("wanderFailRatio", 1.5)
+	var warn: float = player.jack.tuning_f("wanderWarnRatio", 1.2)
+	var wcol := GOOD if wander <= warn else (WATCH if wander <= fail else DANGER)
+	_label("the line: %.2f" % wander, at + Vector2(0.0, 78.0), wcol, SMALL)
+	var track := Rect2(at + Vector2(0.0, 84.0), Vector2(RUN_W, 6.0))
+	draw_rect(track, Color(0.05, 0.04, 0.03, 0.6))
+	# Scaled so the Code's limit sits at three quarters — the bar is about the limit, not about 2.0.
+	var span: float = (fail - 1.0) / 0.75
+	draw_rect(Rect2(track.position, Vector2(RUN_W * clampf((wander - 1.0) / span, 0.0, 1.0), 6.0)),
+		wcol)
+	var mark: float = at.x + RUN_W * clampf((fail - 1.0) / span, 0.0, 1.0)
+	draw_line(Vector2(mark, track.position.y - 3.0), Vector2(mark, track.position.y + 9.0),
+		Color(DANGER, 0.9), 1.0)
+
+	# And what is still wrong with it. Worst first, one line, because this is a checklist the
+	# player is working through rather than a report.
+	var why := ""
+	if not bool(st.get("terminal", false)):
+		why = "no terminal yet — it goes at the very top"
+	elif int(st.get("over_tight", 0)) > 0:
+		why = "%d pinched — they will fail when it turns cold" % st.get("over_tight", 0)
+	elif wander > fail:
+		why = "the run is too long for the drop — it will not pass"
+	elif float(st.get("earth_ohms", -1.0)) < 0.0:
+		why = "no earth yet — dig the pit at the foot of her"
+	elif float(st.get("earth_ohms", 0.0)) > player.jack.tuning_f("earthPassOhms", 10.0):
+		why = "%.0f ohms — that will not do" % st.get("earth_ohms", 0.0)
+	elif int(st.get("too_loose", 0)) > 0:
+		why = "%d loose — they will work off in a gale" % st.get("too_loose", 0)
+	var name_ := String(st.get("verdict_name", ""))
+	var vcol := GOOD if name_ == "SOUND" else (WATCH if name_ == "MARGINAL" else DANGER)
+	_label("%d clips  ·  %s" % [st.get("clips", 0), name_], at + Vector2(0.0, 106.0), vcol, SMALL)
+	if why != "":
+		_label(why, at + Vector2(0.0, 122.0), Color(vcol, 0.8), TINY)
 
 
 # --- the instruments ------------------------------------------------------------------------------
