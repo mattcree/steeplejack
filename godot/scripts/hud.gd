@@ -272,6 +272,58 @@ const RUN_STEPS := [
 ]
 
 
+## A banding job, and a straightening. Same fault as the conductor one had before it was fixed:
+## an archetype without its own list gets the laddering list, which tells a man with a spanner to
+## go and fetch a ladder section.
+const BAND_STEPS := [
+	"Ladder her past the top band",
+	"Stand level with a band",
+	"Go round her and pull the bolts up  [B]",
+	"Opposite pairs — work round and she goes oval",
+]
+
+const PLUMB_STEPS := [
+	"Ladder her to where you want the hinge",
+	"Dial the cut  [X] — read what it will do",
+	"Aim SHORT of plumb; she keeps going for weeks",
+	"Cut her  [F], then she comes back in her own time",
+]
+
+
+func _band_state_steps() -> Array:
+	var index: int = player._band_here()
+	var laddered: bool = player.ladder_top > 8.0
+	var here: bool = index >= 0
+	var pulling := false
+	var seated := false
+	if here:
+		var st: Dictionary = player.jack.band_state(index)
+		pulling = int(st.get("tightened", 0)) > 0 or float(st.get("tightest", 0.0)) > 0.0
+		seated = bool(st.get("seated", false))
+	var done := [laddered, here, pulling, seated]
+	var current := 0
+	for i in 4:
+		current = i
+		if not done[i]:
+			break
+	return [done, current]
+
+
+func _plumb_state_steps() -> Array:
+	var st: Dictionary = player.jack.plumb_state()
+	var laddered: bool = player.ladder_top > 6.0
+	var dialled: bool = player.plumb_take_out > 2.0
+	var cut: bool = player.plumb_cut_done
+	var rested: bool = cut and not bool(st.get("settling", false))
+	var done := [laddered, dialled, cut, rested]
+	var current := 0
+	for i in 4:
+		current = i
+		if not done[i]:
+			break
+	return [done, current]
+
+
 ## Which four steps are on screen, and how far through them he is. Returns [steps, done, current].
 func _run_state() -> Array:
 	var st: Dictionary = player.jack.conductor_state(maxf(player.height_m(), 0.0))
@@ -316,6 +368,12 @@ func _draw_steps() -> void:
 	if player.conductor_job:
 		steps = RUN_STEPS
 		state = _run_state()
+	elif player.band_job:
+		steps = BAND_STEPS
+		state = _band_state_steps()
+	elif player.plumb_job:
+		steps = PLUMB_STEPS
+		state = _plumb_state_steps()
 	var done: Array = state[0]
 	var current: int = state[1]
 	var built: int = player.jack.stack_sections().size()
@@ -324,8 +382,14 @@ func _draw_steps() -> void:
 	# top of the dogs it is telling you to drive.
 	var x := GAUGE_X + 108.0
 	var y := size.y * 0.26
-	_label("THE RUN" if player.conductor_job else "NEXT SECTION   %d of %d up" % [built, total],
-		Vector2(x, y), Color(0.95, 0.93, 0.88, 0.85), 13)
+	var header := "NEXT SECTION   %d of %d up" % [built, total]
+	if player.conductor_job:
+		header = "THE RUN"
+	elif player.band_job:
+		header = "THE BANDS"
+	elif player.plumb_job:
+		header = "BRINGING HER BACK"
+	_label(header, Vector2(x, y), Color(0.95, 0.93, 0.88, 0.85), 13)
 	y += 22.0
 	for i in steps.size():
 		var now: bool = i == current
@@ -338,10 +402,11 @@ func _draw_steps() -> void:
 			# The advice line, but only where it is about this step: the old single-line guidance
 			# runs a step ahead in places, and advice about tapping under "climb to the top" was
 			# exactly the confusion this list is here to end.
-			var detail := "" if player.conductor_job else _next_step()
+			var special: bool = player.conductor_job or player.band_job or player.plumb_job
+			var detail := "" if special else _next_step()
 			if player.conductor_job and i == 0:
 				detail = "She has to be laddered before any of it goes on"
-			if i == 1 and not player.conductor_job:
+			if i == 1 and not special:
 				detail = "Climb up what you've built  [W]" if player.on_ladder else detail
 			if detail != "":
 				_label(detail, Vector2(x + 24.0, y - 2.0), Color(0.92, 0.84, 0.62, 0.95), 13)
