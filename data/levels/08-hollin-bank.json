@@ -1,0 +1,188 @@
+{
+  "$schema": "../schemas/level.schema.json",
+  "id": "08-hollin-bank",
+  "name": "Hollin Bank",
+  "order": 8,
+  "archetype": "SURVEY",
+  "reputationGate": 3,
+  "fee": 1480,
+  "briefing": {
+    "from": "the borough surveyor",
+    "lines": [
+      "There is a chapel twenty feet off this one so she cannot be felled, and before the",
+      "council will pay to have her taken down by hand they want somebody up her who knows",
+      "what he is looking at. Fifty-five metres. Go over her and tell us what is holding",
+      "her together, and be honest, because whoever does the job next is going to be",
+      "standing on your answer."
+    ]
+  },
+  "shiftMinutes": 240,
+  "targetMinutes": 55,
+  "structure": {
+    "type": "chimney",
+    "height": 55.0,
+    "baseRadius": 2.3,
+    "topRadius": 1.2,
+    "profile": "round",
+    "batter": [
+      {
+        "at": 0.0,
+        "step": 0.0
+      }
+    ],
+    "bands": [],
+    "cap": "corbelled-oversail",
+    "leanDegrees": 0.0,
+    "leanBearing": 0,
+    "jointGrid": {
+      "courseHeight": 0.075,
+      "brickLength": 0.225,
+      "candidateDensity": 4.0
+    },
+    "weathering": {
+      "sootTo": 0.8,
+      "bleachFrom": 0.95,
+      "seed": 1008
+    }
+  },
+  "bands": [
+    {
+      "from": 0.0,
+      "to": 18.0,
+      "type": "plain",
+      "quality": {
+        "sound": 0.66,
+        "fair": 0.24,
+        "perished": 0.1,
+        "cracked": 0.0
+      },
+      "note": "Sound enough that nobody has worried about her."
+    },
+    {
+      "from": 18.0,
+      "to": 30.0,
+      "type": "old-fixtures",
+      "quality": {
+        "sound": 0.4,
+        "fair": 0.32,
+        "perished": 0.24,
+        "cracked": 0.04
+      },
+      "note": "Somebody has been up her before and left his dogs in. Wrought iron, by the look of them, which corrodes far less than the welded sort."
+    },
+    {
+      "from": 30.0,
+      "to": 44.0,
+      "type": "delaminated",
+      "quality": {
+        "sound": 0.18,
+        "fair": 0.28,
+        "perished": 0.44,
+        "cracked": 0.1
+      },
+      "note": "The face is coming away from what is behind it. This is the reading the whole job is for, and it is the one that cannot be taken from the ground."
+    },
+    {
+      "from": 44.0,
+      "to": 55.0,
+      "type": "corbelled-cap",
+      "quality": {
+        "sound": 0.1,
+        "fair": 0.22,
+        "perished": 0.5,
+        "cracked": 0.18
+      },
+      "note": "Iron cramps in the coping, rusting and bursting the stone they were put there to hold. Thirty tons of cap on top of it."
+    }
+  ],
+  "weather": {
+    "windBase": 5.0,
+    "windBearing": 300,
+    "windVeerPerHour": 6.0,
+    "windAtHeight": [
+      [
+        0,
+        1.0
+      ],
+      [
+        28,
+        1.45
+      ],
+      [
+        55,
+        1.85
+      ]
+    ],
+    "gustIntervalSeconds": [
+      65,
+      120
+    ],
+    "precipitation": "none",
+    "ramp": null
+  },
+  "site": {
+    "safeLineDistance": 0,
+    "exclusions": [],
+    "corridor": null,
+    "crowd": null,
+    "backdrop": "mill-town-yard"
+  },
+  "mission": {
+    "type": "SURVEY",
+    "defects": [
+      {
+        "id": "old_fixtures",
+        "height": 24.0,
+        "bearing": 0,
+        "discovery": "visual"
+      },
+      {
+        "id": "delaminated_face",
+        "height": 36.0,
+        "bearing": 90,
+        "discovery": "tap"
+      },
+      {
+        "id": "burst_coping",
+        "height": 52.0,
+        "bearing": 180,
+        "discovery": "summit"
+      },
+      {
+        "id": "perished_course",
+        "height": 41.0,
+        "bearing": 270,
+        "discovery": "traverse"
+      }
+    ],
+    "softLanding": false
+  },
+  "complications": [
+    {
+      "at": "summit",
+      "type": "great-aire-reveal",
+      "params": {
+        "durationSeconds": 4.0,
+        "bearing": 214,
+        "distance": 4800
+      }
+    }
+  ],
+  "scoring": {
+    "bonuses": [
+      {
+        "id": "all_defects",
+        "condition": "defectsFound==4",
+        "amount": 0
+      }
+    ],
+    "hardFailConditions": []
+  },
+  "loadoutHint": {
+    "ladders": 15,
+    "dogs": 34,
+    "rope": 2
+  },
+  "replay": "data/replays/01-back-yard-expert.replay",
+  "designDoc": "docs/02-levels/level-01-back-yard.md"
+}

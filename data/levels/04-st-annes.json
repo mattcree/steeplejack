@@ -1,0 +1,164 @@
+{
+  "$schema": "../schemas/level.schema.json",
+  "id": "04-st-annes",
+  "name": "St Anne's",
+  "order": 4,
+  "archetype": "CONDUCTOR",
+  "reputationGate": 2,
+  "fee": 640,
+  "briefing": {
+    "from": "the vicar",
+    "lines": [
+      "We were struck in August and it took a pinnacle off the south side. The insurers",
+      "will not look at us again without a conductor the whole way down, properly earthed,",
+      "and a certificate to say so. Forty-five metres to the weathercock. I am told the",
+      "spire is the worst thing in the parish to work on and I am afraid that is not my",
+      "department."
+    ]
+  },
+  "shiftMinutes": 300,
+  "targetMinutes": 60,
+  "structure": {
+    "type": "chimney",
+    "height": 45.0,
+    "baseRadius": 2.4,
+    "topRadius": 0.35,
+    "profile": "round",
+    "batter": [
+      {
+        "at": 0.0,
+        "step": 0.0
+      }
+    ],
+    "bands": [],
+    "cap": "finial",
+    "leanDegrees": 0.0,
+    "leanBearing": 0,
+    "jointGrid": {
+      "courseHeight": 0.075,
+      "brickLength": 0.225,
+      "candidateDensity": 4.0
+    },
+    "weathering": {
+      "sootTo": 0.2,
+      "bleachFrom": 0.6,
+      "seed": 1004
+    }
+  },
+  "bands": [
+    {
+      "from": 0.0,
+      "to": 20.0,
+      "type": "plain",
+      "quality": {
+        "sound": 0.8,
+        "fair": 0.16,
+        "perished": 0.04,
+        "cracked": 0.0
+      },
+      "note": "Good ashlar in the tower."
+    },
+    {
+      "from": 20.0,
+      "to": 34.0,
+      "type": "plain",
+      "quality": {
+        "sound": 0.55,
+        "fair": 0.3,
+        "perished": 0.15,
+        "cracked": 0.0
+      },
+      "note": "The spire proper. It narrows all the way and the ladders lean INTO it."
+    },
+    {
+      "from": 34.0,
+      "to": 45.0,
+      "type": "crack",
+      "quality": {
+        "sound": 0.22,
+        "fair": 0.3,
+        "perished": 0.34,
+        "cracked": 0.14
+      },
+      "note": "Where the strike came out. Embedded iron rusting inside the stone is what cracked it, which is also why the new run must be bonded to the finial."
+    }
+  ],
+  "weather": {
+    "windBase": 7.0,
+    "windBearing": 214,
+    "windVeerPerHour": 8.0,
+    "windAtHeight": [
+      [
+        0,
+        1.0
+      ],
+      [
+        22,
+        1.4
+      ],
+      [
+        45,
+        1.9
+      ]
+    ],
+    "gustIntervalSeconds": [
+      55,
+      100
+    ],
+    "precipitation": "none",
+    "ramp": null
+  },
+  "site": {
+    "safeLineDistance": 0,
+    "exclusions": [],
+    "corridor": null,
+    "crowd": null,
+    "backdrop": "mill-town-yard"
+  },
+  "mission": {
+    "type": "CONDUCTOR",
+    "terminalHeight": 45.0,
+    "reels": 3,
+    "obstruction": {
+      "from": 20.0,
+      "to": 22.0,
+      "what": "the tower's string course",
+      "note": "The Code: oversize the hole and let the rod move. A conductor through a cornice in too tight a hole rusted, expanded and burst the stone, and forty-eight pounds of it came down on the man who fitted it."
+    },
+    "earth": {
+      "plateSquareFeet": 18.0,
+      "wet": true,
+      "coke": true,
+      "note": "The churchyard drains badly, which for once is what you want."
+    },
+    "softLanding": false
+  },
+  "complications": [
+    {
+      "at": "summit",
+      "type": "great-aire-reveal",
+      "params": {
+        "durationSeconds": 4.0,
+        "bearing": 214,
+        "distance": 4800
+      }
+    }
+  ],
+  "scoring": {
+    "bonuses": [
+      {
+        "id": "all_defects",
+        "condition": "defectsFound==4",
+        "amount": 0
+      }
+    ],
+    "hardFailConditions": []
+  },
+  "loadoutHint": {
+    "ladders": 13,
+    "dogs": 30,
+    "rope": 2
+  },
+  "replay": "data/replays/01-back-yard-expert.replay",
+  "designDoc": "docs/02-levels/level-01-back-yard.md"
+}

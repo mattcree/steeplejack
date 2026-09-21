@@ -85,6 +85,16 @@ a doubt about the traction engine and an interest in lighter RPG-style progressi
 | **Does the campaign get the twelve jobs in [`19-the-complete-game.md`](docs/01-gdd/19-the-complete-game.md)?** Four exist and three of those are the same archetype | It is most of the remaining content, and the order carries the whole arc | **Yes, and in that order.** The placement that matters is STRAIGHTEN at eleven — the one job where you are called to save a chimney, after ten of killing them |
 | **Is STRAIGHTEN a tenth archetype?** It is real, documented and mechanically the inverse of felling | It is a new mission type, which is a month of work | **Yes.** Nothing else in the set makes the campaign mean anything different at the end than it did at the start |
 | **A character modelled on a real person.** The visual push wants reference for the jack himself | Rule 16 forbids the name anywhere in this repo, and BLOCKED item 5 has the character approach open since 2026-09-16 | **Not without you.** Locations, chimneys, mills and streets are safe and are now measured up in [`20-building-the-world.md`](docs/01-gdd/20-building-the-world.md) — a trade belongs to nobody. A likeness does not, and that is a decision with a legal edge on it |
+
+### Raised 2026-09-21 by the campaign arithmetic
+
+Found by asking whether the game can actually be finished, which nothing had asked before.
+
+| The question | The numbers | Recommendation |
+|---|---|---|
+| **The engine is £14 clear of being unaffordable.** It costs £8,980; the nine levels that exist pay £8,994 in fees | Balanced for twelve jobs; nine shipped. Felling bonuses are the only headroom, and any damages eat it | **Build jobs 9, 10 and 11**, which is also what the fifth star needs. Failing that, `economy.json`'s `totalCost` wants dropping to about £6,500 for the content that exists — but that is a decision about how long the campaign should feel, not a number to quietly change |
+| **Great Aire's five-star gate cannot be earned.** Every job that exists comes to four | The board handles it honestly — a gate nothing can reach is reported as a gap with the reason on the card, and the player is let through — so it is not a lock. But the five-star axis of a hundred per cent is unreachable | **Leave the gate at five.** It is the right number for the twelve-job campaign it was written for, and the board is already telling the truth about it. Lowering it would hide the gap rather than close it |
+| **Three levels run on an archetype they were not designed for.** St Anne's ships as a conductor rather than a gild, the Corn Mill as a banding rather than a mechanism, Hollin Bank as a survey rather than a topping | They are real jobs of real types and they are not empty placeholders — but the campaign's variety is three archetypes thinner than the table says | **Fine for now, and marked as such in the table.** Each becomes its designed archetype when that archetype is built |
 | **Packing** | a block under the third rung holds the ladder off the wall *so boots fit on the rungs* | not modelled; the drawn body's standoff does the same job by accident | Cosmetic but cheap, and it explains on screen why the body hangs back |
 
 ## Standing decisions the lead owes the project

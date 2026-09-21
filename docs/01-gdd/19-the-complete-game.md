@@ -62,9 +62,9 @@ leave out, and it is the thematic keystone of the whole campaign — see STRAIGH
 | | Archetype | The pressure | State |
 |---|---|---|---|
 | A | **SURVEY** | none — learning to read | **Built** |
-| B | **CONDUCTOR** | descent as the main event, weather clock | Designed |
+| B | **CONDUCTOR** | descent as the main event, weather clock | **Built** |
 | C | **GILD** | precision at the apex, suspended | Designed |
-| D | **BAND** | sideways, away from safety, heavy haulage | Designed |
+| D | **BAND** | the order you pull the bolts up in | **Built** |
 | E | **TOP** | rhythm, the structure dissolving under you | Designed |
 | F | **FELL** | spatial planning and dread | **Built** |
 | G | **MECHANISM** | a machine, at height | Designed |
@@ -102,20 +102,44 @@ matters for the campaign's shape: see Part 4.
 Four exist. The eight proposed below place every archetype, rise in height and exposure, and put
 the two FELL jobs already built where they already sit.
 
-| # | Job | Archetype | Height | Gate | State |
-|---|---|---|---|---|---|
-| 1 | **The Back Yard** | SURVEY | 12 m | ★ 0 | **Built** |
-| 2 | Chapel Street | CONDUCTOR | 28 m | ★ 0 | Proposed |
-| 3 | Brigg's Dyeworks | BAND | 40 m | ★ 1 | Proposed |
-| 4 | St Anne's | GILD | 45 m spire | ★ 2 | Proposed |
-| 5 | The Corn Mill | MECHANISM | 30 m | ★ 2 | Proposed |
-| 6 | **Waterside Bleachworks** | FELL | 70 m | ★ 3 | **Built** |
-| 7 | **Kershaw's Yard** | FELL | 65 m | ★ 3 | **Built** |
-| 8 | Hollin Bank | TOP | 55 m | ★ 3 | Proposed |
-| 9 | The Gasworks | LATTICE | 60 m | ★ 4 | Proposed |
-| 10 | Sowerby Bridge | EMERGENCY | 50 m | ★ 4 | Proposed |
-| 11 | Pitchcombe Mill | **STRAIGHTEN** | 48 m | ★ 4 | Proposed |
-| 12 | **The Great Aire Chimney** | FELL | 110 m | ★ 5 | **Built** |
+| # | Job | Archetype designed | Ships as | Height | Gate | Fee |
+|---|---|---|---|---|---|---|
+| 1 | **The Back Yard** | SURVEY | SURVEY | 12 m | ★ 0 | — |
+| 2 | **Chapel Street** | CONDUCTOR | CONDUCTOR | 28 m | ★ 0 | £34 |
+| 3 | **Brigg's Dyeworks** | BAND | BAND | 40 m | ★ 1 | £310 |
+| 4 | **St Anne's** | GILD | *CONDUCTOR* | 45 m spire | ★ 2 | £640 |
+| 5 | **The Corn Mill** | MECHANISM | *BAND* | 32 m | ★ 2 | £780 |
+| 6 | **Waterside Bleachworks** | FELL | FELL | 70 m | ★ 3 | £1,100 |
+| 7 | **Kershaw's Yard** | FELL | FELL | 65 m | ★ 3 | £1,250 |
+| 8 | **Hollin Bank** | TOP | *SURVEY* | 55 m | ★ 3 | £1,480 |
+| 9 | The Gasworks | LATTICE | — | 60 m | ★ 4 | — |
+| 10 | Sowerby Bridge | EMERGENCY | — | 50 m | ★ 4 | — |
+| 11 | Pitchcombe Mill | **STRAIGHTEN** | — | 48 m | ★ 4 | — |
+| 12 | **The Great Aire Chimney** | FELL | FELL | 110 m | ★ 5 | £3,400 |
+
+**Nine of twelve exist.** Three of those nine are in *italics*: the job is real and the level is
+real, but it currently runs on an archetype that is built rather than the one it was designed for.
+St Anne's wants the bosun's chair and ships as a spire conductor — which is the best-attested job
+in the whole 1881 Code, so it is not a compromise so much as a different true thing. The Corn Mill
+wants a mechanism and ships as a six-band job on an octagonal stack, which the trade calls the
+awkward sort. Hollin Bank wants taking down by hand and ships as the survey that decides whether
+it should be. Each becomes its designed archetype when that archetype exists; none of them is a
+placeholder with nothing in it.
+
+### And the arithmetic, which is the part that bites
+
+The engine costs **£8,980**. The nine levels that exist pay **£8,994** in fees.
+
+That is a margin of fourteen pounds, before a single pane of glass gets broken — so on the content
+that ships today the campaign's payoff is *technically* reachable and *practically* is not, and it
+only works at all because felling bonuses are on top of the fee. The economy was balanced for
+twelve jobs and there are nine.
+
+Reputation has the same shape: doing every job that exists earns **four stars**, and Great Aire's
+gate is five. The board already handles this honestly rather than locking the player out — a gate
+nothing in the level set can reach is reported as a gap, with the reason on the card, and you are
+let through. But the five-star axis of completion in Part 3 cannot be finished until jobs 9, 10 and
+11 land, and nor comfortably can the engine.
 
 **Deliberate shape.** The three FELL jobs are 6, 7 and 12 — you learn to kill chimneys in the
 middle of the campaign, then at 11 you are asked to save one, and only then does 12 ask you to take
@@ -124,12 +148,13 @@ fluent in felling or its inversion means nothing.
 
 ### What is missing, ranked by what it unlocks
 
-1. **Striking a stack** — no job has a last act. Unlocks: the whole of act 3, the gear economy,
-   and CONDUCTOR (whose fiddly bit *is* the descent).
-2. **The yard** — no hub. Unlocks: loadout, the day clock, the engine, the salvage.
-3. **The front end** — the game opens straight onto a job board with no title screen.
-4. **Eight archetypes** — the actual content.
-5. **The persistent district** — stacks that remember your dogs, your chalk, your bad line.
+1. ~~**Striking a stack**~~ — **built.** R with empty hands takes a ladder off; F draws the dog.
+2. ~~**The yard**~~ — **built.** The board, the kettle and the tarpaulin; the van loads the job.
+3. ~~**The front end**~~ — **built.** Title, menu, options, and a career that goes home.
+4. **Six archetypes** — GILD, TOP, MECHANISM, LATTICE, EMERGENCY, STRAIGHTEN. The actual content.
+5. ~~**The persistent district**~~ — **built.** Your own dogs are in the wall when you come back.
+6. **Three more levels** — 9, 10 and 11, without which the engine and the fifth star are out of
+   reach. This is now the shortest path to a campaign that can actually be finished.
 
 ---
 

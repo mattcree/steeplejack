@@ -1,0 +1,180 @@
+{
+  "$schema": "../schemas/level.schema.json",
+  "id": "05-corn-mill",
+  "name": "The Corn Mill",
+  "order": 5,
+  "archetype": "BAND",
+  "reputationGate": 2,
+  "fee": 780,
+  "briefing": {
+    "from": "Ackroyd & Son",
+    "lines": [
+      "The engineer says our stack is opening at the top and wants six bands on her, not",
+      "three. She is thirty-two metres and she is octagonal, which he tells me is the",
+      "awkward sort. We cannot stop the mill, so whatever you do you do with her hot."
+    ]
+  },
+  "shiftMinutes": 330,
+  "targetMinutes": 85,
+  "structure": {
+    "type": "chimney",
+    "height": 32.0,
+    "baseRadius": 1.7,
+    "topRadius": 1.05,
+    "profile": "octagonal",
+    "batter": [
+      {
+        "at": 0.0,
+        "step": 0.0
+      }
+    ],
+    "bands": [],
+    "cap": "corbelled-oversail",
+    "leanDegrees": 0.0,
+    "leanBearing": 0,
+    "jointGrid": {
+      "courseHeight": 0.075,
+      "brickLength": 0.225,
+      "candidateDensity": 4.0
+    },
+    "weathering": {
+      "sootTo": 0.74,
+      "bleachFrom": 0.94,
+      "seed": 1005
+    }
+  },
+  "bands": [
+    {
+      "from": 0.0,
+      "to": 12.0,
+      "type": "hot",
+      "quality": {
+        "sound": 0.62,
+        "fair": 0.26,
+        "perished": 0.12,
+        "cracked": 0.0
+      },
+      "note": "She is in steam. The brickwork moves as the flue heats, and a bolt you pull up cold is a bolt that is too tight by dinner time."
+    },
+    {
+      "from": 12.0,
+      "to": 24.0,
+      "type": "crack",
+      "quality": {
+        "sound": 0.34,
+        "fair": 0.34,
+        "perished": 0.28,
+        "cracked": 0.04
+      },
+      "note": "Opening from the top down, as they all do."
+    },
+    {
+      "from": 24.0,
+      "to": 32.0,
+      "type": "perished",
+      "quality": {
+        "sound": 0.14,
+        "fair": 0.26,
+        "perished": 0.48,
+        "cracked": 0.12
+      },
+      "note": "An octagon is the difficult sort to hoop: one misfitting square throws the whole hoop out of form."
+    }
+  ],
+  "weather": {
+    "windBase": 4.0,
+    "windBearing": 176,
+    "windVeerPerHour": 3.0,
+    "windAtHeight": [
+      [
+        0,
+        1.0
+      ],
+      [
+        16,
+        1.25
+      ],
+      [
+        32,
+        1.5
+      ]
+    ],
+    "gustIntervalSeconds": [
+      80,
+      150
+    ],
+    "precipitation": "drizzle",
+    "ramp": null
+  },
+  "site": {
+    "safeLineDistance": 0,
+    "exclusions": [],
+    "corridor": null,
+    "crowd": null,
+    "backdrop": "mill-town-yard"
+  },
+  "mission": {
+    "type": "BAND",
+    "bands": [
+      {
+        "height": 8.0,
+        "bolts": 8,
+        "note": "Low and hot."
+      },
+      {
+        "height": 14.0,
+        "bolts": 8,
+        "note": "Under the crack."
+      },
+      {
+        "height": 19.0,
+        "bolts": 12,
+        "note": "Across it."
+      },
+      {
+        "height": 24.0,
+        "bolts": 12,
+        "note": "Above it."
+      },
+      {
+        "height": 28.0,
+        "bolts": 12,
+        "note": "Into the perished band."
+      },
+      {
+        "height": 31.0,
+        "bolts": 8,
+        "note": "Under the cap, where the edge is weakest and they are fitted first."
+      }
+    ],
+    "softLanding": false
+  },
+  "complications": [
+    {
+      "at": "summit",
+      "type": "great-aire-reveal",
+      "params": {
+        "durationSeconds": 4.0,
+        "bearing": 214,
+        "distance": 4800
+      }
+    }
+  ],
+  "scoring": {
+    "bonuses": [
+      {
+        "id": "all_defects",
+        "condition": "defectsFound==4",
+        "amount": 0
+      }
+    ],
+    "hardFailConditions": []
+  },
+  "loadoutHint": {
+    "ladders": 9,
+    "dogs": 24,
+    "rope": 2
+  },
+  "replay": "data/replays/01-back-yard-expert.replay",
+  "designDoc": "docs/02-levels/level-01-back-yard.md"
+}
