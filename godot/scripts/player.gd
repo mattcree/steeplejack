@@ -3224,6 +3224,9 @@ var plumb_job := false
 var plumb_take_out := 2.0      ## mm of thickness the replacement course is thinner by
 var plumb_cut_done := false
 var plumb_hours := 0.0
+## How fast her settling runs. The trade's own figure is eighteen to thirty-six hours; at this
+## rate that is a little under half a minute of standing and watching.
+const SETTLE_HOURS_PER_SECOND := 1.0
 
 
 func _plumb_setup() -> void:
@@ -3301,8 +3304,14 @@ func _plumb_tick(dt: float) -> void:
 	var st: Dictionary = jack.plumb_state()
 	if not bool(st.get("settling", false)):
 		return
-	plumb_hours += dt * 26.0
-	jack.plumb_step(dt * 26.0)
+	# Her day and a half, played out over about half a minute. The first version ran the whole
+	# settle in a second — dt against an hours-per-second rate that happened to equal the total —
+	# so the oscillation the archetype is built on came and went before you could look at it. At
+	# one real second to the hour you get to stand there and watch the slit open and close, which
+	# is the bit where the masons on one real job put their tools down and left.
+	var hours: float = dt * SETTLE_HOURS_PER_SECOND
+	plumb_hours += hours
+	jack.plumb_step(hours)
 	if not bool(jack.plumb_state().get("settling", false)):
 		_settle_plumb()
 

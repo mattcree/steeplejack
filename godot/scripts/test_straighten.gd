@@ -83,7 +83,9 @@ func _init() -> void:
 	# --- and she comes back over a day -----------------------------------------------------
 	player.career_path = "user://test-plumb-tin.json"
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(player.career_path))
-	for i in 240:
+	# Long enough to cover her whole settle at the rate the game runs it — about half a minute of
+	# real time, which is the point of it: the sway is a thing you stand and watch.
+	for i in 3000:
 		player._plumb_tick(1.0 / 60.0)
 		if not bool(jack.plumb_state().get("settling", false)):
 			break
