@@ -78,6 +78,11 @@ func _init() -> void:
 		"the pit is dug and tested: %.1f ohms" % done.get("earth_ohms", -1.0))
 	_check(float(done.get("earth_ohms", 99.0)) <= 10.0, "and it passes")
 
+	# --- and the pit is where a conductor job actually ends ---------------------------------
+	_check(not player.settlement.is_empty(),
+		"a run that passes pays at the BOTTOM, not at the cap")
+	_check(not bool(player.settlement.get("failed", true)), "and it counts as done")
+
 	print("CONDUCTOR: %s" % ("ok" if failures == 0 else "%d failure(s)" % failures))
 	quit(1 if failures > 0 else 0)
 

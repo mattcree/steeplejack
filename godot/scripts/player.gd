@@ -429,6 +429,15 @@ var stripped_out := false
 func _settle_the_job() -> void:
 	if not settlement.is_empty() or stripped_out:
 		return
+	# A conductor run is not finished at the top — the top is where it STARTS. The whole job is on
+	# the way down and the last of it is a pit at the foot of the chimney, so paying at the cap
+	# would pay for work that has not happened. It settles when the run passes, at the bottom.
+	#
+	# This is not the general question of when a job should settle, which 17-the-long-game.md
+	# raises and BLOCKED.md keeps for the designer. It is one archetype whose ending is somewhere
+	# else, and getting it wrong here would not be a design position, it would be a bug.
+	if conductor_job:
+		return
 	var text := ""
 	if FileAccess.file_exists(career_path):
 		var f := FileAccess.open(career_path, FileAccess.READ)
@@ -2884,6 +2893,31 @@ func _conductor_act() -> void:
 		_say("clipped — %.0f m of tape left" % float(after.get("tape_left", 0.0)))
 
 
+## Paid at the bottom, for a run that passed. Goes through the same sim call every other job
+## uses, so the tin and the board are telling the same story whichever archetype you came from.
+func _settle_conductor(st: Dictionary) -> void:
+	if not settlement.is_empty():
+		return
+	var text := ""
+	if FileAccess.file_exists(career_path):
+		var f := FileAccess.open(career_path, FileAccess.READ)
+		if f != null:
+			text = f.get_as_text()
+			f.close()
+	jack.career_load(text)
+	# Marginal work is still work, and it is paid — the fee is for a conductor that is on the
+	# chimney, not for a perfect one. What a poor run costs you is what anyone will let you do next.
+	settlement = jack.career_settle_climb(_level_id(), _level_fee(),
+		String(st.get("verdict_name", "")) == "SOUND")
+	var out := FileAccess.open(career_path, FileAccess.WRITE)
+	if out != null:
+		out.store_string(jack.career_json())
+		out.close()
+	top_reached = true
+	_say("that is her earthed and tested. %s" % ("a good job" if
+		String(st.get("verdict_name", "")) == "SOUND" else "it will pass, but only just"))
+
+
 ## How hard the clip went in. The hammer's own swing, so the verb that drives a dog drives a
 ## holdfast — except that here the right answer is in the middle rather than at the end.
 func _clip_tightness() -> float:
@@ -2898,5 +2932,11 @@ func _conductor_earth() -> void:
 	jack.conductor_earth(float(e.get("plateSquareFeet", 18.0)), bool(e.get("wet", true)),
 		bool(e.get("coke", true)))
 	var st: Dictionary = jack.conductor_state(0.0)
-	_say("%.1f ohms — %s" % [float(st.get("earth_ohms", -1.0)),
-		"that will do" if float(st.get("earth_ohms", 99.0)) <= 10.0 else "that will not do"])
+	var ohms: float = float(st.get("earth_ohms", -1.0))
+	var pass_at: float = jack.tuning_f("earthPassOhms", 10.0)
+	_say("%.1f ohms — %s" % [ohms, "that will do" if ohms <= pass_at else "that will not do"])
+	# The continuity test IS the end of the job — "a lovely final beat: it turns, it points into
+	# the wind, the bell rings", as 05-mission-types.md puts it about the other archetype that
+	# ends in a test. A run that does not pass is finished too; it is just finished badly.
+	if ohms <= pass_at and String(st.get("verdict_name", "")) != "FAILED":
+		_settle_conductor(st)

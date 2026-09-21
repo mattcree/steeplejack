@@ -258,6 +258,33 @@ const STEPS := [
 	"Lash the section to that dog",
 ]
 
+## A conductor job is a different list of four, because it is a different job — and the laddering
+## one was still on screen the whole way down a run, telling a man with a reel of copper on his
+## belt to go and fetch a ladder section.
+const RUN_STEPS := [
+	"Ladder her to the top",
+	"Fix the terminal at the apex  [F]",
+	"Run the tape down, a clip about every metre  [F]",
+	"Dig the earth pit at the foot of her  [F]",
+]
+
+
+## Which four steps are on screen, and how far through them he is. Returns [steps, done, current].
+func _run_state() -> Array:
+	var st: Dictionary = player.jack.conductor_state(maxf(player.height_m(), 0.0))
+	var laddered: bool = player.ladder_top >= float(player.jack.total_height()) - 1.5
+	var terminal: bool = bool(st.get("terminal", false))
+	var down: bool = terminal and player.height_m() < 2.0
+	var earthed: bool = float(st.get("earth_ohms", -1.0)) >= 0.0
+	var done := [laddered, terminal, down, earthed]
+	var current := 0
+	for i in 4:
+		if not done[i]:
+			current = i
+			break
+		current = 3
+	return [done, current]
+
 
 func _step_state() -> Array:
 	var has_section: bool = player.carrying_ladder or player.lashing
@@ -281,7 +308,11 @@ func _draw_steps() -> void:
 		return
 	if player.jack.slip_in_progress() or player.stack_info.get("buckling", false):
 		return
+	var steps: Array = STEPS
 	var state := _step_state()
+	if player.conductor_job:
+		steps = RUN_STEPS
+		state = _run_state()
 	var done: Array = state[0]
 	var current: int = state[1]
 	var built: int = player.jack.stack_sections().size()
@@ -290,21 +321,24 @@ func _draw_steps() -> void:
 	# top of the dogs it is telling you to drive.
 	var x := GAUGE_X + 108.0
 	var y := size.y * 0.26
-	_label("NEXT SECTION   %d of %d up" % [built, total], Vector2(x, y), Color(0.95, 0.93, 0.88, 0.85), 13)
+	_label("THE RUN" if player.conductor_job else "NEXT SECTION   %d of %d up" % [built, total],
+		Vector2(x, y), Color(0.95, 0.93, 0.88, 0.85), 13)
 	y += 22.0
-	for i in STEPS.size():
+	for i in steps.size():
 		var now: bool = i == current
 		var mark := "✓" if done[i] and not now else ("▶" if now else "·")
 		var col := Color(0.98, 0.96, 0.90, 0.98) if now else (
 			Color(0.70, 0.78, 0.66, 0.80) if done[i] else Color(0.72, 0.70, 0.66, 0.60))
-		_label("%s  %d. %s" % [mark, i + 1, STEPS[i]], Vector2(x, y), col, 15 if now else 13)
+		_label("%s  %d. %s" % [mark, i + 1, steps[i]], Vector2(x, y), col, 15 if now else 13)
 		y += 22.0 if now else 19.0
 		if now:
 			# The advice line, but only where it is about this step: the old single-line guidance
 			# runs a step ahead in places, and advice about tapping under "climb to the top" was
 			# exactly the confusion this list is here to end.
-			var detail := _next_step()
-			if i == 1:
+			var detail := "" if player.conductor_job else _next_step()
+			if player.conductor_job and i == 0:
+				detail = "She has to be laddered before any of it goes on"
+			if i == 1 and not player.conductor_job:
 				detail = "Climb up what you've built  [W]" if player.on_ladder else detail
 			if detail != "":
 				_label(detail, Vector2(x + 24.0, y - 2.0), Color(0.92, 0.84, 0.62, 0.95), 13)
@@ -1344,7 +1378,7 @@ func _draw_stack_gauge(jack: Jack) -> void:
 	var hw: float = _font.get_string_size("%.0f" % h, HORIZONTAL_ALIGNMENT_LEFT, -1, H1).x
 	_label("m", Vector2(GAUGE_X + 24.0 + hw, my + 10.0), Color(DIM, 0.9), SMALL)
 	if player.on_ladder and player.ladder_top > h:
-		_label("%.0f m of ladder above you" % (player.ladder_top - h),
+		_label("%.0f m of ladder up" % (player.ladder_top - h),
 			Vector2(GAUGE_X + 20.0, my + 26.0), Color(FAINT, 0.8), TINY)
 
 
