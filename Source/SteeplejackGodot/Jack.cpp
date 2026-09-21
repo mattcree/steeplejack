@@ -209,6 +209,9 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("fell_shift", "height_removed_m"), &Jack::fell_shift);
 	ClassDB::bind_method(D_METHOD("career_load", "json"), &Jack::career_load);
 	ClassDB::bind_method(D_METHOD("career_json"), &Jack::career_json);
+	ClassDB::bind_method(D_METHOD("band_begin", "index", "bolts"), &Jack::band_begin);
+	ClassDB::bind_method(D_METHOD("band_tighten", "index", "bolt", "amount"), &Jack::band_tighten);
+	ClassDB::bind_method(D_METHOD("band_state", "index"), &Jack::band_state);
 	ClassDB::bind_method(D_METHOD("conductor_begin", "reels"), &Jack::conductor_begin);
 	ClassDB::bind_method(D_METHOD("conductor_set_terminal"), &Jack::conductor_set_terminal);
 	ClassDB::bind_method(D_METHOD("conductor_fix", "height", "tape_paid", "tightness"),
@@ -1541,6 +1544,50 @@ void Jack::career_load(const String& json)
 String Jack::career_json() const
 {
 	return String(career.ToJson().c_str());
+}
+
+// --- banding -------------------------------------------------------------------------------------
+
+void Jack::band_begin(int64_t index, int64_t bolts)
+{
+	if (!tuning || index < 0) { return; }
+	if (static_cast<std::size_t>(index) >= bands.size())
+	{
+		bands.resize(static_cast<std::size_t>(index) + 1);
+	}
+	bands[static_cast<std::size_t>(index)].Begin(static_cast<int32_t>(bolts), *tuning);
+}
+
+bool Jack::band_tighten(int64_t index, int64_t bolt, double amount)
+{
+	if (!tuning || index < 0 || static_cast<std::size_t>(index) >= bands.size()) { return false; }
+	return bands[static_cast<std::size_t>(index)].Tighten(static_cast<int32_t>(bolt),
+		static_cast<float>(amount), *tuning);
+}
+
+Dictionary Jack::band_state(int64_t index) const
+{
+	Dictionary d;
+	if (!tuning || index < 0 || static_cast<std::size_t>(index) >= bands.size()) { return d; }
+	static const char* kNames[] = {"LOOSE", "TRUE", "OVAL", "SEATED"};
+	const sj::Band& b = bands[static_cast<std::size_t>(index)];
+	const sj::BandState st = b.State(*tuning);
+	d["fit"] = static_cast<int64_t>(st.fit);
+	d["fit_name"] = String(kNames[static_cast<int>(st.fit)]);
+	d["ovality"] = static_cast<double>(st.ovality);
+	d["tightest"] = static_cast<double>(st.tightest);
+	d["slackest"] = static_cast<double>(st.slackest);
+	d["bolts"] = static_cast<int64_t>(st.bolts);
+	d["tightened"] = static_cast<int64_t>(st.tightened);
+	d["seated"] = st.seated;
+	d["sequence"] = static_cast<double>(b.SequenceQuality());
+	PackedFloat32Array pulls;
+	for (const float v : b.Tensions())
+	{
+		pulls.push_back(v);
+	}
+	d["tension"] = pulls;
+	return d;
 }
 
 // --- the conductor run --------------------------------------------------------------------------

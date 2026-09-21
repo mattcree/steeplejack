@@ -110,6 +110,7 @@ func _draw() -> void:
 	_draw_wind(jack, Vector2(size.x - 108.0, 86.0))
 	_draw_hold_line()
 	_draw_conductor(jack)
+	_draw_band(jack)
 
 	# Only once there is something to span *from*. With no dogs driven, the span is measured from
 	# the ground and reads "62.0 m span — about to buckle" at the top of a ladder that is lashed all
@@ -1297,6 +1298,76 @@ func _draw_conductor(jack: Jack) -> void:
 	_label("%d clips  ·  %s" % [st.get("clips", 0), name_], at + Vector2(0.0, 106.0), vcol, SMALL)
 	if why != "":
 		_label(why, at + Vector2(0.0, 122.0), Color(vcol, 0.8), TINY)
+
+
+## The band you are on, drawn as the ring it is.
+##
+## The puzzle is entirely about ORDER round a circle, so the instrument is a circle: every bolt at
+## its own bearing, filled as it comes up, with the one in front of you marked and the shape of
+## what you have done visible as a shape. A list of numbers could not show "you have pulled one
+## side of her up and left the other", which is the only thing a player needs to see.
+const RING_R := 46.0
+
+
+func _draw_band(jack: Jack) -> void:
+	if not player.band_job:
+		return
+	var index: int = player._band_here()
+	if index < 0:
+		return
+	var st: Dictionary = jack.band_state(index)
+	if st.is_empty():
+		return
+	var n: int = maxi(int(st.get("bolts", 8)), 1)
+	var at := Vector2(size.x - 118.0, 196.0)
+
+	draw_circle(at, RING_R + 22.0, Color(0.05, 0.04, 0.03, 0.5))
+	var fit := String(st.get("fit_name", "LOOSE"))
+	var col := GOOD if fit == "SEATED" else (
+		DANGER if fit == "OVAL" else (WATCH if fit == "TRUE" else FAINT))
+
+	# The ring itself, drawn out of round in proportion to how out of round it is. The number is
+	# on screen too, but the shape is what you read.
+	var oval: float = clampf(float(st.get("ovality", 0.0)), 0.0, 1.0)
+	var pts := PackedVector2Array()
+	for i in 49:
+		var a: float = TAU * float(i) / 48.0
+		pts.append(at + Vector2(cos(a) * RING_R * (1.0 + oval * 0.5),
+			sin(a) * RING_R * (1.0 - oval * 0.5)))
+	for i in pts.size() - 1:
+		draw_line(pts[i], pts[i + 1], Color(col, 0.55), 2.0)
+
+	var here: int = player._band_bolt_here(index)
+	var tension: PackedFloat32Array = st.get("tension", PackedFloat32Array())
+	var seat: float = player.jack.tuning_f("bandSeatTension", 0.72)
+	for b in n:
+		# Bearing zero at the top, going round the way he goes round.
+		var a: float = TAU * float(b) / float(n) - PI * 0.5
+		var p := at + Vector2(cos(a), sin(a)) * RING_R
+		# Each bolt at its OWN tension, because a count cannot show you that the six you have
+		# pulled up are all on one side — which is the only thing about an oval band you can act on.
+		var pull: float = tension[b] if b < tension.size() else 0.0
+		draw_circle(p, 6.0, Color(0.05, 0.04, 0.03, 0.8))
+		if pull > 0.0:
+			draw_circle(p, 1.5 + 4.5 * clampf(pull, 0.0, 1.0),
+				Color(GOOD if pull >= seat else WATCH, 0.9))
+		draw_arc(p, 6.0, 0.0, TAU, 12, Color(col, 0.7), 1.5)
+		if b == here:
+			draw_arc(p, 10.0, 0.0, TAU, 14, Color(INK, 0.9), 2.0)
+	# The count in the middle, because "six of twelve" is the one thing the ring cannot say.
+	var label := "%d/%d" % [int(st.get("tightened", 0)), n]
+	var lw: float = _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, H2).x
+	_label(label, at - Vector2(lw * 0.5, -6.0), Color(col, 0.95), H2)
+
+	var words := {"LOOSE": "loose", "TRUE": "coming in true", "OVAL": "going oval",
+		"SEATED": "home and true"}
+	var word: String = String(words.get(fit, ""))
+	var ww: float = _font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, SMALL).x
+	_label(word, at - Vector2(ww * 0.5, -RING_R - 30.0), Color(col, 0.9), SMALL)
+	if fit == "OVAL":
+		var msg := "work the other side of her"
+		var mw: float = _font.get_string_size(msg, HORIZONTAL_ALIGNMENT_LEFT, -1, TINY).x
+		_label(msg, at - Vector2(mw * 0.5, -RING_R - 46.0), Color(DANGER, 0.85), TINY)
 
 
 # --- the instruments ------------------------------------------------------------------------------

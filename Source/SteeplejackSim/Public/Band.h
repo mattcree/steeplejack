@@ -71,6 +71,11 @@ public:
 
     BandState State(const Tuning& t) const noexcept;
 
+    // Every bolt's own tension. The instrument needs this rather than a count, because "six of
+    // twelve" cannot show you that the six are all on one side, which is the only thing about an
+    // oval band that a player can act on.
+    const std::vector<float>& Tensions() const noexcept { return tension_; }
+
 private:
     std::vector<float>   tension_;
     std::vector<int32_t> order_;      // the bolts touched, in the order they were touched

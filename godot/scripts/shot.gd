@@ -37,6 +37,7 @@
 #   climbfor <s>     hold W for s seconds (negative for S) — mid-climb, hands moving
 #   cam <yaw> <pit>  aim the camera, degrees — NOTE this turns the jack too, because it sets his
 #                    facing and the boom follows it. Use it to pose him, not to look at him.
+#   band <n>         pull the first n bolts of the band he is level with hard up
 #   orbit <d> <m> [p]  look at him from `d` degrees round his own facing, `m` metres back, pitch `p`.
 #                    A free camera that ignores the boom, so it does not turn him: this is the one
 #                    for limb geometry, where the whole question is what a leg does side-on.
@@ -198,6 +199,14 @@ func _run(cmd: String) -> void:
 				await _wait(45)
 				print("LEGS: ", grip_node.describe_limbs())
 				grip_node.watch_limbs = false
+		"band":
+			# Pull `a` bolts of the band he is level with up hard, leaving the rest — the shape a
+			# player makes when they work round the ring instead of across it.
+			var idx: int = int(player._band_here())
+			if idx >= 0:
+				for r in 5:
+					for bolt in int(a):
+						player.jack.band_tighten(idx, bolt, 0.22)
 		"orbit":
 			# A camera of our own, parented to nothing and aimed by hand. The boom re-eases towards
 			# the player's facing every frame, so setting its rotation does not hold for a capture;

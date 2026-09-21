@@ -59,20 +59,24 @@ func _init() -> void:
 
 	# --- the letters that have not arrived yet -------------------------------------------------
 	# A reputation gate is a rule about what the player may do, so the answer comes from the sim.
-	# But a gate you could not reach even by doing every job that exists is a gap in the level set
-	# rather than something the player has failed to earn, and the board has to tell those apart:
-	# twelve levels were designed, five have data, and every felling is gated above what five jobs
-	# can pay. Enforcing that blindly would lock the player out of half the finished game.
+	# But a gate you could not reach even by doing every job that EXISTS is a gap in the level set
+	# rather than something the player has failed to earn, and the board has to tell those apart —
+	# twelve levels were designed and not all of them have data yet.
+	#
+	# This used to assert that Kershaw's three-star gate was one of those gaps, which was true when
+	# five levels shipped. Chapel Street and Brigg's Dyeworks make it earnable, so the same code
+	# now correctly calls it a gate. The property being tested is the TELLING APART, not which side
+	# any particular job happens to fall on this week.
 	for i in board.jobs.size():
 		if String(board.jobs[i]["id"]) == "07-kershaws-yard":
 			board.selected = i
 	_check(int(board.career.get("stars", 0)) == 1, "a new jack has one star")
-	_check(board._reachable_stars() == 2,
-		"and every job with data, done, would still only make him two")
-	_check(board.unearnable(board.jobs[board.selected]),
-		"so Kershaw's three-star gate is a gap, not a gate")
-	_check(not board.locked(board.jobs[board.selected]),
-		"and he is let through it, with the reason on the card")
+	_check(board._reachable_stars() >= 3,
+		"and the jobs that exist can now earn three: %d" % board._reachable_stars())
+	_check(not board.unearnable(board.jobs[board.selected]),
+		"so Kershaw's gate is a real gate now, not a gap in the level set")
+	_check(board.locked(board.jobs[board.selected]),
+		"and it is properly shut until he has earned it")
 
 	# A gate he could reach and has not is a real lock, and stays shut.
 	var reachable := {"id": "x", "gate": 2, "archetype": "FELL", "fee": 100, "height": 40.0,

@@ -23,6 +23,7 @@
 #include "Recovery.h"
 #include "Rng.h"
 #include "Slip.h"
+#include "Band.h"
 #include "Conductor.h"
 #include "Stack.h"
 #include "Wind.h"
@@ -354,6 +355,14 @@ public:
 	godot::String career_json() const;
 	/** `{money, reputation, stars, jobs}` — jobs is an Array of `{id, paid, error, failed}`. */
 	godot::Dictionary career_state() const;
+	// --- banding ------------------------------------------------------------------------------
+	/** Start a band of `bolts` segments at `height`. */
+	void band_begin(int64_t index, int64_t bolts);
+	/** Pull one bolt up. Returns false for a bolt that is not on it. */
+	bool band_tighten(int64_t index, int64_t bolt, double amount);
+	/** How it reads: fit, ovality, how many are up, and the order you have been working in. */
+	godot::Dictionary band_state(int64_t index) const;
+
 	// --- the conductor run --------------------------------------------------------------------
 	/** Start a run with `reels` reels of tape on the van. */
 	void conductor_begin(int64_t reels);
@@ -461,6 +470,7 @@ private:
 
 	sj::WindModel wind{};
 	sj::Conductor conductor{};
+	std::vector<sj::Band> bands;
 	/** The weather's own substream, forked once, so adding a subsystem cannot shift its values. */
 	std::unique_ptr<sj::Rng> weather_rng;
 

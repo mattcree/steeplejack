@@ -353,6 +353,7 @@ func _ready() -> void:
 	# one that matters here: the next crew "had used the old dog holes and it wandered a bit".
 	_plant_what_you_left()
 	_conductor_setup()
+	_band_setup()
 	var tree_root := get_tree().root
 	if tree_root.has_meta("job_ladders"):
 		ladders_at_base = maxi(int(tree_root.get_meta("job_ladders")), 1)
@@ -841,6 +842,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_F: _pick_up()
 			KEY_Q: _cycle_stance()
 			KEY_G: _gin_wheel()
+			KEY_B: _band_act()
 			KEY_T: _recover(REC_TEA)
 			KEY_C: _recover(REC_CIG)
 			KEY_V: _recover(REC_VIEW)
@@ -2982,3 +2984,71 @@ func _conductor_earth() -> void:
 	# ends in a test. A run that does not pass is finished too; it is just finished badly.
 	if ohms <= pass_at and String(st.get("verdict_name", "")) != "FAILED":
 		_settle_conductor(st)
+
+
+# --- banding ---------------------------------------------------------------------------------
+#
+# 05-mission-types.md §D. A band is segments bolted into a ring and then pulled up by those same
+# bolts, and the order you pull them up in is the whole job: opposite pairs and it comes in true,
+# round the ring and it goes oval and will not seat.
+#
+# The bolts are laid out round the chimney, so which one you are on is where you are standing —
+# the lateral shuffle the climb already has, turned into a dial.
+
+var band_job := false
+var band_at := -1              ## which of the level's bands he is working, or -1
+var band_bolt := 0             ## which bolt he is on, by where he is round the face
+
+
+func _band_setup() -> void:
+	band_job = String(jack.level_archetype()) == "BAND"
+	if not band_job:
+		return
+	var list: Array = _mission().get("bands", []) as Array
+	for i in list.size():
+		jack.band_begin(i, int((list[i] as Dictionary).get("bolts", 8)))
+
+
+## The band whose height he is at, or -1. A band is worked from beside it, not from anywhere.
+func _band_here() -> int:
+	var list: Array = _mission().get("bands", []) as Array
+	for i in list.size():
+		if absf(height_m() - float((list[i] as Dictionary).get("height", -99.0))) < 1.6:
+			return i
+	return -1
+
+
+## Which bolt is in front of him: his bearing round the shaft, divided into as many as the band
+## has. Going round the chimney IS choosing a bolt, which is why this needs no new control.
+func _band_bolt_here(index: int) -> int:
+	var st: Dictionary = jack.band_state(index)
+	var n: int = maxi(int(st.get("bolts", 8)), 1)
+	var b: float = deg_to_rad(jack.climb_bearing()) + _shuffle
+	var turn: float = fposmod(b, TAU) / TAU
+	return int(turn * float(n)) % n
+
+
+## [B] pulls the bolt in front of him up a turn.
+func _band_act() -> void:
+	if not band_job:
+		return
+	var index := _band_here()
+	if index < 0:
+		_say("stand level with a band to work on it")
+		return
+	band_at = index
+	band_bolt = _band_bolt_here(index)
+	var before: Dictionary = jack.band_state(index)
+	if not jack.band_tighten(index, band_bolt, jack.tuning_f("bandTightenPerPull", 0.22)):
+		return
+	var after: Dictionary = jack.band_state(index)
+	if foley != null:
+		foley.cue("hammer", 0.8)
+	var fit := String(after.get("fit_name", ""))
+	if fit == "OVAL" and String(before.get("fit_name", "")) != "OVAL":
+		_say("she is going oval — work the other side of her")
+	elif bool(after.get("seated", false)) and not bool(before.get("seated", false)):
+		_say("that one is home and true")
+	else:
+		_say("bolt %d of %d — %d up" % [band_bolt + 1, int(after.get("bolts", 0)),
+			int(after.get("tightened", 0))])

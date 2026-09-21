@@ -1,0 +1,183 @@
+{
+  "$schema": "../schemas/level.schema.json",
+  "id": "03-briggs-dyeworks",
+  "name": "Brigg's Dyeworks",
+  "order": 3,
+  "archetype": "BAND",
+  "reputationGate": 1,
+  "fee": 310,
+  "briefing": {
+    "from": "J. Brigg",
+    "lines": [
+      "She is cracked from the top down and the insurance want three bands on her",
+      "before winter. Forty metres. The top one wants to go where the brickwork is",
+      "perished, which I am told is a problem, and there is an old band of my father's",
+      "on her that I would not trust with a wet paper bag."
+    ]
+  },
+  "shiftMinutes": 300,
+  "targetMinutes": 70,
+  "structure": {
+    "type": "chimney",
+    "height": 40.0,
+    "baseRadius": 1.9,
+    "topRadius": 1.15,
+    "profile": "round",
+    "batter": [
+      {
+        "at": 0.0,
+        "step": 0.0
+      }
+    ],
+    "bands": [],
+    "cap": "corbelled-oversail",
+    "leanDegrees": 0.0,
+    "leanBearing": 0,
+    "jointGrid": {
+      "courseHeight": 0.075,
+      "brickLength": 0.225,
+      "candidateDensity": 4.0
+    },
+    "weathering": {
+      "sootTo": 0.62,
+      "bleachFrom": 0.9,
+      "seed": 1003
+    }
+  },
+  "bands": [
+    {
+      "from": 0.0,
+      "to": 14.0,
+      "type": "plain",
+      "quality": {
+        "sound": 0.78,
+        "fair": 0.18,
+        "perished": 0.04,
+        "cracked": 0.0
+      },
+      "note": "Good brick at the bottom. The first band goes on here and it is the easy one."
+    },
+    {
+      "from": 14.0,
+      "to": 22.0,
+      "type": "existing-band",
+      "quality": {
+        "sound": 0.4,
+        "fair": 0.34,
+        "perished": 0.22,
+        "cracked": 0.04
+      },
+      "note": "His father's band. Sound it before you put any weight near it: a strap whose bolt has corroded to nothing takes six seconds to reach the ground."
+    },
+    {
+      "from": 22.0,
+      "to": 31.0,
+      "type": "crack",
+      "quality": {
+        "sound": 0.3,
+        "fair": 0.36,
+        "perished": 0.3,
+        "cracked": 0.04
+      },
+      "note": "The crack. This is what the bands are for."
+    },
+    {
+      "from": 31.0,
+      "to": 40.0,
+      "type": "perished",
+      "quality": {
+        "sound": 0.08,
+        "fair": 0.22,
+        "perished": 0.56,
+        "cracked": 0.14
+      },
+      "note": "The complication, and it is the one 05-mission-types.md specifies: the top band sits exactly where the brickwork will not take a dog. You work it from above."
+    }
+  ],
+  "weather": {
+    "windBase": 6.0,
+    "windBearing": 252,
+    "windVeerPerHour": 5.0,
+    "windAtHeight": [
+      [
+        0,
+        1.0
+      ],
+      [
+        20,
+        1.35
+      ],
+      [
+        40,
+        1.7
+      ]
+    ],
+    "gustIntervalSeconds": [
+      60,
+      110
+    ],
+    "precipitation": "none",
+    "ramp": null
+  },
+  "site": {
+    "safeLineDistance": 0,
+    "exclusions": [],
+    "corridor": null,
+    "crowd": null,
+    "backdrop": "mill-town-yard"
+  },
+  "mission": {
+    "type": "BAND",
+    "bands": [
+      {
+        "height": 9.0,
+        "bolts": 8,
+        "note": "The easy one, on good brick."
+      },
+      {
+        "height": 26.0,
+        "bolts": 12,
+        "note": "Across the crack, which is what the whole job is for."
+      },
+      {
+        "height": 35.0,
+        "bolts": 12,
+        "note": "Where the brickwork is perished and will not take a dog."
+      }
+    ],
+    "oldBand": {
+      "height": 18.0,
+      "boltRusted": true,
+      "note": "Sound it first. It is the hazard, not the furniture."
+    },
+    "softLanding": false
+  },
+  "complications": [
+    {
+      "at": "summit",
+      "type": "great-aire-reveal",
+      "params": {
+        "durationSeconds": 4.0,
+        "bearing": 214,
+        "distance": 4800
+      }
+    }
+  ],
+  "scoring": {
+    "bonuses": [
+      {
+        "id": "all_defects",
+        "condition": "defectsFound==4",
+        "amount": 0
+      }
+    ],
+    "hardFailConditions": []
+  },
+  "loadoutHint": {
+    "ladders": 11,
+    "dogs": 26,
+    "rope": 2
+  },
+  "replay": "data/replays/01-back-yard-expert.replay",
+  "designDoc": "docs/02-levels/level-01-back-yard.md"
+}
