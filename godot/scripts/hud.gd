@@ -92,38 +92,22 @@ func _draw() -> void:
 	# Nerve is the slow one, and it breathes: the character's chest, not a progress bar.
 	var breath := 1.0 + 0.035 * sin(now * (0.55 + 0.30 * jack.nerve_band()) * PI)
 
-	_arc(hand, GRIP_R, 1.0, 1.5, Color(0, 0, 0, 0.35 * grip_a))
-	_arc(hand, NERVE_R, 1.0, 1.5, Color(0, 0, 0, 0.35 * nerve_a))
-	_arc(hand, GRIP_R, grip / 100.0, 4.0, grip_col)
-	_arc(hand, NERVE_R * breath, nerve / nerve_max, 3.0, Color(0.42, 0.58, 0.78, nerve_a))
+	# --- the body, bottom left ------------------------------------------------------------------
+	#
+	# Bars, not arcs. Two arcs at different radii cannot be compared at a glance and two bars on a
+	# shared scale can, and the pair costs about seventy pixels of height where the arcs cost a
+	# hundred and twenty. That mattered: everything in this HUD used to hang off HAND and the whole
+	# bottom-left corner was six things stacked twenty pixels apart.
+	var bar := Vector2(HAND.x + 34.0, size.y - 118.0)
+	_draw_meter(bar, "GRIP", grip / 100.0, grip_col, grip_a, jack.tremoring())
+	_draw_meter(bar + Vector2(0.0, 40.0), "NERVE", nerve / nerve_max,
+		Color(0.42, 0.58, 0.78, nerve_a), nerve_a, false)
+	# The nerve bar breathes, which is the visual half of rule 8 for the breathing audio and was
+	# the one thing the arcs did better than a bar would.
+	_draw_kit(bar + Vector2(0.0, 74.0), breath)
 
-	if player._now < 30.0:
-		var a := _ease((30.0 - player._now) / 5.0) * 0.55
-		_label("grip", Vector2(HAND.x - 20, hand.y + GRIP_R + 14), Color(0.86, 0.74, 0.42, a))
-		_label("nerve", Vector2(HAND.x + 30, hand.y + NERVE_R + 14), Color(0.42, 0.58, 0.78, a))
-
-	# --- where you are ---------------------------------------------------------------------------
-	var info_x := HAND.x + NERVE_R + 26
-	# His FEET, not the capsule's middle. `global_position.y` is his waist and reads 0.9 m high —
-	# the same off-by-a-body-height that the sim was fixed for and the HUD never was, so the number
-	# on screen disagreed with every number in the level file.
-	# Floored at zero: standing on the ground printed "-0 m", and a negative height is the kind of
-	# small wrongness that makes a player stop trusting every other number on the screen.
-	_label("%.0f m" % maxf(player.height_m(), 0.0), Vector2(info_x, hand.y - 20), Color(INK, 0.95),
-		H2)
-	if player.on_ladder:
-		var where: String = jack.stance_name()
-		var band: String = jack.band_type_at(player.height_m())
-		if band != "":
-			where += "  ·  " + band
-		_label(where, Vector2(info_x, hand.y), Color(FAINT, 0.85), SMALL)
-
-	var stock := "%s   %d dogs in the bag   top %.0fm" % [
-		"ladder on your shoulder" if player.carrying_ladder else "no ladder",
-		player.dogs_carried, player.ladder_top]
-	_label(stock, Vector2(info_x, hand.y + 22), Color(DIM, 0.85), SMALL)
-	_draw_ladder_verdict(jack, Vector2(info_x, hand.y + 48))
-	_draw_wind(jack, Vector2(HAND.x, hand.y - NERVE_R - 58.0))
+	_draw_stack_gauge(jack)
+	_draw_wind(jack, Vector2(size.x - 108.0, 86.0))
 	_draw_hold_line()
 
 	# Only once there is something to span *from*. With no dogs driven, the span is measured from
@@ -132,7 +116,7 @@ func _draw() -> void:
 	if player.span_warning != "" and jack.anchor_count() > 0 and not player.at_top and player.on_ladder:
 		var buckle: bool = player.span_warning.contains("buckle")
 		var col := Color(0.95, 0.30, 0.22, 0.6 + 0.4 * sin(now * 7.0)) if buckle else Color(0.92, 0.70, 0.35, 0.9)
-		_label(player.span_warning, Vector2(info_x, hand.y + 42), col, 13)
+		_label(player.span_warning, Vector2(GAUGE_X + 20.0, size.y - 150.0), col, 13)
 
 	# --- what you can do, and what is stopping you ----------------------------------------------
 	_draw_steps()
@@ -301,7 +285,9 @@ func _draw_steps() -> void:
 	var current: int = state[1]
 	var built: int = player.jack.stack_sections().size()
 	var total: int = built + int(player.ladders_at_base) + (1 if player.carrying_ladder else 0)
-	var x := 28.0
+	# Clear of the stack gauge, which now owns the left edge. At 28 the checklist sat straight on
+	# top of the dogs it is telling you to drive.
+	var x := GAUGE_X + 108.0
 	var y := size.y * 0.26
 	_label("NEXT SECTION   %d of %d up" % [built, total], Vector2(x, y), Color(0.95, 0.93, 0.88, 0.85), 13)
 	y += 22.0
@@ -1139,6 +1125,195 @@ func _draw_slip(jack: Jack) -> void:
 	if not jack.can_slip_save():
 		_centre("nothing left to catch with", eye.y + r + 56.0, Color(0.95, 0.45, 0.35, 0.85), 14)
 
+
+
+# --- the instruments ------------------------------------------------------------------------------
+
+const BAR_W := 200.0
+const BAR_H := 9.0
+const TREMOR_AT := 0.25          ## where grip starts costing you; drawn, not remembered
+
+
+## One meter: an icon, a name, a number, and a bar with the danger notch marked.
+func _draw_meter(at: Vector2, name_: String, fraction: float, col: Color, alpha: float,
+		flashing: bool) -> void:
+	var f: float = clampf(fraction, 0.0, 1.0)
+	var line := Color(col, maxf(alpha, 0.5))
+	if name_ == "GRIP":
+		_icon_hand(at + Vector2(0.0, -4.0), line)
+	else:
+		_icon_pulse(at + Vector2(0.0, -4.0), line)
+	_label(name_, at + Vector2(24.0, 0.0), line, TINY)
+	var num := "%d" % roundi(f * 100.0)
+	var nw: float = _font.get_string_size(num, HORIZONTAL_ALIGNMENT_LEFT, -1, SMALL).x
+	_label(num, at + Vector2(BAR_W - nw, 0.0), line, SMALL)
+
+	var track := Rect2(at + Vector2(0.0, 6.0), Vector2(BAR_W, BAR_H))
+	draw_rect(track, Color(0.05, 0.04, 0.03, 0.55))
+	if f > 0.0:
+		draw_rect(Rect2(track.position, Vector2(BAR_W * f, BAR_H)), line)
+	# The threshold you must not cross, as a mark on the scale rather than a number to recall.
+	var notch: float = at.x + BAR_W * TREMOR_AT
+	draw_line(Vector2(notch, track.position.y - 2.0), Vector2(notch, track.position.y + BAR_H + 2.0),
+		Color(DANGER, 0.85), 1.0)
+	if flashing:
+		draw_rect(Rect2(track.position - Vector2(1, 1), Vector2(BAR_W + 2, BAR_H + 2)),
+			Color(DANGER, 0.5 * alpha), false, 2.0)
+
+
+## What he is carrying, as counts rather than a sentence. "no ladder   0 dogs in the bag   top 15m"
+## was three unrelated facts welded together; these are three chips that dim when empty instead of
+## vanishing, so the slot keeps its place and the eye learns where to look.
+func _draw_kit(at: Vector2, breath: float) -> void:
+	var x := at.x
+	x = _chip(Vector2(x, at.y), CHIP_LADDER, 1 if player.carrying_ladder else 0, breath)
+	x = _chip(Vector2(x, at.y), CHIP_DOG, player.dogs_carried, breath)
+	if player.jack != null and player.jack.anchor_count() > 0:
+		x = _chip(Vector2(x, at.y), CHIP_LASH, int(player.jack.anchor_count()), breath)
+
+
+const CHIP_LADDER := 0
+const CHIP_DOG := 1
+const CHIP_LASH := 2
+
+
+func _chip(at: Vector2, kind: int, count: int, _breath: float) -> float:
+	var live: bool = count > 0
+	var col := Color(CHALK, 0.92) if live else Color(GHOST, 0.42)
+	var w := 54.0
+	draw_rect(Rect2(at, Vector2(w, 22.0)), Color(0.05, 0.04, 0.03, 0.45 if live else 0.25))
+	var mid := at + Vector2(13.0, 11.0)
+	match kind:
+		CHIP_LADDER: _icon_ladder(mid, col)
+		CHIP_DOG:    _icon_dog(mid, col)
+		CHIP_LASH:   _icon_lash(mid, col)
+	_label("%d" % count, at + Vector2(28.0, 16.0), col, SMALL)
+	return at.x + w + 7.0
+
+
+## The stack gauge — the whole climb, down the left edge.
+##
+## It replaces four lines of text at once: the height, "top 15m", "the ladder: WORKING" and the
+## span band. More than that, it is the image 00-vision.md calls the best the game has — your own
+## ladder stack receding below you — turned into something you can read. Height rides the marker
+## that says where you are, which is what finally got it out of the bottom-left corner.
+const GAUGE_X := 34.0
+const GAUGE_W := 26.0
+const GAUGE_TOP := 96.0
+const GAUGE_BOTTOM := 132.0
+
+
+func _draw_stack_gauge(jack: Jack) -> void:
+	var total: float = maxf(float(jack.total_height()), 1.0)
+	var top_y: float = GAUGE_TOP
+	var bot_y: float = size.y - GAUGE_BOTTOM
+	var span: float = bot_y - top_y
+
+	# The chimney, with its own batter, so the gauge is a picture of THIS stack and not a ruler.
+	var pts := PackedVector2Array()
+	var steps := 14
+	for i in steps + 1:
+		var f: float = float(i) / float(steps)
+		var r: float = float(jack.radius_at(f * total))
+		pts.append(Vector2(GAUGE_X - GAUGE_W * 0.5 * r / maxf(float(jack.radius_at(0.0)), 0.01),
+			bot_y - span * f))
+	for i in range(steps, -1, -1):
+		var f: float = float(i) / float(steps)
+		var r: float = float(jack.radius_at(f * total))
+		pts.append(Vector2(GAUGE_X + GAUGE_W * 0.5 * r / maxf(float(jack.radius_at(0.0)), 0.01),
+			bot_y - span * f))
+	draw_colored_polygon(pts, Color(0.06, 0.05, 0.05, 0.45))
+	draw_line(Vector2(GAUGE_X - 13.0, top_y), Vector2(GAUGE_X + 13.0, top_y), Color(GHOST, 0.8), 2.0)
+	_label("%.0f" % total, Vector2(GAUGE_X + 18.0, top_y + 4.0), Color(GHOST, 0.7), TINY)
+
+	# The ladder you have built, in the colour of what the whole stack is worth.
+	var verdict_col := GOOD
+	var survey: Dictionary = jack.stack_survey()
+	if not survey.is_empty():
+		var n := String(survey.get("verdict_name", "SOUND"))
+		verdict_col = DANGER if n == "NOT RIGHT" else (WATCH if n == "WORKING" else GOOD)
+	var ladder_y: float = bot_y - span * clampf(player.ladder_top / total, 0.0, 1.0)
+	draw_line(Vector2(GAUGE_X + 2.0, bot_y), Vector2(GAUGE_X + 2.0, ladder_y), verdict_col, 3.0)
+	draw_line(Vector2(GAUGE_X - 4.0, ladder_y), Vector2(GAUGE_X + 8.0, ladder_y), verdict_col, 2.0)
+
+	# Every dog at its real height, coloured by what it is worth. A bad run of anchors is a
+	# pattern here, and a pattern is a thing no sentence can show you.
+	var first_to_go: int = int(survey.get("first_to_go", -1))
+	for i in jack.anchor_count():
+		var a: Dictionary = jack.anchor_at(i)
+		if a.is_empty():
+			continue
+		var ay: float = bot_y - span * clampf(float(a["height"]) / total, 0.0, 1.0)
+		var rate := int(a["rate"])
+		var c: Color = [DANGER, DANGER, WATCH, GOOD][clampi(rate, 0, 3)]
+		var wide: bool = i == first_to_go
+		draw_line(Vector2(GAUGE_X - (14.0 if wide else 10.0), ay),
+			Vector2(GAUGE_X + (14.0 if wide else 10.0), ay), c, 4.0 if wide else 2.0)
+
+	# Where a fall would put you, and only when the survey says the stack will not hold one.
+	if not survey.is_empty() and not bool(survey.get("holds_a_fall", true)):
+		var to_y: float = bot_y - span * clampf(float(survey.get("would_fall_to", 0.0)) / total,
+			0.0, 1.0)
+		var me_y: float = bot_y - span * clampf(maxf(player.height_m(), 0.0) / total, 0.0, 1.0)
+		var y := me_y
+		while y < to_y:
+			draw_line(Vector2(GAUGE_X + 2.0, y), Vector2(GAUGE_X + 2.0, minf(y + 5.0, to_y)),
+				Color(DANGER, 0.9), 2.0)
+			y += 10.0
+
+	# And him, with the number riding alongside.
+	var h: float = maxf(player.height_m(), 0.0)
+	var my: float = bot_y - span * clampf(h / total, 0.0, 1.0)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(GAUGE_X - 24.0, my - 7.0), Vector2(GAUGE_X - 24.0, my + 7.0),
+		Vector2(GAUGE_X - 13.0, my)]), Color(INK, 0.95))
+	_label("%.0f" % h, Vector2(GAUGE_X + 20.0, my + 10.0), Color(INK, 0.95), H1)
+	var hw: float = _font.get_string_size("%.0f" % h, HORIZONTAL_ALIGNMENT_LEFT, -1, H1).x
+	_label("m", Vector2(GAUGE_X + 24.0 + hw, my + 10.0), Color(DIM, 0.9), SMALL)
+	if player.on_ladder and player.ladder_top > h:
+		_label("%.0f m of ladder above you" % (player.ladder_top - h),
+			Vector2(GAUGE_X + 20.0, my + 26.0), Color(FAINT, 0.8), TINY)
+
+
+# --- icons ----------------------------------------------------------------------------------------
+#
+# Stroke paths, drawn with the same draw_line calls everything else here uses. No textures, no
+# atlas, nothing to import — which is the only reason a HUD in this project can afford icons at all.
+
+func _icon_hand(at: Vector2, col: Color) -> void:
+	for i in 3:
+		var x: float = at.x + 4.0 + float(i) * 3.5
+		draw_line(Vector2(x, at.y - 1.0), Vector2(x, at.y - 7.0 + float(i) * 0.8), col, 1.6)
+	draw_line(Vector2(at.x + 3.0, at.y - 1.0), Vector2(at.x + 3.0, at.y + 3.0), col, 1.6)
+	draw_arc(at + Vector2(7.0, 1.0), 5.0, 0.0, PI, 10, col, 1.6)
+
+
+func _icon_pulse(at: Vector2, col: Color) -> void:
+	var p := PackedVector2Array([
+		Vector2(at.x, at.y), Vector2(at.x + 3.0, at.y), Vector2(at.x + 5.0, at.y - 5.0),
+		Vector2(at.x + 8.0, at.y + 5.0), Vector2(at.x + 10.5, at.y - 2.0),
+		Vector2(at.x + 12.5, at.y + 1.0), Vector2(at.x + 16.0, at.y)])
+	for i in p.size() - 1:
+		draw_line(p[i], p[i + 1], col, 1.6)
+
+
+func _icon_ladder(at: Vector2, col: Color) -> void:
+	draw_line(at + Vector2(-4.0, -7.0), at + Vector2(-4.0, 7.0), col, 1.6)
+	draw_line(at + Vector2(4.0, -7.0), at + Vector2(4.0, 7.0), col, 1.6)
+	for i in 3:
+		var y: float = at.y - 4.0 + float(i) * 4.0
+		draw_line(Vector2(at.x - 4.0, y), Vector2(at.x + 4.0, y), col, 1.4)
+
+
+func _icon_dog(at: Vector2, col: Color) -> void:
+	draw_line(at + Vector2(-6.0, 6.0), at + Vector2(2.0, -2.0), col, 1.8)
+	draw_line(at + Vector2(2.0, -2.0), at + Vector2(6.0, -6.0), col, 1.8)
+	draw_line(at + Vector2(6.0, -6.0), at + Vector2(6.0, -1.0), col, 1.8)
+
+
+func _icon_lash(at: Vector2, col: Color) -> void:
+	draw_arc(at, 6.0, 0.0, TAU, 16, col, 1.5)
+	draw_arc(at, 2.6, 0.0, TAU, 10, col, 1.5)
 
 # --- drawing helpers ----------------------------------------------------------------------------
 
