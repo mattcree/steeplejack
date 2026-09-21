@@ -348,6 +348,7 @@ func _ready() -> void:
 		ladders_at_base = jack.loadout_ladders()
 	if jack.loadout_dogs() > 0:
 		dogs_at_base = jack.loadout_dogs()
+	_conductor_setup()
 	var tree_root := get_tree().root
 	if tree_root.has_meta("job_ladders"):
 		ladders_at_base = maxi(int(tree_root.get_meta("job_ladders")), 1)
@@ -987,6 +988,7 @@ func _climb(dt: float, ladder_world: Vector3) -> void:
 		_arrive_at_top()
 		return
 	_climb_rate = (height_m() - before) / maxf(dt, 0.0001)
+	_conductor_descend(before)
 
 	# A knock on every rung he passes, hand and boot alternately. The climb had no sound at all,
 	# and a ladder under a man is not silent.
@@ -2442,6 +2444,14 @@ func _joint_of_anchor_at(height: float) -> int:
 
 
 func _pick_up() -> void:
+	# On a conductor job, F is the run: the terminal at the apex, a clip on the way down, and the
+	# earth pit when you get to the bottom.
+	if conductor_job:
+		if at_cradle():
+			_conductor_earth()
+		else:
+			_conductor_act()
+		return
 	# On the ladder, F draws the dog in reach rather than telling you to go to the cradle. It is
 	# the same idea — picking your gear up — at the other end of the job.
 	if not at_cradle() and on_ladder:
@@ -2774,3 +2784,119 @@ func target_tapped() -> bool:
 
 func has_tapped_here() -> bool:
 	return tap_pip >= 0 and absf(tapped_at - height_m()) < 1.5
+
+
+# --- the conductor run -----------------------------------------------------------------------
+#
+# 05-mission-types.md §B: the fiddly bit is the DESCENT. You pay out copper down the chimney and
+# fix a clip roughly every metre, one-handed, going down — so the half of the job that used to be
+# a slide with a loud noise is the half the job is scored on.
+#
+# The rules are all in Conductor.cpp. These are the hands: where the tape has got to, how much of
+# it you have let out since the last fixing, and what the hammer did.
+
+## Whether this job is a conductor run at all, and how far the tape has been paid out to.
+var conductor_job := false
+var tape_at := -1.0            ## the height of the last clip, or -1 before the terminal is set
+var tape_paid := 0.0           ## let out since that clip, and the thing the Code measures
+
+
+func _conductor_setup() -> void:
+	conductor_job = String(jack.level_archetype()) == "CONDUCTOR"
+	if not conductor_job:
+		return
+	jack.conductor_begin(_mission_reels())
+	tape_at = -1.0
+	tape_paid = 0.0
+
+
+## The mission block, straight out of the level file. LevelData does not carry it and does not
+## need to: these are numbers the scene sets up with, not rules the sim enforces.
+func _mission() -> Dictionary:
+	var path := ProjectSettings.globalize_path("res://../data/levels/%s.json" % _level_id())
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return {}
+	var doc = JSON.parse_string(f.get_as_text())
+	f.close()
+	if typeof(doc) != TYPE_DICTIONARY:
+		return {}
+	return (doc as Dictionary).get("mission", {}) as Dictionary
+
+
+func _mission_reels() -> int:
+	return maxi(int(_mission().get("reels", 1)), 1)
+
+
+## Paying out. Every metre you descend takes a metre of tape at best — and more than a metre if you
+## have gone round something, which is the whole of the Code's curvature rule.
+func _conductor_descend(before: float) -> void:
+	if not conductor_job or tape_at < 0.0:
+		return
+	var moved: float = absf(before - height_m())
+	# Round the face costs you as well as down it: the lateral shuffle is tape too.
+	tape_paid += moved + absf(_shuffle - _shuffle_before) * 0.6
+	_shuffle_before = _shuffle
+
+
+var _shuffle_before := 0.0
+
+
+## [F] at the apex sets the terminal; [F] on the way down fixes a clip. Same key, because it is the
+## same act — putting the thing on the wall — and the game already uses F for "deal with what is
+## in front of you".
+func _conductor_act() -> void:
+	if not conductor_job:
+		return
+	var here: float = maxf(height_m(), 0.0)
+	var st: Dictionary = jack.conductor_state(here)
+
+	if not bool(st.get("terminal", false)):
+		if here < float(jack.total_height()) - 1.5:
+			_say("the terminal goes at the very top — that is what it is for")
+			return
+		jack.conductor_set_terminal()
+		jack.conductor_fix(here, 0.0, _clip_tightness())
+		tape_at = here
+		tape_paid = 0.0
+		if foley != null:
+			foley.cue("seated", 1.2)
+		_say("terminal on. now run it down and clip it as you go")
+		return
+
+	if here > tape_at:
+		_say("the run goes downwards — you are above the last clip")
+		return
+	if not jack.conductor_fix(here, tape_paid, _clip_tightness()):
+		_say("out of tape. that is as far as the run goes")
+		return
+
+	tape_at = here
+	tape_paid = 0.0
+	if foley != null:
+		foley.cue("hammer", 1.15)
+	var after: Dictionary = jack.conductor_state(here)
+	if int(after.get("over_tight", 0)) > int(st.get("over_tight", 0)):
+		_say("too hard — you have pinched it. it cannot move when it is cold")
+	elif int(after.get("too_loose", 0)) > int(st.get("too_loose", 0)):
+		_say("that one is loose. it will work off in the first gale")
+	else:
+		_say("clipped — %.0f m of tape left" % float(after.get("tape_left", 0.0)))
+
+
+## How hard the clip went in. The hammer's own swing, so the verb that drives a dog drives a
+## holdfast — except that here the right answer is in the middle rather than at the end.
+func _clip_tightness() -> float:
+	return clampf(swing_power if swing_power > 0.0 else 0.55, 0.0, 1.0)
+
+
+## At the foot of it: the earth pit, and the test that says whether any of it was worth doing.
+func _conductor_earth() -> void:
+	if not conductor_job:
+		return
+	var e: Dictionary = _mission().get("earth", {}) as Dictionary
+	jack.conductor_earth(float(e.get("plateSquareFeet", 18.0)), bool(e.get("wet", true)),
+		bool(e.get("coke", true)))
+	var st: Dictionary = jack.conductor_state(0.0)
+	_say("%.1f ohms — %s" % [float(st.get("earth_ohms", -1.0)),
+		"that will do" if float(st.get("earth_ohms", 99.0)) <= 10.0 else "that will not do"])

@@ -293,9 +293,28 @@ func _draw() -> void:
 		_draw_van()
 
 
+## What the job is called on its own card. Every archetype in 05-mission-types.md gets a word
+## here, so a new one appears on the board named rather than misfiled as a survey.
+func _kind_of(job: Dictionary) -> String:
+	match String(job.get("archetype", "")):
+		"FELL":      return "FELLING"
+		"CONDUCTOR": return "CONDUCTOR"
+		"GILD":      return "GILDING"
+		"BAND":      return "BANDING"
+		"TOP":       return "TOPPING"
+		"MECHANISM": return "MECHANISM"
+		"LATTICE":   return "LATTICE"
+		"EMERGENCY": return "EMERGENCY"
+		"STRAIGHTEN": return "STRAIGHTENING"
+		_:           return "SURVEY"
+
+
 ## One job, as a card pinned to the board. Returns the y to carry on from.
 func _card(job: Dictionary, x: float, y: float, here: bool) -> float:
 	var felling: bool = String(job["archetype"]) == "FELL"
+	# The card used to say SURVEY for anything that was not a felling, which was true when there
+	# were two kinds of job and became a lie the moment there were three.
+	var kind := _kind_of(job)
 	var shut: bool = locked(job)
 	var done: bool = jack.career_done(String(job["id"]))
 	var h := 92.0
@@ -312,7 +331,7 @@ func _card(job: Dictionary, x: float, y: float, here: bool) -> float:
 	var shift := "untimed" if int(job["shift"]) <= 0 else "%d min" % int(job["shift"])
 	if not shut and not unearnable(job):
 		draw_string(_font, Vector2(x + 16, y + 52),
-			"%s   %.0f m   %s" % ["FELLING" if felling else "SURVEY", job["height"], shift],
+			"%s   %.0f m   %s" % [kind, job["height"], shift],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, RED_INK if felling else FADED)
 	var fee := "no fee — a favour" if int(job["fee"]) <= 0 else "£%d" % int(job["fee"])
 	if done:
@@ -328,7 +347,7 @@ func _card(job: Dictionary, x: float, y: float, here: bool) -> float:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, RED_INK)
 	elif unearnable(job):
 		draw_string(_font, Vector2(x + 16, y + 52),
-			"%s   %.0f m   %s" % ["FELLING" if felling else "SURVEY", job["height"], shift],
+			"%s   %.0f m   %s" % [kind, job["height"], shift],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, RED_INK if felling else FADED)
 		draw_string(_font, Vector2(x + CARD_W - 120, y + 30), "above your name",
 			HORIZONTAL_ALIGNMENT_RIGHT, 104, 11, Color(0.45, 0.40, 0.30))

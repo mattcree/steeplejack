@@ -1,0 +1,163 @@
+{
+  "$schema": "../schemas/level.schema.json",
+  "id": "02-chapel-street",
+  "name": "Chapel Street",
+  "order": 2,
+  "archetype": "CONDUCTOR",
+  "reputationGate": 0,
+  "fee": 34,
+  "briefing": {
+    "from": "the chapel trustees",
+    "lines": [
+      "We are told the stack wants a conductor on it and that the insurance will not",
+      "renew without one. Twenty-eight foot of chimney above the roof and the rest of it",
+      "down the side, and there is a steel band about half way that you will have to get",
+      "round. We can find thirty-four shillings and a pot of tea."
+    ]
+  },
+  "shiftMinutes": 240,
+  "targetMinutes": 40,
+  "structure": {
+    "type": "chimney",
+    "height": 28.0,
+    "baseRadius": 1.15,
+    "topRadius": 0.82,
+    "profile": "round",
+    "batter": [
+      {
+        "at": 0.0,
+        "step": 0.0
+      }
+    ],
+    "bands": [],
+    "cap": "corbelled-oversail",
+    "leanDegrees": 0.0,
+    "leanBearing": 0,
+    "jointGrid": {
+      "courseHeight": 0.075,
+      "brickLength": 0.225,
+      "candidateDensity": 4.0
+    },
+    "weathering": {
+      "sootTo": 0.55,
+      "bleachFrom": 0.88,
+      "seed": 1002
+    }
+  },
+  "bands": [
+    {
+      "from": 0.0,
+      "to": 12.0,
+      "type": "plain",
+      "quality": {
+        "sound": 0.72,
+        "fair": 0.22,
+        "perished": 0.06,
+        "cracked": 0.0
+      },
+      "note": "Sound enough low down. The chapel has kept it pointed."
+    },
+    {
+      "from": 12.0,
+      "to": 15.0,
+      "type": "existing-band",
+      "quality": {
+        "sound": 0.1,
+        "fair": 0.25,
+        "perished": 0.55,
+        "cracked": 0.1
+      },
+      "note": "The steel band, and the perished course it was put on to hold together. You cannot fix a clip to the band itself and you cannot drive into this - the run has to go round, and the Code allows half as long again and no more."
+    },
+    {
+      "from": 15.0,
+      "to": 28.0,
+      "type": "plain",
+      "quality": {
+        "sound": 0.48,
+        "fair": 0.34,
+        "perished": 0.18,
+        "cracked": 0.0
+      },
+      "note": "Weathered above the band, as the top of a chimney always is."
+    }
+  ],
+  "weather": {
+    "windBase": 5.0,
+    "windBearing": 288,
+    "windVeerPerHour": 7.0,
+    "windAtHeight": [
+      [
+        0,
+        1.0
+      ],
+      [
+        14,
+        1.3
+      ],
+      [
+        28,
+        1.6
+      ]
+    ],
+    "gustIntervalSeconds": [
+      70,
+      130
+    ],
+    "precipitation": "none",
+    "ramp": null
+  },
+  "site": {
+    "safeLineDistance": 0,
+    "exclusions": [],
+    "corridor": null,
+    "crowd": null,
+    "backdrop": "mill-town-yard"
+  },
+  "mission": {
+    "type": "CONDUCTOR",
+    "terminalHeight": 28.0,
+    "reels": 2,
+    "obstruction": {
+      "from": 12.0,
+      "to": 15.0,
+      "what": "steel tensioning band",
+      "note": "ATLAS: never fix to a tensioning band without proving it first, and if you cannot confirm it, do not fix to it. Here you cannot."
+    },
+    "earth": {
+      "plateSquareFeet": 18.0,
+      "wet": true,
+      "coke": true,
+      "note": "There is a drain at the foot of the wall, so the ground stays damp. The coke is the player's to remember."
+    },
+    "softLanding": false
+  },
+  "complications": [
+    {
+      "at": "summit",
+      "type": "great-aire-reveal",
+      "params": {
+        "durationSeconds": 4.0,
+        "bearing": 214,
+        "distance": 4800
+      }
+    }
+  ],
+  "scoring": {
+    "bonuses": [
+      {
+        "id": "all_defects",
+        "condition": "defectsFound==4",
+        "amount": 0
+      }
+    ],
+    "hardFailConditions": []
+  },
+  "loadoutHint": {
+    "ladders": 8,
+    "dogs": 20,
+    "rope": 1
+  },
+  "replay": "data/replays/01-back-yard-expert.replay",
+  "designDoc": "docs/02-levels/level-01-back-yard.md"
+}

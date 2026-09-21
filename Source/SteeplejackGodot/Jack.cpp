@@ -209,6 +209,13 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("fell_shift", "height_removed_m"), &Jack::fell_shift);
 	ClassDB::bind_method(D_METHOD("career_load", "json"), &Jack::career_load);
 	ClassDB::bind_method(D_METHOD("career_json"), &Jack::career_json);
+	ClassDB::bind_method(D_METHOD("conductor_begin", "reels"), &Jack::conductor_begin);
+	ClassDB::bind_method(D_METHOD("conductor_set_terminal"), &Jack::conductor_set_terminal);
+	ClassDB::bind_method(D_METHOD("conductor_fix", "height", "tape_paid", "tightness"),
+	                     &Jack::conductor_fix);
+	ClassDB::bind_method(D_METHOD("conductor_earth", "plate_square_feet", "wet", "coke"),
+	                     &Jack::conductor_earth);
+	ClassDB::bind_method(D_METHOD("conductor_state", "height"), &Jack::conductor_state);
 	ClassDB::bind_method(D_METHOD("career_sleep"), &Jack::career_sleep);
 	ClassDB::bind_method(D_METHOD("career_buy_engine_part", "cost"),
 	                     &Jack::career_buy_engine_part);
@@ -1529,6 +1536,53 @@ void Jack::career_load(const String& json)
 String Jack::career_json() const
 {
 	return String(career.ToJson().c_str());
+}
+
+// --- the conductor run --------------------------------------------------------------------------
+
+void Jack::conductor_begin(int64_t reels)
+{
+	if (!tuning) { return; }
+	const double per = static_cast<double>(tuning->GetF("reelMetres"));
+	conductor.Begin(static_cast<float>(per * static_cast<double>(std::max<int64_t>(reels, 1))),
+	                *tuning);
+}
+
+void Jack::conductor_set_terminal()
+{
+	conductor.SetTerminal();
+}
+
+bool Jack::conductor_fix(double height, double tape_paid, double tightness)
+{
+	if (!tuning) { return false; }
+	return conductor.Fix(static_cast<float>(height), static_cast<float>(tape_paid),
+	                     static_cast<float>(tightness), *tuning);
+}
+
+void Jack::conductor_earth(double plate_square_feet, bool wet, bool coke)
+{
+	if (!tuning) { return; }
+	conductor.Earth(static_cast<float>(plate_square_feet), wet, coke, *tuning);
+}
+
+Dictionary Jack::conductor_state(double height) const
+{
+	Dictionary d;
+	if (!tuning) { return d; }
+	static const char* kNames[] = {"SOUND", "MARGINAL", "FAILED"};
+	const sj::ConductorRun v = conductor.Judge(static_cast<float>(height), *tuning);
+	d["verdict"] = static_cast<int64_t>(v.verdict);
+	d["verdict_name"] = String(kNames[static_cast<int>(v.verdict)]);
+	d["tape_left"] = static_cast<double>(v.tapeLeftM);
+	d["wander"] = static_cast<double>(v.wanderRatio);
+	d["clips"] = static_cast<int64_t>(v.clips);
+	d["over_tight"] = static_cast<int64_t>(v.overTight);
+	d["too_loose"] = static_cast<int64_t>(v.tooLoose);
+	d["longest_gap"] = static_cast<double>(v.longestGapM);
+	d["earth_ohms"] = static_cast<double>(v.earthOhms);
+	d["terminal"] = v.terminalSet;
+	return d;
 }
 
 void Jack::career_sleep()

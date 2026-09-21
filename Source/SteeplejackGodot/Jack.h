@@ -23,6 +23,7 @@
 #include "Recovery.h"
 #include "Rng.h"
 #include "Slip.h"
+#include "Conductor.h"
 #include "Stack.h"
 #include "Wind.h"
 #include "Verbs/Haul.h"
@@ -353,6 +354,18 @@ public:
 	godot::String career_json() const;
 	/** `{money, reputation, stars, jobs}` — jobs is an Array of `{id, paid, error, failed}`. */
 	godot::Dictionary career_state() const;
+	// --- the conductor run --------------------------------------------------------------------
+	/** Start a run with `reels` reels of tape on the van. */
+	void conductor_begin(int64_t reels);
+	/** The terminal, set at the apex. Without it there is no system, only an attraction. */
+	void conductor_set_terminal();
+	/** Fix a clip: where, how much tape it took to get there, how hard it was driven. */
+	bool conductor_fix(double height, double tape_paid, double tightness);
+	/** Make the earth at the foot of it. */
+	void conductor_earth(double plate_square_feet, bool wet, bool coke);
+	/** The run as it stands, judged from `height`. */
+	godot::Dictionary conductor_state(double height) const;
+
 	/** The yard: advance the calendar, and buy a part for the engine. */
 	void career_sleep();
 	bool career_buy_engine_part(double cost);
@@ -439,6 +452,7 @@ private:
 	godot::String last_error;
 
 	sj::WindModel wind{};
+	sj::Conductor conductor{};
 	/** The weather's own substream, forked once, so adding a subsystem cannot shift its values. */
 	std::unique_ptr<sj::Rng> weather_rng;
 
