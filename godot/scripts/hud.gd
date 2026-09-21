@@ -501,7 +501,7 @@ func _affordances() -> Array:
 		]
 	var has_target: bool = player.target_id >= 0
 	var sounded: bool = player.target_tapped()
-	return [
+	var rows := [
 		["W/S", "climb", true, ""],
 		["E", "sound this joint" if not sounded else "sound it again", has_target,
 			"no joint in reach — look at the brickwork"],
@@ -510,11 +510,23 @@ func _affordances() -> Array:
 		["R", _r_label(), _r_live(), _r_why()],
 		["F", _f_label(), _f_live(), _f_why()],
 		[Q_KEY, _next_stance_label(), true, ""],
+		["B", _b_label(), player.band_job and player._band_here() >= 0,
+			"stand level with a band to work on it"],
+		["X", "dial the cut — %.0f mm, brings her back %.2f m" % [player.plumb_take_out,
+			float(player.plumb_here().get("brings_back", 0.0))] if player.plumb_job else "",
+			player.plumb_job and not player.plumb_cut_done, "she is cut"],
 		["T", "brew up", jack_free_hands(),
 			"you need both hands — belt on first"],
 		["G", _gin_label(), true, ""],
 		["C / V", "a cigarette  ·  look at the view (hold)", true, ""],
 	]
+	# A key with nothing to say on this job is not dimmed, it is absent. The list is what THIS job
+	# wants, not an index of everything the game can do.
+	var out := []
+	for r in rows:
+		if String(r[1]) != "":
+			out.append(r)
+	return out
 
 
 ## R is lash-the-next-one with a ladder on your shoulder and take-this-one-off without. The same
@@ -550,6 +562,9 @@ func _r_why() -> String:
 ## And F is the gear: draw the dog in reach, or fill the bag at the cradle — or, on a conductor
 ## job, the run itself.
 func _f_label() -> String:
+	if player.plumb_job:
+		return "she is cut — now she comes back" if player.plumb_cut_done \
+			else "cut her here, %.0f mm out" % player.plumb_take_out
 	if player.conductor_job:
 		var st: Dictionary = player.jack.conductor_state(maxf(player.height_m(), 0.0))
 		if player.at_cradle():
@@ -563,6 +578,8 @@ func _f_label() -> String:
 
 
 func _f_live() -> bool:
+	if player.plumb_job:
+		return player.on_ladder and not player.plumb_cut_done
 	if player.conductor_job:
 		return true
 	if player.at_cradle():
@@ -571,6 +588,9 @@ func _f_live() -> bool:
 
 
 func _f_why() -> String:
+	if player.plumb_job:
+		return "she is cut — you only get one" if player.plumb_cut_done \
+			else "you cut her from the ladder"
 	if player.at_cradle():
 		return "nothing left to take"
 	if not player.on_ladder:
@@ -580,6 +600,19 @@ func _f_why() -> String:
 		if w != "" and w != "you have had that one out":
 			return w
 	return "no dog in reach"
+
+
+## The two archetype keys. They only appear on the jobs that use them — a list of everything the
+## game can do would be a manual, and what this list is for is what THIS job wants next.
+func _b_label() -> String:
+	if not player.band_job:
+		return ""
+	var index: int = player._band_here()
+	if index < 0:
+		return "pull a bolt up"
+	var st: Dictionary = player.jack.band_state(index)
+	return "pull this bolt up — %d of %d, %s" % [int(st.get("tightened", 0)),
+		int(st.get("bolts", 0)), String(st.get("fit_name", "")).to_lower()]
 
 
 func _gin_label() -> String:
