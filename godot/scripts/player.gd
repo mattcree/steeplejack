@@ -354,6 +354,7 @@ func _ready() -> void:
 	_plant_what_you_left()
 	_conductor_setup()
 	_band_setup()
+	_survey_setup()
 	var tree_root := get_tree().root
 	if tree_root.has_meta("job_ladders"):
 		ladders_at_base = maxi(int(tree_root.get_meta("job_ladders")), 1)
@@ -450,6 +451,27 @@ func _settle_the_job() -> void:
 			text = f.get_as_text()
 			f.close()
 	jack.career_load(text)
+	# A survey is paid for the report, not for the climb. Missing defects costs fee — 05-mission-
+	# types.md says so in as many words — and a thin survey is not a failure, it is a thin survey:
+	# the floor keeps a man who found almost nothing in wages, and what it really costs him is what
+	# anyone will let him do next.
+	if survey_job:
+		var r: Dictionary = jack.survey_report()
+		var share: float = float(r.get("share", 1.0))
+		var floor_: float = jack.tuning_f("surveyFeeFloorShare", 0.35)
+		var paid: float = _level_fee() * (floor_ + (1.0 - floor_) * share)
+		# Done, whatever is in the report. A thin survey is a thin survey — 05-mission-types.md
+		# says missing defects costs FEE, not the job — and the first version of this passed
+		# `complete` as "did you finish it", which failed the tutorial for climbing a chimney
+		# without noticing a jackdaw. What a poor report costs you is the money and the next
+		# letter, which is the same shape as every other consequence in this game.
+		settlement = jack.career_settle_climb(_level_id(), paid, true)
+		var out := FileAccess.open(career_path, FileAccess.WRITE)
+		if out != null:
+			out.store_string(jack.career_json())
+			out.close()
+		_say("%d of %d in the report" % [int(r.get("found", 0)), int(r.get("total", 0))])
+		return
 	if String(jack.level_archetype()) == "FELL":
 		# On a felling, getting to the top is not the job — it is Act 2, the strip-out. The bands
 		# come off, the conductor comes down, and the chimney is ready to be cut. It pays nothing
@@ -1042,6 +1064,7 @@ func _climb(dt: float, ladder_world: Vector3) -> void:
 		return
 	_climb_rate = (height_m() - before) / maxf(dt, 0.0001)
 	_conductor_descend(before)
+	_survey_look(false)
 
 	# A knock on every rung he passes, hand and boot alternately. The climb had no sound at all,
 	# and a ladder under a man is not silent.
@@ -1505,6 +1528,9 @@ func _update_tap(dt: float) -> void:
 		_dust_at(_tap_joint, 6)
 		if face != null:
 			face.touch()
+		# Some defects are only ever heard. This is the frame the note arrives on, so it is the
+		# only frame on which one of those can be found.
+		_survey_look(true)
 	if tapping <= 0.0:
 		tapping = 0.0
 
@@ -3052,3 +3078,48 @@ func _band_act() -> void:
 	else:
 		_say("bolt %d of %d — %d up" % [band_bolt + 1, int(after.get("bolts", 0)),
 			int(after.get("tightened", 0))])
+
+
+# --- the survey ------------------------------------------------------------------------------
+#
+# 05-mission-types.md §A: go up, look at it, tell them what is wrong, come down. Three levels have
+# shipped with their defects authored and nothing reading them, so a survey job has been a climb
+# with a briefing that promised something else.
+#
+# Finding is passive, which is the whole feel of it: you look about as you work and things come to
+# you. The only active part is the tap, because some of them can only be heard.
+
+var survey_job := false
+var survey_said := 0.0            ## when the last find was announced, for the HUD
+
+
+func _survey_setup() -> void:
+	survey_job = String(jack.level_archetype()) == "SURVEY"
+	if not survey_job:
+		return
+	var list: Array = _mission().get("defects", []) as Array
+	jack.survey_begin(list)
+
+
+## Called as he moves and when he taps. `sounded` is true on the frame a joint is sounded, because
+## a defect you have to HEAR must not be found by standing next to it.
+func _survey_look(sounded: bool) -> void:
+	if not survey_job:
+		return
+	# Relative to the climbing line, not to north. A level authors a defect as "on your line" or
+	# "a bit round to the left of it", because that is the only frame a man on one ladder has.
+	# _shuffle is metres along the face, so it becomes degrees at the radius he is at.
+	var r: float = maxf(float(chimney.radius_at(maxf(height_m(), 0.0))), 0.1)
+	var bearing: int = int(round(rad_to_deg(_shuffle / r)))
+	var hit: int = int(jack.survey_look(maxf(height_m(), 0.0), bearing, at_top, sounded))
+	if hit < 0:
+		return
+	var list: Array = jack.survey_defects()
+	var what := String((list[hit] as Dictionary).get("id", ""))
+	survey_said = _now
+	if foley != null:
+		foley.cue("seated", 1.3)
+	_say("%s — that is one for the report" % what.replace("_", " "))
+	# Chalk it, the same as a sounded joint: the mark is the record.
+	if face != null and target_id >= 0:
+		face.touch()

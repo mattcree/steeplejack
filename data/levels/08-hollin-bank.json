@@ -139,19 +139,19 @@
       {
         "id": "delaminated_face",
         "height": 36.0,
-        "bearing": 90,
+        "bearing": 0,
         "discovery": "tap"
       },
       {
         "id": "burst_coping",
         "height": 52.0,
-        "bearing": 180,
+        "bearing": 0,
         "discovery": "summit"
       },
       {
         "id": "perished_course",
         "height": 41.0,
-        "bearing": 270,
+        "bearing": 22,
         "discovery": "traverse"
       }
     ],

@@ -209,6 +209,11 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("fell_shift", "height_removed_m"), &Jack::fell_shift);
 	ClassDB::bind_method(D_METHOD("career_load", "json"), &Jack::career_load);
 	ClassDB::bind_method(D_METHOD("career_json"), &Jack::career_json);
+	ClassDB::bind_method(D_METHOD("survey_begin", "defects"), &Jack::survey_begin);
+	ClassDB::bind_method(D_METHOD("survey_look", "height", "bearing", "at_top", "sounded"),
+	                     &Jack::survey_look);
+	ClassDB::bind_method(D_METHOD("survey_defects"), &Jack::survey_defects);
+	ClassDB::bind_method(D_METHOD("survey_report"), &Jack::survey_report);
 	ClassDB::bind_method(D_METHOD("band_begin", "index", "bolts"), &Jack::band_begin);
 	ClassDB::bind_method(D_METHOD("band_tighten", "index", "bolt", "amount"), &Jack::band_tighten);
 	ClassDB::bind_method(D_METHOD("band_state", "index"), &Jack::band_state);
@@ -1544,6 +1549,59 @@ void Jack::career_load(const String& json)
 String Jack::career_json() const
 {
 	return String(career.ToJson().c_str());
+}
+
+// --- the survey ----------------------------------------------------------------------------------
+
+void Jack::survey_begin(const Array& defects)
+{
+	std::vector<sj::Defect> out;
+	for (int64_t i = 0; i < defects.size(); ++i)
+	{
+		const Dictionary d = defects[i];
+		sj::Defect one{};
+		one.id = String(d.get("id", "")).utf8().get_data();
+		one.height = static_cast<float>(static_cast<double>(d.get("height", 0.0)));
+		one.bearing = static_cast<int32_t>(static_cast<int64_t>(d.get("bearing", 0)));
+		one.how = sj::FindByName(String(d.get("discovery", "visual")).utf8().get_data());
+		out.push_back(one);
+	}
+	survey.Begin(out);
+}
+
+int64_t Jack::survey_look(double height, int64_t bearing, bool at_top, bool sounded)
+{
+	if (!tuning) { return -1; }
+	return static_cast<int64_t>(survey.Look(static_cast<float>(height),
+		static_cast<int32_t>(bearing), at_top, sounded, *tuning));
+}
+
+Array Jack::survey_defects() const
+{
+	Array out;
+	static const char* kHow[] = {"visual", "tap", "summit", "traverse"};
+	for (const sj::Defect& d : survey.Defects())
+	{
+		Dictionary one;
+		one["id"] = String(d.id.c_str());
+		one["height"] = static_cast<double>(d.height);
+		one["bearing"] = static_cast<int64_t>(d.bearing);
+		one["discovery"] = String(kHow[static_cast<int>(d.how)]);
+		one["found"] = d.found;
+		out.push_back(one);
+	}
+	return out;
+}
+
+Dictionary Jack::survey_report() const
+{
+	Dictionary d;
+	const sj::SurveyReport r = survey.Report();
+	d["total"] = static_cast<int64_t>(r.total);
+	d["found"] = static_cast<int64_t>(r.found);
+	d["share"] = static_cast<double>(r.share);
+	d["complete"] = r.complete;
+	return d;
 }
 
 // --- banding -------------------------------------------------------------------------------------

@@ -1,0 +1,11 @@
+{
+  "_survey_comment": "Going up to look at it. The ranges are the archetype's whole feel: too generous and a survey is a lift ride, too tight and it is a search for a pixel. They are set so that a defect is found by being in roughly the right PLACE rather than by aiming.",
+  "surveyVisualRangeMetres": 3.2,
+  "surveyTapRangeMetres": 2.2,
+  "surveySummitRangeMetres": 6.0,
+  "surveyTraverseBearingDeg": 42.0,
+  "_survey_fee": "A defect you did not find is not a failure, it is a worse report. The fee is for the survey; what a thin one costs you is what anyone will let you do next.",
+  "surveyFeeFloorShare": 0.35,
+  "_survey_traverse": "A climber cannot get round a chimney: shuffle 0.7 m off the line and he steps off the ladder. So a traverse defect is one off to the side of the climbing line, within reach of that shuffle, with a tighter window than the others so being on your line does not find it by accident.",
+  "surveyTraverseWindowDeg": 14.0
+}

@@ -26,6 +26,7 @@
 #include "Band.h"
 #include "Conductor.h"
 #include "Stack.h"
+#include "Survey.h"
 #include "Wind.h"
 #include "Verbs/Haul.h"
 #include "Verbs/Lash.h"
@@ -355,6 +356,16 @@ public:
 	godot::String career_json() const;
 	/** `{money, reputation, stars, jobs}` — jobs is an Array of `{id, paid, error, failed}`. */
 	godot::Dictionary career_state() const;
+	// --- the survey ---------------------------------------------------------------------------
+	/** Load the defects for this job: `[{id, height, bearing, discovery}]`. */
+	void survey_begin(const godot::Array& defects);
+	/** Look about from here. Returns the index of what he has just found, or -1. */
+	int64_t survey_look(double height, int64_t bearing, bool at_top, bool sounded);
+	/** Every defect and whether it has been found. */
+	godot::Array survey_defects() const;
+	/** How much of the survey he has: `{total, found, share, complete}`. */
+	godot::Dictionary survey_report() const;
+
 	// --- banding ------------------------------------------------------------------------------
 	/** Start a band of `bolts` segments at `height`. */
 	void band_begin(int64_t index, int64_t bolts);
@@ -471,6 +482,7 @@ private:
 	sj::WindModel wind{};
 	sj::Conductor conductor{};
 	std::vector<sj::Band> bands;
+	sj::Survey survey;
 	/** The weather's own substream, forked once, so adding a subsystem cannot shift its values. */
 	std::unique_ptr<sj::Rng> weather_rng;
 

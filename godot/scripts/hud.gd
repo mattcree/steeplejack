@@ -111,6 +111,7 @@ func _draw() -> void:
 	_draw_hold_line()
 	_draw_conductor(jack)
 	_draw_band(jack)
+	_draw_survey(jack)
 
 	# Only once there is something to span *from*. With no dogs driven, the span is measured from
 	# the ground and reads "62.0 m span — about to buckle" at the top of a ladder that is lashed all
@@ -1368,6 +1369,42 @@ func _draw_band(jack: Jack) -> void:
 		var msg := "work the other side of her"
 		var mw: float = _font.get_string_size(msg, HORIZONTAL_ALIGNMENT_LEFT, -1, TINY).x
 		_label(msg, at - Vector2(mw * 0.5, -RING_R - 46.0), Color(DANGER, 0.85), TINY)
+
+
+## The report, as it fills — the SURVEY archetype's instrument.
+##
+## A survey has no resource and no timer; what it has is a list of things that are wrong with a
+## chimney and no way of knowing how many you have left to find. So the panel says how many there
+## are, which is the only number that makes the job a job rather than a wander, and it says what
+## you have got without saying where the rest are.
+func _draw_survey(jack: Jack) -> void:
+	if not player.survey_job:
+		return
+	var r: Dictionary = jack.survey_report()
+	if r.is_empty() or int(r.get("total", 0)) <= 0:
+		return
+	var at := Vector2(size.x - 232.0, 150.0)
+	var found: int = int(r.get("found", 0))
+	var total: int = int(r.get("total", 0))
+	var col := GOOD if bool(r.get("complete", false)) else (WATCH if found > 0 else FAINT)
+
+	draw_rect(Rect2(at - Vector2(14.0, 26.0), Vector2(216.0, 86.0)), Color(0.05, 0.04, 0.03, 0.5))
+	_label("THE REPORT", at, Color(GHOST, 0.8), TINY)
+	_label("%d of %d" % [found, total], at + Vector2(0.0, 26.0), col, H1)
+	var w: float = _font.get_string_size("%d of %d" % [found, total],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, H1).x
+	_label("found", at + Vector2(w + 10.0, 26.0), Color(col, 0.8), SMALL)
+
+	# Ticks rather than a bar: a survey is a list of discrete things, and four of five should look
+	# like four of five rather than like eighty per cent.
+	for i in total:
+		var x: float = at.x + float(i) * 20.0
+		var on: bool = i < found
+		draw_rect(Rect2(Vector2(x, at.y + 40.0), Vector2(14.0, 5.0)),
+			col if on else Color(GHOST, 0.35))
+	if bool(r.get("complete", false)):
+		_label("that is the lot — go down and tell them",
+			at + Vector2(0.0, 62.0), Color(GOOD, 0.85), TINY)
 
 
 # --- the instruments ------------------------------------------------------------------------------

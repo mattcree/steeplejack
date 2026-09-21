@@ -75,12 +75,13 @@ TEST_CASE("Tuning: Acceptance 1: all five shipped tuning files load without erro
 
     const Tuning t = Tuning::LoadAll(dir);
 
-    CHECK(t.Sources().size() == 7);   // + conductor.json and banding.json, for those archetypes
+    CHECK(t.Sources().size() == 8);   // + conductor, banding and survey, for those archetypes
     CHECK(t.Keys().size() > 200);   // 235 leaf keys at the time of writing; the point is "lots"
 
     // One key from each file, so a file silently failing to load cannot pass this test.
     CHECK(t.Has("wanderFailRatio"));             // conductor.json
     CHECK(t.Has("bandOvalFailAt"));              // banding.json
+    CHECK(t.Has("surveyVisualRangeMetres"));     // survey.json
     CHECK(t.Has("climbSpeedMetresPerSecond"));   // climbing.json
     CHECK(t.Has("gripMax"));                     // meters.json
     CHECK(t.Has("currency"));                    // economy.json
