@@ -19,6 +19,12 @@ namespace {
 constexpr float kGroundCapacityKN = std::numeric_limits<float>::max();   // literal: the ground
 // Two anchors this close in height are at the same height. Float tolerance, not a game number.
 constexpr float kSameHeight = 1.0e-4f;   // literal: float comparison tolerance
+// Striking. These two are geometry rather than balance — how far above his feet a man can work,
+// and how much slop to allow before "above me" and "under me" stop being distinguishable — so
+// they are constants here rather than tuning. A designer changing either is not tuning the game,
+// they are changing what a human arm is.
+constexpr float kReachUp = 2.2f;         // literal: metres a climber can work above his feet
+constexpr float kOnItMargin = 0.2f;      // literal: metres of slop on "you are standing on it"
 
 const Anchor& NullAnchor() noexcept
 {
@@ -63,6 +69,8 @@ int32_t Stack::AddAnchor(const Anchor& a)
 {
     anchors_.push_back(a);
     anchorFailed_.push_back(false);
+    anchorDrawn_.push_back(false);
+    anchorBent_.push_back(false);
     return static_cast<int32_t>(anchors_.size()) - 1;
 }
 
@@ -92,7 +100,16 @@ const Section& Stack::SectionAt(int32_t i) const noexcept
 
 bool Stack::AnchorFailed(int32_t i) const noexcept
 {
-    return i < 0 || i >= AnchorCount() || anchorFailed_[static_cast<std::size_t>(i)];
+    if (i < 0 || i >= AnchorCount())
+    {
+        return true;
+    }
+    const auto u = static_cast<std::size_t>(i);
+    // A drawn dog is not a failed one, but every structural question has the same answer for
+    // both: it is not in the wall any more. Hooking striking in here rather than beside it is
+    // what makes InStructure, TopOfStructure, Survey, the load shares and the cascade all correct
+    // for a half-struck stack without one of them being taught about striking.
+    return anchorFailed_[u] || (u < anchorDrawn_.size() && anchorDrawn_[u]);
 }
 
 bool Stack::InStructure(int32_t i) const noexcept
@@ -136,7 +153,12 @@ int32_t Stack::TopOfStructure() const noexcept
 
 bool Stack::SectionFailed(int32_t i) const noexcept
 {
-    return i < 0 || i >= SectionCount() || sectionFailed_[static_cast<std::size_t>(i)];
+    if (i < 0 || i >= SectionCount())
+    {
+        return true;
+    }
+    const auto u = static_cast<std::size_t>(i);
+    return sectionFailed_[u] || (u < sectionStruck_.size() && sectionStruck_[u]);
 }
 
 float Stack::SectionDriftCm(int32_t i) const noexcept
@@ -506,6 +528,168 @@ StackEvents Stack::Step(float dt, int32_t loadedSection, float loadKN, const Tun
         }
     }
     return ev;
+}
+
+
+// --- striking -----------------------------------------------------------------------------------
+
+const char* Stack::WhyNotSection(int32_t section, float fromHeight) const noexcept
+{
+    if (section < 0 || section >= SectionCount())
+    {
+        return "there is no ladder there";
+    }
+    const auto u = static_cast<std::size_t>(section);
+    if (u < sectionStruck_.size() && sectionStruck_[u])
+    {
+        return "that one is already down";
+    }
+    const Section& s = sections_[u];
+    const float top = std::max(AnchorAt(s.lowerAnchor).height, AnchorAt(s.upperAnchor).height);
+    const float bottom = std::min(AnchorAt(s.lowerAnchor).height, AnchorAt(s.upperAnchor).height);
+    // You take down what is above you. Standing on a ladder and unlashing that same ladder is the
+    // one thing the trade's guidance is unambiguous about.
+    if (fromHeight > bottom + kOnItMargin)
+    {
+        return "you are standing on it";
+    }
+    // You work from its foot, not from its head. A first pass asked for the TOP of the ladder to
+    // be within arm's reach, which is a rule that can never be satisfied — a section is four
+    // metres long and an arm is not. What you actually reach is the lashing at its foot; the
+    // ladder itself goes down on the wheel from the dog above.
+    if (bottom > fromHeight + kReachUp)
+    {
+        return "too far above you";
+    }
+    (void)top;
+    return "";
+}
+
+const char* Stack::WhyNotAnchor(int32_t anchor, float fromHeight) const noexcept
+{
+    if (anchor <= 0 || anchor >= AnchorCount())
+    {
+        return "there is no dog there";
+    }
+    const auto u = static_cast<std::size_t>(anchor);
+    if (u < anchorDrawn_.size() && anchorDrawn_[u])
+    {
+        return "you have had that one out";
+    }
+    if (anchorFailed_[u])
+    {
+        return "that one has pulled";
+    }
+    // The second half of the safety rule, and it took a run at it to get right.
+    //
+    // A dog must not be drawn while a ladder STANDS on it — that is the one that drops you. But a
+    // dog carrying only the TOP lashing of a ladder is a different thing, and it has to be
+    // drawable or the sequence does not close: strike a ladder first and the dog that held its
+    // head is left a ladder's length above the highest place you can stand, for ever. The trade
+    // works the other way round, taking the top dog out before lowering the ladder under it, and
+    // that is the order this allows.
+    for (int32_t i = 0; i < SectionCount(); ++i)
+    {
+        if (SectionFailed(i))
+        {
+            continue;
+        }
+        const Section& s = sections_[static_cast<std::size_t>(i)];
+        if (s.lowerAnchor == anchor)
+        {
+            return "there is a ladder standing on it";
+        }
+    }
+    // Two ladders spliced at one dog: the upper one has to come off before the lower one's head
+    // can be freed, or you are unlashing something that is still carrying a ladder above it.
+    int32_t heads = 0;
+    for (int32_t i = 0; i < SectionCount(); ++i)
+    {
+        if (!SectionFailed(i) && sections_[static_cast<std::size_t>(i)].upperAnchor == anchor)
+        {
+            ++heads;
+        }
+    }
+    if (heads > 1)
+    {
+        return "there is still a ladder on it";
+    }
+    const float h = AnchorAt(anchor).height;
+    if (h < fromHeight - kOnItMargin)
+    {
+        return "that is below you";
+    }
+    if (h > fromHeight + kReachUp)
+    {
+        return "out of reach";
+    }
+    return "";
+}
+
+bool Stack::StrikeSection(int32_t section, float fromHeight) noexcept
+{
+    if (WhyNotSection(section, fromHeight)[0] != '\0')
+    {
+        return false;
+    }
+    sectionStruck_.resize(static_cast<std::size_t>(SectionCount()), false);
+    sectionStruck_[static_cast<std::size_t>(section)] = true;
+    return true;
+}
+
+bool Stack::DrawAnchor(int32_t anchor, float fromHeight, bool& bent) noexcept
+{
+    bent = false;
+    if (WhyNotAnchor(anchor, fromHeight)[0] != '\0')
+    {
+        return false;
+    }
+    anchorDrawn_.resize(static_cast<std::size_t>(AnchorCount()), false);
+    anchorBent_.resize(static_cast<std::size_t>(AnchorCount()), false);
+    anchorDrawn_[static_cast<std::size_t>(anchor)] = true;
+    // Which dogs shear coming out is not settled by the sources — the anchor guidance says only
+    // that fixings "have been known to break on removal (but not during use)" and does not say
+    // which ones. So it is a design choice, and it is made this way round on purpose: the dog in
+    // poor brickwork is the one that has been working at its hole under load all shift, and it is
+    // the one that shears. A dog in sound mortar lifts clean.
+    //
+    // The first pass had it the other way about, and it made good work pure loss — every well
+    // driven dog snapped, so the better you were the more gear you went home without. Losing the
+    // anchors that were nearly useless anyway keeps the cost of a strike in TIME, which is where
+    // the trade put it too: about thirty minutes, against two and a half hours to go up.
+    bent = AnchorAt(anchor).rate <= AnchorRate::Poor;
+    anchorBent_[static_cast<std::size_t>(anchor)] = bent;
+    return true;
+}
+
+int32_t Stack::AnchorsLeftIn() const noexcept
+{
+    int32_t left = 0;
+    for (int32_t i = 1; i < AnchorCount(); ++i)
+    {
+        const auto u = static_cast<std::size_t>(i);
+        const bool drawn = u < anchorDrawn_.size() && anchorDrawn_[u];
+        const bool snapped = u < anchorBent_.size() && anchorBent_[u];
+        if ((!drawn || snapped) && !anchorFailed_[u])
+        {
+            ++left;
+        }
+    }
+    return left;
+}
+
+bool Stack::AllStruck() const noexcept
+{
+    for (int32_t i = 0; i < SectionCount(); ++i)
+    {
+        const auto u = static_cast<std::size_t>(i);
+        const bool struck = u < sectionStruck_.size() && sectionStruck_[u];
+        if (!struck && !sectionFailed_[u])
+        {
+            return false;
+        }
+    }
+    return SectionCount() > 0;
 }
 
 }  // namespace sj

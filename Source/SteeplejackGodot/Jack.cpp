@@ -225,6 +225,14 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("career_settle_climb", "job_id", "fee_gbp", "reached_top"),
 	                     &Jack::career_settle_climb);
 	ClassDB::bind_method(D_METHOD("stack_survey"), &Jack::stack_survey);
+	ClassDB::bind_method(D_METHOD("why_not_strike", "height"), &Jack::why_not_strike);
+	ClassDB::bind_method(D_METHOD("section_to_strike", "height"), &Jack::section_to_strike);
+	ClassDB::bind_method(D_METHOD("strike_section", "section", "height"), &Jack::strike_section);
+	ClassDB::bind_method(D_METHOD("dog_to_draw", "height"), &Jack::dog_to_draw);
+	ClassDB::bind_method(D_METHOD("why_not_draw", "anchor", "height"), &Jack::why_not_draw);
+	ClassDB::bind_method(D_METHOD("draw_dog", "anchor", "height"), &Jack::draw_dog);
+	ClassDB::bind_method(D_METHOD("dogs_left_in"), &Jack::dogs_left_in);
+	ClassDB::bind_method(D_METHOD("all_struck"), &Jack::all_struck);
 	ClassDB::bind_method(D_METHOD("wind_state", "height"), &Jack::wind_state);
 	ClassDB::bind_method(D_METHOD("wind_side_push", "height", "facing_deg"), &Jack::wind_side_push);
 	ClassDB::bind_method(D_METHOD("set_wind_lean", "fraction"), &Jack::set_wind_lean);
@@ -930,6 +938,100 @@ Dictionary Jack::seat_anchor(double height, double depth, double spall)
 	d["capacity_kn"] = static_cast<double>(a.capacityKN);
 	d["height"] = static_cast<double>(a.height);
 	return d;
+}
+
+// --- striking ---------------------------------------------------------------------------------
+//
+// The rules are all in Stack, where they can be tested without a scene. These are the firebreak
+// and the search: "which one am I standing next to" is a question about geometry that the HUD asks
+// every frame, and it does not belong in GDScript any more than the rules do.
+
+int64_t Jack::section_to_strike(double height) const
+{
+	const auto h = static_cast<float>(height);
+	int32_t best = -1;
+	float best_drop = 1e9f;
+	for (int32_t i = 0; i < stack.SectionCount(); ++i)
+	{
+		if (stack.WhyNotSection(i, h)[0] != '\0')
+		{
+			continue;
+		}
+		// The nearest one at or below his feet: working down, that is always the next one off.
+		const sj::Section& sec = stack.SectionAt(i);
+		const float bottom = std::min(stack.AnchorAt(sec.lowerAnchor).height,
+		                              stack.AnchorAt(sec.upperAnchor).height);
+		const float drop = std::fabs(h - bottom);
+		if (drop < best_drop)
+		{
+			best_drop = drop;
+			best = i;
+		}
+	}
+	return static_cast<int64_t>(best);
+}
+
+String Jack::why_not_strike(double height) const
+{
+	if (section_to_strike(height) >= 0)
+	{
+		return String();
+	}
+	// Nothing in reach: say why about the nearest thing there is, rather than nothing at all.
+	const auto h = static_cast<float>(height);
+	for (int32_t i = stack.SectionCount() - 1; i >= 0; --i)
+	{
+		const char* why = stack.WhyNotSection(i, h);
+		if (why[0] != '\0' && String(why) != String("that one is already down"))
+		{
+			return String(why);
+		}
+	}
+	return String("nothing left to take down");
+}
+
+bool Jack::strike_section(int64_t section, double height)
+{
+	return stack.StrikeSection(static_cast<int32_t>(section), static_cast<float>(height));
+}
+
+int64_t Jack::dog_to_draw(double height) const
+{
+	const auto h = static_cast<float>(height);
+	for (int32_t i = stack.AnchorCount() - 1; i >= 1; --i)
+	{
+		if (stack.WhyNotAnchor(i, h)[0] == '\0')
+		{
+			return static_cast<int64_t>(i);
+		}
+	}
+	return -1;
+}
+
+String Jack::why_not_draw(int64_t anchor, double height) const
+{
+	return String(stack.WhyNotAnchor(static_cast<int32_t>(anchor), static_cast<float>(height)));
+}
+
+Dictionary Jack::draw_dog(int64_t anchor, double height)
+{
+	Dictionary d;
+	bool bent = false;
+	const bool drew = stack.DrawAnchor(static_cast<int32_t>(anchor), static_cast<float>(height),
+	                                   bent);
+	d["drew"] = drew;
+	d["bent"] = bent;
+	return d;
+}
+
+int64_t Jack::dogs_left_in() const
+{
+	return static_cast<int64_t>(stack.AnchorsLeftIn());
+}
+
+bool Jack::all_struck() const
+{
+	return stack.AllStruck();
 }
 
 Dictionary Jack::anchor_at(int64_t index) const

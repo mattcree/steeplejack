@@ -111,6 +111,10 @@ const SLIP_FELL := 2
 var ladder_top := 5.0
 var carrying_ladder := false
 var dogs_carried := 0
+## The strike, counted, for the board at the end and for the HUD while it is happening.
+var struck_sections := 0
+var dogs_recovered := 0
+var dogs_bent_out := 0
 ## The cradle. Filled from the level's loadoutHint at load; these are the fallbacks for a level
 ## that does not say. `dogs_at_base` used to be this literal for EVERY level, whatever the file
 ## asked for — 14 on the Grey Box's 32, 14 on Great Aire's 70 — which is a supply a clean ascent
@@ -2187,6 +2191,12 @@ func _give_hammer(skel: Skeleton3D) -> void:
 ## interaction the player could not do better or worse, which the anti-pillars name. Now it is the
 ## one continuous physical input in the game: you wrap the rope by going round.
 func _lash() -> void:
+	# Empty-handed on the ladder, R is the same verb run backwards: you are not lashing one on,
+	# you are taking one off. The trade struck a stack in about thirty minutes against two and a
+	# half hours to put it up, and until now the game had no way to do it at all.
+	if not carrying_ladder and on_ladder and jack.section_to_strike(height_m()) >= 0:
+		_strike_section()
+		return
 	if not carrying_ladder:
 		_say("you are not carrying a ladder — go down to the cradle"
 			if ladders_at_base > 0 else "no ladder sections left")
@@ -2219,6 +2229,67 @@ func _lash() -> void:
 	jack.lash_begin()
 	chimney.set_ghost(ladder_top, lash_new_top)
 	_say("lashing — %s" % _lash_how())
+
+
+## How high the built stack reaches now, and the chimney told about it. Striking has to use the
+## same arithmetic lashing does or the two disagree the first time you take a section off.
+func _retop() -> void:
+	ladder_top = clampf(maxf(STANDING_TOP, jack.stack_top() + _rise()) if jack.stack_top() > 0.0
+		else STANDING_TOP, 0.0, chimney.height_m)
+	chimney.set_ladder_top(ladder_top)
+
+
+## Take the ladder off. It goes down on the wheel and into the cradle — and a section that is not
+## carrying anything stops holding the stack up the instant it goes, which the sim handles by
+## treating a struck section exactly as it treats a failed one.
+func _strike_section() -> void:
+	var here: float = height_m()
+	var section: int = int(jack.section_to_strike(here))
+	if section < 0:
+		_say(String(jack.why_not_strike(here)))
+		return
+	if not jack.strike_section(section, here):
+		_say(String(jack.why_not_strike(here)))
+		return
+	ladders_at_base += 1
+	struck_sections += 1
+	_retop()
+	if foley != null:
+		foley.cue("creak", 0.9)
+	_say("ladder down and in the cradle")
+
+
+## Draw the dog. Sound brickwork holds a dog so well that it is the one that snaps coming out,
+## which is the way round the anchor guidance describes and the better mechanic besides: the dogs
+## you most want back are the ones you are most likely to lose.
+func _draw_dog() -> void:
+	var here: float = height_m()
+	var dog: int = int(jack.dog_to_draw(here))
+	if dog < 0:
+		var why := ""
+		for i in range(int(jack.anchor_count()), 0, -1):
+			var w := String(jack.why_not_draw(i, here))
+			if w != "" and w != "you have had that one out":
+				why = w
+				break
+		_say(why if why != "" else "no dog in reach")
+		return
+	var r: Dictionary = jack.draw_dog(dog, here)
+	if not bool(r.get("drew", false)):
+		_say(String(jack.why_not_draw(dog, here)))
+		return
+	if bool(r.get("bent", false)):
+		dogs_bent_out += 1
+		if foley != null:
+			foley.cue("bent")
+		_say("snapped it off in the wall — that one is staying there")
+	else:
+		dogs_carried = mini(dogs_carried + 1, DOG_BAG)
+		dogs_recovered += 1
+		if foley != null:
+			foley.cue("seated", 1.15)
+		_say("dog out — %d in the bag" % dogs_carried)
+	_retop()
 
 
 func _lash_how() -> String:
@@ -2359,6 +2430,11 @@ func _joint_of_anchor_at(height: float) -> int:
 
 
 func _pick_up() -> void:
+	# On the ladder, F draws the dog in reach rather than telling you to go to the cradle. It is
+	# the same idea — picking your gear up — at the other end of the job.
+	if not at_cradle() and on_ladder:
+		_draw_dog()
+		return
 	if not at_cradle():
 		_say("the materials are in the cradle at the foot of the stack")
 		return

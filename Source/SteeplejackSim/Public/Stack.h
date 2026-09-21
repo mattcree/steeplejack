@@ -148,6 +148,37 @@ public:
     // the number that decides every fall in this game and which the player has never been shown.
     StackSurvey Survey(float loadKN, const Tuning& t) const;
 
+    // --- striking ---------------------------------------------------------------------------
+    //
+    // Coming down. Until now a job ended at the cap and the ladders stayed on the chimney for
+    // ever, which is half the trade missing — the strip took the real thing about thirty minutes
+    // against two and a half hours to ladder up.
+    //
+    // The one rule that makes it safe is the trade's own, and it is the reason this lives in the
+    // sim rather than in the scene: **you only ever take down what is above you, and never
+    // something that is still carrying a ladder.** ATLAS puts it as "once a ladder is disconnected
+    // from its anchors, operatives must not go back onto it"; here it falls out of two checks.
+
+    // Why a thing cannot be struck, or empty when it can. A string rather than a bool because the
+    // player has to be told which of the two rules they are up against.
+    const char* WhyNotSection(int32_t section, float fromHeight) const noexcept;
+    const char* WhyNotAnchor(int32_t anchor, float fromHeight) const noexcept;
+
+    // Take the section off. It stops carrying load the instant it goes, which is the point.
+    bool StrikeSection(int32_t section, float fromHeight) noexcept;
+
+    // Draw the dog. Returns false if the rules say no; `bent` says it broke on the way out, which
+    // the anchor guidance records as a real and specific hazard of removal: fixings "have been
+    // known to break on removal (but not during use)".
+    bool DrawAnchor(int32_t anchor, float fromHeight, bool& bent) noexcept;
+
+    // Dogs still in the brickwork: the ones never drawn, PLUS the ones that snapped off coming
+    // out. A sheared dog stops holding anything the moment its lashing is off, so structurally it
+    // is gone — but it is still in the wall, and "gear left up there" has to mean what it says.
+    int32_t AnchorsLeftIn() const noexcept;
+    // And whether there is any ladder left on the chimney at all.
+    bool AllStruck() const noexcept;
+
     // One fixed step with a climber of `loadKN` on `loadedSection` (-1 for nobody). Runs
     // buckling, walking and anchor loading, and any cascade that follows. Deterministic.
     StackEvents Step(float dt, int32_t loadedSection, float loadKN, const Tuning& t);
@@ -169,6 +200,9 @@ public:
 
 private:
     void FailAnchor(int32_t i);
+    // Struck sections and drawn anchors are marked rather than erased: every index in a recorded
+    // shift, a checkpoint and a replay would otherwise shift under it.
+    std::vector<bool> sectionStruck_, anchorDrawn_, anchorBent_;
 
     std::vector<Anchor>  anchors_;
     std::vector<bool>    anchorFailed_;

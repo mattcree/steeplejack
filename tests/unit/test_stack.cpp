@@ -352,3 +352,136 @@ TEST_CASE("Stack: a dog nobody lashed a ladder to carries nothing")
     // And the next section starts from the last *lashed* dog, not the last driven one.
     CHECK(s.TopOfStructure() == used);
 }
+
+// ---------------------------------------------------------------- striking
+//
+// Coming down, which until now no job had. The two cases that matter are both safety rules rather
+// than balance, and both are the trade's own: you take down what is above you, never what you are
+// standing on, and never a dog that still has a ladder hanging off it. A player who can strip the
+// stack out from under themselves has been handed a way to die that they cannot see coming, and
+// the whole fairness contract in 10-failure-and-difficulty.md is about not doing that.
+
+TEST_CASE("Strike: you cannot unlash the ladder you are standing on")
+{
+    Stack s = Tower(4, 4.0f, AnchorRate::Sound);   // dogs at 4, 8, 12, 16
+
+    // Standing at 6 m: that is section 1, between the ground and the dog at 4... no — between the
+    // dog at 4 and the dog at 8, which is the one under his feet.
+    CHECK(std::string(s.WhyNotSection(1, 6.0f)) == "you are standing on it");
+    CHECK_FALSE(s.StrikeSection(1, 6.0f));
+
+    // From the section below it, the same ladder comes off.
+    CHECK(std::string(s.WhyNotSection(1, 4.0f)) == "");
+    CHECK(s.StrikeSection(1, 4.0f));
+}
+
+TEST_CASE("Strike: a dog with a ladder still on it stays in the wall")
+{
+    Stack s = Tower(3, 4.0f, AnchorRate::Fair);
+    bool bent = false;
+
+    // The dog at 8 m has the ladder above STANDING on it. That is the one that drops you.
+    CHECK(std::string(s.WhyNotAnchor(2, 8.0f)) == "there is a ladder standing on it");
+    CHECK_FALSE(s.DrawAnchor(2, 8.0f, bent));
+
+    // Take that ladder off and only the head of the one below is left on it, which is the dog the
+    // trade draws before lowering the ladder under it.
+    CHECK(s.StrikeSection(2, 8.0f));
+    CHECK(std::string(s.WhyNotAnchor(2, 8.0f)) == "");
+    CHECK(s.DrawAnchor(2, 8.0f, bent));
+}
+
+TEST_CASE("Strike: you work downwards, never reaching below your own feet")
+{
+    Stack s = Tower(4, 4.0f, AnchorRate::Fair);
+    bool bent = false;
+    // Every ladder off first, working down, each from its own foot — otherwise the dogs are still
+    // carrying something and that rule answers before this one does.
+    for (int32_t i = 3; i >= 0; --i)
+    {
+        REQUIRE(s.StrikeSection(i, i == 0 ? 0.0f : s.AnchorAt(i).height));
+    }
+    // Standing at the top, the dog at 4 m is a long way under him.
+    CHECK(std::string(s.WhyNotAnchor(1, 16.0f)) == "that is below you");
+    // And one 12 m over his head is not reachable either.
+    CHECK(std::string(s.WhyNotAnchor(4, 4.0f)) == "out of reach");
+    // At its own height it is exactly right.
+    CHECK(std::string(s.WhyNotAnchor(4, 16.0f)) == "");
+    CHECK(s.DrawAnchor(4, 16.0f, bent));
+}
+
+TEST_CASE("Strike: a struck stack stops holding anything up")
+{
+    const Tuning& t = Tune();
+    Stack s = Tower(4, 4.0f, AnchorRate::Sound);
+    CHECK(s.TopOfStructure() > 0);
+    CHECK(s.TopHeight() == doctest::Approx(16.0f));
+
+    for (int32_t i = 3; i >= 0; --i)
+    {
+        REQUIRE(s.StrikeSection(i, i == 0 ? 0.0f : s.AnchorAt(i).height));
+    }
+    // This is the property the whole design of it rests on: striking hooks into the same predicate
+    // failure does, so the survey, the load shares and the cascade are all correct for a
+    // half-struck stack without any of them being taught what striking is.
+    CHECK(s.AllStruck());
+    CHECK(s.TopHeight() == doctest::Approx(0.0f));
+    const sj::StackSurvey v = s.Survey(t.GetF("playerLoadKN"), t);
+    CHECK(v.longestSpanM == doctest::Approx(0.0f));
+}
+
+TEST_CASE("Strike: a dog in poor brickwork shears, one in sound mortar lifts clean")
+{
+    Stack sound = Tower(1, 4.0f, AnchorRate::Sound);
+    Stack poor = Tower(1, 4.0f, AnchorRate::Poor);
+    bool bent_sound = false;
+    bool bent_poor = false;
+
+    REQUIRE(sound.StrikeSection(0, 0.0f));
+    REQUIRE(poor.StrikeSection(0, 0.0f));
+    REQUIRE(sound.DrawAnchor(1, 4.0f, bent_sound));
+    REQUIRE(poor.DrawAnchor(1, 4.0f, bent_poor));
+
+    // The sources do not say which fixings break, only that they do. This is the choice that does
+    // not punish good work: a dog that has been working at its hole in poor mortar all shift is
+    // the one that shears, and the gear you lose is the gear that was nearly useless anyway.
+    CHECK_FALSE(bent_sound);
+    CHECK(bent_poor);
+}
+
+TEST_CASE("Strike: gear left in the wall is counted, and drawing it stops counting it")
+{
+    Stack s = Tower(3, 4.0f, AnchorRate::Fair);
+    bool bent = false;
+    CHECK(s.AnchorsLeftIn() == 3);
+
+    for (int32_t i = 2; i >= 0; --i)
+    {
+        REQUIRE(s.StrikeSection(i, i == 0 ? 0.0f : s.AnchorAt(i).height));
+    }
+    REQUIRE(s.DrawAnchor(3, 12.0f, bent));
+    CHECK_FALSE(bent);              // fair brickwork lets go cleanly
+    CHECK(s.AnchorsLeftIn() == 2);
+    REQUIRE(s.DrawAnchor(2, 8.0f, bent));
+    REQUIRE(s.DrawAnchor(1, 4.0f, bent));
+    CHECK(s.AnchorsLeftIn() == 0);
+
+    // And a dog that snaps is still in the wall, however gone it is structurally.
+    Stack bad = Tower(1, 4.0f, AnchorRate::Poor);
+    bool snapped = false;
+    REQUIRE(bad.StrikeSection(0, 0.0f));
+    REQUIRE(bad.DrawAnchor(1, 4.0f, snapped));
+    CHECK(snapped);
+    CHECK(bad.AnchorsLeftIn() == 1);
+}
+
+TEST_CASE("Strike: nothing can be struck twice")
+{
+    Stack s = Tower(2, 4.0f, AnchorRate::Fair);
+    bool bent = false;
+    REQUIRE(s.StrikeSection(1, 4.0f));
+    CHECK(std::string(s.WhyNotSection(1, 4.0f)) == "that one is already down");
+    REQUIRE(s.StrikeSection(0, 0.0f));
+    REQUIRE(s.DrawAnchor(1, 4.0f, bent));
+    CHECK(std::string(s.WhyNotAnchor(1, 4.0f)) == "you have had that one out");
+}

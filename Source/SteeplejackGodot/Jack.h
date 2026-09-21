@@ -207,6 +207,23 @@ public:
 	godot::Dictionary stack_step(double dt, double height, bool on_ladder);
 	/** How the section at this height is doing, without stepping anything. */
 	godot::Dictionary stack_section_at(double height) const;
+	// --- striking: the way down ----------------------------------------------------------------
+	/** Why the section above `height` cannot come off, or "" if it can. */
+	godot::String why_not_strike(double height) const;
+	/** The section whose foot is within reach at `height`, or -1. */
+	int64_t section_to_strike(double height) const;
+	/** Take it off. Returns true if it came. */
+	bool strike_section(int64_t section, double height);
+	/** The dog within reach at `height` that could be drawn, or -1. */
+	int64_t dog_to_draw(double height) const;
+	/** Why that dog cannot be drawn, or "" if it can. */
+	godot::String why_not_draw(int64_t anchor, double height) const;
+	/** Draw it. `{drew, bent}` — bent means it broke coming out and is not coming home. */
+	godot::Dictionary draw_dog(int64_t anchor, double height);
+	/** Dogs still in the brickwork, and whether every ladder is down. */
+	int64_t dogs_left_in() const;
+	bool all_struck() const;
+
 	/** Whether the dog at this index (anchor_at's) has pulled. */
 	bool anchor_failed(int64_t index) const;
 
