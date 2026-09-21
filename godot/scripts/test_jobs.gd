@@ -109,7 +109,8 @@ func _init() -> void:
 	if failures > 0:
 		printerr("JOBS: %d failure(s)" % failures)
 	else:
-		print("JOBS: a board of letters, and taking one starts the right half of the game.")
+		await _the_van()
+	print("JOBS: a board of letters, and taking one starts the right half of the game.")
 	quit(1 if failures > 0 else 0)
 
 
@@ -119,3 +120,48 @@ func _check(ok: bool, what: String) -> void:
 	else:
 		printerr("  FAIL  %s" % what)
 		failures += 1
+
+
+## The van — the loadout decision, and the one number it exists to make legible.
+func _the_van() -> void:
+	var board: Node = load("res://scenes/jobs.tscn").instantiate()
+	board.career_path = "user://test-career-van.json"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(board.career_path))
+	root.add_child(board)
+	await process_frame
+
+	# Pick the Grey Box, which has a known 55 m and a known fourteen-ladder hint.
+	for i in board.jobs.size():
+		if String(board.jobs[i]["id"]).contains("greybox"):
+			board.selected = i
+	var job: Dictionary = board.jobs[board.selected]
+
+	_check(not board.van_open, "the van is shut until you take a job")
+	board.open_van()
+	_check(board.van_open, "and enter opens it rather than setting off")
+	_check(board.van_ladders == int(job["ladders"]),
+		"loaded with what the level packed: %d ladders" % board.van_ladders)
+	_check(board.van_dogs == int(job["dogs"]), "and %d dogs" % board.van_dogs)
+
+	# The span is the decision. Fewer ladders is a longer section and the game should say so.
+	var packed_span: float = board.van_span(job)
+	for i in 6:
+		board.van_step(-1)
+	_check(board.van_span(job) > packed_span,
+		"six ladders fewer is a longer section: %.1f m -> %.1f m" % [packed_span, board.van_span(job)])
+	_check(board.van_ladders >= 1, "and it will not go below one ladder")
+	for i in 60:
+		board.van_step(-1)
+	_check(board.van_ladders == 1, "however hard you hold the key: %d" % board.van_ladders)
+
+	# What is loaded is what turns up at the chimney.
+	board.van_ladders = 9
+	board.van_dogs = 30
+	board._take_it()
+	await process_frame
+	_check(int(root.get_meta("job_ladders", -1)) == 9,
+		"what you load is what the job is told about: %d ladders"
+			% root.get_meta("job_ladders", -1))
+	_check(int(root.get_meta("job_dogs", -1)) == 30, "and the dogs with it")
+
+	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://test-career-van.json"))

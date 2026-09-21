@@ -34,6 +34,15 @@ var jobs: Array = []
 var selected := 0
 var career := {}
 
+## The van. Enter on a job opens it rather than departing, because what you load is the last
+## decision of the yard and the first one of the job: twelve ladders for a 55 m chimney commits you
+## to spans you have to live with all day, and sixteen is ten more minutes on the rope.
+var van_open := false
+var van_row := 0
+var van_ladders := 0
+var van_dogs := 0
+const VAN_ROWS := ["ladders", "dogs"]
+
 @onready var jack: Jack = Jack.new()
 
 var _font: Font
@@ -79,6 +88,8 @@ func _read_jobs() -> Array:
 			"height": _num(doc.get("structure", {}).get("height"), 0.0),
 			"briefing": doc.get("briefing", {}),
 			"strip_out": not (doc.get("mission", {}).get("stripOut", []) as Array).is_empty(),
+			"ladders": int(_num((doc.get("loadoutHint", {}) as Dictionary).get("ladders"), 12.0)),
+			"dogs": int(_num((doc.get("loadoutHint", {}) as Dictionary).get("dogs"), 24.0)),
 		})
 	out.sort_custom(func(a, b): return int(a["order"]) < int(b["order"]))
 	return out
@@ -139,7 +150,20 @@ func _reachable_stars() -> int:
 
 
 func _input(event: InputEvent) -> void:
+	if van_open and (event is InputEventMouseButton or event is InputEventMouseMotion):
+		var hit: Dictionary = van_hit(event.position)
+		if not hit.is_empty():
+			van_row = int(hit["row"])
+			if event is InputEventMouseButton and event.pressed \
+					and event.button_index == MOUSE_BUTTON_LEFT and int(hit["step"]) != 0:
+				van_step(int(hit["step"]))
+		queue_redraw()
+		return
 	if not (event is InputEventKey) or not event.pressed or event.echo:
+		return
+	if van_open:
+		_van_key(event.keycode)
+		queue_redraw()
 		return
 	match event.keycode:
 		KEY_DOWN, KEY_S, KEY_RIGHT, KEY_D:
@@ -149,7 +173,7 @@ func _input(event: InputEvent) -> void:
 			selected = (selected - 1 + maxi(jobs.size(), 1)) % maxi(jobs.size(), 1)
 			queue_redraw()
 		KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
-			_take_it()
+			open_van()
 		KEY_ESCAPE:
 			# Back to the yard rather than out of the game. Escape quitting the process from the
 			# middle of a career is the kind of thing that only ever happens by accident.
@@ -175,6 +199,50 @@ func scene_for(job: Dictionary) -> String:
 	return FELL_SCENE
 
 
+## Load the van for this job. Defaults to what the level packed — the reachability gate proves the
+## top can be reached with that many ladders, so it is the only number the game can promise.
+func open_van() -> void:
+	if jobs.is_empty():
+		return
+	var job: Dictionary = jobs[selected]
+	if locked(job):
+		return
+	van_ladders = maxi(int(job.get("ladders", 0)), 1)
+	van_dogs = maxi(int(job.get("dogs", 0)), 1)
+	van_row = 0
+	van_open = true
+
+
+func _van_key(key: int) -> void:
+	match key:
+		KEY_ESCAPE:
+			van_open = false
+		KEY_UP, KEY_W:
+			van_row = (van_row - 1 + VAN_ROWS.size()) % VAN_ROWS.size()
+		KEY_DOWN, KEY_S:
+			van_row = (van_row + 1) % VAN_ROWS.size()
+		KEY_LEFT, KEY_A:
+			van_step(-1)
+		KEY_RIGHT, KEY_D:
+			van_step(1)
+		KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
+			_take_it()
+
+
+func van_step(dir: int) -> void:
+	if VAN_ROWS[van_row] == "ladders":
+		van_ladders = clampi(van_ladders + dir, 1, 40)
+	else:
+		van_dogs = clampi(van_dogs + dir * 2, 2, 120)
+
+
+## What the ladders you are taking mean, in metres of span — the number the decision is actually
+## about. Said out loud rather than left for the player to work out at fifty metres.
+func van_span(job: Dictionary) -> float:
+	var height: float = float(job.get("height", 0.0))
+	return height / maxf(float(van_ladders), 1.0)
+
+
 ## Start the job.
 func _take_it() -> void:
 	if jobs.is_empty():
@@ -186,6 +254,8 @@ func _take_it() -> void:
 	# On the tree root rather than on the scene, because the climbing scene's root is a plain
 	# Node3D with no script on it and the felling scene's is not. One way in for both.
 	get_tree().root.set_meta("job_level", String(job["id"]))
+	get_tree().root.set_meta("job_ladders", van_ladders)
+	get_tree().root.set_meta("job_dogs", van_dogs)
 	var world: Node = packed.instantiate()
 	get_tree().root.add_child(world)
 	get_tree().current_scene = world
@@ -216,6 +286,11 @@ func _draw() -> void:
 
 	if selected < jobs.size():
 		_letter(jobs[selected], 48.0 + CARD_W + 60.0, 130.0)
+
+	# Last, over everything: the van is a decision, and a decision should not share the screen
+	# with the thing it is about.
+	if van_open:
+		_draw_van()
 
 
 ## One job, as a card pinned to the board. Returns the y to carry on from.
@@ -296,3 +371,90 @@ func _letter(job: Dictionary, x: float, y: float) -> void:
 			"They will not give this to a %d-star jack. Take smaller work first."
 				% int(career.get("stars", 0)),
 			HORIZONTAL_ALIGNMENT_LEFT, int(w - 52), 12, RED_INK)
+
+
+# --- the van ----------------------------------------------------------------------------------
+#
+# The strategy layer, and the only screen in the game where a decision is made with nothing at
+# stake yet. 08-hub-and-meta.md: "There is no 'recommended loadout' button." There is a default —
+# what the level packed, which the reachability gate has proved can reach the top — and the rest
+# is yours.
+
+const VAN_W := 560.0
+const VAN_H := 300.0
+const VAN_ROW_H := 54.0
+
+
+func van_rect() -> Rect2:
+	return Rect2(Vector2((size.x - VAN_W) * 0.5, (size.y - VAN_H) * 0.5), Vector2(VAN_W, VAN_H))
+
+
+## Which row a point is over, and whether it is on the minus or the plus. -1 for neither.
+func van_hit(p: Vector2) -> Dictionary:
+	var r := van_rect()
+	if not r.has_point(p):
+		return {}
+	for i in VAN_ROWS.size():
+		var y: float = r.position.y + 106.0 + VAN_ROW_H * float(i)
+		if p.y >= y - 26.0 and p.y <= y + 14.0:
+			var step := 0
+			if p.x >= r.position.x + VAN_W - 90.0:
+				step = 1
+			elif p.x >= r.position.x + VAN_W - 170.0:
+				step = -1
+			return {"row": i, "step": step}
+	return {}
+
+
+func _draw_van() -> void:
+	var job: Dictionary = jobs[selected] if not jobs.is_empty() else {}
+	var r := van_rect()
+	draw_rect(Rect2(r.position - Vector2(6, 6), r.size + Vector2(12, 12)), Color(0, 0, 0, 0.45))
+	draw_rect(r, PAPER)
+
+	draw_string(_font, r.position + Vector2(28, 44), "THE VAN",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, FADED)
+	draw_string(_font, r.position + Vector2(28, 74), String(job.get("name", "")),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 21, INK)
+
+	for i in VAN_ROWS.size():
+		var y: float = r.position.y + 106.0 + VAN_ROW_H * float(i)
+		var on: bool = i == van_row
+		if on:
+			draw_rect(Rect2(Vector2(r.position.x + 16.0, y - 26.0),
+				Vector2(VAN_W - 32.0, 36.0)), Color(0.16, 0.14, 0.12, 0.07))
+		var what := "Ladder sections" if VAN_ROWS[i] == "ladders" else "Dogs"
+		draw_string(_font, Vector2(r.position.x + 28.0, y), what,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK if on else FADED)
+		var n: int = van_ladders if VAN_ROWS[i] == "ladders" else van_dogs
+		draw_string(_font, Vector2(r.position.x + VAN_W - 150.0, y), "‹" if on else " ",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK)
+		draw_string(_font, Vector2(r.position.x + VAN_W - 118.0, y), "%d" % n,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 21, INK)
+		draw_string(_font, Vector2(r.position.x + VAN_W - 66.0, y), "›" if on else " ",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK)
+
+	# What the choice actually means, in the units the job is in. A player should not have to do
+	# this division at fifty metres with one hand on a rung.
+	var span := van_span(job)
+	var verdict := "rigid"
+	var col := Color(0.20, 0.42, 0.24)
+	if span > 8.0:
+		verdict = "past buckling — she will not hold"
+		col = RED_INK
+	elif span > 6.0:
+		verdict = "swaying"
+		col = RED_INK
+	elif span > 4.0:
+		verdict = "flexing"
+		col = Color(0.55, 0.38, 0.10)
+	draw_string(_font, Vector2(r.position.x + 28.0, r.position.y + VAN_H - 76.0),
+		"%.1f m a section over %.0f m — %s" % [span, float(job.get("height", 0.0)), verdict],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, col)
+	draw_string(_font, Vector2(r.position.x + 28.0, r.position.y + VAN_H - 52.0),
+		"%d dogs — %s" % [van_dogs,
+			"plenty" if van_dogs >= van_ladders * 2 else "you will be going back down for more"],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, FADED)
+	draw_string(_font, Vector2(r.position.x + 28.0, r.position.y + VAN_H - 22.0),
+		"↑↓ choose   ←→ or click   ·   enter to set off   ·   esc to think again",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, FADED)

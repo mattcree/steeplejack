@@ -341,10 +341,18 @@ func _ready() -> void:
 	# The job's own allowance, the number the reachability gate (CORE-009) proves the top with. It
 	# was a hard-coded 12 against the Grey Box's 14, so a careful player could run out of ladder on a
 	# level the gate had passed.
+	# What the level packed, unless the van says otherwise. The board's loadout screen writes its
+	# numbers onto the tree root before the scene is built, because that decision is made in the
+	# yard and has to survive the trip.
 	if jack.loadout_ladders() > 0:
 		ladders_at_base = jack.loadout_ladders()
 	if jack.loadout_dogs() > 0:
 		dogs_at_base = jack.loadout_dogs()
+	var tree_root := get_tree().root
+	if tree_root.has_meta("job_ladders"):
+		ladders_at_base = maxi(int(tree_root.get_meta("job_ladders")), 1)
+	if tree_root.has_meta("job_dogs"):
+		dogs_at_base = maxi(int(tree_root.get_meta("job_dogs")), 1)
 
 	# glTF animations import unlooped, so idle and run play once and then he freezes mid-stride.
 	# Nothing warns about this; the character simply stops a second or two after you start.
