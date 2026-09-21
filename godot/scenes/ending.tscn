@@ -1,0 +1,14 @@
+; The end of it: the engine steamed out of the yard and through a town with fewer chimneys in it
+; than when you arrived. 19-the-complete-game.md, "What the player keeps".
+;
+; Hand-written text, reviewable in a diff. That is why we are in this engine.
+
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ending.gd" id="1_ending"]
+
+[node name="Ending" type="Control"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_ending")

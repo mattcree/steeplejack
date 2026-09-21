@@ -46,14 +46,24 @@ func _ready() -> void:
 		ProjectSettings.globalize_path("res://../data/levels/00-greybox.json"))
 	_load_career()
 	stages = _engine_stages()
+	_build_rows()
+	set_process(true)
+	set_process_input(true)
+	queue_redraw()
+
+
+## Steaming her only appears when she is finished. It is the last row because it is the last
+## thing, and it is not a menu item until then — an option greyed out for a whole campaign is a
+## countdown, and this should arrive rather than approach.
+func _build_rows() -> void:
 	rows = [
 		["board", "The board", "see what work there is"],
 		["kettle", "The kettle", "turn in, and let a day go by"],
 		["engine", "The tarpaulin", "the engine"],
 	]
-	set_process(true)
-	set_process_input(true)
-	queue_redraw()
+	if engine_done():
+		rows.append(["steam", "Steam her", "take her out on the road"])
+	selected = mini(selected, rows.size() - 1)
 
 
 func _load_career() -> void:
@@ -158,6 +168,8 @@ func choose(what: String) -> void:
 			_said = "morning. day %d." % (int(career.get("day", 0)) + 1)
 		"engine":
 			_buy_part()
+		"steam":
+			_steam_her()
 
 
 ## One part at a time, and refused rather than allowed into debt. A job cannot leave you owing
@@ -172,9 +184,22 @@ func _buy_part() -> void:
 		return
 	_save_career()
 	career = jack.career_state()
+	_build_rows()
 	var i := stage_index()
 	_said = ("that's her done." if engine_done()
 		else "£%.0f. %s." % [cost, String(stages[maxi(i, 0)].get("name", "a part"))])
+
+
+func _steam_her() -> void:
+	var packed: PackedScene = load("res://scenes/ending.tscn")
+	if packed == null:
+		push_error("yard: cannot load the ending")
+		return
+	var ending: Node = packed.instantiate()
+	ending.career_path = career_path
+	get_tree().root.add_child(ending)
+	get_tree().current_scene = ending
+	queue_free()
 
 
 func _open_board() -> void:
