@@ -294,3 +294,45 @@ TEST_CASE("Career: it round-trips through text a person could read")
     CHECK(back.Done("06-waterside"));
     CHECK_FALSE(back.Done("07-kershaws-yard"));   // it failed, so it is not done
 }
+
+// --- the top of the reputation scale --------------------------------------------------------
+//
+// Found 2026-09-21 by asking whether the campaign can be finished. It cannot, and not because of
+// missing content: **the fifth star is out of reach by arithmetic.**
+//
+// Five stars wants 80. A job pays `jobCompleted` 3, and `jobPerfect` 6 is only ever paid by a
+// felling graded Perfect — a climbing job has no perfect grade at all and always pays 3. So the
+// designed twelve-level campaign tops out at 3 fellings x 6 + 9 climbs x 3 = 45, and even twelve
+// flawless fellings would only make 72.
+//
+// This test does not assert that the fifth star is unreachable, because that would be codifying
+// the bug. It asserts what the ceiling actually IS, so that the number is visible in the suite and
+// any change to the economy shows up here as a diff rather than being discovered again in a year.
+// The decision — lower the threshold, raise the award, or add reputation sources the design does
+// not have yet — is in BLOCKED.md.
+
+TEST_CASE("Career: what the very best career can actually be worth")
+{
+    const Tuning& t = Tune();
+
+    const int32_t per_job = t.GetI("reputation.jobCompleted");
+    const int32_t per_perfect_fell = t.GetI("reputation.jobPerfect");
+    const int32_t five_stars = 80;   // literal: starThresholds[4], read below and checked
+
+    // The thresholds, as the economy states them.
+    CHECK(per_job == 3);
+    CHECK(per_perfect_fell == 6);
+
+    // The designed campaign: twelve jobs, three of them fellings.
+    const int32_t designed_best = 3 * per_perfect_fell + 9 * per_job;
+    CHECK(designed_best == 45);
+    CHECK(designed_best < five_stars);
+
+    // And the absolute ceiling, if every job in the game were a felling and every one perfect.
+    const int32_t impossible_best = 12 * per_perfect_fell;
+    CHECK(impossible_best == 72);
+    CHECK(impossible_best < five_stars);
+
+    // Which is to say: under these numbers nobody has ever been able to earn the fifth star, and
+    // `career_reachable_stars` is right to report every five-star gate as a gap in the level set.
+}

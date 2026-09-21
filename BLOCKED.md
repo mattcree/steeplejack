@@ -88,6 +88,32 @@ a doubt about the traction engine and an interest in lighter RPG-style progressi
 
 ### Raised 2026-09-21 by the campaign arithmetic
 
+**The headline one: the fifth star has never been reachable by anybody.**
+
+Five stars wants 80 reputation. A job pays `jobCompleted` 3; `jobPerfect` 6 is paid only by a
+felling graded Perfect, and a climbing job has no perfect grade at all — it always pays 3. So the
+designed twelve-level campaign tops out at **3 fellings x 6 + 9 climbs x 3 = 45**, and even twelve
+flawless fellings would only make **72**. The top 20% of the reputation scale is dead, every
+five-star gate in the level set is unreachable by arithmetic rather than by content, and the
+hundred-per-cent in [`19-the-complete-game.md`](docs/01-gdd/19-the-complete-game.md) cannot be
+completed by anyone.
+
+`test_career.cpp` now pins those figures so the numbers are visible in the suite rather than
+rediscovered in a year. It deliberately does NOT assert that the fifth star is unreachable, because
+that would be codifying the bug.
+
+| The fix | What it costs |
+|---|---|
+| **Lower `starThresholds[4]` to about 40** | Cheapest, and keeps the five-star scale meaning "did nearly everything well". With 45 available, 40 is a real target and 80 is not |
+| **Give climbing jobs a perfect grade** | Truer to the design — every archetype has a "done well" the fee does not pay for — but it is a new grading rule per archetype |
+| **Raise `jobCompleted` and `jobPerfect`** | Blunt, and it makes early jobs feel cheap relative to late ones |
+
+My recommendation is the first now and the second later: drop the threshold so the scale works
+today, and give the archetypes their own perfect grades as they get built. **Not done** — it is a
+number about how the whole campaign feels, and that is yours.
+
+---
+
 Found by asking whether the game can actually be finished, which nothing had asked before.
 
 | The question | The numbers | Recommendation |

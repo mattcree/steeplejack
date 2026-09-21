@@ -1,0 +1,164 @@
+{
+  "$schema": "../schemas/level.schema.json",
+  "id": "09-the-gasworks",
+  "name": "The Gasworks",
+  "order": 9,
+  "archetype": "CONDUCTOR",
+  "reputationGate": 4,
+  "fee": 1750,
+  "briefing": {
+    "from": "the works manager",
+    "lines": [
+      "Our retort house stack has no protection on it whatever and we hold four hundred",
+      "thousand cubic feet of gas within a hundred yards of it. The board have decided",
+      "this is now urgent, which I am told is the word men use when they have been putting",
+      "something off. Sixty metres. There is old ironwork on her that nobody can account",
+      "for and I want it bonded or taken off, your judgement which."
+    ]
+  },
+  "shiftMinutes": 330,
+  "targetMinutes": 75,
+  "structure": {
+    "type": "chimney",
+    "height": 60.0,
+    "baseRadius": 2.6,
+    "topRadius": 1.25,
+    "profile": "round",
+    "batter": [
+      {
+        "at": 0.0,
+        "step": 0.0
+      }
+    ],
+    "bands": [],
+    "cap": "capped",
+    "leanDegrees": 0.0,
+    "leanBearing": 0,
+    "jointGrid": {
+      "courseHeight": 0.075,
+      "brickLength": 0.225,
+      "candidateDensity": 4.0
+    },
+    "weathering": {
+      "sootTo": 0.85,
+      "bleachFrom": 0.97,
+      "seed": 1009
+    }
+  },
+  "bands": [
+    {
+      "from": 0.0,
+      "to": 20.0,
+      "type": "plain",
+      "quality": {
+        "sound": 0.7,
+        "fair": 0.22,
+        "perished": 0.08,
+        "cracked": 0.0
+      },
+      "note": "Engineering brick at the bottom, and it has held up."
+    },
+    {
+      "from": 20.0,
+      "to": 38.0,
+      "type": "old-fixtures",
+      "quality": {
+        "sound": 0.42,
+        "fair": 0.3,
+        "perished": 0.24,
+        "cracked": 0.04
+      },
+      "note": "The ironwork nobody can account for. Unbonded metal beside a conductor run is a side-flash path, which is the one way a conductor makes things worse."
+    },
+    {
+      "from": 38.0,
+      "to": 60.0,
+      "type": "corroded-steel",
+      "quality": {
+        "sound": 0.16,
+        "fair": 0.26,
+        "perished": 0.44,
+        "cracked": 0.14
+      },
+      "note": "Acid off the retorts has been at the top of her for forty years. It eats conductors too: one stack was struck four times after the tip corroded away while the rest of the rod was perfect."
+    }
+  ],
+  "weather": {
+    "windBase": 8.0,
+    "windBearing": 268,
+    "windVeerPerHour": 11.0,
+    "windAtHeight": [
+      [
+        0,
+        1.0
+      ],
+      [
+        30,
+        1.5
+      ],
+      [
+        60,
+        2.0
+      ]
+    ],
+    "gustIntervalSeconds": [
+      45,
+      90
+    ],
+    "precipitation": "drizzle",
+    "ramp": null
+  },
+  "site": {
+    "safeLineDistance": 0,
+    "exclusions": [],
+    "corridor": null,
+    "crowd": null,
+    "backdrop": "mill-town-yard"
+  },
+  "mission": {
+    "type": "CONDUCTOR",
+    "terminalHeight": 60.0,
+    "reels": 4,
+    "obstruction": {
+      "from": 20.0,
+      "to": 38.0,
+      "what": "unaccounted ironwork",
+      "note": "Bond it or go round it. Either is a defensible answer and neither is free."
+    },
+    "earth": {
+      "plateSquareFeet": 18.0,
+      "wet": false,
+      "coke": true,
+      "note": "Made ground, and it dries out in summer. A pit here passes in March and fails in August unless you go deep enough to find water."
+    },
+    "softLanding": false
+  },
+  "complications": [
+    {
+      "at": "summit",
+      "type": "great-aire-reveal",
+      "params": {
+        "durationSeconds": 4.0,
+        "bearing": 214,
+        "distance": 4800
+      }
+    }
+  ],
+  "scoring": {
+    "bonuses": [
+      {
+        "id": "all_defects",
+        "condition": "defectsFound==4",
+        "amount": 0
+      }
+    ],
+    "hardFailConditions": []
+  },
+  "loadoutHint": {
+    "ladders": 16,
+    "dogs": 38,
+    "rope": 2
+  },
+  "replay": "data/replays/01-back-yard-expert.replay",
+  "designDoc": "docs/02-levels/level-01-back-yard.md"
+}

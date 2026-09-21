@@ -1,0 +1,193 @@
+{
+  "$schema": "../schemas/level.schema.json",
+  "id": "11-pitchcombe-mill",
+  "name": "Pitchcombe Mill",
+  "order": 11,
+  "archetype": "BAND",
+  "reputationGate": 4,
+  "fee": 2150,
+  "briefing": {
+    "from": "Miss Pitchcombe",
+    "lines": [
+      "My father built this chimney and I am told by three separate men that it should come",
+      "down. It is four feet out of upright and it has been four feet out of upright since",
+      "1889. I do not want it felled. I want it banded, properly, by somebody who has done",
+      "it before, and I will pay what that costs. Forty-eight metres."
+    ]
+  },
+  "shiftMinutes": 360,
+  "targetMinutes": 95,
+  "structure": {
+    "type": "chimney",
+    "height": 48.0,
+    "baseRadius": 2.1,
+    "topRadius": 1.15,
+    "profile": "round",
+    "batter": [
+      {
+        "at": 0.0,
+        "step": 0.0
+      }
+    ],
+    "bands": [],
+    "cap": "corbelled-oversail",
+    "leanDegrees": 2.4,
+    "leanBearing": 64,
+    "jointGrid": {
+      "courseHeight": 0.075,
+      "brickLength": 0.225,
+      "candidateDensity": 4.0
+    },
+    "weathering": {
+      "sootTo": 0.68,
+      "bleachFrom": 0.92,
+      "seed": 1011
+    }
+  },
+  "bands": [
+    {
+      "from": 0.0,
+      "to": 16.0,
+      "type": "plain",
+      "quality": {
+        "sound": 0.6,
+        "fair": 0.26,
+        "perished": 0.14,
+        "cracked": 0.0
+      },
+      "note": "Her father built her well. That is why she is still up."
+    },
+    {
+      "from": 16.0,
+      "to": 30.0,
+      "type": "crack",
+      "quality": {
+        "sound": 0.28,
+        "fair": 0.32,
+        "perished": 0.32,
+        "cracked": 0.08
+      },
+      "note": "The lean opens her on the high side, which is where every band has to bite."
+    },
+    {
+      "from": 30.0,
+      "to": 41.0,
+      "type": "delaminated",
+      "quality": {
+        "sound": 0.16,
+        "fair": 0.26,
+        "perished": 0.44,
+        "cracked": 0.14
+      },
+      "note": "Face coming away from the backing. Sound before you drive."
+    },
+    {
+      "from": 41.0,
+      "to": 48.0,
+      "type": "corbelled-cap",
+      "quality": {
+        "sound": 0.1,
+        "fair": 0.22,
+        "perished": 0.5,
+        "cracked": 0.18
+      },
+      "note": "A heavy cap on a leaning shaft is a weight at the end of a long lever, which is the failure the whole 1885 treatise keeps coming back to."
+    }
+  ],
+  "weather": {
+    "windBase": 6.0,
+    "windBearing": 204,
+    "windVeerPerHour": 6.0,
+    "windAtHeight": [
+      [
+        0,
+        1.0
+      ],
+      [
+        24,
+        1.4
+      ],
+      [
+        48,
+        1.8
+      ]
+    ],
+    "gustIntervalSeconds": [
+      60,
+      110
+    ],
+    "precipitation": "none",
+    "ramp": null
+  },
+  "site": {
+    "safeLineDistance": 0,
+    "exclusions": [],
+    "corridor": null,
+    "crowd": null,
+    "backdrop": "mill-town-yard"
+  },
+  "mission": {
+    "type": "BAND",
+    "bands": [
+      {
+        "height": 12.0,
+        "bolts": 12,
+        "note": "The foot of the crack."
+      },
+      {
+        "height": 19.0,
+        "bolts": 12,
+        "note": "Across it, low."
+      },
+      {
+        "height": 25.0,
+        "bolts": 16,
+        "note": "The widest part of it."
+      },
+      {
+        "height": 31.0,
+        "bolts": 16,
+        "note": "Into the delaminated face \u2014 sound every joint first."
+      },
+      {
+        "height": 37.0,
+        "bolts": 12,
+        "note": "Above the crack."
+      },
+      {
+        "height": 43.0,
+        "bolts": 12,
+        "note": "Under the cap. Fitted first in the trade, because the unrestrained edge is weakest."
+      }
+    ],
+    "softLanding": false
+  },
+  "complications": [
+    {
+      "at": "summit",
+      "type": "great-aire-reveal",
+      "params": {
+        "durationSeconds": 4.0,
+        "bearing": 214,
+        "distance": 4800
+      }
+    }
+  ],
+  "scoring": {
+    "bonuses": [
+      {
+        "id": "all_defects",
+        "condition": "defectsFound==4",
+        "amount": 0
+      }
+    ],
+    "hardFailConditions": []
+  },
+  "loadoutHint": {
+    "ladders": 13,
+    "dogs": 32,
+    "rope": 2
+  },
+  "replay": "data/replays/01-back-yard-expert.replay",
+  "designDoc": "docs/02-levels/level-01-back-yard.md"
+}
