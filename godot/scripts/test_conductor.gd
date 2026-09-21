@@ -83,6 +83,19 @@ func _init() -> void:
 		"a run that passes pays at the BOTTOM, not at the cap")
 	_check(not bool(player.settlement.get("failed", true)), "and it counts as done")
 
+	# --- climbing back up does not pay out tape ------------------------------------------------
+	# It used to be the absolute distance moved, so going up to look at something cost tape as if
+	# you had run it down her.
+	var paid_before: float = player.tape_paid
+	player.set_height_m(12.0)
+	player._conductor_descend(8.0)     # moved UP four metres
+	_check(absf(player.tape_paid - paid_before) < 0.001,
+		"climbing back up pays out no tape: %.2f -> %.2f" % [paid_before, player.tape_paid])
+	player.set_height_m(8.0)
+	player._conductor_descend(12.0)    # and back down four
+	_check(player.tape_paid > paid_before, "and going down again does")
+	player.tape_paid = paid_before
+
 	# --- and there is a way home from the bottom of her ---------------------------------------
 	# The only way out of a climb used to be standing on the cap, which two archetypes never do.
 	var ev := InputEventKey.new()

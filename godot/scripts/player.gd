@@ -2985,9 +2985,15 @@ func _mission_reels() -> int:
 func _conductor_descend(before: float) -> void:
 	if not conductor_job or tape_at < 0.0:
 		return
-	var moved: float = absf(before - height_m())
+	# DOWN only. It was the absolute distance, so climbing back up a few metres to look at
+	# something paid out tape as if you had run it — on a 28 m chimney with 50 m on the van that
+	# is the difference between finishing the job and running out half way down her.
+	#
+	# Going up does not take the tape back either. What you have let out is let out; you are
+	# simply not paying any more while you are going the wrong way.
+	var dropped: float = maxf(before - height_m(), 0.0)
 	# Round the face costs you as well as down it: the lateral shuffle is tape too.
-	tape_paid += moved + absf(_shuffle - _shuffle_before) * 0.6
+	tape_paid += dropped + absf(_shuffle - _shuffle_before) * 0.6
 	_shuffle_before = _shuffle
 
 
