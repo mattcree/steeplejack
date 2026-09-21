@@ -400,8 +400,21 @@ func _draw_salvage(ground: float) -> void:
 ## stage at a time as it is paid for. It has no mechanical benefit of any kind, which is the whole
 ## point of it.
 func _draw_engine(at: Vector2, scale: float) -> void:
-	var i := stage_index()
-	var done: int = stages.size() if i < 0 else i
+	# How much of her is REVEALED is how much of her is bought, not which stage she is up to. The
+	# first stage is "strip and assess" and has no parts in it, so keying the drawing off the stage
+	# index showed a brand-new career a pair of wheels it had not paid for.
+	var bought: int = int(career.get("engine_parts", 0))
+	var done := 0
+	var seen := 0
+	for st in stages:
+		var need: int = int(st.get("parts", 0))
+		if need <= 0:
+			continue
+		seen += need
+		if bought >= seen:
+			done += 1
+		else:
+			break
 	var w := 300.0 * scale
 	var h := 150.0 * scale
 
@@ -418,23 +431,23 @@ func _draw_engine(at: Vector2, scale: float) -> void:
 
 	# Wheels first, then boiler, then motion, then brasswork, then paint — in the order they are
 	# bought, so the yard shows you what your money did.
-	var body := RUST if done < stages.size() else GREEN
+	var body := GREEN if engine_done() else RUST
 	var rear := h * 0.40
 	var front := h * 0.22
 	draw_arc(at + Vector2(-w * 0.26, -rear), rear, 0.0, TAU, 26, Color(body, 0.95), 5.0)
 	draw_arc(at + Vector2(w * 0.28, -front), front, 0.0, TAU, 20, Color(body, 0.95), 4.0)
-	if done >= 2:
+	if done >= 1:
 		draw_rect(Rect2(at + Vector2(-w * 0.34, -h * 0.72), Vector2(w * 0.60, h * 0.34)),
 			Color(body, 0.95))
 		draw_rect(Rect2(at + Vector2(w * 0.16, -h * 1.10), Vector2(w * 0.10, h * 0.42)),
 			Color(body, 0.95))
-	if done >= 3:
+	if done >= 2:
 		draw_line(at + Vector2(-w * 0.26, -rear), at + Vector2(w * 0.10, -h * 0.50),
 			Color(0.72, 0.68, 0.60, 0.9), 3.0)
-	if done >= 4:
+	if done >= 3:
 		draw_circle(at + Vector2(-w * 0.04, -h * 0.80), 5.0, Color(0.85, 0.72, 0.36, 0.95))
 		draw_circle(at + Vector2(w * 0.06, -h * 0.80), 5.0, Color(0.85, 0.72, 0.36, 0.95))
-	if done >= stages.size():
+	if engine_done():
 		draw_line(at + Vector2(-w * 0.34, -h * 0.55), at + Vector2(w * 0.26, -h * 0.55),
 			Color(0.80, 0.24, 0.20, 0.9), 3.0)
 
