@@ -1,0 +1,14 @@
+; The yard behind the house — the only place in the game at ground level where nothing is trying
+; to kill you, and that contrast is the point (08-hub-and-meta.md).
+;
+; Hand-written text, reviewable in a diff. That is why we are in this engine.
+
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/yard.gd" id="1_yard"]
+
+[node name="Yard" type="Control"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_yard")

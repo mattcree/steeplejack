@@ -65,6 +65,25 @@ class SJ_API Career
 public:
     Career() = default;
 
+    // --- the yard -----------------------------------------------------------------------------
+    //
+    // The day and the engine. Both belong in the tin rather than in a second save file beside it:
+    // a split save is the kind of thing that rots the first time one half is written and the other
+    // is not, and a career whose money says one thing and whose calendar says another is not
+    // recoverable by anybody.
+
+    // Days since the season started. The board shows weather by the day and some jobs have
+    // deadlines, so this is the clock the whole meta layer hangs off.
+    int32_t Day() const noexcept { return day_; }
+    void    SleepOneNight() noexcept { ++day_; }
+
+    // Parts bought for the traction engine under the tarpaulin. It has no mechanical benefit of
+    // any kind, which is the entire point of it: see 19-the-complete-game.md on what a player
+    // keeps. Buying is refused rather than allowed into debt — a job cannot leave you owing money
+    // and neither can a boiler tube.
+    int32_t EngineParts() const noexcept { return engineParts_; }
+    bool    BuyEnginePart(float costGbp) noexcept;
+
     float   MoneyGbp() const noexcept { return money_; }
     int32_t Reputation() const noexcept { return reputation_; }
     // Reputation as the board draws it: how many of `economy.json`'s thresholds you are past.
@@ -119,6 +138,8 @@ public:
 
 private:
     float   money_{};
+    int32_t day_{};
+    int32_t engineParts_{};
     int32_t reputation_{};
     std::vector<JobRecord> jobs_;
     std::vector<std::string> stripped_;

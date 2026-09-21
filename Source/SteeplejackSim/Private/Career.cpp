@@ -169,10 +169,22 @@ int32_t Career::Injured(const Tuning& t)
     return delta;
 }
 
+bool Career::BuyEnginePart(float costGbp) noexcept
+{
+    if (costGbp < 0.0f || costGbp > money_)
+    {
+        return false;
+    }
+    money_ -= costGbp;
+    ++engineParts_;
+    return true;
+}
+
 std::string Career::ToJson() const
 {
     std::ostringstream out;
     out << "{\n  \"money\": " << money_ << ",\n  \"reputation\": " << reputation_
+        << ",\n  \"day\": " << day_ << ",\n  \"engineParts\": " << engineParts_
         << ",\n  \"jobs\": [";
     for (std::size_t i = 0; i < jobs_.size(); ++i)
     {
@@ -196,6 +208,15 @@ Career Career::FromJson(const std::string& json, const std::string& origin)
     const JsonValue doc = JsonValue::Parse(json, origin);
     c.money_ = static_cast<float>(doc.At("money").AsNumber());
     c.reputation_ = static_cast<int32_t>(doc.At("reputation").AsNumber());
+    // Optional, so a tin written before the yard existed still loads — day nought, no engine.
+    if (doc.Has("day"))
+    {
+        c.day_ = static_cast<int32_t>(doc.At("day").AsNumber());
+    }
+    if (doc.Has("engineParts"))
+    {
+        c.engineParts_ = static_cast<int32_t>(doc.At("engineParts").AsNumber());
+    }
     if (doc.Has("jobs"))
     {
         for (const JsonValue& j : doc.At("jobs").Elements())

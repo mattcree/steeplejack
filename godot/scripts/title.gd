@@ -11,7 +11,8 @@
 ## hand-placed level geometry"). The skyline below is four numbers and a loop.
 extends Control
 
-const BOARD_SCENE := "res://scenes/jobs.tscn"
+## The title opens the yard, and the yard opens the board. A career starts at home.
+const YARD_SCENE := "res://scenes/yard.tscn"
 const CAREER_PATH := "user://career.json"
 
 ## Where the tin lives. A test points this somewhere else so it does not read a real career.
@@ -135,7 +136,7 @@ func _mouse(event: InputEvent) -> void:
 func choose(what: String) -> void:
 	match what:
 		"continue":
-			_open_board()
+			_open_yard()
 		"new":
 			# Destructive, and it is somebody's whole season. Ask.
 			if has_career():
@@ -152,18 +153,18 @@ func choose(what: String) -> void:
 func _start_new() -> void:
 	confirming = false
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(career_path))
-	_open_board()
+	_open_yard()
 
 
-func _open_board() -> void:
-	var packed: PackedScene = load(BOARD_SCENE)
+func _open_yard() -> void:
+	var packed: PackedScene = load(YARD_SCENE)
 	if packed == null:
-		push_error("title: cannot load %s" % BOARD_SCENE)
+		push_error("title: cannot load %s" % YARD_SCENE)
 		return
-	var board: Node = packed.instantiate()
-	board.career_path = career_path
-	get_tree().root.add_child(board)
-	get_tree().current_scene = board
+	var yard: Node = packed.instantiate()
+	yard.career_path = career_path
+	get_tree().root.add_child(yard)
+	get_tree().current_scene = yard
 	queue_free()
 
 

@@ -209,6 +209,9 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("fell_shift", "height_removed_m"), &Jack::fell_shift);
 	ClassDB::bind_method(D_METHOD("career_load", "json"), &Jack::career_load);
 	ClassDB::bind_method(D_METHOD("career_json"), &Jack::career_json);
+	ClassDB::bind_method(D_METHOD("career_sleep"), &Jack::career_sleep);
+	ClassDB::bind_method(D_METHOD("career_buy_engine_part", "cost"),
+	                     &Jack::career_buy_engine_part);
 	ClassDB::bind_method(D_METHOD("career_state"), &Jack::career_state);
 	ClassDB::bind_method(D_METHOD("career_can_take", "gate_stars"), &Jack::career_can_take);
 	ClassDB::bind_method(D_METHOD("career_reachable_stars", "job_ids"),
@@ -1528,11 +1531,23 @@ String Jack::career_json() const
 	return String(career.ToJson().c_str());
 }
 
+void Jack::career_sleep()
+{
+	career.SleepOneNight();
+}
+
+bool Jack::career_buy_engine_part(double cost)
+{
+	return career.BuyEnginePart(static_cast<float>(cost));
+}
+
 Dictionary Jack::career_state() const
 {
 	Dictionary d;
 	d["money"] = static_cast<double>(career.MoneyGbp());
 	d["reputation"] = static_cast<int64_t>(career.Reputation());
+	d["day"] = static_cast<int64_t>(career.Day());
+	d["engine_parts"] = static_cast<int64_t>(career.EngineParts());
 	d["stars"] = tuning ? static_cast<int64_t>(career.Stars(*tuning)) : 0;
 	Array jobs;
 	for (const sj::JobRecord& j : career.Jobs())

@@ -353,6 +353,9 @@ public:
 	godot::String career_json() const;
 	/** `{money, reputation, stars, jobs}` — jobs is an Array of `{id, paid, error, failed}`. */
 	godot::Dictionary career_state() const;
+	/** The yard: advance the calendar, and buy a part for the engine. */
+	void career_sleep();
+	bool career_buy_engine_part(double cost);
 	/** Whether a level's letter has arrived, for a `reputationGate` in stars. */
 	bool career_can_take(int64_t gate_stars) const;
 	/**
