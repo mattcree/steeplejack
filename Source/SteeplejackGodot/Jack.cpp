@@ -231,6 +231,8 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("conductor_earth", "plate_square_feet", "wet", "coke"),
 	                     &Jack::conductor_earth);
 	ClassDB::bind_method(D_METHOD("conductor_state", "height"), &Jack::conductor_state);
+	ClassDB::bind_method(D_METHOD("career_salvage"), &Jack::career_salvage);
+	ClassDB::bind_method(D_METHOD("career_keep", "job_id", "what"), &Jack::career_keep);
 	ClassDB::bind_method(D_METHOD("career_left_in", "job_id"), &Jack::career_left_in);
 	ClassDB::bind_method(D_METHOD("plant_left_in", "job_id", "rust"), &Jack::plant_left_in,
 	                     DEFVAL(0.55));
@@ -1754,6 +1756,24 @@ Dictionary Jack::conductor_state(double height) const
 	d["earth_ohms"] = static_cast<double>(v.earthOhms);
 	d["terminal"] = v.terminalSet;
 	return d;
+}
+
+Array Jack::career_salvage() const
+{
+	Array out;
+	for (const auto& entry : career.Salvage())
+	{
+		Dictionary d;
+		d["id"] = String(entry.first.c_str());
+		d["what"] = String(entry.second.c_str());
+		out.push_back(d);
+	}
+	return out;
+}
+
+void Jack::career_keep(const String& job_id, const String& what)
+{
+	career.RememberSalvage(job_id.utf8().get_data(), what.utf8().get_data());
 }
 
 PackedFloat32Array Jack::career_left_in(const String& job_id) const

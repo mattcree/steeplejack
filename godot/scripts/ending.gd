@@ -102,10 +102,12 @@ func _build_tally() -> void:
 	for c in chimneys:
 		if bool(c[2]):
 			stumps += 1
+	var kept: int = (jack.career_salvage() as Array).size()
 	lines = [
 		["%d" % jobs.size(), "jobs, from the back yard to the Great Aire"],
 		["%d" % int(career.get("day", 0)), "days of it"],
 		["£%.0f" % paid, "in the tin, and most of it in the engine"],
+		["%d" % kept, "things on a shelf in the yard that came off them"],
 		["%d" % stumps, "chimneys that are not there any more"],
 		["", "because of you"],
 	]

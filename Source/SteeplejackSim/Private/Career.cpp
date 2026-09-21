@@ -197,6 +197,19 @@ void Career::RememberLeftIn(const std::string& levelId, const std::vector<float>
     leftIn_.emplace_back(levelId, heights);
 }
 
+void Career::RememberSalvage(const std::string& levelId, const std::string& what)
+{
+    for (auto& entry : salvage_)
+    {
+        if (entry.first == levelId)
+        {
+            // One thing per job. Going back to a chimney does not get you a second souvenir of it.
+            return;
+        }
+    }
+    salvage_.emplace_back(levelId, what);
+}
+
 bool Career::BuyEnginePart(float costGbp) noexcept
 {
     if (costGbp < 0.0f || costGbp > money_)
@@ -231,7 +244,13 @@ std::string Career::ToJson() const
         }
         out << "]}";
     }
-    out << (leftIn_.empty() ? "" : "\n  ") << "],\n  \"stripped\": [";
+    out << (leftIn_.empty() ? "" : "\n  ") << "],\n  \"salvage\": [";
+    for (std::size_t i = 0; i < salvage_.size(); ++i)
+    {
+        out << (i ? ",\n    " : "\n    ") << "{\"id\": \"" << salvage_[i].first
+            << "\", \"what\": \"" << salvage_[i].second << "\"}";
+    }
+    out << (salvage_.empty() ? "" : "\n  ") << "],\n  \"stripped\": [";
     for (std::size_t i = 0; i < stripped_.size(); ++i)
     {
         out << (i ? ", " : "") << "\"" << stripped_[i] << "\"";
@@ -254,6 +273,13 @@ Career Career::FromJson(const std::string& json, const std::string& origin)
     if (doc.Has("engineParts"))
     {
         c.engineParts_ = static_cast<int32_t>(doc.At("engineParts").AsNumber());
+    }
+    if (doc.Has("salvage"))
+    {
+        for (const JsonValue& e : doc.At("salvage").Elements())
+        {
+            c.salvage_.emplace_back(e.At("id").AsString(), e.At("what").AsString());
+        }
     }
     if (doc.Has("leftIn"))
     {

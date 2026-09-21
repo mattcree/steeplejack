@@ -542,6 +542,27 @@ func _plant_what_you_left() -> void:
 		_say("your own dogs are still in her — %d of them, a winter rustier" % n)
 
 
+## One thing off every job, carried home. Not bought — earned by doing it, and specific to what
+## the job was, so the shelf in the yard ends up being a list of the things you have done rather
+## than a list of the money you made.
+func _keep_something() -> void:
+	if settlement.is_empty():
+		return
+	var what := {
+		"SURVEY": "a chalked brick out of the perished course",
+		"CONDUCTOR": "a yard of the old copper you took off her",
+		"BAND": "the band bolt that had nothing left of it",
+		"FELL": "a brick off the top, picked up off the ground",
+		"STRAIGHTEN": "one of the wedges, still bright where it bore",
+	}
+	var arch := String(jack.level_archetype())
+	jack.career_keep(_level_id(), String(what.get(arch, "something off her")))
+	var out := FileAccess.open(career_path, FileAccess.WRITE)
+	if out != null:
+		out.store_string(jack.career_json())
+		out.close()
+
+
 ## Home, once the job is done — the yard, not the board.
 ##
 ## It used to go straight back to the wall of letters, which meant the money you had just earned
@@ -550,6 +571,7 @@ func _plant_what_you_left() -> void:
 func back_to_the_board() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	_remember_what_you_left()
+	_keep_something()
 	var yard: Node = load("res://scenes/yard.tscn").instantiate()
 	get_tree().root.add_child(yard)
 	get_tree().current_scene = yard

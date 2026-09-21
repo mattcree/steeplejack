@@ -85,6 +85,20 @@ public:
     const std::vector<float>& LeftIn(const std::string& levelId) const noexcept;
     void RememberLeftIn(const std::string& levelId, const std::vector<float>& heights);
 
+    // --- what you carried home ----------------------------------------------------------------
+    //
+    // One thing off every job, kept. Not bought — earned by doing, and by choosing to bring it
+    // back. 19-the-complete-game.md, on the five axes of a hundred per cent: "twelve objects, and
+    // the yard is a museum of a trade that no longer exists, assembled by the man who ended it."
+    //
+    // It is the counterweight to the engine. The engine is the thing you buy; this is the thing
+    // you remember, and between them they are the only two things in the game that get bigger.
+    const std::vector<std::pair<std::string, std::string>>& Salvage() const noexcept
+    {
+        return salvage_;
+    }
+    void RememberSalvage(const std::string& levelId, const std::string& what);
+
     // Days since the season started. The board shows weather by the day and some jobs have
     // deadlines, so this is the clock the whole meta layer hangs off.
     int32_t Day() const noexcept { return day_; }
@@ -154,6 +168,7 @@ private:
     int32_t day_{};
     int32_t engineParts_{};
     std::vector<std::pair<std::string, std::vector<float>>> leftIn_;
+    std::vector<std::pair<std::string, std::string>> salvage_;
     int32_t reputation_{};
     std::vector<JobRecord> jobs_;
     std::vector<std::string> stripped_;

@@ -404,6 +404,10 @@ public:
 	godot::PackedFloat32Array career_left_in(const godot::String& job_id) const;
 	/** Remember what is still in it now — every dog not drawn, plus the ones that snapped. */
 	void career_remember_left_in(const godot::String& job_id);
+	/** Everything carried home so far: `[{id, what}]`. */
+	godot::Array career_salvage() const;
+	/** Keep one thing off this job. The second time is ignored. */
+	void career_keep(const godot::String& job_id, const godot::String& what);
 	/** Put the ones you left last time back in the wall, rustier. Returns how many went in. */
 	int64_t plant_left_in(const godot::String& job_id, double rust);
 

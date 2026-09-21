@@ -81,6 +81,15 @@ func _init() -> void:
 	_check(int(again.career.get("engine_parts", 0)) == 1, "the engine is still bought next time")
 	_check(int(again.career.get("day", 0)) == day_before + 1, "and the day is still gone")
 
+	# --- and the shelf, which is the half of the yard that is not bought ----------------------
+	again.jack.career_keep("01-back-yard", "a chalked brick out of the perished course")
+	again.jack.career_keep("01-back-yard", "something else entirely")
+	var kept: Array = again.jack.career_salvage()
+	_check(kept.size() == 1, "one thing per job, and going back does not get you a second: %d"
+		% kept.size())
+	_check(String((kept[0] as Dictionary).get("what", "")).contains("chalked brick"),
+		"and it is the thing that job was about")
+
 	# --- the click geometry is the drawn geometry ---------------------------------------------
 	var origin: Vector2 = again._rows_origin()
 	for i in again.rows.size():

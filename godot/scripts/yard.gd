@@ -317,6 +317,7 @@ func _draw_yard() -> void:
 	draw_rect(Rect2(Vector2(fx - 15.0, ground - 22.0), Vector2(30.0, 22.0)), Color(0.13, 0.11, 0.10))
 
 	_draw_engine(Vector2(size.x * 0.68, ground), 1.0)
+	_draw_salvage(ground)
 
 
 ## The skyline, over the yard wall, and the reason this screen exists at all.
@@ -348,6 +349,51 @@ func _draw_town(base: float) -> void:
 		if not gone:
 			draw_rect(Rect2(Vector2(x - top_w * 0.5 - 3.0, base - h - 5.0),
 				Vector2(top_w + 6.0, 5.0)), col)
+
+
+## The shelf against the wall, and what is on it.
+##
+## One thing off every job, and none of it bought. 19-the-complete-game.md: "twelve objects, and
+## the yard is a museum of a trade that no longer exists, assembled by the man who ended it." It is
+## the counterweight to the engine — that is the thing you buy, this is the thing you remember —
+## and between them they are the only two things in this game that get bigger.
+func _draw_salvage(ground: float) -> void:
+	var kept: Array = jack.career_salvage()
+	if kept.is_empty():
+		return
+	# Clear of the menu panel on the left and the engine on the right; the yard has three
+	# things in it and they should not be standing on each other.
+	var shelf := Vector2(size.x * 0.31, ground - 70.0)
+	var w: float = 44.0 * float(mini(kept.size(), 9))
+	draw_rect(Rect2(shelf, Vector2(w + 18.0, 5.0)), Color(0.30, 0.24, 0.19))
+	draw_rect(Rect2(shelf + Vector2(0.0, 5.0), Vector2(w + 18.0, 4.0)), Color(0.0, 0.0, 0.0, 0.25))
+
+	for i in mini(kept.size(), 9):
+		var what := String((kept[i] as Dictionary).get("what", ""))
+		var x: float = shelf.x + 14.0 + 44.0 * float(i)
+		var base := Vector2(x, shelf.y)
+		# Each one drawn as the thing it is. A brick is a brick and a bolt is a bolt; nothing here
+		# is an icon of a category.
+		if what.contains("copper"):
+			draw_arc(base + Vector2(9.0, -12.0), 10.0, 0.0, TAU, 16, Color(0.72, 0.45, 0.24), 3.0)
+			draw_arc(base + Vector2(9.0, -12.0), 5.0, 0.0, TAU, 12, Color(0.72, 0.45, 0.24), 2.5)
+		elif what.contains("bolt"):
+			draw_rect(Rect2(base + Vector2(6.0, -22.0), Vector2(6.0, 22.0)), Color(0.38, 0.25, 0.18))
+			draw_rect(Rect2(base + Vector2(2.0, -26.0), Vector2(14.0, 6.0)), Color(0.42, 0.29, 0.21))
+		elif what.contains("wedge"):
+			draw_colored_polygon(PackedVector2Array([
+				base + Vector2(2.0, 0.0), base + Vector2(20.0, 0.0),
+				base + Vector2(6.0, -24.0)]), Color(0.62, 0.60, 0.56))
+		else:
+			# A brick, chalked or picked up off the ground.
+			draw_rect(Rect2(base + Vector2(1.0, -13.0), Vector2(20.0, 13.0)), Color(0.50, 0.28, 0.21))
+			if what.contains("chalk"):
+				draw_line(base + Vector2(4.0, -9.0), base + Vector2(16.0, -9.0),
+					Color(0.90, 0.88, 0.82, 0.9), 2.0)
+
+	_label("%d thing%s off %d job%s" % [kept.size(), "" if kept.size() == 1 else "s",
+		kept.size(), "" if kept.size() == 1 else "s"],
+		shelf + Vector2(0.0, 30.0), Color(GHOST, 0.65), 12)
 
 
 ## The engine. Under a tarpaulin at first — a shapeless lump with a wheel showing — and revealed a
