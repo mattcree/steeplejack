@@ -421,6 +421,11 @@ func breath_rate() -> float:
 
 
 ## For tests: the wind player's level right now, and the level the last one-shot played at.
+## For the tests: the loudest the slide can ever play, before master and the player's volume.
+func slide_max_db() -> float:
+	return float(_spec["slide"]["maxDb"])
+
+
 func wind_player_db() -> float:
 	return _wind_player.volume_db if _wind_player != null else -80.0
 

@@ -14,16 +14,16 @@
     "decay envelope rather than on timbre alone. The decayMs figures are that document's own."
   ],
   "sampleRate": 22050,
-  "_levelsComment": "Every one-shot used to play at full scale \u2014 the synthesis clamps to +-1.0 and nothing turned it down \u2014 so a tap, a hammer blow and a boot on a rung were all as loud as the game could make them. These are the levels they play at, in dB, under the player's own volume setting (F1).",
+  "_levelsComment": "Every one-shot used to play at full scale \u2014 the synthesis clamps to +-1.0 and nothing turned it down \u2014 so a tap, a hammer blow and a boot on a rung were all as loud as the game could make them. These are the levels they play at, in dB, under the player's own volume setting (F1).  Levels are dB under the master, and the master is -6. Two rules learned by having them wrong: a CONTINUOUS sound needs 6-10 dB more headroom than a one-shot at the same felt loudness, and a sound that REPEATS hundreds of times a shift (rung, hammer) has to sit under one that happens twice (crash, crack).",
   "levels": {
     "master": -6.0,
     "taps": -13.0,
-    "hammer": -9.0,
-    "bent": -11.0,
+    "hammer": -12.0,
+    "bent": -12.0,
     "seated": -13.0,
     "rung": -22.0,
     "creak": -19.0,
-    "thump": -10.0,
+    "thump": -14.0,
     "gustTell": -17.0,
     "mortarTick": -24.0,
     "groan": -15.0,
@@ -183,7 +183,8 @@
     "lowpassHz": 2400,
     "highpassHz": 500,
     "gain": 0.8,
-    "maxDb": -6.0
+    "maxDb": -20.0,
+    "_levels": "Was -6 dB, which made going down a ladder the second loudest thing in the game after a chimney hitting the ground, and 16 dB above the rung knocks of the climb it interrupts. A playtest called it earsplitting and was right. The rush this wants comes from CONTRAST with a near-silent climb, not from level: it is broadband and continuous, so at -20 it still sits over the -22 knocks and reads as a rush without being painful."
   },
   "_gustComment": "The 1.2 s pre-roll. 10-failure-and-difficulty.md allows a gust to blow you off ONLY if this played first, so it is a mechanic with a duration fixed by gustPreRollSeconds, not a flourish. Rendered as a rising filtered-noise swell rather than a tone, because it has to read as weather arriving and not as a UI beep.",
   "gustTell": {

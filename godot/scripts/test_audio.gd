@@ -132,6 +132,28 @@ func _init() -> void:
 			_check(absf(pcm[0]) < 0.05 and absf(pcm[pcm.size() - 1]) < 0.05,
 				"and its seam does not click (%.3f, %.3f)" % [pcm[0], pcm[pcm.size() - 1]])
 
+	# --- the mix has an order, and it is not an accident ----------------------------------------
+	#
+	# Going down the ladder was the second loudest thing in the game after a chimney hitting the
+	# ground, and 14 dB over the hammer you spend the whole shift swinging. A playtest called it
+	# earsplitting. These are the two rules that were being broken, as assertions, because a mix
+	# drifts back the moment someone wants one sound to "read better".
+	var slide_db: float = foley.slide_max_db()
+	_check(slide_db < foley.level("hammer"),
+		"the slide down is quieter than a hammer blow (%.0f < %.0f dB)" % [slide_db, foley.level("hammer")])
+	_check(slide_db < foley.level("crash"),
+		"and far quieter than a chimney landing (%.0f < %.0f dB)" % [slide_db, foley.level("crash")])
+	# It is continuous and broadband, so it needs headroom a one-shot does not — but it still has
+	# to be audible over the knocks of the climb it interrupts, or the descent has no voice at all.
+	_check(slide_db > foley.level("rung"),
+		"but still over the rung knocks it replaces (%.0f > %.0f dB)" % [slide_db, foley.level("rung")])
+
+	# The sounds you make hundreds of times a shift sit under the ones that happen twice.
+	for often in ["rung", "hammer", "taps"]:
+		for rare in ["crash", "crack", "propSplit"]:
+			_check(foley.level(often) < foley.level(rare),
+				"%s (%.0f) sits under %s (%.0f)" % [often, foley.level(often), rare, foley.level(rare)])
+
 	# Breathing quickens as nerve goes. The rate is set by band, and each band is faster.
 	var rates := []
 	for band in 4:
