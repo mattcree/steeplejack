@@ -77,7 +77,7 @@ func _open(id: String) -> void:
 
 	# And the archetype has to be one the game can actually run.
 	var arch := String(jack.level_archetype())
-	if ok and not (arch in ["SURVEY", "FELL", "CONDUCTOR", "BAND"]):
+	if ok and not (arch in ["SURVEY", "FELL", "CONDUCTOR", "BAND", "STRAIGHTEN"]):
 		ok = false
 		why = "archetype %s has no code behind it" % arch
 

@@ -40,7 +40,7 @@ acts missing at either end.
 |---|---|---|
 | **0. The yard** | Load the van. Twelve ladders or sixteen? | **Built** |
 | **1. Laddering** | Dog, lash, haul, climb, sound | **Built.** The best thing in the game |
-| **2. The work** | One of ten archetypes | **Four of ten** — survey, conductor, band, fell |
+| **2. The work** | One of ten archetypes | **Five of ten** — survey, conductor, band, fell, straighten |
 | **3. Striking** | Bring it all down and take it home | **Built** |
 | **4. The board** | What it paid, what it cost, what they think of you | **Built** |
 
@@ -71,7 +71,7 @@ leave out, and it is the thematic keystone of the whole campaign — see STRAIGH
 | G | **MECHANISM** | a machine, at height | Designed |
 | H | **LATTICE** | 3D movement, heat, the void | Designed |
 | I | **EMERGENCY** | time and storm, everything at once | Designed |
-| J | **STRAIGHTEN** | *nerve* — cutting into a sound chimney on purpose | **New, this document** |
+| J | **STRAIGHTEN** | *nerve* — cutting into a sound chimney on purpose | **Built.** The arithmetic is the puzzle |
 
 #### J. STRAIGHTEN — "She's three foot out of plumb and they want her saved."
 
@@ -115,7 +115,7 @@ the two FELL jobs already built where they already sit.
 | 8 | **Hollin Bank** | TOP | *SURVEY* | 55 m | ★ 3 | £1,480 |
 | 9 | The Gasworks | LATTICE | — | 60 m | ★ 4 | — |
 | 10 | Sowerby Bridge | EMERGENCY | — | 50 m | ★ 4 | — |
-| 11 | Pitchcombe Mill | **STRAIGHTEN** | — | 48 m | ★ 4 | — |
+| 11 | **Pitchcombe Mill** | **STRAIGHTEN** | STRAIGHTEN | 48 m | ★ 4 | £2,150 |
 | 12 | **The Great Aire Chimney** | FELL | FELL | 110 m | ★ 5 | £3,400 |
 
 **Nine of twelve exist.** Three of those nine are in *italics*: the job is real and the level is
@@ -152,7 +152,7 @@ fluent in felling or its inversion means nothing.
 1. ~~**Striking a stack**~~ — **built.** R with empty hands takes a ladder off; F draws the dog.
 2. ~~**The yard**~~ — **built.** The board, the kettle and the tarpaulin; the van loads the job.
 3. ~~**The front end**~~ — **built.** Title, menu, options, and a career that goes home.
-4. **Six archetypes** — GILD, TOP, MECHANISM, LATTICE, EMERGENCY, STRAIGHTEN. The actual content.
+4. **Five archetypes** — GILD, TOP, MECHANISM, LATTICE, EMERGENCY. The actual content.
 5. ~~**The persistent district**~~ — **built.** Your own dogs are in the wall when you come back.
 6. **Three more levels** — 9, 10 and 11, without which the engine and the fifth star are out of
    reach. This is now the shortest path to a campaign that can actually be finished.

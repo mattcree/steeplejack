@@ -112,6 +112,7 @@ func _draw() -> void:
 	_draw_conductor(jack)
 	_draw_band(jack)
 	_draw_survey(jack)
+	_draw_plumb(jack)
 
 	# Only once there is something to span *from*. With no dogs driven, the span is measured from
 	# the ground and reads "62.0 m span — about to buckle" at the top of a ladder that is lashed all
@@ -1405,6 +1406,86 @@ func _draw_survey(jack: Jack) -> void:
 	if bool(r.get("complete", false)):
 		_label("that is the lot — go down and tell them",
 			at + Vector2(0.0, 62.0), Color(GOOD, 0.85), TINY)
+
+
+## The plumb line — the STRAIGHTEN archetype's instrument.
+##
+## The whole verb is deciding, so the instrument is a prediction: where she is now, where a cut
+## here at this thickness would put her, and where she will finish once the weeks of overshoot have
+## run. All three on one scale, because the entire skill is reading the difference between the
+## second and the third.
+func _draw_plumb(jack: Jack) -> void:
+	if not player.plumb_job:
+		return
+	var st: Dictionary = jack.plumb_state()
+	if st.is_empty():
+		return
+	var at := Vector2(size.x - 250.0, 150.0)
+	var w := 214.0
+	draw_rect(Rect2(at - Vector2(14.0, 26.0), Vector2(w + 28.0, 176.0)),
+		Color(0.05, 0.04, 0.03, 0.5))
+	_label("THE PLUMB LINE", at, Color(GHOST, 0.8), TINY)
+
+	var start: float = float(st.get("lean_at_start", 1.0))
+	var now: float = float(st.get("lean_now", 0.0))
+	var scale: float = maxf(absf(start), 0.4) * 1.4
+	var mid: float = at.x + w * 0.5
+
+	# The scale: plumb in the middle, the way she started at one end.
+	draw_line(Vector2(at.x, at.y + 44.0), Vector2(at.x + w, at.y + 44.0), Color(GHOST, 0.4), 2.0)
+	draw_line(Vector2(mid, at.y + 34.0), Vector2(mid, at.y + 54.0), Color(INK, 0.8), 2.0)
+	_label("plumb", Vector2(mid - 16.0, at.y + 68.0), Color(GHOST, 0.7), TINY)
+
+	# Where she started, faint, so you can see what you have done.
+	var sx: float = mid + w * 0.5 * clampf(start / scale, -1.0, 1.0)
+	draw_line(Vector2(sx, at.y + 38.0), Vector2(sx, at.y + 50.0), Color(GHOST, 0.5), 2.0)
+
+	# Where she is.
+	var nx: float = mid + w * 0.5 * clampf(now / scale, -1.0, 1.0)
+	draw_circle(Vector2(nx, at.y + 44.0), 6.0, Color(INK, 0.95))
+	_label("%.2f m out" % absf(now), at + Vector2(0.0, 24.0), Color(INK, 0.95), H2)
+
+	if bool(st.get("collapsed", false)):
+		_label("she is down", at + Vector2(0.0, 92.0), DANGER, SMALL)
+		return
+
+	if not player.plumb_cut_done:
+		# The prediction. This is the instrument: a cut here, this deep, lands her THERE — and the
+		# overshoot carries her past it, which is why you aim short.
+		var p: Dictionary = player.plumb_here()
+		var lands: float = start - float(p.get("brings_back", 0.0))
+		var over: float = lands - float(p.get("brings_back", 0.0)) \
+			* player.jack.tuning_f("straightenOvershootShare", 0.14)
+		var lx: float = mid + w * 0.5 * clampf(lands / scale, -1.0, 1.0)
+		var ox: float = mid + w * 0.5 * clampf(over / scale, -1.0, 1.0)
+		draw_line(Vector2(lx, at.y + 36.0), Vector2(lx, at.y + 52.0), Color(WATCH, 0.9), 2.0)
+		# Where the weeks afterwards take her — the one a first-timer does not know about.
+		draw_line(Vector2(ox, at.y + 40.0), Vector2(ox, at.y + 48.0), Color(DANGER, 0.85), 3.0)
+		draw_line(Vector2(lx, at.y + 44.0), Vector2(ox, at.y + 44.0), Color(DANGER, 0.5), 1.0)
+
+		var risk: float = float(p.get("risk", 0.0))
+		var rcol := GOOD if risk < 0.5 else (WATCH if risk < 0.82 else DANGER)
+		_label("cut here, %.1f mm out" % player.plumb_take_out,
+			at + Vector2(0.0, 92.0), Color(DIM, 0.9), SMALL)
+		_label("brings her back %.2f m  [X]" % float(p.get("brings_back", 0.0)),
+			at + Vector2(0.0, 110.0), Color(WATCH, 0.9), SMALL)
+		_label("and she keeps going after", at + Vector2(0.0, 128.0), Color(DANGER, 0.75), TINY)
+		_label("the cut swings her: %s" % ["steady", "she will move", "she will not come back"][
+			0 if risk < 0.5 else (1 if risk < 0.82 else 2)],
+			at + Vector2(0.0, 146.0), Color(rcol, 0.9), TINY)
+	else:
+		var settling: bool = bool(st.get("settling", false))
+		var sway: float = float(st.get("sway_cm", 0.0))
+		_label("on the wedges" if settling else String(st.get("verdict_name", "")),
+			at + Vector2(0.0, 92.0), WATCH if settling else GOOD, SMALL)
+		if settling:
+			_label("the slit is opening and closing %.1f cm" % sway,
+				at + Vector2(0.0, 110.0), Color(DANGER if sway > 1.2 else DIM, 0.85), TINY)
+			_label("she comes back in her own time", at + Vector2(0.0, 128.0),
+				Color(GHOST, 0.8), TINY)
+		else:
+			_label("%.2f m out when the weeks have run" % absf(float(st.get("lean_when_done", 0.0))),
+				at + Vector2(0.0, 110.0), Color(DIM, 0.9), TINY)
 
 
 # --- the instruments ------------------------------------------------------------------------------

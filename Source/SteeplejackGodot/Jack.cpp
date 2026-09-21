@@ -209,6 +209,13 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("fell_shift", "height_removed_m"), &Jack::fell_shift);
 	ClassDB::bind_method(D_METHOD("career_load", "json"), &Jack::career_load);
 	ClassDB::bind_method(D_METHOD("career_json"), &Jack::career_json);
+	ClassDB::bind_method(D_METHOD("plumb_begin", "height", "lean_degrees"), &Jack::plumb_begin);
+	ClassDB::bind_method(D_METHOD("plumb_plan", "cut_height", "take_out_mm", "radius_at_cut"),
+	                     &Jack::plumb_plan);
+	ClassDB::bind_method(D_METHOD("plumb_cut", "cut_height", "take_out_mm", "radius_at_cut"),
+	                     &Jack::plumb_cut);
+	ClassDB::bind_method(D_METHOD("plumb_step", "hours"), &Jack::plumb_step);
+	ClassDB::bind_method(D_METHOD("plumb_state"), &Jack::plumb_state);
 	ClassDB::bind_method(D_METHOD("survey_begin", "defects"), &Jack::survey_begin);
 	ClassDB::bind_method(D_METHOD("survey_look", "height", "bearing", "at_top", "sounded"),
 	                     &Jack::survey_look);
@@ -1549,6 +1556,60 @@ void Jack::career_load(const String& json)
 String Jack::career_json() const
 {
 	return String(career.ToJson().c_str());
+}
+
+// --- straightening ---------------------------------------------------------------------------------
+
+void Jack::plumb_begin(double height, double lean_degrees)
+{
+	if (!tuning) { return; }
+	plumb.Begin(static_cast<float>(height), static_cast<float>(lean_degrees), *tuning);
+}
+
+Dictionary Jack::plumb_plan(double cut_height, double take_out_mm, double radius_at_cut) const
+{
+	Dictionary d;
+	if (!tuning) { return d; }
+	const sj::StraightenPlan p = plumb.Plan(static_cast<float>(cut_height),
+		static_cast<float>(take_out_mm), static_cast<float>(radius_at_cut), *tuning);
+	d["cut_height"] = static_cast<double>(p.cutHeightM);
+	d["take_out_mm"] = static_cast<double>(p.takeOutMm);
+	d["brings_back"] = static_cast<double>(p.bringsBackM);
+	d["leverage"] = static_cast<double>(p.leverage);
+	d["risk"] = static_cast<double>(p.riskShare);
+	return d;
+}
+
+bool Jack::plumb_cut(double cut_height, double take_out_mm, double radius_at_cut)
+{
+	if (!tuning) { return false; }
+	return plumb.Cut(plumb.Plan(static_cast<float>(cut_height), static_cast<float>(take_out_mm),
+		static_cast<float>(radius_at_cut), *tuning), *tuning);
+}
+
+void Jack::plumb_step(double hours)
+{
+	if (!tuning) { return; }
+	plumb.Step(static_cast<float>(hours), *tuning);
+}
+
+Dictionary Jack::plumb_state() const
+{
+	Dictionary d;
+	if (!tuning) { return d; }
+	static const char* kNames[] = {"UPRIGHT", "STANDING", "SHORT", "WORSE", "DOWN"};
+	const sj::StraightenState live = plumb.State();
+	const sj::StraightenState after = plumb.Settled(*tuning);
+	d["lean_now"] = static_cast<double>(live.leanAtTopM);
+	d["lean_at_start"] = static_cast<double>(live.startedAtM);
+	d["settled"] = static_cast<double>(live.settledM);
+	d["sway_cm"] = static_cast<double>(live.swayCm);
+	d["settling"] = live.settling;
+	d["collapsed"] = live.collapsed;
+	d["lean_when_done"] = static_cast<double>(after.leanAtTopM);
+	d["verdict"] = static_cast<int64_t>(after.verdict);
+	d["verdict_name"] = String(kNames[static_cast<int>(after.verdict)]);
+	return d;
 }
 
 // --- the survey ----------------------------------------------------------------------------------

@@ -35,10 +35,16 @@ StraightenPlan Straighten::Plan(float cutHeightM, float takeOutMm, float radiusA
                               heightM_ * t.GetF("straightenCutMaxShare"));
     p.takeOutMm = std::max(takeOutMm, 0.0f);
 
-    // Closing a wedge of thickness t across a width w tilts everything above it by t/w, so the top
-    // moves (H - h) * t / w. The width the cut acts across is the shaft, not the wall: it is the
-    // whole section that hinges.
-    const float width = std::max(radiusAtCutM * 2.0f, kTiny);
+    // Closing a wedge of thickness t across a width w tilts everything above it by t/w, so the
+    // top moves (H - h) * t / w.
+    //
+    // What w is took working backwards from the 1875 job — a quarter inch bringing a 132 ft shaft
+    // back seven inches from a cut at 40 ft — which puts it at about a metre. That is the depth of
+    // the cut zone rather than the width of the chimney: the course comes out of one side and the
+    // uncut side is the hinge, so the lever arm is the radius, not the diameter. Using the
+    // diameter halved the leverage and made a two-metre lean want eight inches of course out,
+    // which is most of a wall.
+    const float width = std::max(radiusAtCutM, kTiny);
     const float above = std::max(heightM_ - p.cutHeightM, 0.0f);
     p.leverage = above / (width * kMmPerMetre);
     p.bringsBackM = p.takeOutMm * p.leverage;

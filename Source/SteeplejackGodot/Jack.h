@@ -26,6 +26,7 @@
 #include "Band.h"
 #include "Conductor.h"
 #include "Stack.h"
+#include "Straighten.h"
 #include "Survey.h"
 #include "Wind.h"
 #include "Verbs/Haul.h"
@@ -356,6 +357,18 @@ public:
 	godot::String career_json() const;
 	/** `{money, reputation, stars, jobs}` — jobs is an Array of `{id, paid, error, failed}`. */
 	godot::Dictionary career_state() const;
+	// --- straightening ------------------------------------------------------------------------
+	/** Start on a shaft `height` tall that is `lean_degrees` over. */
+	void plumb_begin(double height, double lean_degrees);
+	/** What a cut at this height, this deep, would do. Changes nothing. */
+	godot::Dictionary plumb_plan(double cut_height, double take_out_mm, double radius_at_cut) const;
+	/** Commit to it. */
+	bool plumb_cut(double cut_height, double take_out_mm, double radius_at_cut);
+	/** Time passing while she comes back onto herself. */
+	void plumb_step(double hours);
+	/** Where she is now, and where she will be when the weeks of overshoot have run. */
+	godot::Dictionary plumb_state() const;
+
 	// --- the survey ---------------------------------------------------------------------------
 	/** Load the defects for this job: `[{id, height, bearing, discovery}]`. */
 	void survey_begin(const godot::Array& defects);
@@ -483,6 +496,7 @@ private:
 	sj::Conductor conductor{};
 	std::vector<sj::Band> bands;
 	sj::Survey survey;
+	sj::Straighten plumb;
 	/** The weather's own substream, forked once, so adding a subsystem cannot shift its values. */
 	std::unique_ptr<sj::Rng> weather_rng;
 

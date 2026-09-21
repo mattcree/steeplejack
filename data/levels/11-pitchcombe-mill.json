@@ -3,16 +3,16 @@
   "id": "11-pitchcombe-mill",
   "name": "Pitchcombe Mill",
   "order": 11,
-  "archetype": "BAND",
+  "archetype": "STRAIGHTEN",
   "reputationGate": 4,
   "fee": 2150,
   "briefing": {
     "from": "Miss Pitchcombe",
     "lines": [
       "My father built this chimney and I am told by three separate men that it should come",
-      "down. It is four feet out of upright and it has been four feet out of upright since",
-      "1889. I do not want it felled. I want it banded, properly, by somebody who has done",
-      "it before, and I will pay what that costs. Forty-eight metres."
+      "down. It is three feet out of upright and it has been three feet out of upright since",
+      "1889. I do not want it felled and I do not want it strapped up like a parcel. I want",
+      "it STRAIGHTENED, by somebody who has done it before, and I will pay what that costs."
     ]
   },
   "shiftMinutes": 360,
@@ -31,7 +31,7 @@
     ],
     "bands": [],
     "cap": "corbelled-oversail",
-    "leanDegrees": 2.4,
+    "leanDegrees": 1.1,
     "leanBearing": 64,
     "jointGrid": {
       "courseHeight": 0.075,
@@ -127,39 +127,8 @@
     "backdrop": "mill-town-yard"
   },
   "mission": {
-    "type": "BAND",
-    "bands": [
-      {
-        "height": 12.0,
-        "bolts": 12,
-        "note": "The foot of the crack."
-      },
-      {
-        "height": 19.0,
-        "bolts": 12,
-        "note": "Across it, low."
-      },
-      {
-        "height": 25.0,
-        "bolts": 16,
-        "note": "The widest part of it."
-      },
-      {
-        "height": 31.0,
-        "bolts": 16,
-        "note": "Into the delaminated face \u2014 sound every joint first."
-      },
-      {
-        "height": 37.0,
-        "bolts": 12,
-        "note": "Above the crack."
-      },
-      {
-        "height": 43.0,
-        "bolts": 12,
-        "note": "Under the cap. Fitted first in the trade, because the unrestrained edge is weakest."
-      }
-    ],
+    "type": "STRAIGHTEN",
+    "note": "Cut a course out of the convex side, hold it on graduated wedges, withdraw the smallest first and let gravity do it. Cut high and a little goes a long way \u2014 and the shaft above a high cut swings while she comes back. And she overshoots for weeks afterwards, so do not aim at plumb.",
     "softLanding": false
   },
   "complications": [

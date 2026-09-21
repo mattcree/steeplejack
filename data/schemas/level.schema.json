@@ -44,7 +44,7 @@
         "FELL",
         "MECHANISM",
         "LATTICE",
-        "EMERGENCY"
+        "EMERGENCY", "STRAIGHTEN"
       ]
     },
     "reputationGate": {
@@ -523,7 +523,7 @@
             "FELL",
             "MECHANISM",
             "LATTICE",
-            "EMERGENCY"
+            "EMERGENCY", "STRAIGHTEN"
           ]
         }
       }

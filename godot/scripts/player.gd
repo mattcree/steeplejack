@@ -355,6 +355,7 @@ func _ready() -> void:
 	_conductor_setup()
 	_band_setup()
 	_survey_setup()
+	_plumb_setup()
 	var tree_root := get_tree().root
 	if tree_root.has_meta("job_ladders"):
 		ladders_at_base = maxi(int(tree_root.get_meta("job_ladders")), 1)
@@ -865,6 +866,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_Q: _cycle_stance()
 			KEY_G: _gin_wheel()
 			KEY_B: _band_act()
+			KEY_X: _plumb_dial()
 			KEY_T: _recover(REC_TEA)
 			KEY_C: _recover(REC_CIG)
 			KEY_V: _recover(REC_VIEW)
@@ -888,6 +890,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _physics_process(dt: float) -> void:
 	_now += dt
 	_update_camera(dt)
+	_plumb_tick(dt)
 
 	# Hanging by one hand. Nothing he does moves him and no verb is available; the only input that
 	# means anything is the grab, and _step_sim is what closes the window on it. Stepping the sim
@@ -2525,6 +2528,9 @@ func _joint_of_anchor_at(height: float) -> int:
 func _pick_up() -> void:
 	# On a conductor job, F is the run: the terminal at the apex, a clip on the way down, and the
 	# earth pit when you get to the bottom.
+	if plumb_job:
+		_plumb_cut()
+		return
 	if conductor_job:
 		if at_cradle():
 			_conductor_earth()
@@ -3123,3 +3129,126 @@ func _survey_look(sounded: bool) -> void:
 	# Chalk it, the same as a sounded joint: the mark is the record.
 	if face != null and target_id >= 0:
 		face.touch()
+
+
+# --- straightening ------------------------------------------------------------------------------
+#
+# The keystone job, and the only verb in this game where the whole of it is DECIDING. You read what
+# a cut would do before you make it, you make it once, and then you live with what she does over
+# the following day and the following weeks.
+
+var plumb_job := false
+var plumb_take_out := 2.0      ## mm of thickness the replacement course is thinner by
+var plumb_cut_done := false
+var plumb_hours := 0.0
+
+
+func _plumb_setup() -> void:
+	plumb_job = String(jack.level_archetype()) == "STRAIGHTEN"
+	if not plumb_job:
+		return
+	jack.plumb_begin(jack.total_height(), _lean_degrees())
+	plumb_take_out = 20.0
+	plumb_cut_done = false
+	plumb_hours = 0.0
+
+
+func _lean_degrees() -> float:
+	var path := ProjectSettings.globalize_path("res://../data/levels/%s.json" % _level_id())
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return 0.0
+	var doc = JSON.parse_string(f.get_as_text())
+	f.close()
+	if typeof(doc) != TYPE_DICTIONARY:
+		return 0.0
+	return float(((doc as Dictionary).get("structure", {}) as Dictionary).get("leanDegrees", 0.0))
+
+
+## What a cut where he is standing, at the thickness he has dialled in, would do.
+func plumb_here() -> Dictionary:
+	if not plumb_job:
+		return {}
+	return jack.plumb_plan(maxf(height_m(), 0.0), plumb_take_out,
+		chimney.radius_at(maxf(height_m(), 0.0)))
+
+
+## [X] dials the thickness up a millimetre at a time and wraps. Small steps, because a millimetre
+## at the cut is a foot at the top and the difference between upright and over the other way is
+## about that fine.
+func _plumb_dial() -> void:
+	if not plumb_job or plumb_cut_done:
+		return
+	plumb_take_out += 2.0
+	if plumb_take_out > 60.0:
+		plumb_take_out = 2.0
+	var p := plumb_here()
+	_say("%.1f mm — brings her back %.2f m" % [plumb_take_out, float(p.get("brings_back", 0.0))])
+
+
+## And [F] commits it. Once.
+func _plumb_cut() -> void:
+	if not plumb_job:
+		return
+	if plumb_cut_done:
+		_say("she is cut. now she comes back in her own time")
+		return
+	if not on_ladder:
+		_say("you cut her from the ladder, at the height you want the hinge")
+		return
+	var p := plumb_here()
+	if not jack.plumb_cut(maxf(height_m(), 0.0), plumb_take_out,
+			chimney.radius_at(maxf(height_m(), 0.0))):
+		return
+	plumb_cut_done = true
+	if foley != null:
+		foley.cue("crack", 0.7)
+	var st: Dictionary = jack.plumb_state()
+	if bool(st.get("collapsed", false)):
+		_say("you have cut her too high. she is going")
+	else:
+		_say("the course is out and she is on the wedges")
+
+
+## Time passes while she comes back onto herself — eighteen to thirty-six hours in the trade,
+## played out in a minute here.
+func _plumb_tick(dt: float) -> void:
+	if not plumb_job or not plumb_cut_done:
+		return
+	var st: Dictionary = jack.plumb_state()
+	if not bool(st.get("settling", false)):
+		return
+	plumb_hours += dt * 26.0
+	jack.plumb_step(dt * 26.0)
+	if not bool(jack.plumb_state().get("settling", false)):
+		_settle_plumb()
+
+
+func _settle_plumb() -> void:
+	if not settlement.is_empty():
+		return
+	var st: Dictionary = jack.plumb_state()
+	var name_ := String(st.get("verdict_name", "STANDING"))
+	var share := {"UPRIGHT": 1.0, "SHORT": 0.75, "STANDING": 0.4, "WORSE": 0.2, "DOWN": 0.0}
+	var text := ""
+	if FileAccess.file_exists(career_path):
+		var f := FileAccess.open(career_path, FileAccess.READ)
+		if f != null:
+			text = f.get_as_text()
+			f.close()
+	jack.career_load(text)
+	settlement = jack.career_settle_climb(_level_id(),
+		_level_fee() * float(share.get(name_, 0.4)), name_ != "DOWN")
+	var out := FileAccess.open(career_path, FileAccess.WRITE)
+	if out != null:
+		out.store_string(jack.career_json())
+		out.close()
+	top_reached = true
+	var words := {
+		"UPRIGHT": "she is upright. her father would not have known the difference.",
+		"SHORT": "a little over still, but nobody is going to argue with that.",
+		"STANDING": "she is better than she was, and she still leans.",
+		"WORSE": "you have sent her over the other way. that is worse than leaving her.",
+		"DOWN": "she is down. that is the job you were paid not to do.",
+	}
+	_say(String(words.get(name_, "")))

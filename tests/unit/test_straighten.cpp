@@ -72,8 +72,9 @@ TEST_CASE("Straighten: the leverage is the trade's own arithmetic")
     // cut, and "it had been calculated that 1/4 inch would bring the stack back 7 inches at top".
     s.Begin(40.2f, 3.0f, t);
     // A quarter inch is 6.35 mm. For that to give 7 inches (0.178 m) of top movement over the
-    // 28 m above the cut, the width it acts across is about 1 m — a half-width of 0.5 m.
-    const StraightenPlan p = s.Plan(12.2f, 6.35f, 0.5f, t);
+    // 28 m above the cut, the lever arm is about a metre — which is the RADIUS of a shaft of that
+    // size, not its diameter: the course comes out of one side and the uncut side is the hinge.
+    const StraightenPlan p = s.Plan(12.2f, 6.35f, 1.0f, t);
     CHECK(p.bringsBackM == doctest::Approx(0.178f).epsilon(0.05));
     // And the plan is pure: reading it changes nothing.
     CHECK(s.State().leanAtTopM == doctest::Approx(s.State().startedAtM));
