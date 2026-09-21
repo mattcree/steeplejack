@@ -1,0 +1,21 @@
+{
+  "_conductor_comment": "Running a lightning conductor \u2014 the CONDUCTOR archetype. Numbers from the 1881 Lightning Rod Conference Code of Rules where it has them, and from modern BS EN 62305 practice where the Code is silent. Where the two disagree the modern one wins for anything safety-shaped and the Code wins for anything the player can see, because the Code is what the trade in this game would have worked to.",
+  "_conductor_reel": "25 m of 25 x 3 mm bare copper tape on a reel, which is a real product size and weighs about 17 kg. A 28 m chimney therefore takes more than one reel, and that is the point of the complication.",
+  "reelMetres": 25.0,
+  "tapeKgPerMetre": 0.67,
+  "_conductor_spacing": "The Code says fixings 'at intervals of 6 or 8 ft., according to circumstances'; modern practice is 1000 mm. The game sits at the modern figure because it makes the descent a rhythm rather than a stroll, and allows the historic spacing before it complains.",
+  "clipSpacingMetres": 1.0,
+  "clipSpacingMaxMetres": 2.4,
+  "_conductor_wander": "The Code's curvature rule, verbatim: 'In no case should the length of the rod between two points be more than half as long again as the straight line joining them.' 1.5 is therefore not a balance number and should not be tuned. The marginal band below it is ours.",
+  "wanderFailRatio": 1.5,
+  "wanderWarnRatio": 1.2,
+  "_conductor_tightness": "'The holdfasts should not be driven in so tightly as to pinch the rod, or prevent the contraction and expansion produced by changes of temperature.' So it is a band, not a maximum: a hammer verb with a right answer in the middle.",
+  "clipTightMin": 0.35,
+  "clipTightMax": 0.78,
+  "_conductor_earth": "Copper plate 3 ft x 3 ft x 1/16 in in permanently wet earth 'surrounded by cinders or coke', total surface not less than 18 square feet. The pass is the modern one: 10 ohms overall.",
+  "earthPlateSquareFeetMin": 18.0,
+  "earthPassOhms": 10.0,
+  "earthDryPenalty": 3.4,
+  "earthNoCokePenalty": 1.9,
+  "earthBaseOhms": 4.0
+}
