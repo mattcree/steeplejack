@@ -27,7 +27,8 @@ This is the part that works. A playtest called out the tapping and dogging as th
 it feel like a sim, and the instruction from that note is to keep going along those lines and not
 to get clever.
 
-**Built:** tap, hammer, lash, haul. Four verbs, and the climb itself.
+**Built:** tap, hammer, lash, haul — and now strike, draw, clip, bolt and look. Nine verbs across
+five archetypes, and the climb itself.
 
 ### The job — the four acts
 
@@ -37,10 +38,10 @@ acts missing at either end.
 
 | Act | What it is | State |
 |---|---|---|
-| **0. The yard** | Load the van. Twelve ladders or sixteen? | **Not built** |
+| **0. The yard** | Load the van. Twelve ladders or sixteen? | **Built** |
 | **1. Laddering** | Dog, lash, haul, climb, sound | **Built.** The best thing in the game |
-| **2. The work** | One of ten archetypes | **Two of ten** |
-| **3. Striking** | Bring it all down and take it home | **Not built** |
+| **2. The work** | One of ten archetypes | **Four of ten** — survey, conductor, band, fell |
+| **3. Striking** | Bring it all down and take it home | **Built** |
 | **4. The board** | What it paid, what it cost, what they think of you | **Built** |
 
 ### The season — twelve jobs and a tarpaulin
@@ -61,7 +62,7 @@ leave out, and it is the thematic keystone of the whole campaign — see STRAIGH
 
 | | Archetype | The pressure | State |
 |---|---|---|---|
-| A | **SURVEY** | none — learning to read | **Built** |
+| A | **SURVEY** | none — learning to read | **Built.** Four ways of finding a thing, and the pay is the report |
 | B | **CONDUCTOR** | descent as the main event, weather clock | **Built** |
 | C | **GILD** | precision at the apex, suspended | Designed |
 | D | **BAND** | the order you pull the bolts up in | **Built** |
