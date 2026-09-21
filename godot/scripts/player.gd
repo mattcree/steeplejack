@@ -853,10 +853,16 @@ func _look_at_stack() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _options_input(event):
 		return
-	# The job is done and you are standing on the cap. Enter takes you back to the board, which is
-	# the only way out of a climb that is not closing the window.
-	if at_top and event is InputEventKey and event.pressed and not event.echo \
-			and event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_ESCAPE]:
+	# The job is done. Enter takes you home.
+	#
+	# This used to require standing on the cap, which was true when every job in the game ended
+	# there — and then two archetypes arrived whose whole point is that they end at the BOTTOM. A
+	# conductor run finishes with the earth pit at the foot of her and a straightening finishes
+	# when she has come back onto herself, and on both of them the player finished the job and
+	# then could not leave. Not a soft lock in the usual sense: the job was over, the money was
+	# paid, and the only way out of the game was the window button.
+	if (at_top or not settlement.is_empty()) and event is InputEventKey and event.pressed \
+			and not event.echo and event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_ESCAPE]:
 		back_to_the_board()
 		return
 	# A click in the window with the mouse free takes it back. The click is spent on that, so it

@@ -83,6 +83,21 @@ func _init() -> void:
 		"a run that passes pays at the BOTTOM, not at the cap")
 	_check(not bool(player.settlement.get("failed", true)), "and it counts as done")
 
+	# --- and there is a way home from the bottom of her ---------------------------------------
+	# The only way out of a climb used to be standing on the cap, which two archetypes never do.
+	var ev := InputEventKey.new()
+	ev.keycode = KEY_ENTER
+	ev.pressed = true
+	player._unhandled_input(ev)
+	await process_frame
+	await process_frame
+	var home: Node = null
+	for i in range(root.get_child_count() - 1, -1, -1):
+		if root.get_child(i).has_method("stage_index"):
+			home = root.get_child(i)
+			break
+	_check(home != null, "enter at the foot of her, job done, goes home")
+
 	print("CONDUCTOR: %s" % ("ok" if failures == 0 else "%d failure(s)" % failures))
 	quit(1 if failures > 0 else 0)
 

@@ -113,6 +113,10 @@ func _draw() -> void:
 	_draw_band(jack)
 	_draw_survey(jack)
 	_draw_plumb(jack)
+	# The way out, on the jobs that do not end on the cap. Without it a player who has just
+	# finished a conductor run at the foot of the chimney has no idea the job is over.
+	if not player.settlement.is_empty() and not player.at_top:
+		_centre("the job is done  ·  [enter] to go home", size.y - 96.0, Color(INK, 0.92), H2)
 
 	# Only once there is something to span *from*. With no dogs driven, the span is measured from
 	# the ground and reads "62.0 m span — about to buckle" at the top of a ladder that is lashed all
