@@ -2946,16 +2946,28 @@ func _conductor_setup() -> void:
 
 ## The mission block, straight out of the level file. LevelData does not carry it and does not
 ## need to: these are numbers the scene sets up with, not rules the sim enforces.
+var _mission_cache := {}
+var _mission_read := false
+
+
 func _mission() -> Dictionary:
+	# Cached, because this opens and JSON-parses the level file and the HUD asks for it every
+	# frame: `_band_here()` needs the band heights to know which one he is level with, and it is
+	# called from the drawing. A file read and a parse per frame is the kind of thing that does not
+	# show up in a test and does show up on a laptop.
+	if _mission_read:
+		return _mission_cache
+	_mission_read = true
 	var path := ProjectSettings.globalize_path("res://../data/levels/%s.json" % _level_id())
 	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null:
-		return {}
+		return _mission_cache
 	var doc = JSON.parse_string(f.get_as_text())
 	f.close()
 	if typeof(doc) != TYPE_DICTIONARY:
-		return {}
-	return (doc as Dictionary).get("mission", {}) as Dictionary
+		return _mission_cache
+	_mission_cache = (doc as Dictionary).get("mission", {}) as Dictionary
+	return _mission_cache
 
 
 func _mission_reels() -> int:
