@@ -1,0 +1,10 @@
+{
+  "_banding_comment": "Getting a steel band round a cracked chimney. The shape of it comes from the trade: bands are post-tensioned by the bolts that join the segments, 'loose bands are virtually worthless', and they are fitted starting at the top where the unrestrained edge is weakest. The star sequence is not attested for chimney bands specifically \u2014 it is how any fitter pulls up a flange or a wheel, and it is what makes this a puzzle rather than a chore.",
+  "bandSeatTension": 0.72,
+  "bandOverTension": 0.95,
+  "bandOvalFailAt": 0.34,
+  "bandOvalWarnAt": 0.18,
+  "_banding_sequence": "How much of the ovality comes from the ORDER rather than from the spread. Tighten opposite pairs and the steel comes in true; work round in sequence and it draws in behind you and stands off in front.",
+  "bandSequenceWeight": 0.55,
+  "bandTightenPerPull": 0.22
+}
