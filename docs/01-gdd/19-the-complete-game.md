@@ -252,22 +252,41 @@ almost nothing else in the medium is set up to say.
 
 ---
 
-## Part 5 — What to build, in order
+## Part 5 — What was built, and what is next
 
-Ordered by what unlocks the most, not by what is most fun to write.
+The order below was written on 2026-09-20 as a plan. Everything struck through was built in the
+night of the 20th–21st; what is left is left in the same order and for the same reasons.
 
-| | Work | Why first |
+| | Work | State |
 |---|---|---|
-| 1 | **The front end** — title, menu, options, continue | The game has no front door. Cheapest item here and the first thing anyone sees |
-| 2 | **Striking a stack** | Gives every job a last act, and builds most of CONDUCTOR as a side effect |
-| 3 | **The yard** — loadout, bench, board, kettle, tarpaulin | Unlocks the day clock, the ledger and the salvage. The whole meta layer is one scene |
-| 4 | **CONDUCTOR** (job 2) | Proves the archetype pipeline with the cheapest new art in the set |
-| 5 | **The persistent district** | Your dogs, your chalk, your bad line, still there next time |
-| 6 | **BAND, TOP, GILD** (3, 4, 8) | The three that reuse the most existing verbs |
-| 7 | **STRAIGHTEN** (11) | The keystone. Needs felling to exist first, and it does |
+| 1 | ~~The front end — title, menu, options, continue~~ | **Done.** And a career that goes home to the yard afterwards |
+| 2 | ~~Striking a stack~~ | **Done.** R takes a ladder off, F draws the dog, and what you leave stays in that chimney |
+| 3 | ~~The yard — loadout, board, kettle, tarpaulin~~ | **Done.** The van loads the job; the bench is still to come |
+| 4 | ~~CONDUCTOR (job 2)~~ | **Done.** Chapel Street, and the descent is the job |
+| 5 | ~~The persistent district~~ | **Done.** Your own dogs are in the wall when you come back, a season rustier |
+| 6 | ~~BAND~~ (3), **TOP** (8), **GILD** (4) | Band done — the star sequence. Top and gild are the next two |
+| 7 | ~~STRAIGHTEN (11)~~ | **Done,** and it is the keystone it was supposed to be |
 | 8 | **MECHANISM, LATTICE, EMERGENCY** (5, 9, 10) | The three with genuinely new systems |
-| 9 | **The engine and the credits** | Last, because it is the payoff for all of the above |
+| 9 | ~~The engine and the credits~~ | **Done.** She steams out of the yard past a town with fewer chimneys in it |
 
-**Nothing above is a decision this document gets to make on its own.** The twelve-job table, the
-tenth archetype and the five axes of completion are proposals with reasons; the ones that change
-scope are in [`BLOCKED.md`](../../BLOCKED.md).
+### Where it actually stands
+
+**Five archetypes of ten** — survey, conductor, band, fell, straighten — across **thirteen level
+files**, with a front door, a yard, a van, a job board that scrolls, striking, a district that
+remembers you, a shelf of things you carried home, an engine you pay for a piece at a time, and an
+ending.
+
+**What it still needs, in order of how much it unlocks:**
+
+1. **Jobs 9, 10 and 11 as their designed archetypes.** They exist and are playable, but three of
+   them run on a substitute — St Anne's wants the bosun's chair, the Corn Mill a mechanism, Hollin
+   Bank taking down by hand. The campaign is three archetypes thinner than the table says.
+2. **The fifth star**, which nobody can earn. See [`BLOCKED.md`](../../BLOCKED.md): it is
+   arithmetic, not content, and it wants a number changing.
+3. **TOP and GILD**, the two remaining archetypes that reuse the most existing verbs.
+4. **The bench** — tool maintenance, the one part of the yard that is still a paragraph.
+5. **MECHANISM, LATTICE, EMERGENCY**, which each need a system that does not exist yet.
+
+**Nothing in this document decides anything on its own.** The twelve-job table, the tenth archetype
+and the five axes of completion are proposals with reasons; everything that changes scope or a
+number is in [`BLOCKED.md`](../../BLOCKED.md).
