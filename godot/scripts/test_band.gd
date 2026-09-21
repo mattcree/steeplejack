@@ -88,6 +88,18 @@ func _init() -> void:
 	player._band_act()
 	_check(player.band_at == 1, "B pulls up the band you are level with")
 
+	# --- and the pay is the bands, not the climb ----------------------------------------------
+	player.career_path = "user://test-band-tin.json"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(player.career_path))
+	player._settle_the_job()
+	_check(not player.settlement.is_empty(), "a banding job settles")
+	# One of three seated: it pays, and it does not pay the lot.
+	var fee: float = float(player.settlement.get("fee", 0.0))
+	_check(fee > 0.0 and fee < float(player._level_fee()) * 0.95,
+		"one band of three is not a whole job's money: £%.0f of £%.0f"
+			% [fee, player._level_fee()])
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(player.career_path))
+
 	print("BAND: %s" % ("ok" if failures == 0 else "%d failure(s)" % failures))
 	quit(1 if failures > 0 else 0)
 

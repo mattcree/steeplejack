@@ -72,6 +72,14 @@ func _init() -> void:
 	player._plumb_cut()
 	_check(player.plumb_cut_done, "a second cut is not a thing you get")
 
+	# --- reaching the top must NOT pay for a job that has not happened ------------------------
+	player.career_path = "user://test-plumb-early.json"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(player.career_path))
+	player._settle_the_job()
+	_check(player.settlement.is_empty(),
+		"climbing her does not pay: the job is not done until she has come back")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(player.career_path))
+
 	# --- and she comes back over a day -----------------------------------------------------
 	player.career_path = "user://test-plumb-tin.json"
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(player.career_path))

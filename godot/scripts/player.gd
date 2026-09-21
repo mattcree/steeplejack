@@ -445,6 +445,12 @@ func _settle_the_job() -> void:
 	# else, and getting it wrong here would not be a design position, it would be a bug.
 	if conductor_job:
 		return
+	# And a straightening is not finished at the top either — it is not finished until she has
+	# come back onto herself, which is a day later. Without this it paid the full fee for climbing
+	# her, and then `_settle_plumb` found the job already settled and never ran, so what you
+	# actually did to the chimney was worth nothing at all.
+	if plumb_job:
+		return
 	var text := ""
 	if FileAccess.file_exists(career_path):
 		var f := FileAccess.open(career_path, FileAccess.READ)
@@ -472,6 +478,27 @@ func _settle_the_job() -> void:
 			out.store_string(jack.career_json())
 			out.close()
 		_say("%d of %d in the report" % [int(r.get("found", 0)), int(r.get("total", 0))])
+		return
+	# Banding is paid for the bands, not for the climb. Reaching the cap used to pay the lot
+	# whether or not a single bolt had been pulled up.
+	if band_job:
+		var list: Array = _mission().get("bands", []) as Array
+		var seated := 0
+		for i in list.size():
+			if bool(jack.band_state(i).get("seated", false)):
+				seated += 1
+		var share: float = float(seated) / maxf(float(list.size()), 1.0)
+		var floor_b: float = jack.tuning_f("surveyFeeFloorShare", 0.35)
+		# Done, whatever is on her. `reached_top` false means the job FAILED and pays nothing at
+		# all, which is not what "you got two of the three bands on" means — the same mistake the
+		# survey settlement made an hour ago. The share is in the fee.
+		settlement = jack.career_settle_climb(_level_id(),
+			_level_fee() * (floor_b + (1.0 - floor_b) * share), true)
+		var ob := FileAccess.open(career_path, FileAccess.WRITE)
+		if ob != null:
+			ob.store_string(jack.career_json())
+			ob.close()
+		_say("%d of %d bands on her and true" % [seated, list.size()])
 		return
 	if String(jack.level_archetype()) == "FELL":
 		# On a felling, getting to the top is not the job — it is Act 2, the strip-out. The bands
