@@ -294,6 +294,35 @@ const PLUMB_STEPS := [
 ]
 
 
+## And a survey, which is the first job anybody plays. It was left on the laddering list — the one
+## archetype I did not give its own — so the tutorial told a new player to fetch ladder sections
+## and said nothing whatever about the four things wrong with the chimney it had just asked them
+## to go and find.
+const LOOK_STEPS := [
+	"Ladder her — you cannot read what you cannot reach",
+	"Look about as you climb. Some of it is just there to see",
+	"Sound the joints  [E] — some of it can only be heard",
+	"Get on the cap. The last of it is only visible from up there",
+]
+
+
+func _look_state_steps() -> Array:
+	var r: Dictionary = player.jack.survey_report()
+	var found: int = int(r.get("found", 0))
+	var total: int = maxi(int(r.get("total", 1)), 1)
+	var laddered: bool = player.ladder_top > 5.0
+	var looked: bool = found > 0
+	var sounded: bool = player.taps_made > 0
+	var topped: bool = player.top_reached or bool(r.get("complete", false))
+	var done := [laddered, looked, sounded, topped]
+	var current := 0
+	for i in 4:
+		current = i
+		if not done[i]:
+			break
+	return [done, current]
+
+
 func _band_state_steps() -> Array:
 	var index: int = player._band_here()
 	var laddered: bool = player.ladder_top > 8.0
@@ -378,6 +407,9 @@ func _draw_steps() -> void:
 	elif player.plumb_job:
 		steps = PLUMB_STEPS
 		state = _plumb_state_steps()
+	elif player.survey_job:
+		steps = LOOK_STEPS
+		state = _look_state_steps()
 	var done: Array = state[0]
 	var current: int = state[1]
 	var built: int = player.jack.stack_sections().size()
@@ -393,6 +425,9 @@ func _draw_steps() -> void:
 		header = "THE BANDS"
 	elif player.plumb_job:
 		header = "BRINGING HER BACK"
+	elif player.survey_job:
+		var rep: Dictionary = player.jack.survey_report()
+		header = "THE REPORT   %d of %d" % [int(rep.get("found", 0)), int(rep.get("total", 0))]
 	_label(header, Vector2(x, y), Color(0.95, 0.93, 0.88, 0.85), 13)
 	y += 22.0
 	for i in steps.size():
@@ -406,7 +441,8 @@ func _draw_steps() -> void:
 			# The advice line, but only where it is about this step: the old single-line guidance
 			# runs a step ahead in places, and advice about tapping under "climb to the top" was
 			# exactly the confusion this list is here to end.
-			var special: bool = player.conductor_job or player.band_job or player.plumb_job
+			var special: bool = player.conductor_job or player.band_job or player.plumb_job \
+				or player.survey_job
 			var detail := "" if special else _next_step()
 			if player.conductor_job and i == 0:
 				detail = "She has to be laddered before any of it goes on"
