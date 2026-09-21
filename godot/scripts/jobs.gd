@@ -271,14 +271,27 @@ func _draw() -> void:
 	# The tin, and what anyone thinks of you.
 	var stars := ""
 	for s in 5:
-		stars += "*" if s < int(career.get("stars", 0)) else "."
+		stars += "★" if s < int(career.get("stars", 0)) else "☆"
 	draw_string(_font, Vector2(size.x - 330, 58),
 		"£%d in the tin        %s" % [int(float(career.get("money", 0.0))), stars],
 		HORIZONTAL_ALIGNMENT_RIGHT, 282, 16, PAPER)
 
-	var y := 130.0
-	for i in jobs.size():
+	# Thirteen jobs do not fit on a board, so the board scrolls. It only scrolls when it has to —
+	# a list that slides about while you are reading it is worse than one that sits still — and it
+	# keeps the selection a card clear of either edge so you can always see what is next.
+	var top := 130.0
+	var bottom: float = size.y - 64.0
+	var step := 118.0
+	var shown: int = maxi(int((bottom - top) / step), 1)
+	var first: int = clampi(selected - shown / 2, 0, maxi(jobs.size() - shown, 0))
+	var y := top
+	for i in range(first, mini(first + shown, jobs.size())):
 		y = _card(jobs[i], 48.0, y, i == selected)
+	# And it says so, because a list that has more in it than it shows must admit that.
+	if jobs.size() > shown:
+		draw_string(_font, Vector2(48.0, top - 14.0),
+			"%d-%d of %d" % [first + 1, mini(first + shown, jobs.size()), jobs.size()],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(PAPER.r, PAPER.g, PAPER.b, 0.6))
 
 	draw_string(_font, Vector2(48, size.y - 36),
 		"up / down to look through them    enter to take it    esc to leave it",
@@ -354,7 +367,7 @@ func _card(job: Dictionary, x: float, y: float, here: bool) -> float:
 	if int(job["gate"]) > 0:
 		var stars := ""
 		for s in 5:
-			stars += "*" if s < int(job["gate"]) else "."
+			stars += "★" if s < int(job["gate"]) else "☆"
 		draw_string(_font, Vector2(x + CARD_W - 78, y + 74), stars,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, FADED)
 	return y + h + CARD_GAP
