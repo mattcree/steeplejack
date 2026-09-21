@@ -439,14 +439,79 @@ func _affordances() -> Array:
 			"no joint in reach — look at the brickwork"],
 		["RMB", _drive_label(), has_target and player.dogs_carried > 0,
 			"no joint in reach" if not has_target else "no dogs in the bag"],
-		["R", "lash the next ladder", player.has_lashable_anchor() and player.carrying_ladder,
-			"you are not carrying one" if not player.carrying_ladder else "needs a dog seated above you"],
+		["R", _r_label(), _r_live(), _r_why()],
+		["F", _f_label(), _f_live(), _f_why()],
 		[Q_KEY, _next_stance_label(), true, ""],
 		["T", "brew up", jack_free_hands(),
 			"you need both hands — belt on first"],
 		["G", _gin_label(), true, ""],
 		["C / V", "a cigarette  ·  look at the view (hold)", true, ""],
 	]
+
+
+## R is lash-the-next-one with a ladder on your shoulder and take-this-one-off without. The same
+## key doing the job and its reverse, and the list has to say which it is doing or the whole
+## striking stage is invisible — the verb shipped before this did and there was nothing on screen
+## that mentioned it existed.
+func _r_label() -> String:
+	if player.conductor_job:
+		return "lash the next ladder"
+	# Empty-handed on a ladder, R is ALWAYS the striking verb — including when it is refused, or
+	# the label says one thing and the reason beside it explains the other.
+	if not player.carrying_ladder and player.on_ladder:
+		return "take this ladder off and lower it"
+	return "lash the next ladder"
+
+
+func _r_live() -> bool:
+	if not player.carrying_ladder and player.on_ladder \
+			and int(player.jack.section_to_strike(player.height_m())) >= 0:
+		return true
+	return player.has_lashable_anchor() and player.carrying_ladder
+
+
+func _r_why() -> String:
+	if not player.carrying_ladder and player.on_ladder:
+		var why := String(player.jack.why_not_strike(player.height_m()))
+		if why != "" and why != "nothing left to take down":
+			return why
+	return "you are not carrying one" if not player.carrying_ladder \
+		else "needs a dog seated above you"
+
+
+## And F is the gear: draw the dog in reach, or fill the bag at the cradle — or, on a conductor
+## job, the run itself.
+func _f_label() -> String:
+	if player.conductor_job:
+		var st: Dictionary = player.jack.conductor_state(maxf(player.height_m(), 0.0))
+		if player.at_cradle():
+			return "dig the earth pit and test her"
+		if not bool(st.get("terminal", false)):
+			return "fix the terminal"
+		return "clip the tape here"
+	if player.at_cradle():
+		return "fill the bag from the cradle"
+	return "draw the dog in reach"
+
+
+func _f_live() -> bool:
+	if player.conductor_job:
+		return true
+	if player.at_cradle():
+		return player.dogs_at_base > 0 or player.ladders_at_base > 0
+	return player.on_ladder and int(player.jack.dog_to_draw(player.height_m())) >= 0
+
+
+func _f_why() -> String:
+	if player.at_cradle():
+		return "nothing left to take"
+	if not player.on_ladder:
+		return "the materials are in the cradle"
+	for i in range(int(player.jack.anchor_count()), 0, -1):
+		var w := String(player.jack.why_not_draw(i, player.height_m()))
+		if w != "" and w != "you have had that one out":
+			return w
+	return "no dog in reach"
 
 
 func _gin_label() -> String:
