@@ -925,6 +925,10 @@ func _props_burn_through() -> void:
 	if _caught:
 		# Not a scoring modifier. The job may have gone perfectly and you are still under it.
 		_settlement["injured"] = jack.career_injured()
+	# One thing off every job, and a felling is a job. The climbing half has done this since the
+	# shelf went up in the yard and this half never did, so three of the thirteen levels could
+	# never put anything on it.
+	jack.career_keep(String(_authored["id"]), "a brick off the top, picked up off the ground")
 	_save_career()
 	# You stand where you ran to. If that was not far enough, you were inside the line when it went.
 	_pitch = 0.22

@@ -281,6 +281,15 @@ func _init() -> void:
 	var paid: Dictionary = world._settlement
 	_check(not paid.is_empty(), "the job settled")
 	_check(float(paid.get("fee", 0.0)) > 0.0, "it paid its fee of £%d" % int(float(paid.get("fee", 0.0))))
+
+	# And a felling puts something on the shelf in the yard, the same as every other job. The
+	# climbing half has done this since the shelf went up and this half never did, so three of
+	# the thirteen levels could not put anything on it.
+	var kept: Array = world.jack.career_salvage()
+	_check(kept.size() >= 1, "a felling leaves something on the yard shelf: %d" % kept.size())
+	if kept.size() > 0:
+		_check(String((kept[0] as Dictionary).get("what", "")).contains("brick off the top"),
+			"and it is a brick off the top")
 	_check(float(paid.get("bonus", 0.0))
 			== float(out.get("bonus", 0.0)) + float(paid.get("before_dark", 0.0)),
 		"the bonus the fall earned, plus £%d for getting it done in the daylight"
