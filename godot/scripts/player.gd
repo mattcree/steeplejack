@@ -3117,14 +3117,24 @@ func _band_here() -> int:
 	return -1
 
 
-## Which bolt is in front of him: his bearing round the shaft, divided into as many as the band
-## has. Going round the chimney IS choosing a bolt, which is why this needs no new control.
+## Which bolt is in front of him.
+##
+## The shuffle along the face, mapped onto the whole ring. It was a straight bearing at first —
+## where you stand IS which bolt — and that is a better idea than it is a playable one: a man can
+## only work 0.7 m off his climbing line before he steps off the ladder, which at these radii is
+## about twenty degrees. One bolt of eight. The archetype was not completable and the test that
+## said it was had set the shuffle straight past the limit that makes it impossible.
+##
+## So leaning as far as you can go each way walks you round the band. What is elided is the
+## re-rigging between positions — the lateral re-dogging 05-mission-types.md describes as "you
+## leave the safety of your vertical stack and crab sideways on two anchors", which is a movement
+## system rather than a number and is the honest way to build this later.
 func _band_bolt_here(index: int) -> int:
 	var st: Dictionary = jack.band_state(index)
 	var n: int = maxi(int(st.get("bolts", 8)), 1)
-	var b: float = deg_to_rad(jack.climb_bearing()) + _shuffle
-	var turn: float = fposmod(b, TAU) / TAU
-	return int(turn * float(n)) % n
+	var reach: float = maxf(SHUFFLE_OFF, 0.01)
+	var turn: float = clampf(_shuffle / reach, -1.0, 1.0) * 0.5 + 0.5   # 0..1 across the ring
+	return clampi(int(turn * float(n)), 0, n - 1)
 
 
 ## [B] pulls the bolt in front of him up a turn.

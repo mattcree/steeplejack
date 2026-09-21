@@ -43,12 +43,17 @@ func _init() -> void:
 	_check(player._band_here() == 0, "level with the first one, that is the one you are on")
 
 	# --- which bolt you are on is where you are standing -----------------------------------------
+	# Within what a man can actually shuffle before he steps off the ladder — which is the whole
+	# point. The first version of this test swept _shuffle through a full turn, well past
+	# SHUFFLE_OFF, and so proved that the bolts were reachable from a position the game does not
+	# let you be in. Every bolt has to be reachable inside +-SHUFFLE_OFF or the job cannot be done.
 	var seen := {}
-	for k in 8:
-		player._shuffle = TAU * float(k) / 8.0
+	var steps := 40
+	for k in steps + 1:
+		player._shuffle = player.SHUFFLE_OFF * (2.0 * float(k) / float(steps) - 1.0)
 		seen[player._band_bolt_here(0)] = true
-	_check(seen.size() >= 6,
-		"going round her reaches %d of the %d bolts — no new control needed" % [seen.size(), n])
+	_check(seen.size() == n,
+		"leaning as far as he can go each way reaches all %d bolts (%d)" % [n, seen.size()])
 
 	# --- the order is the job -------------------------------------------------------------------
 	# Round the ring, one bolt after its neighbour.
@@ -87,6 +92,15 @@ func _init() -> void:
 	player._shuffle = 0.0
 	player._band_act()
 	_check(player.band_at == 1, "B pulls up the band you are level with")
+
+	# And the whole band can be worked without ever leaving the ladder.
+	var n2b: int = int(jack.band_state(1).get("bolts", 12))
+	var touched := {}
+	for k in 60:
+		player._shuffle = player.SHUFFLE_OFF * (2.0 * float(k) / 59.0 - 1.0)
+		touched[player._band_bolt_here(1)] = true
+	_check(touched.size() == n2b,
+		"and every one of its %d bolts is in reach from the ladder (%d)" % [n2b, touched.size()])
 
 	# --- and the pay is the bands, not the climb ----------------------------------------------
 	player.career_path = "user://test-band-tin.json"
