@@ -207,6 +207,21 @@ The rotation is baked into the mesh at build time rather than applied per instan
 runs along Y, every fixture on this wall is placed along Z, and one `append_from` is cheaper and
 harder to get wrong than a rotation on each of a hundred and thirty transforms.
 
+**Iron bands** (`Chimney.set_bands`). A banding job is: go up, stand level with a band, pull its
+bolts up in a star until she is round again. It shipped with a checklist, a ring in the HUD, a bolt
+count and a verdict, and **nothing on the chimney at all**. The player was told to stand level with
+a band that did not exist and tighten bolts they could not see.
+
+Each band is now a strap round her with a bolt standing out at every lug, and **how far a bolt
+stands out is how slack it is** — pulled home it is a stub, untouched it is a finger's length of
+thread. That is the trick `Face.set_work` uses for a dog going in, for the same reason: a length
+you can see beats a bar you have to read. The consequence is that the thing the archetype is
+*about* — working round the ring pulls her oval, working across it does not — finally happens
+somewhere the player can see it, as a shape on the chimney rather than a number in a corner.
+
+The strap keeps a little sheen. Cold iron on sooty brick is two dark things, and the first thing
+the checklist asks is that you *find* a band.
+
 **The site** — the works the chimney was built to draw for: a boiler house at its foot, the mill,
 a saw-tooth weaving shed, a yard wall. Nothing is built across the walk in, and the gate is
 wherever the walk in crosses the wall, which is the only place a gate could honestly be.

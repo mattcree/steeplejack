@@ -470,7 +470,10 @@ func _draw_steps() -> void:
 			detail = "Climb up what you've built  [W]" if player.on_ladder else detail
 		if detail != "":
 			rows.append([detail, Color(0.94, 0.86, 0.64, 0.95), 13, 24.0, 20.0])
-		if i == 3 and not player.lashing:
+		# Only on the stack-building checklist. It is keyed on the step *index*, and every
+		# archetype has a step 4 — so on a banding job "opposite pairs, work round and she goes
+		# oval" was being explained with a sentence about lashing a ladder to a dog.
+		if i == 3 and not special and not player.lashing:
 			rows.append(["the new section stands on your ladder; the rope ties it to the dog",
 				Color(0.84, 0.82, 0.78, 0.80), 12, 24.0, 18.0])
 

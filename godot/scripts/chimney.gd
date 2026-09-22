@@ -34,6 +34,10 @@ var _bow_lo := 0.0
 var _bow_hi := 0.0
 var _bow := 0.0
 var _dogs := MultiMeshInstance3D.new()
+## The iron bands, on a banding job: a strap per band and a bolt per bolt.
+var _straps: Node3D
+var _bolts := MultiMeshInstance3D.new()
+var _band_specs: Array = []
 
 # Not art direction — a legend. The level file says a band is ivy or a wind band, and until there
 # are real materials the stack is striped by band type so you can see the data by looking at it.
@@ -407,6 +411,96 @@ func bow_at(h: float) -> Vector3:
 ## Where the cradle is, in the world: for the marker that points a player at it.
 func cradle_point() -> Vector3:
 	return global_position + FACE * (_base_r + 4.5)
+
+
+# --- the iron bands -----------------------------------------------------------------------------
+#
+# A banding job is: go up, stand level with a band, and pull its bolts up in a star until she is
+# round again. It shipped with a checklist, a ring in the HUD, a bolt count, a verdict — and
+# nothing on the chimney. The player was told to stand level with a band that did not exist and
+# tighten bolts they could not see, which made the one thing the archetype is *about* — that
+# working round the ring pulls her oval and working across it does not — completely invisible.
+#
+# So the band is a strap round her with a bolt standing out of it at each lug, and **how far a
+# bolt stands out is how slack it is**. Pulled home it is a stub; untouched it is a finger's
+# length of thread. That is the same trick `Face.set_work` uses for a dog going in, for the same
+# reason: a length you can see beats a bar you have to read, and the star pattern becomes a shape
+# on the chimney rather than a number in the corner.
+
+const BAND_PROUD_M := 0.035     ## how far the strap stands off the brickwork
+const BAND_DEEP := 0.17         ## the strap's own height
+const BOLT_OUT_SLACK := 0.20   ## thread showing on a bolt nobody has touched
+const BOLT_OUT_HOME := 0.028    ## and on one that is home
+
+## Build the straps. `specs` is the mission's own `bands` list: {height, bolts}.
+func set_bands(specs: Array) -> void:
+	_band_specs = specs
+	if _straps != null:
+		_straps.queue_free()
+	_straps = Node3D.new()
+	_straps.name = "Bands"
+	add_child(_straps)
+
+	# Cold iron on sooty brick is two dark things, and the first thing the checklist asks of the
+	# player is to *find* a band. So it keeps a little sheen: wrought iron picks the sky up along
+	# its length, which is what separates a strap from the wall behind it at forty metres.
+	var iron := StandardMaterial3D.new()
+	iron.albedo_color = Color(0.29, 0.28, 0.28)
+	iron.roughness = 0.46
+	iron.metallic = 0.55
+
+	for spec in specs:
+		var h: float = float((spec as Dictionary).get("height", 0.0))
+		var r: float = radius_at(h) + BAND_PROUD_M
+		var strap := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = r
+		cm.bottom_radius = r + 0.012     # the batter, over the strap's own depth
+		cm.height = BAND_DEEP
+		cm.radial_segments = 40
+		cm.material = iron
+		strap.mesh = cm
+		strap.position = Vector3(0, h, 0)
+		_straps.add_child(strap)
+
+	_setup_multimesh(_bolts, Color(0.33, 0.31, 0.29))
+	if _bolts.get_parent() == null:
+		add_child(_bolts)
+	set_band_tension(-1, PackedFloat32Array())
+
+
+## Lay the bolts out. `index` -1 rebuilds every band from whatever `tension` the caller last gave
+## each of them; otherwise only that band's tensions are updated.
+var _band_tension: Array = []
+
+func set_band_tension(index: int, tension: PackedFloat32Array) -> void:
+	while _band_tension.size() < _band_specs.size():
+		_band_tension.append(PackedFloat32Array())
+	if index >= 0 and index < _band_tension.size():
+		_band_tension[index] = tension
+	if _bolts.multimesh == null:
+		return
+
+	var xs: Array[Transform3D] = []
+	for i in _band_specs.size():
+		var spec: Dictionary = _band_specs[i]
+		var h: float = float(spec.get("height", 0.0))
+		var n: int = maxi(int(spec.get("bolts", 8)), 1)
+		var r: float = radius_at(h) + BAND_PROUD_M
+		var pulls: PackedFloat32Array = _band_tension[i]
+		for k in n:
+			var t: float = clampf(pulls[k] if k < pulls.size() else 0.0, 0.0, 1.0)
+			var out: float = lerpf(BOLT_OUT_SLACK, BOLT_OUT_HOME, t)
+			var a: float = TAU * float(k) / float(n)
+			var dir := Vector3(sin(a), 0.0, cos(a))
+			# Along the radius, so its own length is the thread showing. The mesh is a unit box,
+			# so the scale gives the bolt its section and its length in one.
+			var basis := Basis(Vector3(dir.z, 0.0, -dir.x), Vector3.UP, dir)
+			xs.append(Transform3D(basis * Basis().scaled(Vector3(0.062, 0.062, out)),
+				dir * (r + out * 0.5) + Vector3(0, h, 0)))
+	_bolts.multimesh.instance_count = xs.size()
+	for i in xs.size():
+		_bolts.multimesh.set_instance_transform(i, xs[i])
 
 
 ## The stretch of wall where the next dog should go, drawn on the brick as a chalked band: a faint

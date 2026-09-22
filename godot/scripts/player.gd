@@ -397,6 +397,11 @@ func _ready() -> void:
 		# Told where the walk in starts, so nothing gets built across it.
 		town.build(jack.level_name(), town.to_local(global_position))
 	chimney.build(jack)
+	# After the build, not before. `Chimney.build` frees every child it has before it lays the
+	# stack, so straps added during `_band_setup` — which runs earlier in this function — were
+	# built and then destroyed a dozen lines later. On screen that is indistinguishable from never
+	# having written the code, which is what a frame of the banding level showed.
+	_band_geometry()
 	_restore_checkpoint()
 	# After the build, not before: the chimney's height is zero until then, so aiming at the top of
 	# it aimed at the ground and the opening shot came out flat and pointed at a field.
@@ -3283,6 +3288,20 @@ func _band_setup() -> void:
 		jack.band_begin(i, int((list[i] as Dictionary).get("bolts", 8)))
 
 
+
+## The straps and their bolts, on the chimney, where the job is. Without them the player was told
+## to stand level with a band that had no geometry and pull up bolts that were not there — and the
+## one thing the archetype is about, that working round the ring pulls her oval and working across
+## it does not, had nowhere to happen where anybody could see it.
+func _band_geometry() -> void:
+	if not band_job:
+		return
+	var list: Array = _mission().get("bands", []) as Array
+	chimney.set_bands(list)
+	for i in list.size():
+		chimney.set_band_tension(i, jack.band_state(i).get("tension", PackedFloat32Array()))
+
+
 ## The band whose height he is at, or -1. A band is worked from beside it, not from anywhere.
 func _band_here() -> int:
 	var list: Array = _mission().get("bands", []) as Array
@@ -3326,6 +3345,7 @@ func _band_act() -> void:
 	if not jack.band_tighten(index, band_bolt, jack.tuning_f("bandTightenPerPull", 0.22)):
 		return
 	var after: Dictionary = jack.band_state(index)
+	chimney.set_band_tension(index, after.get("tension", PackedFloat32Array()))
 	if foley != null:
 		foley.cue("hammer", 0.8)
 	var fit := String(after.get("fit_name", ""))
