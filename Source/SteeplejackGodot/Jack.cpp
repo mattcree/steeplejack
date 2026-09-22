@@ -89,6 +89,9 @@ void Jack::_bind_methods()
 	                     &Jack::set_context);
 	ClassDB::bind_method(D_METHOD("set_exposure", "exposure"), &Jack::set_exposure);
 	ClassDB::bind_method(D_METHOD("set_stance", "stance"), &Jack::set_stance);
+	ClassDB::bind_method(D_METHOD("set_kit", "gloves", "chair"), &Jack::set_kit);
+	ClassDB::bind_method(D_METHOD("kit_gloves"), &Jack::kit_gloves);
+	ClassDB::bind_method(D_METHOD("kit_chair"), &Jack::kit_chair);
 	ClassDB::bind_method(D_METHOD("get_stance"), &Jack::get_stance);
 	ClassDB::bind_method(D_METHOD("stance_name"), &Jack::stance_name);
 	ClassDB::bind_method(D_METHOD("stance_name_of", "stance"), &Jack::stance_name_of);
@@ -241,6 +244,13 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("career_sleep"), &Jack::career_sleep);
 	ClassDB::bind_method(D_METHOD("career_buy_engine_part", "cost"),
 	                     &Jack::career_buy_engine_part);
+	ClassDB::bind_method(D_METHOD("career_owns", "item"), &Jack::career_owns);
+	ClassDB::bind_method(D_METHOD("career_buy_kit", "item"), &Jack::career_buy_kit);
+	ClassDB::bind_method(D_METHOD("career_kit_cost", "item"), &Jack::career_kit_cost);
+	ClassDB::bind_method(D_METHOD("career_carrying", "item"), &Jack::career_carrying);
+	ClassDB::bind_method(D_METHOD("career_carry", "item", "take"), &Jack::career_carry);
+	ClassDB::bind_method(D_METHOD("career_owned"), &Jack::career_owned);
+	ClassDB::bind_method(D_METHOD("career_carried"), &Jack::career_carried);
 	ClassDB::bind_method(D_METHOD("career_state"), &Jack::career_state);
 	ClassDB::bind_method(D_METHOD("career_can_take", "gate_stars"), &Jack::career_can_take);
 	ClassDB::bind_method(D_METHOD("career_reachable_stars", "job_ids"),
@@ -403,6 +413,12 @@ String Jack::band_type_at(double height) const
 String Jack::level_name() const
 {
 	return level ? String(level->Name().c_str()) : String();
+}
+
+void Jack::set_kit(bool gloves, bool chair)
+{
+	context.gloves = gloves;
+	hasChair = chair;
 }
 
 void Jack::set_context(double height, double wind_speed, bool carrying_ladder, bool working)
@@ -1831,6 +1847,50 @@ void Jack::career_sleep()
 	career.SleepOneNight();
 }
 
+bool Jack::career_owns(const String& item) const
+{
+	return career.Owns(std::string(item.utf8().get_data()));
+}
+
+double Jack::career_kit_cost(const String& item) const
+{
+	// economy.json's own `costs` block, so the price on the screen and the price taken out of the
+	// tin are one number read from one place. Nought means the economy has never heard of it.
+	return tuning_f(String("costs.") + item, 0.0);
+}
+
+bool Jack::career_buy_kit(const String& item)
+{
+	const double cost = career_kit_cost(item);
+	// Selling the player something the economy does not list, for free, is worse than refusing.
+	if (cost <= 0.0) { return false; }
+	return career.Buy(std::string(item.utf8().get_data()), static_cast<float>(cost));
+}
+
+bool Jack::career_carrying(const String& item) const
+{
+	return career.Carrying(std::string(item.utf8().get_data()));
+}
+
+void Jack::career_carry(const String& item, bool take)
+{
+	career.Carry(std::string(item.utf8().get_data()), take);
+}
+
+PackedStringArray Jack::career_owned() const
+{
+	PackedStringArray out;
+	for (const std::string& v : career.Owned()) { out.push_back(String(v.c_str())); }
+	return out;
+}
+
+PackedStringArray Jack::career_carried() const
+{
+	PackedStringArray out;
+	for (const std::string& v : career.Carried()) { out.push_back(String(v.c_str())); }
+	return out;
+}
+
 bool Jack::career_buy_engine_part(double cost)
 {
 	return career.BuyEnginePart(static_cast<float>(cost));
@@ -1855,6 +1915,8 @@ Dictionary Jack::career_state() const
 		jobs.push_back(r);
 	}
 	d["jobs"] = jobs;
+	d["owned"] = career_owned();
+	d["carried"] = career_carried();
 	return d;
 }
 

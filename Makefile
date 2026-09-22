@@ -323,6 +323,22 @@ shot: godot-build godot-import
 		$(if $(LEVEL),--level $(LEVEL),) \
 		2>&1 | grep -vE "^(WARNING|MESA|Note:|     at:)" || true
 
+## ui-shot: photograph a menu — the board, the van, the yard, the shed, the ending
+##
+##   make ui-shot SCENE=res://scenes/jobs.tscn CMDS="enter,shot the-van"
+##   make ui-shot SCENE=res://scenes/yard.tscn CMDS="down,down,enter,shot the-shed"
+##
+## See the command vocabulary at the top of godot/scripts/ui_shot.gd. It spends a tin of its own,
+## never the player's.
+UI_SCENE ?= res://scenes/yard.tscn
+ui-shot: godot-build godot-import
+	@command -v xvfb-run >/dev/null || (echo "ui-shot needs xvfb-run (package xorg-x11-server-Xvfb)" && exit 1)
+	@mkdir -p docs/shots
+	@xvfb-run -a --server-args="-screen 0 $(SHOT_RES)x24" \
+		$(GODOT) --path godot --audio-driver Dummy --resolution $(SHOT_RES) --fixed-fps 60 \
+		--script res://scripts/ui_shot.gd -- --scene $(UI_SCENE) "$(CMDS)" \
+		2>&1 | grep -E "wrote|UI-SHOT|ui-shot:|SCRIPT ERROR|Parse Error" || true
+
 ## fell-shot: render the felling mode to a PNG. CMDS="cut 160,shot gob"
 ##
 ## Same software renderer as `make shot`. A felling is almost entirely a thing you look at, so
@@ -362,7 +378,7 @@ ascent-sheet: godot-build godot-import
 ## fail: the scene never loads, the script never reaches its quit(), and the run just sits there.
 ## A gate that hangs is worse than a gate that fails, because nobody reads a hang as a result.
 godot-test: godot-build godot-import
-	@for t in test_ladder test_character test_slip test_stance test_audio test_face test_lash_game test_stack_game test_top test_haul_game test_checkpoint test_options test_grip test_felling test_kershaws test_great_aire test_levels test_jobs test_title test_yard test_flow test_striking test_conductor test_survey test_straighten test_district test_band test_ending test_job_done test_caught test_strip_out test_went_early test_fell_audio; do \
+	@for t in test_ladder test_character test_slip test_stance test_kit test_audio test_face test_lash_game test_stack_game test_top test_haul_game test_checkpoint test_options test_grip test_felling test_kershaws test_great_aire test_levels test_jobs test_title test_yard test_flow test_striking test_conductor test_survey test_straighten test_district test_band test_ending test_job_done test_caught test_strip_out test_went_early test_fell_audio; do \
 		timeout 120 $(GODOT) --path godot --headless --script res://scripts/$$t.gd; \
 		rc=$$?; \
 		if [ $$rc -eq 124 ]; then \

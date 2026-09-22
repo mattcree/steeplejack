@@ -71,6 +71,12 @@ public:
 	// Set every frame before `step`. Passed in rather than read from an ambient world, which is
 	// what makes the meter maths testable without a world to test it in.
 	void set_context(double height, double wind_speed, bool carrying_ladder, bool working);
+
+	/// What came up on the cart. Set once at the start of a job from the tin's `carried` list, and
+	/// then every rule that depends on kit reads one flag instead of re-reading a save file.
+	void set_kit(bool gloves, bool chair);
+	bool kit_gloves() const { return context.gloves; }
+	bool kit_chair() const { return hasChair; }
 	void set_exposure(int exposure);
 	void set_stance(int stance);
 	int64_t get_stance() const { return static_cast<int64_t>(meters.stance); }
@@ -414,6 +420,16 @@ public:
 	/** The yard: advance the calendar, and buy a part for the engine. */
 	void career_sleep();
 	bool career_buy_engine_part(double cost);
+
+	/// The shed. `career_kit_cost` reads economy.json's own `costs` block, so the price on the
+	/// screen and the price taken out of the tin are the same number read from the same place.
+	bool career_owns(const godot::String& item) const;
+	bool career_buy_kit(const godot::String& item);
+	double career_kit_cost(const godot::String& item) const;
+	bool career_carrying(const godot::String& item) const;
+	void career_carry(const godot::String& item, bool take);
+	godot::PackedStringArray career_owned() const;
+	godot::PackedStringArray career_carried() const;
 	/** Whether a level's letter has arrived, for a `reputationGate` in stars. */
 	bool career_can_take(int64_t gate_stars) const;
 	/**
@@ -517,6 +533,9 @@ private:
 	std::unique_ptr<sj::Gob> gob;
 	sj::FellSite fell;
 	sj::Career career;
+	/// Whether a bosun's chair is on the job at all. Without one the stance does not exist,
+	/// which is the difference between a verb a player chose and one they stumbled into.
+	bool hasChair{false};
 };
 
 }  // namespace steeplejack

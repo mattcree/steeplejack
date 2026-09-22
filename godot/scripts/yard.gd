@@ -59,6 +59,7 @@ func _build_rows() -> void:
 	rows = [
 		["board", "The board", "see what work there is"],
 		["kettle", "The kettle", "turn in, and let a day go by"],
+		["shed", "The shed", "what you climb with"],
 		["engine", "The tarpaulin", "the engine"],
 	]
 	if engine_done():
@@ -134,6 +135,9 @@ func _process(dt: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if shed_open:
+		_shed_input(event)
+		return
 	if event is InputEventMouseButton or event is InputEventMouseMotion:
 		var r := row_at(event.position)
 		if r >= 0:
@@ -157,6 +161,91 @@ func _input(event: InputEvent) -> void:
 	queue_redraw()
 
 
+func _shed_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton or event is InputEventMouseMotion:
+		var r := shed_row_at(event.position)
+		if r >= 0:
+			shed_row = r
+			if event is InputEventMouseButton and event.pressed \
+					and event.button_index == MOUSE_BUTTON_LEFT:
+				shed_choose()
+		queue_redraw()
+		return
+	if not (event is InputEventKey) or not event.pressed or event.echo:
+		return
+	match event.keycode:
+		KEY_DOWN, KEY_S:
+			shed_row = (shed_row + 1) % SHED.size()
+		KEY_UP, KEY_W:
+			shed_row = (shed_row - 1 + SHED.size()) % SHED.size()
+		KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
+			shed_choose()
+		KEY_ESCAPE:
+			shed_open = false
+			_said = ""
+	queue_redraw()
+
+
+# --- the shed's geometry, shared by the drawing and the hit-testing ---------------------------
+#
+# One function, as with the options panel: the second copy of "the third row is 70 + 26i pixels
+# down" is the one that drifts, and a menu whose clicks land one row off is worse than one that
+# ignores the mouse.
+
+const SHED_W := 560.0
+const SHED_ROW_H := 74.0
+
+
+func shed_rect() -> Rect2:
+	var h := 120.0 + SHED_ROW_H * float(SHED.size()) + 64.0
+	return Rect2(Vector2((size.x - SHED_W) * 0.5, (size.y - h) * 0.5), Vector2(SHED_W, h))
+
+
+func shed_row_at(p: Vector2) -> int:
+	var r := shed_rect()
+	for i in SHED.size():
+		var y: float = r.position.y + 120.0 + SHED_ROW_H * float(i)
+		if p.y >= y - 28.0 and p.y <= y + 34.0 and r.encloses(Rect2(p, Vector2.ZERO)):
+			return i
+	return -1
+
+
+func _draw_shed() -> void:
+	var r := shed_rect()
+	draw_rect(Rect2(r.position - Vector2(8, 8), r.size + Vector2(16, 16)), Color(0, 0, 0, 0.55))
+	draw_rect(r, Color(0.13, 0.12, 0.12))
+	_label("THE SHED", r.position + Vector2(28, 46), Color(GHOST, 0.75), 13)
+	_label("£%.0f in the tin" % float(career.get("money", 0.0)), r.position + Vector2(28, 80),
+		INK, 22)
+
+	for i in SHED.size():
+		var item: String = SHED[i]
+		var y: float = r.position.y + 120.0 + SHED_ROW_H * float(i)
+		var on: bool = i == shed_row
+		var owned: bool = jack.career_owns(item)
+		if on:
+			draw_rect(Rect2(Vector2(r.position.x + 16.0, y - 28.0),
+				Vector2(SHED_W - 32.0, 62.0)), Color(1, 1, 1, 0.05))
+			draw_rect(Rect2(Vector2(r.position.x + 16.0, y - 28.0), Vector2(3.0, 62.0)), WATCH)
+		_label(String(SHED_NAME.get(item, item)), Vector2(r.position.x + 34.0, y),
+			INK if on else Color(DIM, 0.75), 20)
+		_label(String(SHED_WHY.get(item, "")), Vector2(r.position.x + 34.0, y + 22.0),
+			Color(GHOST, 0.8 if on else 0.55), 13)
+		var cost: float = jack.career_kit_cost(item)
+		var right := Vector2(r.position.x + SHED_W - 118.0, y)
+		if owned:
+			_label("yours", right, Color(GOOD, 0.9), 17)
+		elif cost > float(career.get("money", 0.0)):
+			_label("£%.0f" % cost, right, Color(0.72, 0.42, 0.34, 0.9), 20)
+		else:
+			_label("£%.0f" % cost, right, Color(WATCH, 0.95), 20)
+
+	if _said != "":
+		_label(_said, r.position + Vector2(28, r.size.y - 52.0), Color(WATCH, 0.9), 15)
+	_label("↑↓ or the mouse   ·   enter to buy   ·   esc back to the yard",
+		r.position + Vector2(28, r.size.y - 24.0), Color(GHOST, 0.7), 13)
+
+
 func choose(what: String) -> void:
 	match what:
 		"board":
@@ -166,10 +255,55 @@ func choose(what: String) -> void:
 			_save_career()
 			career = jack.career_state()
 			_said = "morning. day %d." % (int(career.get("day", 0)) + 1)
+		"shed":
+			_open_shed()
 		"engine":
 			_buy_part()
 		"steam":
 			_steam_her()
+
+
+# --- the shed ---------------------------------------------------------------------------------
+#
+# Two things, and neither of them is an upgrade: both cost you something. Gloves save your hands
+# and blunt your ear for a joint. A chair takes twenty seconds to rig and £75 out of the tin, and
+# in exchange you can sit down fifty metres up and work until the light goes.
+#
+# It exists at all because the verbs it unlocks were unreadable without it. A stance you reach by
+# pressing Q until something happens is a stance nobody understands; one you paid for, and then
+# chose to put on the cart, is one you know the name of before you ever rig it.
+
+const SHED := ["gloves", "bosunsChair"]
+const SHED_NAME := {"gloves": "A pair of gloves", "bosunsChair": "A bosun's chair"}
+const SHED_WHY := {
+	"gloves": "less grip going out of you — and a tier worse at reading a joint by sound",
+	"bosunsChair": "sit in it and work. No grip going out at all, and 20 s to rig on the stack",
+}
+
+var shed_open := false
+var shed_row := 0
+
+
+func _open_shed() -> void:
+	shed_open = true
+	shed_row = 0
+	_said = ""
+
+
+func shed_choose() -> void:
+	var item: String = SHED[shed_row]
+	if jack.career_owns(item):
+		# Owned kit is loaded in the van, not here. Two screens that both decide the same thing is
+		# how a player ends up certain they took the chair and arrives without it.
+		_said = "you have one. whether it goes up is decided at the van."
+		return
+	var cost: float = jack.career_kit_cost(item)
+	if not jack.career_buy_kit(item):
+		_said = "£%.0f short of it." % (cost - float(career.get("money", 0.0)))
+		return
+	_save_career()
+	career = jack.career_state()
+	_said = "£%.0f. it's on the cart." % cost
 
 
 ## One part at a time, and refused rather than allowed into debt. A job cannot leave you owing
@@ -250,9 +384,12 @@ func _draw() -> void:
 			note = _engine_note()
 		_label(note, Vector2(at.x, y + 19.0), Color(GHOST, 0.85 if on else 0.55), 13)
 
-	if _said != "":
+	if _said != "" and not shed_open:
 		_label(_said, Vector2(at.x, size.y - 62.0), Color(WATCH, 0.9), 16)
 	_label("↑↓ or the mouse   ·   enter", Vector2(at.x, size.y - 36.0), Color(GHOST, 0.7), 13)
+
+	if shed_open:
+		_draw_shed()
 
 
 func _engine_note() -> String:

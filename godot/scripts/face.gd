@@ -89,7 +89,7 @@ var _lash_laid := 0.0
 var _rope: MultiMeshInstance3D
 var _rope_live: MultiMeshInstance3D
 const ROPE := Color(0.64, 0.53, 0.35)
-const WRAP_PITCH := 0.024        ## height between turns of the coil
+const WRAP_PITCH := 0.030        ## height between turns of the coil
 
 
 func _ready() -> void:
@@ -133,10 +133,13 @@ func _ready() -> void:
 
 	# Rope: one torus per turn round the lug. Finished lashings in one bank, the one going on now in
 	# another, so the live coil can be rebuilt every frame without touching the rest of the stack.
+	# Sized to what it actually goes round: a stile and the dog behind it, not a bare lug. At 76 mm
+	# across the coil was a washer on a spike — technically the rope, invisible from four metres,
+	# which is every metre a player ever looks at it from.
 	var torus := TorusMesh.new()
-	torus.inner_radius = 0.030
-	torus.outer_radius = 0.046
-	torus.rings = 10
+	torus.inner_radius = 0.055
+	torus.outer_radius = 0.082
+	torus.rings = 14
 	torus.ring_segments = 6
 	torus.material = _lit(ROPE, 0.95)
 	_rope = _wrap(torus)
@@ -311,7 +314,9 @@ func _coil(j: Dictionary, wraps: int) -> Array:
 func _coil_turn(j: Dictionary, k: int) -> Transform3D:
 	var n: Vector3 = j["normal"]
 	# Round the lug, which stands 0.21 m off the face, climbing up the lug turn by turn.
-	var origin: Vector3 = j["pos"] + n * 0.19 + Vector3.UP * (float(k) - 2.5) * WRAP_PITCH
+	# Close in to the wall, where the stile lies, rather than out at the tip of the lug: a lashing
+	# binds the ladder to the dog, so the turns have to be round both of them.
+	var origin: Vector3 = j["pos"] + n * 0.10 + Vector3.UP * (float(k) - 2.5) * WRAP_PITCH
 	return Transform3D(Basis(), origin)
 
 

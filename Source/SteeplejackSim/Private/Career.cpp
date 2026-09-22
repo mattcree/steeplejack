@@ -210,6 +210,50 @@ void Career::RememberSalvage(const std::string& levelId, const std::string& what
     salvage_.emplace_back(levelId, what);
 }
 
+bool Career::Owns(const std::string& item) const noexcept
+{
+    return std::find(owned_.begin(), owned_.end(), item) != owned_.end();
+}
+
+bool Career::Buy(const std::string& item, float costGbp)
+{
+    if (item.empty() || costGbp < 0.0f || costGbp > money_ || Owns(item))
+    {
+        return false;
+    }
+    money_ -= costGbp;
+    owned_.push_back(item);
+    // Bought is carried. Nobody buys a chair and then leaves it in the shed on purpose, and a
+    // player who had to make the same decision twice in two screens would reasonably assume the
+    // first one had not taken.
+    Carry(item, true);
+    return true;
+}
+
+bool Career::Carrying(const std::string& item) const noexcept
+{
+    return std::find(carried_.begin(), carried_.end(), item) != carried_.end();
+}
+
+void Career::Carry(const std::string& item, bool take)
+{
+    const auto at = std::find(carried_.begin(), carried_.end(), item);
+    if (take)
+    {
+        // You cannot load what is not in the shed. A save file that says otherwise is a save file
+        // from a build where the thing was free, and it does not get to put a chair on the cart.
+        if (Owns(item) && at == carried_.end())
+        {
+            carried_.push_back(item);
+        }
+        return;
+    }
+    if (at != carried_.end())
+    {
+        carried_.erase(at);
+    }
+}
+
 bool Career::BuyEnginePart(float costGbp) noexcept
 {
     if (costGbp < 0.0f || costGbp > money_)
@@ -254,6 +298,16 @@ std::string Career::ToJson() const
     for (std::size_t i = 0; i < stripped_.size(); ++i)
     {
         out << (i ? ", " : "") << "\"" << stripped_[i] << "\"";
+    }
+    out << "],\n  \"owned\": [";
+    for (std::size_t i = 0; i < owned_.size(); ++i)
+    {
+        out << (i ? ", " : "") << "\"" << owned_[i] << "\"";
+    }
+    out << "],\n  \"carried\": [";
+    for (std::size_t i = 0; i < carried_.size(); ++i)
+    {
+        out << (i ? ", " : "") << "\"" << carried_[i] << "\"";
     }
     out << "]\n}\n";
     return out.str();
@@ -310,6 +364,22 @@ Career Career::FromJson(const std::string& json, const std::string& origin)
         for (const JsonValue& s : doc.At("stripped").Elements())
         {
             c.stripped_.push_back(s.AsString());
+        }
+    }
+    if (doc.Has("owned"))
+    {
+        for (const JsonValue& s : doc.At("owned").Elements())
+        {
+            c.owned_.push_back(s.AsString());
+        }
+    }
+    if (doc.Has("carried"))
+    {
+        for (const JsonValue& s : doc.At("carried").Elements())
+        {
+            // Through Carry(), not push_back: it is the one place that enforces "you cannot load
+            // what you do not own", and a loader that goes round it is how that rule rots.
+            c.Carry(s.AsString(), true);
         }
     }
     return c;

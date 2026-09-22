@@ -118,11 +118,16 @@ func build(jack: Jack) -> void:
 
 	_cradle()
 	_setup_multimesh(_ladders, Color(0.42, 0.30, 0.17))
-	# The section being lashed, held in place and not yet trusted: drawn translucent until it is tied.
-	_setup_multimesh(_ghost, Color(0.62, 0.50, 0.34))
+	# The section being lashed: where it will be, not where it is. In timber colour at 45% alpha it
+	# was a ladder — a frame taken mid-lash has it reading as solid, indistinguishable from the one
+	# the man is standing on, so the whole verb looked like it had already happened. Chalk instead,
+	# which is the colour everything provisional is drawn in, and unlit so it does not take the
+	# sun and pass for wood at the top of the stack.
+	_setup_multimesh(_ghost, Color(0.72, 0.80, 0.88))
 	var gm := _ghost.multimesh.mesh.material as StandardMaterial3D
 	gm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	gm.albedo_color.a = 0.45
+	gm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	gm.albedo_color.a = 0.42
 	add_child(_ghost)
 	_setup_multimesh(_dogs, Color(0.18, 0.17, 0.16))
 	add_child(_ladders)

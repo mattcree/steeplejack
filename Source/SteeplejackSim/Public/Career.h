@@ -99,6 +99,26 @@ public:
     }
     void RememberSalvage(const std::string& levelId, const std::string& what);
 
+    // --- the shed ------------------------------------------------------------------------------
+    //
+    // What you own, and what you are carrying up today. Two different questions, and conflating
+    // them is what made the climbing verbs opaque: every stance in the table was always available,
+    // so a player pressed Q, waited twenty seconds for a bosun's chair to rig, and had no idea
+    // where the chair had come from or what it was for. Gear you had to buy and then decide to
+    // put on the cart is gear you know the name of before you use it.
+    //
+    // Ids are `economy.json`'s own `costs` keys, so the price of a thing and the fact that you
+    // own it cannot disagree. Buying is refused rather than allowed into debt, like the engine.
+    bool Owns(const std::string& item) const noexcept;
+    bool Buy(const std::string& item, float costGbp);
+    const std::vector<std::string>& Owned() const noexcept { return owned_; }
+
+    // The loadout: the subset of what you own that went on the cart. Setting it keeps only what
+    // you actually have, so a save that names a chair you sold cannot put one on the chimney.
+    const std::vector<std::string>& Carried() const noexcept { return carried_; }
+    void  Carry(const std::string& item, bool take);
+    bool  Carrying(const std::string& item) const noexcept;
+
     // Days since the season started. The board shows weather by the day and some jobs have
     // deadlines, so this is the clock the whole meta layer hangs off.
     int32_t Day() const noexcept { return day_; }
@@ -172,6 +192,8 @@ private:
     int32_t reputation_{};
     std::vector<JobRecord> jobs_;
     std::vector<std::string> stripped_;
+    std::vector<std::string> owned_;
+    std::vector<std::string> carried_;
 };
 
 }  // namespace sj

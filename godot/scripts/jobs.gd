@@ -41,7 +41,21 @@ var van_open := false
 var van_row := 0
 var van_ladders := 0
 var van_dogs := 0
-const VAN_ROWS := ["ladders", "dogs"]
+var van_said := ""
+## Two numbers you set, and then the kit — which is a different kind of decision and reads like
+## one: a number goes up and down, a thing is either on the cart or it is not.
+##
+## Kit on the cart is what makes the verbs that use it legible. The bosun's chair was a stance you
+## could reach by pressing Q four times on any job, on any chimney, having never heard of one; now
+## it is £75 in the yard and a line on this screen, and by the time you rig one you know what it is
+## and why you are carrying it up a chimney.
+const VAN_ROWS := ["ladders", "dogs", "gloves", "bosunsChair"]
+const KIT_ROWS := ["gloves", "bosunsChair"]
+const KIT_NAME := {"gloves": "Gloves", "bosunsChair": "Bosun's chair"}
+const KIT_WHY := {
+	"gloves": "less out of your hands, and you read the joints a tier worse",
+	"bosunsChair": "sit down and work — no grip going out at all. 20 s to rig",
+}
 
 @onready var jack: Jack = Jack.new()
 
@@ -210,6 +224,7 @@ func open_van() -> void:
 	van_ladders = maxi(int(job.get("ladders", 0)), 1)
 	van_dogs = maxi(int(job.get("dogs", 0)), 1)
 	van_row = 0
+	van_said = ""
 	van_open = true
 
 
@@ -230,10 +245,30 @@ func _van_key(key: int) -> void:
 
 
 func van_step(dir: int) -> void:
-	if VAN_ROWS[van_row] == "ladders":
+	var row: String = VAN_ROWS[van_row]
+	if row == "ladders":
 		van_ladders = clampi(van_ladders + dir, 1, 40)
-	else:
+		return
+	if row == "dogs":
 		van_dogs = clampi(van_dogs + dir * 2, 2, 120)
+		return
+	van_toggle(row)
+
+
+## A kit row is on or off, and either arrow does the same thing — there is no more or less of a
+## chair. Refused rather than silently ignored when it is not in the shed, and the refusal says
+## where to get one, because "nothing happened" is the worst answer a menu can give.
+func van_toggle(item: String) -> void:
+	if not jack.career_owns(item):
+		van_said = "%s — £%.0f at the yard. You have not bought a pair yet." % [
+			KIT_NAME.get(item, item), jack.career_kit_cost(item)] if item == "gloves" \
+			else "%s — £%.0f at the yard. You have not bought one yet." % [
+			KIT_NAME.get(item, item), jack.career_kit_cost(item)]
+		return
+	var taking := not jack.career_carrying(item)
+	jack.career_carry(item, taking)
+	save_career()
+	van_said = "%s %s" % [KIT_NAME.get(item, item), "on the cart" if taking else "left in the shed"]
 
 
 ## What the ladders you are taking mean, in metres of span — the number the decision is actually
@@ -413,7 +448,7 @@ func _letter(job: Dictionary, x: float, y: float) -> void:
 # is yours.
 
 const VAN_W := 560.0
-const VAN_H := 300.0
+const VAN_H := 420.0
 const VAN_ROW_H := 54.0
 
 
@@ -429,6 +464,10 @@ func van_hit(p: Vector2) -> Dictionary:
 	for i in VAN_ROWS.size():
 		var y: float = r.position.y + 106.0 + VAN_ROW_H * float(i)
 		if p.y >= y - 26.0 and p.y <= y + 14.0:
+			# A kit row is a switch, so the whole row is the switch. Making the player find an
+			# 18-pixel box is a worse version of the same click.
+			if VAN_ROWS[i] in KIT_ROWS:
+				return {"row": i, "step": 1}
 			var step := 0
 			if p.x >= r.position.x + VAN_W - 90.0:
 				step = 1
@@ -450,15 +489,43 @@ func _draw_van() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 21, INK)
 
 	for i in VAN_ROWS.size():
+		var key: String = VAN_ROWS[i]
 		var y: float = r.position.y + 106.0 + VAN_ROW_H * float(i)
 		var on: bool = i == van_row
 		if on:
 			draw_rect(Rect2(Vector2(r.position.x + 16.0, y - 26.0),
 				Vector2(VAN_W - 32.0, 36.0)), Color(0.16, 0.14, 0.12, 0.07))
-		var what := "Ladder sections" if VAN_ROWS[i] == "ladders" else "Dogs"
+		# A rule between the numbers and the kit. They are answers to different questions and the
+		# line is cheaper than a heading.
+		if key == KIT_ROWS[0]:
+			draw_rect(Rect2(Vector2(r.position.x + 28.0, y - 40.0),
+				Vector2(VAN_W - 56.0, 1.0)), Color(0.16, 0.14, 0.12, 0.18))
+
+		if key in KIT_ROWS:
+			var owned: bool = jack.career_owns(key)
+			var taking: bool = jack.career_carrying(key)
+			var col: Color = (INK if on else FADED) if owned else Color(0.16, 0.14, 0.12, 0.3)
+			draw_string(_font, Vector2(r.position.x + 28.0, y), String(KIT_NAME.get(key, key)),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 17, col)
+			draw_string(_font, Vector2(r.position.x + 28.0, y + 17.0),
+				String(KIT_WHY.get(key, "")) if owned
+					else "£%.0f at the yard" % jack.career_kit_cost(key),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.16, 0.14, 0.12, 0.45))
+			# A drawn box rather than a word: it is the one row on this screen whose state you
+			# should be able to take in without reading anything.
+			var box := Rect2(Vector2(r.position.x + VAN_W - 132.0, y - 15.0), Vector2(18, 18))
+			draw_rect(box, Color(0.16, 0.14, 0.12, 0.5), false, 1.5)
+			if taking:
+				draw_rect(Rect2(box.position + Vector2(4, 4), Vector2(10, 10)), INK)
+			draw_string(_font, Vector2(r.position.x + VAN_W - 104.0, y),
+				"on the cart" if taking else ("in the shed" if owned else "not bought"),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, col)
+			continue
+
+		var what := "Ladder sections" if key == "ladders" else "Dogs"
 		draw_string(_font, Vector2(r.position.x + 28.0, y), what,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK if on else FADED)
-		var n: int = van_ladders if VAN_ROWS[i] == "ladders" else van_dogs
+		var n: int = van_ladders if key == "ladders" else van_dogs
 		draw_string(_font, Vector2(r.position.x + VAN_W - 150.0, y), "‹" if on else " ",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK)
 		draw_string(_font, Vector2(r.position.x + VAN_W - 118.0, y), "%d" % n,
@@ -480,13 +547,16 @@ func _draw_van() -> void:
 	elif span > 4.0:
 		verdict = "flexing"
 		col = Color(0.55, 0.38, 0.10)
-	draw_string(_font, Vector2(r.position.x + 28.0, r.position.y + VAN_H - 76.0),
+	draw_string(_font, Vector2(r.position.x + 28.0, r.position.y + VAN_H - 100.0),
 		"%.1f m a section over %.0f m — %s" % [span, float(job.get("height", 0.0)), verdict],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, col)
-	draw_string(_font, Vector2(r.position.x + 28.0, r.position.y + VAN_H - 52.0),
+	draw_string(_font, Vector2(r.position.x + 28.0, r.position.y + VAN_H - 76.0),
 		"%d dogs — %s" % [van_dogs,
 			"plenty" if van_dogs >= van_ladders * 2 else "you will be going back down for more"],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, FADED)
+	if van_said != "":
+		draw_string(_font, Vector2(r.position.x + 28.0, r.position.y + VAN_H - 48.0), van_said,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.55, 0.18, 0.14))
 	draw_string(_font, Vector2(r.position.x + 28.0, r.position.y + VAN_H - 22.0),
 		"↑↓ choose   ←→ or click   ·   enter to set off   ·   esc to think again",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, FADED)

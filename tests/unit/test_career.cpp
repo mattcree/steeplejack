@@ -336,3 +336,72 @@ TEST_CASE("Career: what the very best career can actually be worth")
     // Which is to say: under these numbers nobody has ever been able to earn the fifth star, and
     // `career_reachable_stars` is right to report every five-star gate as a gap in the level set.
 }
+
+// --- the shed -----------------------------------------------------------------------------------
+//
+// Kit exists to make the verbs that use it legible: a stance you reached by pressing Q until
+// something happened was a stance nobody understood. That only works if "I own it" and "I brought
+// it" stay two different facts, and if neither of them can be true by accident.
+
+TEST_CASE("Career: you cannot carry what you have not bought")
+{
+    Career c;
+    CHECK(!c.Owns("bosunsChair"));
+    CHECK(!c.Carrying("bosunsChair"));
+
+    // Asking to load a chair you have not got does nothing at all. It does not half-work, and it
+    // does not leave a carried item with nothing behind it — which is the state that would put a
+    // stance on the chimney that the player never paid for.
+    c.Carry("bosunsChair", true);
+    CHECK(!c.Carrying("bosunsChair"));
+}
+
+TEST_CASE("Career: buying, and what buying does not do")
+{
+    Career c;
+    c.Settle("a-job", 100.0f, FellOutcome{}, Tune());
+    const float before = c.MoneyGbp();
+    REQUIRE(before >= 75.0f);
+
+    CHECK(c.Buy("bosunsChair", 75.0f));
+    CHECK(c.Owns("bosunsChair"));
+    // Bought is carried. Nobody buys a chair and then leaves it in the shed on purpose, and a
+    // player made to make the same decision twice in two screens reasonably assumes the first
+    // one did not take.
+    CHECK(c.Carrying("bosunsChair"));
+    CHECK(c.MoneyGbp() == doctest::Approx(before - 75.0f));
+
+    // Twice is not twice. Buying a second chair for a second £75 is the kind of thing that only
+    // ever happens by a double click.
+    CHECK(!c.Buy("bosunsChair", 75.0f));
+    CHECK(c.MoneyGbp() == doctest::Approx(before - 75.0f));
+
+    // And never into debt, which is the rule the whole economy is built on.
+    CHECK(!c.Buy("somethingDear", 1.0e6f));
+    CHECK(!c.Owns("somethingDear"));
+}
+
+TEST_CASE("Career: what is in the shed and what is on the cart both survive the night")
+{
+    Career c;
+    c.Settle("a-job", 200.0f, FellOutcome{}, Tune());
+    REQUIRE(c.Buy("bosunsChair", 75.0f));
+    REQUIRE(c.Buy("gloves", 6.0f));
+    c.Carry("gloves", false);   // owned, left behind
+
+    const Career back = Career::FromJson(c.ToJson(), "test");
+    CHECK(back.Owns("bosunsChair"));
+    CHECK(back.Owns("gloves"));
+    CHECK(back.Carrying("bosunsChair"));
+    CHECK(!back.Carrying("gloves"));
+}
+
+TEST_CASE("Career: a tin that claims to be carrying what it does not own is corrected, not trusted")
+{
+    // The one file in this game a player can edit by hand, and the one rule that must survive it:
+    // a chair on the cart with no chair in the shed is a free £75 stance.
+    const Career c = Career::FromJson(
+        R"({"money": 10, "reputation": 0, "owned": [], "carried": ["bosunsChair"]})", "test");
+    CHECK(!c.Owns("bosunsChair"));
+    CHECK(!c.Carrying("bosunsChair"));
+}

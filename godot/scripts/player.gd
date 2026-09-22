@@ -285,7 +285,8 @@ var _cam_yaw := 0.0              ## Where the camera actually is, easing towards
 var _cam_pitch := -0.1
 var _cam_side := BOOM_SIDE
 var boom_length := BOOM_LENGTH   ## Where the camera sits when not working. A var so a shot can set it.
-var rigging_to := -1             ## Stance being rigged, or -1. The HUD draws the ring.
+var rigging_to := -1             ## The stance being rigged right now, or -1. The HUD draws the ring.
+var rig_want := -1               ## Where he is going. The rig walks up the table to it, one at a time.
 var rig_left := 0.0              ## Seconds of it still to do.
 var rig_total := 0.0
 var _rig_at := 0.0               ## The height he was at when he started. Moving off it breaks it.
@@ -344,6 +345,7 @@ func _ready() -> void:
 	# What the level packed, unless the van says otherwise. The board's loadout screen writes its
 	# numbers onto the tree root before the scene is built, because that decision is made in the
 	# yard and has to survive the trip.
+	_load_kit()
 	if jack.loadout_ladders() > 0:
 		ladders_at_base = jack.loadout_ladders()
 	if jack.loadout_dogs() > 0:
@@ -392,7 +394,8 @@ func _ready() -> void:
 	_apply_settings()
 	var town: Town = get_node_or_null("../Town")
 	if town != null:
-		town.build(jack.level_name())
+		# Told where the walk in starts, so nothing gets built across it.
+		town.build(jack.level_name(), town.to_local(global_position))
 	chimney.build(jack)
 	_restore_checkpoint()
 	# After the build, not before: the chimney's height is zero until then, so aiming at the top of
@@ -431,6 +434,31 @@ var career_path := CAREER_PATH
 var settlement := {}
 ## True when this climb was a felling's Act 2 rather than a job of its own.
 var stripped_out := false
+
+
+## What came up on the cart, read once.
+##
+## Every stance in the table used to be available on every job, which meant the bosun's chair — a
+## £75 piece of equipment, twenty seconds to rig, the only stance in the game that costs no grip at
+## all — was something a player arrived at by pressing Q four times and waiting. It read as a bug.
+## It is kit now: you buy it in the yard, you decide in the van whether it is worth the weight, and
+## if it is not on the cart the stance does not exist.
+var has_chair := false
+var has_gloves := false
+var _said_no_chair := false
+
+func _load_kit() -> void:
+	var text := ""
+	if FileAccess.file_exists(career_path):
+		var f := FileAccess.open(career_path, FileAccess.READ)
+		if f != null:
+			text = f.get_as_text()
+			f.close()
+	if text != "":
+		jack.career_load(text)
+	has_chair = jack.career_carrying("bosunsChair")
+	has_gloves = jack.career_carrying("gloves")
+	jack.set_kit(has_gloves, has_chair)
 
 
 func _settle_the_job() -> void:
@@ -1571,7 +1599,10 @@ func _update_tap(dt: float) -> void:
 	tapping -= dt
 	if not _tap_landed and total - tapping >= TAP_CONTACT:
 		_tap_landed = true
-		var r: Dictionary = jack.tap_joint(_tap_joint, false)
+		# Gloves cost you a tier of resolution here and buy it back on the grip bar. That trade
+		# has been in the sim since VERB-001 and `false` was hard-coded into the one call that
+		# could ever exercise it, so nobody has ever made it.
+		var r: Dictionary = jack.tap_joint(_tap_joint, has_gloves)
 		if r.is_empty():
 			return
 		tap_reading = r["tier_name"]
@@ -2379,7 +2410,8 @@ func _lash() -> void:
 	_lash_presses.clear()
 	jack.lash_begin()
 	chimney.set_ghost(ladder_top, lash_new_top)
-	_say("lashing — %s" % _lash_how())
+	# No message. The lashing panel is already on the screen saying the same words in the same
+	# second, and a transient line at the top edge saying them again only competes with it.
 
 
 ## How high the built stack reaches now, and the chimney told about it. Striking has to use the
@@ -2680,6 +2712,7 @@ func _update_grip(dt: float) -> void:
 func _update_gear() -> void:
 	if _gear == null:
 		_gear = _build_gear()
+	_update_lash_rope()
 	var stance: int = jack.get_stance()
 	var shown := stance
 	var part := 1.0
@@ -2742,8 +2775,18 @@ func _build_gear() -> Node3D:
 	webbing.roughness = 0.9
 	var wood := StandardMaterial3D.new()
 	wood.albedo_color = Color(0.46, 0.33, 0.19)
-	for spec in [["Clip", 0.014, hemp], ["BeltL", 0.022, webbing], ["BeltR", 0.022, webbing],
-			["FallL", 0.013, hemp], ["FallR", 0.013, hemp]]:
+	var specs: Array = [["Clip", 0.014, hemp], ["BeltL", 0.022, webbing], ["BeltR", 0.022, webbing],
+			["FallL", 0.013, hemp], ["FallR", 0.013, hemp]]
+	# Fatter than the stance lines. This is a lashing line, and it is also the one rope in the game
+	# that has to read from the ground.
+	var line := StandardMaterial3D.new()
+	line.albedo_color = Color(0.80, 0.69, 0.46)
+	line.roughness = 0.95
+	for i in LASH_ROPE_SEGMENTS:
+		specs.append(["Haul%d" % i, 0.024, line])
+	for i in LASH_TAIL_SEGMENTS:
+		specs.append(["Tail%d" % i, 0.024, line])
+	for spec in specs:
 		var mi := MeshInstance3D.new()
 		var cm := CylinderMesh.new()
 		cm.top_radius = spec[1]
@@ -2766,6 +2809,79 @@ func _build_gear() -> Node3D:
 	return g
 
 
+## The rope while a lashing is going on.
+##
+## The verb had a panel, a ring, a turn count and a sound, and in the world it had nothing: a man
+## with his arm up and a ghost ladder that looked like a real one. A player who pressed R could
+## watch the number climb without ever seeing what the number *was*. So: rope out of his hand,
+## sagging, up to the dog; the coil growing round it, which face.gd draws; and a free end hanging
+## down the wall and swinging, which is the part you can read from the ground.
+const LASH_ROPE_SEGMENTS := 5
+const LASH_TAIL_SEGMENTS := 4
+## Long enough to be a thing hanging off a chimney rather than a detail on a dog. A probe put the
+## first version exactly where it was meant to be and a rendered frame could not find it: 16 mm of
+## hemp at six metres is four pixels, behind a ladder.
+const LASH_TAIL_M := 3.4
+
+func _update_lash_rope() -> void:
+	if _gear == null:
+		return
+	var on := lashing and lash_joint >= 0 and face != null
+	for i in LASH_ROPE_SEGMENTS:
+		_gear.get_node("Haul%d" % i).visible = on
+	for i in LASH_TAIL_SEGMENTS:
+		_gear.get_node("Tail%d" % i).visible = on
+	if not on:
+		return
+	var j: Dictionary = face.joint(lash_joint)
+	if j.is_empty():
+		return
+	var n: Vector3 = j["normal"]
+	var lug: Vector3 = face.to_global(Vector3(j["pos"]) + n * 0.12)
+
+	# Out of the working hand — his right, the one that is off the ladder for the whole verb.
+	var hand := shoulders() + _lean + _wall_out() * 0.18 \
+		+ _wall_out().cross(Vector3.UP).normalized() * 0.26 - Vector3.UP * 0.12
+
+	# The rope pays *in* as it goes round: at nought turns there is a long bight of slack between
+	# his hand and the dog, and by the sixth there is almost none. That is the progress, in the
+	# world, at a glance, without a number.
+	var st: Dictionary = jack.lash_state()
+	var turns := float(st.get("wraps", 0)) + float(st.get("laid", 0.0))
+	var slack := lerpf(0.55, 0.06, clampf(turns / 6.0, 0.0, 1.0))
+	_sag(_seg_names("Haul", LASH_ROPE_SEGMENTS), hand, lug, slack)
+
+	# The free end, down the wall. It swings — hung rope in wind does, and it is the one part of
+	# this that is visible from the foot of the stack.
+	var sway := sin(_now * 1.7) * 0.10 + sin(_now * 0.9) * 0.05
+	var side := _wall_out().cross(Vector3.UP).normalized()
+	# Clear of the wall and clear of the section being held against it, so it hangs in front of
+	# both rather than inside them.
+	var foot := lug + n * 0.16 - Vector3.UP * LASH_TAIL_M + side * sway
+	_sag(_seg_names("Tail", LASH_TAIL_SEGMENTS), lug, foot, 0.10)
+
+
+func _seg_names(prefix: String, n: int) -> Array:
+	var out: Array = []
+	for i in n:
+		out.append("%s%d" % [prefix, i])
+	return out
+
+
+## Lay a chain of cylinders along a hanging curve from `a` to `b`. `slack` is the depth of the
+## bight at the middle, in metres — a parabola rather than a true catenary, which at this length
+## differs by less than the rope is thick.
+func _sag(names: Array, a: Vector3, b: Vector3, slack: float) -> void:
+	var n := names.size()
+	var prev := a
+	for i in range(1, n + 1):
+		var t := float(i) / float(n)
+		var at := a.lerp(b, t) - Vector3.UP * (slack * 4.0 * t * (1.0 - t))
+		_rope_between(_gear.get_node(names[i - 1]), prev, at)
+		_gear.get_node(names[i - 1]).visible = true
+		prev = at
+
+
 ## A unit-height cylinder stretched and turned to run from `a` to `b`.
 func _rope_between(mi: Node3D, a: Vector3, b: Vector3) -> void:
 	var d := b - a
@@ -2785,13 +2901,44 @@ func _rope_between(mi: Node3D, a: Vector3, b: Vector3) -> void:
 ## on — belting on cost nothing, so there was never a reason not to, and the slip-save's whole
 ## clipped-or-not distinction was free. Rigging is work: a hand is off, so it drains at the stance
 ## you are *leaving*, which is also what stops a climber with nothing left belting on to recover.
+const STANCE_CHAIR := 4
+
 func _cycle_stance() -> void:
 	var here: int = jack.get_stance()
 	var want: int = (here + 1) % 5
+	# The chair is the one stance that is a thing rather than a technique, and if it is not on the
+	# job Q goes straight past it rather than offering it and then refusing. Said once, because a
+	# player who has never bought one needs telling where it comes from.
+	if want == STANCE_CHAIR and not has_chair:
+		want = 0
+		if not _said_no_chair:
+			_said_no_chair = true
+			_say("no chair on this job — there is one in the yard for £%.0f"
+				% jack.career_kit_cost("bosunsChair"))
 
+	# Q while already rigging used to stop, and that is most of why the chair was unreachable: the
+	# way anybody asks for a stance four steps up the table is to press Q four times, which rigged,
+	# cancelled, rigged, cancelled, and left them where they started with no explanation.
+	#
+	# Now it raises where you are *going*, and the rig walks up the table one stance at a time,
+	# taking each one as it gets there. That is not a convenience — it is the only way the chair
+	# can be reached at all. Rigging straight from one hand means twenty seconds at eight grip a
+	# second, and nobody has eight times twenty. Up the table it is 1.5 s at 8, 3 s at 4, 5 s at 4
+	# and then the twenty at 1, because by then you are belted on: sixty-four grip instead of a
+	# hundred and sixty. A player who mashes Q is asking for the chair, and this is what asking for
+	# the chair actually involves.
 	if rigging_to >= 0:
-		_say("stopped rigging")
-		_cancel_rig()
+		var next_up: int = (rig_want + 1) % 5
+		if next_up == STANCE_CHAIR and not has_chair:
+			next_up = 0
+		# Off the end of the table is the cancel, and it has to stay instant: the fastest way out
+		# of a stance you cannot afford must never itself cost five seconds.
+		if next_up == 0:
+			_cancel_rig()
+			jack.set_stance(0)
+			_say(jack.stance_name())
+			return
+		rig_want = next_up
 		return
 
 	if not jack.stance_needs_rigging(here, want):
@@ -2805,10 +2952,8 @@ func _cycle_stance() -> void:
 		_say("rig a stance on the stack, not on the ground")
 		return
 
-	rigging_to = want
-	rig_total = jack.stance_setup_seconds(want)
-	rig_left = rig_total
-	_rig_at = height_m()
+	rig_want = want
+	_begin_rig_step(want)
 	if rig_total <= 0.0:
 		_finish_rig()
 		return
@@ -2816,18 +2961,34 @@ func _cycle_stance() -> void:
 	# well put the same words on the screen twice.
 
 
+func _begin_rig_step(to: int) -> void:
+	rigging_to = to
+	rig_total = jack.stance_setup_seconds(to)
+	rig_left = rig_total
+	_rig_at = height_m()
+
+
 func _cancel_rig() -> void:
 	rigging_to = -1
+	rig_want = -1
 	rig_left = 0.0
 	rig_total = 0.0
 
 
+## One step of the table done. If it was not the one asked for, the next one starts straight away
+## — and he is now in the stance he just rigged, so the next step is paid for at the new rate.
 func _finish_rig() -> void:
 	var to := rigging_to
+	var want := rig_want
 	_cancel_rig()
-	if to >= 0:
-		jack.set_stance(to)
-		_say(jack.stance_name())
+	if to < 0:
+		return
+	jack.set_stance(to)
+	if want > to and jack.stance_needs_rigging(to, to + 1):
+		rig_want = want
+		_begin_rig_step(to + 1)
+		return
+	_say(jack.stance_name())
 
 
 ## Tick the rigging. Moving or working breaks it — you cannot pass a rope round a stack with the

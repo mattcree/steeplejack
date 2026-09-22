@@ -70,6 +70,7 @@ func _draw() -> void:
 	var hand := Vector2(HAND.x, size.y + HAND.y)
 	var now := float(Time.get_ticks_msec()) / 1000.0
 
+	_draw_scrim()
 	_draw_vignette(jack)
 
 	var grip: float = jack.grip()
@@ -136,7 +137,7 @@ func _draw() -> void:
 		var text: String = "[%s]  %s" % [row[0], row[1]]
 		if not row[2] and row[3] != "":
 			text += " — " + row[3]
-		var col := Color(0.93, 0.90, 0.84, 0.88) if row[2] else Color(0.64, 0.62, 0.60, 0.48)
+		var col := Color(0.93, 0.90, 0.84, 0.88) if row[2] else Color(0.72, 0.70, 0.68, 0.66)
 		var w := _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
 		_label(text, Vector2(size.x - w - 28, row_y), col, 13)
 		row_y += 17
@@ -152,7 +153,12 @@ func _draw() -> void:
 
 	if player.work_mode:
 		_draw_work(jack)
-	else:
+	elif not player.lashing:
+		# Not while lashing. The caption and its bracket sit on the joint, the lashing panel sits
+		# in the middle of the screen, and on any frame where the joint is roughly ahead of you
+		# those are the same pixels — a frame taken mid-lash has "weathered mortar — looks fair"
+		# printed through the middle of the turn counter. Two true things in one place read as
+		# neither, and while the rope is going round the joint's verdict is not the question.
 		_draw_target_caption()
 
 	_draw_pip(jack)
@@ -193,7 +199,10 @@ func _draw() -> void:
 
 	# There is no objective marker because the objective is the top and you can see it. But you
 	# cannot see the *rule*, so it is said once and then never again.
-	if player._now < 14.0 and not player.at_top:
+	# It yields to the transient line. Two centred instructions 60 px apart, both in white, both
+	# reading like they matter, is how a player learns to read neither — and it is exactly what a
+	# frame taken mid-lash showed: "lashing — hold the left button" stacked over "Climb the stack".
+	if player._now < 14.0 and not player.at_top and player.message_ttl() <= 0.0 and not player.lashing:
 		var fade := Color(0.92, 0.90, 0.86, 0.85 * _ease((14.0 - player._now) / 3.0))
 		_centre("Climb the stack. You can only go as high as you have built.", size.y * 0.14, fade)
 		# On a felling, this climb is Act 2 and not the job. A player who took the letter off the
@@ -394,6 +403,11 @@ func _step_state() -> Array:
 func _draw_steps() -> void:
 	if player.at_top or player.falling or player.fade_in > 0.3 or player.options_open:
 		return
+	# Not while the rope is going round. Both of these are "what to do next", the lashing panel is
+	# the more specific of the two, and a frame taken mid-lash has one plate laid over the other
+	# with the darkening doubled where they cross.
+	if player.lashing:
+		return
 	if player.jack.slip_in_progress() or player.stack_info.get("buckling", false):
 		return
 	var steps: Array = STEPS
@@ -428,33 +442,53 @@ func _draw_steps() -> void:
 	elif player.survey_job:
 		var rep: Dictionary = player.jack.survey_report()
 		header = "THE REPORT   %d of %d" % [int(rep.get("found", 0)), int(rep.get("total", 0))]
-	_label(header, Vector2(x, y), Color(0.95, 0.93, 0.88, 0.85), 13)
-	y += 22.0
+	# Laid out first, drawn second, so the plate underneath can be the size of what is on it.
+	#
+	# It used to draw straight onto the world, and the world it draws onto is a brick chimney in
+	# sunlight: a frame taken mid-climb has "2. Look about as you climb" in pale grey running over
+	# three courses of red brick and a shadow, and the outline on each glyph is not enough — an
+	# outline saves a letter, it cannot save a paragraph. The plate can, and it costs one rect.
+	var rows: Array = [[header, Color(0.95, 0.93, 0.88, 0.85), 13, 0.0, 22.0]]
 	for i in steps.size():
 		var now: bool = i == current
 		var mark := "✓" if done[i] and not now else ("▶" if now else "·")
 		var col := Color(0.98, 0.96, 0.90, 0.98) if now else (
-			Color(0.70, 0.78, 0.66, 0.80) if done[i] else Color(0.72, 0.70, 0.66, 0.60))
-		_label("%s  %d. %s" % [mark, i + 1, steps[i]], Vector2(x, y), col, 15 if now else 13)
-		y += 22.0 if now else 19.0
-		if now:
-			# The advice line, but only where it is about this step: the old single-line guidance
-			# runs a step ahead in places, and advice about tapping under "climb to the top" was
-			# exactly the confusion this list is here to end.
-			var special: bool = player.conductor_job or player.band_job or player.plumb_job \
-				or player.survey_job
-			var detail := "" if special else _next_step()
-			if player.conductor_job and i == 0:
-				detail = "She has to be laddered before any of it goes on"
-			if i == 1 and not special:
-				detail = "Climb up what you've built  [W]" if player.on_ladder else detail
-			if detail != "":
-				_label(detail, Vector2(x + 24.0, y - 2.0), Color(0.92, 0.84, 0.62, 0.95), 13)
-				y += 20.0
-			if i == 3 and not player.lashing:
-				_label("the new section stands on your ladder; the rope ties it to the dog",
-					Vector2(x + 24.0, y - 2.0), Color(0.80, 0.78, 0.74, 0.75), 12)
-				y += 18.0
+			Color(0.74, 0.84, 0.70, 0.88) if done[i] else Color(0.78, 0.76, 0.72, 0.70))
+		rows.append(["%s  %d. %s" % [mark, i + 1, steps[i]], col, 15 if now else 13, 0.0,
+			22.0 if now else 19.0])
+		if not now:
+			continue
+		# The advice line, but only where it is about this step: the old single-line guidance
+		# runs a step ahead in places, and advice about tapping under "climb to the top" was
+		# exactly the confusion this list is here to end.
+		var special: bool = player.conductor_job or player.band_job or player.plumb_job \
+			or player.survey_job
+		var detail := "" if special else _next_step()
+		if player.conductor_job and i == 0:
+			detail = "She has to be laddered before any of it goes on"
+		if i == 1 and not special:
+			detail = "Climb up what you've built  [W]" if player.on_ladder else detail
+		if detail != "":
+			rows.append([detail, Color(0.94, 0.86, 0.64, 0.95), 13, 24.0, 20.0])
+		if i == 3 and not player.lashing:
+			rows.append(["the new section stands on your ladder; the rope ties it to the dog",
+				Color(0.84, 0.82, 0.78, 0.80), 12, 24.0, 18.0])
+
+	var w := 0.0
+	var h := 10.0
+	for row in rows:
+		w = maxf(w, float(row[3]) + _font.get_string_size(String(row[0]),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, int(row[2])).x)
+		h += float(row[4])
+	draw_rect(Rect2(Vector2(x - 14.0, y - 20.0), Vector2(w + 28.0, h + 14.0)),
+		Color(0.05, 0.05, 0.06, 0.42))
+	# A rule down the left edge rather than a border all the way round. It gives the block an
+	# origin without drawing a box in the middle of a view somebody climbed to look at.
+	draw_rect(Rect2(Vector2(x - 14.0, y - 20.0), Vector2(2.0, h + 14.0)),
+		Color(0.86, 0.84, 0.78, 0.30))
+	for row in rows:
+		_label(String(row[0]), Vector2(x + float(row[3]), y), row[1], int(row[2]))
+		y += float(row[4])
 
 
 ## Pointers in the world for the step in hand: the cradle when the job is on the ground, the dog to
@@ -687,6 +721,10 @@ func _next_stance_label() -> String:
 	var jack: Jack = player.jack
 	var here: int = jack.get_stance()
 	var want: int = (here + 1) % 5
+	# The same skip the verb makes. A key hint that names a stance Q will not go to is worse than
+	# no hint: it is the game telling you about equipment you have not got.
+	if want == player.STANCE_CHAIR and not player.has_chair:
+		want = 0
 	var name: String = jack.stance_name_of(want)
 	if not jack.stance_needs_rigging(here, want):
 		return "back to %s — instant" % name
@@ -1242,6 +1280,13 @@ func _draw_lash(jack: Jack) -> void:
 	var c := Vector2(size.x * 0.5, size.y * 0.40)
 	var r := 64.0
 
+	# A plate under the whole thing. It is a modal verb — nothing else you can do while the rope is
+	# going round — so it is allowed to own its part of the screen, and it has to be readable over
+	# whatever brickwork happens to be behind it.
+	var plate := Rect2(Vector2(c.x - 268.0, c.y - r - 72.0), Vector2(536.0, r * 2.0 + 198.0))
+	draw_rect(plate, Color(0.05, 0.05, 0.06, 0.46))
+	draw_rect(Rect2(plate.position, Vector2(plate.size.x, 2.0)), Color(0.86, 0.84, 0.78, 0.26))
+
 	# What is going on, in words: the new section is stood on the old one, and the rope is what
 	# holds it to the dog. Without this the ring and the count were a minigame about nothing.
 	_centre("Roping the new section to the dog", c.y - r - 52.0, Color(0.97, 0.95, 0.90, 0.95), 18)
@@ -1295,6 +1340,15 @@ func _draw_lash(jack: Jack) -> void:
 ## The bar says how long is left; the line under it says what it is buying. Both matter: the player
 ## is spending grip *now* against a drain they will pay *later*, and a countdown with no stake
 ## attached is just a wait.
+## What each stance buys you, in the one sentence that explains why anybody would pay for it.
+const STANCE_WHY := {
+	1: "a leg through the rungs — both hands, and you are still holding on with something",
+	2: "a line to the rung above — a slip ends at the end of the line",
+	3: "belted to both stiles — both hands free, and almost no grip going out",
+	4: "sat in it. No grip at all, and you can work all day where you are",
+}
+
+
 func _draw_rig(jack: Jack) -> void:
 	var eye := Vector2(size.x * 0.5, size.y * 0.42)
 	var done: float = 1.0 - (player.rig_left / maxf(player.rig_total, 0.01))
@@ -1304,15 +1358,32 @@ func _draw_rig(jack: Jack) -> void:
 	draw_rect(Rect2(at - Vector2(1, 1), Vector2(w + 2, 10)), Color(0, 0, 0, 0.45))
 	draw_rect(Rect2(at, Vector2(w * done, 8)), Color(0.82, 0.74, 0.48, 0.95))
 
-	_centre("rigging — %s" % jack.stance_name_of(player.rigging_to), eye.y - 26.0,
-		Color(0.94, 0.91, 0.86, 0.92), 18)
+	# Where he is now and where he is going, when they differ. The chair is four rungs up the
+	# table and is reached by climbing it, so a bar that only ever named the rung in hand would
+	# make thirty seconds of rigging look like four separate things that kept restarting.
+	var heading := "rigging — %s" % jack.stance_name_of(player.rigging_to)
+	if player.rig_want > player.rigging_to:
+		heading = "rigging — %s, on the way to %s" % [jack.stance_name_of(player.rigging_to),
+			jack.stance_name_of(player.rig_want)]
+	_centre(heading, eye.y - 26.0, Color(0.94, 0.91, 0.86, 0.92), 18)
 	_centre("%.1f s" % player.rig_left, eye.y + 26.0, Color(0.88, 0.85, 0.80, 0.85), 15)
 
 	var from_rate: float = jack.stance_drain_rate(jack.get_stance())
 	var to_rate: float = jack.stance_drain_rate(player.rigging_to)
 	_centre("%.0f grip a second becomes %.0f" % [from_rate, to_rate], eye.y + 48.0,
 		Color(0.80, 0.78, 0.74, 0.75), 13)
-	_centre("[Q] to stop", eye.y + 70.0, Color(0.72, 0.70, 0.67, 0.65), 13)
+	# What it is *for*, not just what it costs. A twenty-second bar with a grip figure under it
+	# tells a player what they are paying and never what they are buying, and the chair is the one
+	# stance whose whole reason for existing is the thing the bar does not say: you can stop
+	# holding on. It is also the only place in the game that sentence can be read.
+	var why: String = STANCE_WHY.get(player.rigging_to, "")
+	if why != "":
+		_centre(why, eye.y + 70.0, Color(0.84, 0.81, 0.76, 0.80), 14)
+		_centre("[Q] to stop  ·  moving or working breaks it", eye.y + 92.0,
+			Color(0.72, 0.70, 0.67, 0.68), 13)
+	else:
+		_centre("[Q] to stop  ·  moving or working breaks it", eye.y + 70.0,
+			Color(0.72, 0.70, 0.67, 0.68), 13)
 
 
 ## The gust, arriving. 1.2 seconds, and then it hits your hands.
@@ -1854,6 +1925,56 @@ func _centre(text: String, y: float, col: Color, px: int = 15) -> void:
 func _ease(t: float) -> float:
 	t = clampf(t, 0.0, 1.0)
 	return t * t * (3.0 - 2.0 * t)
+
+
+## The scrim: a permanent, very soft darkening of the four edges, under everything else.
+##
+## This HUD lives against sky, and a British sky at ten in the morning is the brightest thing in
+## the frame by a long way. Outlined text survives it — barely — but a gauge drawn in thin lines
+## does not, and the top-left stack gauge was a rumour. A shadow on each glyph fixes one glyph;
+## it cannot fix a shape. So the edges of the frame get a gradient instead, strongest where the
+## instruments actually are, and nothing in the middle third is touched at all: you still look out
+## of a clean window at the thing you climbed up to see.
+##
+## Rule 20: it does not move, pulse or respond to anything. It is part of the frame.
+var _scrim: Dictionary = {}
+
+func _scrim_tex(dir: Vector2) -> GradientTexture2D:
+	var key := str(dir)
+	if _scrim.has(key):
+		return _scrim[key]
+	var g := Gradient.new()
+	g.set_color(0, Color(0, 0, 0, 1))
+	g.set_color(1, Color(0, 0, 0, 0))
+	# Most of the fall happens in the first third, so the band has a dark lip and a long tail
+	# rather than a visible straight ramp with an edge you can see.
+	g.add_point(0.34, Color(0, 0, 0, 0.30))
+	var t := GradientTexture2D.new()
+	t.gradient = g
+	t.fill = GradientTexture2D.FILL_LINEAR
+	t.fill_from = Vector2(0.5, 0.5) - dir * 0.5
+	t.fill_to = Vector2(0.5, 0.5) + dir * 0.5
+	t.width = 8 if dir.y != 0.0 else 128
+	t.height = 128 if dir.y != 0.0 else 8
+	_scrim[key] = t
+	return t
+
+
+const SCRIM_TOP := 0.20      ## how dark the lip of each band is
+const SCRIM_BOTTOM := 0.34
+const SCRIM_SIDE := 0.22
+
+func _draw_scrim() -> void:
+	var down := Vector2(0, 1)
+	var right := Vector2(1, 0)
+	draw_texture_rect(_scrim_tex(down), Rect2(0.0, 0.0, size.x, size.y * 0.26),
+		false, Color(1, 1, 1, SCRIM_TOP))
+	draw_texture_rect(_scrim_tex(-down), Rect2(0.0, size.y * 0.66, size.x, size.y * 0.34),
+		false, Color(1, 1, 1, SCRIM_BOTTOM))
+	draw_texture_rect(_scrim_tex(right), Rect2(0.0, 0.0, size.x * 0.17, size.y),
+		false, Color(1, 1, 1, SCRIM_SIDE))
+	draw_texture_rect(_scrim_tex(-right), Rect2(size.x * 0.80, 0.0, size.x * 0.20, size.y),
+		false, Color(1, 1, 1, SCRIM_SIDE))
 
 
 ## The tunnel at the edges when nerve is going — 03-meters-grip-nerve.md's "tunnel vignette" in the

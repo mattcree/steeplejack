@@ -6,7 +6,7 @@ A small terraced house with a back yard in a mill town. It is the only place in 
 level where nothing is trying to kill you, and that contrast is the point. Warm light, a fire,
 a kettle, a whippet, a van, and — under a tarpaulin — a very large, very rusty traction engine.
 
-The hub is **not** an open world. It's one small space with 5 interaction points. Total time per
+The hub is **not** an open world. It's one small space with 6 interaction points. Total time per
 visit: 2–5 minutes. It must never become a chore.
 
 ### 1. The Van — loadout
@@ -24,12 +24,48 @@ decide. Bringing 12 ladders for a 55 m chimney assumes 4.6 m average spans — i
 to risky spans before you've even left the yard. Bring 16 and you'll spend an extra ten minutes
 hauling. There is no "recommended loadout" button.
 
-### 2. The Bench — tool maintenance
+#### What is actually in the van (built, September 2026)
+
+Two numbers and a list of kit. The numbers default to what the level packed — the figure the
+reachability gate has proved can reach the top, which is the only loadout the game is in a position
+to promise — and the kit is whatever is in the shed and you decided to bring.
+
+```
+Ladder sections             ‹   12   ›
+Dogs                        ‹   24   ›
+────────────────────────────────────────
+Gloves                             ▣  on the cart
+  less out of your hands, and you read the joints a tier worse
+Bosun's chair                      ▢  in the shed
+  sit down and work — no grip going out at all. 20 s to rig
+```
+
+**Kit is what makes the verbs that use it legible.** The bosun's chair existed for months as a
+stance you could reach on any job, on any chimney, by pressing Q four times having never heard of
+one — £75 of equipment, twenty seconds to rig, arrived at by accident. A player who has bought a
+thing and then decided to carry it up a chimney knows what it is before they use it. If it is not
+on the cart, the stance does not exist and Q goes straight past it.
+
+Gloves are the model for what belongs here: not an upgrade, a **trade**. They cost you a tier of
+resolution on the tap test and buy it back on the grip bar. That trade has been in the sim since
+VERB-001 and nothing ever set the flag, so nobody had ever made it.
+
+### 2. The Shed — what you own
+
+Buying, and only buying. Whether a thing goes up is decided at the van, because two screens that
+both decide the same thing is how a player ends up certain they took the chair and arrives without
+it. Refused rather than allowed into debt, like the engine — a job cannot leave you owing money and
+neither can a pair of gloves.
+
+It is deliberately small. The counterweight to the engine is the [salvage](19-the-complete-game.md)
+— the thing you earn and keep — and a shed with thirty lines in it would turn the yard into a shop.
+
+### 3. The Bench — tool maintenance
 A list. Click to sharpen/re-shaft/splice/replace. Cheap in money, cheap in time. The interest is
 entirely in whether the player bothers to look. A **kit check prompt** appears before departure and
 can be dismissed.
 
-### 3. The Board — jobs
+### 4. The Board — jobs
 Letters and postcards pinned to a board. Each is a hand-written briefing:
 
 ```
@@ -51,12 +87,12 @@ Briefings are **the only tutorialisation for new mission types.** They tell you 
 voice of the client, not the voice of a tooltip. The hazard/weather line is the concession to
 usability and it's small.
 
-### 4. The Kettle — save, sleep, advance the day
+### 5. The Kettle — save, sleep, advance the day
 Days pass. Weather changes day to day and is visible on the board. Some jobs have deadlines. Some
 weather makes some jobs stupid. **Choosing to wait a day for better wind is a real decision** with a
 real cost (deadlines, money).
 
-### 5. The Tarpaulin — the engine
+### 6. The Tarpaulin — the engine
 
 A 1912 traction engine, in pieces, in the yard. This is the game's long-term carrot and it has
 **zero mechanical benefit**.
