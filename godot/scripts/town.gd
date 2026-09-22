@@ -31,7 +31,7 @@ const INNER_M := 120.0
 const SITE_FROM := 22.0
 const SITE_TO := 108.0
 const OUTER_M := 1100.0
-const TERRACES := 260
+const TERRACES := 440
 const MILLS := 44
 const STACKS := 26
 
@@ -54,6 +54,9 @@ func build(seed_text: String, approach: Vector3 = Vector3.ZERO) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(seed_text)
 	_approach = Vector3(approach.x, 0.0, approach.z)
+	# One angle for the whole town, off the level's own seed. The streets of a place are parallel
+	# to each other and to nothing else, and which way they run is an accident of the valley.
+	_town_yaw = rng.randf_range(0.0, PI * 0.5)
 
 	_river()
 	_site(rng)
@@ -217,53 +220,110 @@ func _rows(_rng: RandomNumberGenerator) -> void:
 	# what turn into a pattern when you finally look down from the top. Two banks rather than one
 	# so the roofline is not all the same value — see the note on _bank about why the variation is
 	# per bank and not per instance.
+	_row_band = 0
 	_bank(_box(), TERRACES / 2, BRICK.lerp(SOOT, 0.45), 11, _terrace)
-	_bank(_box(), TERRACES / 2, BRICK.lerp(SOOT, 0.72), 12, _terrace)
-	# And their roofs. Same seed, same bank size, so every roof lands on the terrace it belongs to
-	# without a second list of positions to keep in step with the first. Flat-topped boxes are what
-	# made the old skyline read as a bar chart; a mill town from above is slate, and slate is the
-	# one surface up there that changes value as the light moves.
 	_bank(_prism(), TERRACES / 2, SLATE, 11, _terrace_roof)
+	_row_band = 1
+	_bank(_box(), TERRACES / 2, BRICK.lerp(SOOT, 0.72), 12, _terrace)
 	_bank(_prism(), TERRACES / 2, SLATE.lerp(SOOT, 0.4), 12, _terrace_roof)
 
-	# Mills: the big sheds. Fewer, wider, and they break the terraces up.
-	_bank(_box(), MILLS, SOOT_WARM, 21, func(r):
-		var a: float = r.randf_range(0.0, TAU)
-		var d: float = r.randf_range(INNER_M + 20.0, OUTER_M)
-		var h: float = r.randf_range(12.0, 34.0)
-		return [Vector3(cos(a) * d, h * 0.5, sin(a) * d),
-			Vector3(r.randf_range(30.0, 58.0), h, r.randf_range(18.0, 34.0)),
-			r.randf_range(0.0, TAU)])
+	# Mills: the big sheds. Fewer, wider, and they break the terraces up. Roofed like the
+	# terraces, off the same seed — a flat-topped box the size of a mill is the most obviously
+	# untrue thing in the skyline, because a mill roof is the biggest slate surface in the town.
+	_bank(_box(), MILLS, SOOT_WARM, 21, _mill)
+	_bank(_prism(), MILLS, SLATE.lerp(SOOT, 0.55), 21, _mill_roof)
 
 	# Other stacks. The one thing that tells you how tall yours is, because it is the only object
 	# out there whose size the player already knows.
-	_bank(_stack_mesh(), STACKS, SOOT, 31, func(r):
+	_bank(_stack_mesh(), STACKS, SOOT, 31, func(r, _i):
 		var a: float = r.randf_range(0.0, TAU)
 		var d: float = r.randf_range(INNER_M + 40.0, OUTER_M)
 		var h: float = r.randf_range(20.0, 58.0)
 		return [Vector3(cos(a) * d, h * 0.5, sin(a) * d), Vector3(1.0, h, 1.0), 0.0])
 
 
+## Mills sit on the same grid, squared to the streets. They are what the streets were built for,
+## and a mill at a jaunty angle to the terraces it houses is the one thing that would give the
+## whole arrangement away.
+func _mill(r: RandomNumberGenerator, _i: int) -> Array:
+	var a: float = r.randf_range(0.0, TAU)
+	var d: float = r.randf_range(INNER_M + 20.0, OUTER_M)
+	var h: float = r.randf_range(12.0, 34.0)
+	var quarter: float = float(r.randi_range(0, 1)) * PI * 0.5
+	return [Vector3(cos(a) * d, h * 0.5, sin(a) * d),
+		Vector3(r.randf_range(30.0, 58.0), h, r.randf_range(18.0, 34.0)),
+		-_town_yaw + quarter + r.randf_range(-0.05, 0.05)]
+
+
+func _mill_roof(r: RandomNumberGenerator, i: int) -> Array:
+	var m := _mill(r, i)
+	var size: Vector3 = m[1]
+	var at: Vector3 = m[0]
+	# Shallow, the way a wide span has to be. A mill roof at a cottage pitch would be forty feet
+	# of ridge above the eaves and would read as a barn.
+	return [Vector3(at.x, size.y, at.z), Vector3(size.x, size.z * 0.22, size.z + 0.6), m[2]]
+
+
 ## The roof that goes on the terrace this same seed just produced. It draws from the generator in
 ## exactly the same order, which is the whole trick: two banks with one seed stay in step for free.
-func _terrace_roof(r: RandomNumberGenerator) -> Array:
-	var t := _terrace(r)
+func _terrace_roof(r: RandomNumberGenerator, i: int) -> Array:
+	var t := _terrace(r, i)
 	var size: Vector3 = t[1]
 	var at: Vector3 = t[0]
 	return [Vector3(at.x, size.y, at.z), Vector3(size.x, 2.1, size.z + 0.5), t[2]]
 
 
-func _terrace(r: RandomNumberGenerator) -> Array:
-	var a: float = r.randf_range(0.0, TAU)
-	var d: float = r.randf_range(INNER_M, OUTER_M)
+## Terraces come in streets.
+##
+## They used to be scattered: a random bearing, a random distance, a yaw snapped to a right angle.
+## From the ground that is fine, because from the ground you see three of them. From the top of the
+## stack — the shot the whole game is built towards — it is a heap of bricks dropped on a field,
+## and a mill town from above is the exact opposite of that. It is stripes. Long parallel rows with
+## a street between each pair and back yards behind, laid on one grid because the ground is flat
+## and the land was cheap and nobody was being clever about it.
+##
+## So: a grid, at the town's own angle, with the houses long-ways along it. What varies is the
+## length of a row, how tall it is and how far it sits off true — not where it is.
+## Back-to-back terraces: two rows of houses, their yards meeting down the middle, a street on
+## each side. Thirty-odd metres from one row's front door to the next row's, which is what makes a
+## mill town read as stripes from the air rather than as blocks.
+const STREET_PITCH := 33.0
+const BLOCK_PITCH := 104.0     ## end of a row to the start of the next along the same street
+const ROWS_EACH_WAY := 17
+var _town_yaw := 0.0
+## Which half of the grid this bank owns, so the two colours of terrace interleave street by
+## street instead of being dealt the same slots twice.
+var _row_band := 0
+
+func _terrace(r: RandomNumberGenerator, i: int) -> Array:
+	var street: int = ((i % ROWS_EACH_WAY) - ROWS_EACH_WAY / 2) * 2 + _row_band
+	var block: int = (i / ROWS_EACH_WAY) - 6
 	var h: float = r.randf_range(5.5, 9.0)
-	var run: float = r.randf_range(24.0, 70.0)
-	return [Vector3(cos(a) * d, h * 0.5, sin(a) * d), Vector3(run, h, 7.0),
-		snappedf(a, PI * 0.5) + r.randf_range(-0.12, 0.12)]
+	var run: float = r.randf_range(34.0, BLOCK_PITCH - 14.0)
+	var at := Vector2(float(block) * BLOCK_PITCH + r.randf_range(-7.0, 7.0),
+		float(street) * STREET_PITCH + r.randf_range(-1.5, 1.5))
+
+	# Nothing on the site. A row that would land on it moves a whole seven blocks along its own
+	# street, which is past the far end of the grid and therefore empty — nudging it just clear of
+	# INNER_M instead put every displaced row on the same two x values and piled six terraces into
+	# each other, which from the cap is a heap rather than a street.
+	if absf(at.x) < INNER_M + 40.0 and absf(at.y) < INNER_M + 40.0:
+		at.x += BLOCK_PITCH * 7.0 * (1.0 if at.x >= 0.0 else -1.0)
+	if at.length() > OUTER_M:
+		at *= OUTER_M / at.length()
+
+	var turned := at.rotated(_town_yaw)
+	return [Vector3(turned.x, h * 0.5, turned.y), Vector3(run, h, 7.2),
+		-_town_yaw + r.randf_range(-0.02, 0.02)]
 
 
-## One MultiMesh, one draw call, `count` instances of one colour placed by `place` — which returns
-## [origin, scale, yaw].
+## One MultiMesh, one draw call, `count` instances of one colour placed by `place(rng, i)` — which
+## returns [origin, scale, yaw].
+##
+## The index matters as much as the generator does. Everything placed purely at random collides
+## with itself: a hundred and thirty terraces thrown at a grid of three hundred slots put two rows
+## through each other often enough to see from the cap. The index picks the slot, the generator
+## decides what stands in it.
 ##
 ## The colour is on the material and not per instance. `MultiMesh.use_colors` plus
 ## `vertex_color_use_as_albedo` is the obvious way to vary them and it does nothing here: a probe
@@ -287,7 +347,7 @@ func _bank(mesh: Mesh, count: int, colour: Color, bank_seed: int, place: Callabl
 	mm.instance_count = count
 
 	for i in count:
-		var p: Array = place.call(rng)
+		var p: Array = place.call(rng, i)
 		mm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, p[2]).scaled(p[1]), p[0]))
 
 	var node := MultiMeshInstance3D.new()

@@ -116,6 +116,21 @@ void fragment() {
 		clamp((1.8 - px) / 1.8, 0.0, 1.0));
 
 	vec3 col = mix(mix(setts, cinder, to_yard), field, to_field);
+
+	// The one thing that has to survive distance.
+	//
+	// Everything above is metre-scale and fades out as its features drop under a pixel, which is
+	// correct and which left the view from the cap — the shot the whole game is built towards —
+	// as one flat olive plane running to the fog, exactly the fault the town was added to fix.
+	// This octave is thirty metres across. It never drops under a pixel from anywhere a player can
+	// stand, and it is what turns the ground between the buildings into yards, ash, allotments and
+	// cinder tracks instead of a billiard cloth.
+	float broad = ground_noise(p * 0.028);
+	col *= 0.74 + 0.52 * broad;
+	// Darker lanes through it: the gaps between rows, which from above is most of what a mill town
+	// actually is.
+	float lane = ground_noise(p * 0.075 + vec2(31.7, 11.3));
+	col = mix(col, col * 0.62, smoothstep(0.58, 0.78, lane) * to_field);
 	// Soot falls out of a chimney onto the ground under it. The darkest ring is not at the wall,
 	// it is a little out from it, which is where the draught actually drops it.
 	col *= mix(0.84, 1.0, smoothstep(4.0, 30.0, d));

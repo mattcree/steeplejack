@@ -26,7 +26,7 @@ uniform float variation = 0.22;
 // Soot and bleach, as the stack weathers top to bottom. See chimney.gd's _weathered().
 uniform float stack_height = 55.0;
 uniform vec3 soot : source_color = vec3(0.09, 0.08, 0.07);
-uniform vec3 bleach : source_color = vec3(0.62, 0.58, 0.52);
+uniform vec3 bleach : source_color = vec3(0.541, 0.533, 0.506);
 
 // --- relief ------------------------------------------------------------------------------------
 // How deep the mortar sits behind the face of the brick, in metres. Victorian work was struck or

@@ -139,3 +139,48 @@ in the world.
 - **No ray-traced path tracing mode.** Lumen is the ceiling.
 - **No destruction beyond the authored pre-fracture.** [ADR-0002](../03-tech/adr/0002-physics-and-destruction.md)
   is unchanged and is now easier to satisfy, not harder.
+
+
+## Built, September 2026 — what the surfaces actually are
+
+Everything here is procedural and in text, for the reason the brick shader's own header gives:
+binary is the half of this project agents cannot author or review.
+
+**Brick** (`godot/shaders/brick.gdshader`). Courses and running bond off the level's own
+`jointGrid`, per-brick colour, soot at the foot and bleach at the head. It now has relief as well
+as colour: joints struck 5 mm deep, bricks sitting up to 2 mm proud of one another, a pitted face.
+The normal is perturbed in a basis built from the interpolated normal rather than through
+`NORMAL_MAP`, because the wall is unrolled by hand — the horizontal axis is distance *around* the
+stack, which no UV on a tapered cylinder agrees with.
+
+Every one of those features fades out as it drops under a pixel, at the same rate the mortar
+already did. Relief that does not fade is a field of sparkle at twenty metres, which reads as a
+rendering fault rather than as distance.
+
+**Ground** (`godot/shaders/ground.gdshader`). Setts round the base, cinder over the yard, rough
+grass past the wall, blended by distance from the stack with a wandering edge. The setts are
+crowned and jointed, with the same relief treatment.
+
+One octave of it is thirty metres across and never fades. That is deliberate and it is the whole
+lesson of this surface: every metre-scale feature disappears by the time you are on the cap, and
+the cap is the shot the game is built towards. Without a feature bigger than the view, fifty-seven
+metres up you are looking at one flat olive plane — which is exactly the fault the town was added
+to fix, arriving back by a different door.
+
+**The town** (`godot/scripts/town.gd`). Terraces on a grid at the town's own angle: parallel rows,
+back-to-back, 33 m from one street to the next. They used to be scattered on a random bearing,
+which is fine from the ground — you see three of them — and from the cap is a heap of bricks
+dropped on a field. A mill town from the air is stripes.
+
+The index into the bank picks the slot; the generator only decides what stands in it. Placing
+purely at random puts two rows through each other often enough to see.
+
+**The site** — the works the chimney was built to draw for: a boiler house at its foot, the mill,
+a saw-tooth weaving shed, a yard wall. Nothing is built across the walk in, and the gate is
+wherever the walk in crosses the wall, which is the only place a gate could honestly be.
+
+**Light.** The sky came down (its horizon was at 0.78 luminance and the HUD could not be read
+against it). Ambient here is the sky, so taking the sky down takes the fill light with it, and the
+first pass put the shaded face of the stack at black — half the game is spent looking at that face.
+The sky stays down; the ambient energy makes the difference back up. HUD contrast is the scrim's
+job, not the scene's.
