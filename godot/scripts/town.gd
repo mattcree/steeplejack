@@ -25,8 +25,8 @@ const SLATE      := Color(0.20, 0.21, 0.23)
 ## the colour of a building seen through half a kilometre of Pennine air — and using it on the
 ## boiler house put a black slab at the foot of the stack: a shaded face of a dark colour under a
 ## dark sky is not dark, it is nothing.
-const SITE_BRICK := Color(0.56, 0.34, 0.25)
-const SITE_SOOT  := Color(0.33, 0.30, 0.27)
+const SITE_BRICK := Color(0.44, 0.29, 0.22)
+const SITE_SOOT  := Color(0.28, 0.26, 0.24)
 const SITE_SLATE := Color(0.37, 0.38, 0.40)
 
 ## Nothing stands closer than this: the site has to stay clear, and a building you can walk into

@@ -188,6 +188,25 @@ means grain along the length of a stile and along the length of a rung from one 
 Rungs are round — a separate MultiMesh with a cylinder — and stiles are planks on edge rather than
 square sections. One mesh for both had the man climbing a lattice of square sticks.
 
+**Fixtures** (`godot/scripts/face.gd`). A dog was a 5 cm box with a smaller box across the end.
+It is the object the player handles most in the whole game — every one is chosen, sounded, drilled,
+driven, and later drawn — and it was a cuboid.
+
+It is forged now: six-sided and tapered, thicker at the head where the hammer lands than at the
+point, because a dog is drawn down under a hammer on an anvil and a square extrusion is the one
+shape it cannot be. The lug stands up from the head rather than across it — an L, which is the
+shape the rope is described as going round in
+[16-how-it-was-actually-done.md](16-how-it-was-actually-done.md).
+
+And the **wooden plug** is drawn, which it never was. That document gives the sequence as hole,
+plug, dog, and says the hold comes from the plug as much as from the mortar. The game has said so
+in text since the research landed and every dog in the world still appeared to be driven straight
+into brick.
+
+The rotation is baked into the mesh at build time rather than applied per instance: `CylinderMesh`
+runs along Y, every fixture on this wall is placed along Z, and one `append_from` is cheaper and
+harder to get wrong than a rotation on each of a hundred and thirty transforms.
+
 **The site** — the works the chimney was built to draw for: a boiler house at its foot, the mill,
 a saw-tooth weaving shed, a yard wall. Nothing is built across the walk in, and the gate is
 wherever the walk in crosses the wall, which is the only place a gate could honestly be.

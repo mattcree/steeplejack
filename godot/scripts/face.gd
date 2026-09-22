@@ -56,6 +56,7 @@ var _chalk_cross: MultiMeshInstance3D
 var _chalk_bar: MultiMeshInstance3D
 var _dogs: MultiMeshInstance3D
 var _lugs: MultiMeshInstance3D
+var _plugs: MultiMeshInstance3D
 var _bracket: Node3D
 var _work_dog: MeshInstance3D
 var _work_id := -1
@@ -114,8 +115,19 @@ func _ready() -> void:
 	_chalk_bar = _bank(Vector2(0.10, 0.010), _chalk())
 
 	# Dogs: the spike, and the lug the ladder lashes to.
-	_dogs = _bank_box(Vector3(0.05, 0.05, 0.22), _lit(Color(0.20, 0.19, 0.18), 0.55))
-	_lugs = _bank_box(Vector3(0.10, 0.03, 0.03), _lit(Color(0.22, 0.21, 0.20), 0.5))
+	_dogs = _wrap(_forged(0.22, 0.026))
+	_dogs.multimesh.mesh.surface_set_material(0, _lit(Color(0.20, 0.19, 0.18), 0.55))
+	_lugs = _wrap(_lug_mesh())
+	_lugs.multimesh.mesh.surface_set_material(0, _lit(Color(0.22, 0.21, 0.20), 0.5))
+	# The wooden plug, which is the thing the dog is actually driven into.
+	#
+	# 16-how-it-was-actually-done.md gives the sequence as hole, plug, dog, and says in as many
+	# words that the hold comes from the plug as much as from the mortar. The game has said that in
+	# text since the research landed and has never once drawn it: every dog in the world appeared
+	# to be driven straight into the brick. It is a pale ring a hand's width across at the foot of
+	# the spike, and it is the one part of this the player can see going soft.
+	_plugs = _wrap(_plug_mesh())
+	_plugs.multimesh.mesh.surface_set_material(0, _lit(Color(0.42, 0.33, 0.21), 0.95))
 
 	_bracket = _make_bracket()
 	add_child(_bracket)
@@ -150,13 +162,18 @@ func _ready() -> void:
 	# they are all just old dogs.
 	for grade in 3:
 		var c := Color(0.30, 0.22, 0.17).lerp(Color(0.62, 0.30, 0.12), float(grade) / 2.0)
-		_rusty.append(_bank_box(Vector3(0.05, 0.05, 0.22), _lit(c, 0.95)))
+		var rusted := _wrap(_forged(0.22, 0.026))
+		rusted.multimesh.mesh.surface_set_material(0, _lit(c, 0.95))
+		_rusty.append(rusted)
 
 	# Where a dog was torn out: a dark, spalled hole. The cascade happened here and the wall says so.
 	_scars = _bank(Vector2(0.16, 0.10), _lit(Color(0.07, 0.06, 0.05)))
 
 	# A bent dog: the spike kinked, standing out of a joint it has spoiled.
-	_bent = _bank_box(Vector3(0.045, 0.045, 0.16), _lit(Color(0.30, 0.20, 0.14), 0.7))
+	# A snapped-off stub. Shorter and blunter than a whole one — what is left in the wall after a
+	# dog breaks coming out is the buried half, with no head and no lug.
+	_bent = _wrap(_forged(0.09, 0.024))
+	_bent.multimesh.mesh.surface_set_material(0, _lit(Color(0.30, 0.20, 0.14), 0.7))
 
 
 ## How high the ladder actually reaches. Set by the player each frame; -1 means "no ladder yet",
@@ -373,6 +390,7 @@ func _rebuild() -> void:
 	var dogs: Array = []
 	var lugs: Array = []
 	var bent: Array = []
+	var plugs: Array = []
 	var scars: Array = []
 	var rusty: Array = [[], [], []]
 
@@ -386,16 +404,19 @@ func _rebuild() -> void:
 			var grade := clampi(int(float(fixture_rust[j["id"]]) / 0.17), 0, 2)
 			rusty[grade].append(_on_face(j, Vector2.ZERO, 0.11))
 			lugs.append(_on_face(j, Vector2(0.0, 0.0), 0.21))
+			plugs.append(_on_face(j, Vector2.ZERO, 0.013))
 		elif j["occupied"] and bent_ids.has(j["id"]):
 			bent.append(_on_face(j, Vector2(0.02, -0.03), 0.07, deg_to_rad(38.0)))
 		elif started_ids.has(j["id"]):
 			var left := 0.11 * (1.0 - clampf(float(started_ids[j["id"]]), 0.0, 1.0))
 			dogs.append(_on_face(j, Vector2.ZERO, 0.11 + left))
 			lugs.append(_on_face(j, Vector2(0.0, 0.0), 0.21 + left))
+			plugs.append(_on_face(j, Vector2.ZERO, 0.013))
 		elif j["occupied"]:
 			# A driven dog: the spike standing out of the joint, and the lug across its end.
 			dogs.append(_on_face(j, Vector2.ZERO, 0.11))
 			lugs.append(_on_face(j, Vector2(0.0, 0.0), 0.21))
+			plugs.append(_on_face(j, Vector2.ZERO, 0.013))
 		else:
 			look[seen].append(_on_face(j, Vector2.ZERO, PROUD))
 			if seen == PERISHED:
@@ -433,6 +454,7 @@ func _rebuild() -> void:
 	_fill(_chalk_bar, bar)
 	_fill(_dogs, dogs)
 	_fill(_lugs, lugs)
+	_fill(_plugs, plugs)
 	_fill(_bent, bent)
 	_fill(_scars, scars)
 	for grade in 3:
@@ -484,6 +506,61 @@ func _bank(size: Vector2, mat: Material) -> MultiMeshInstance3D:
 	quad.size = size
 	quad.material = mat
 	return _wrap(quad)
+
+
+## A hand-forged spike, lying along local Z — which is the wall's outward normal, because that is
+## the basis `_on_face` hands every fixture on this wall.
+##
+## Six sides and tapered. A dog is drawn down under a hammer on an anvil, so it is faceted and it
+## is thicker at the head than at the point; a square extruded box is the one shape it cannot be,
+## and it is what the game has had a hundred and thirty of on every chimney.
+##
+## The rotation is baked into the mesh rather than applied per instance: CylinderMesh runs along Y,
+## every fixture here is placed along Z, and one `append_from` at build time is cheaper and harder
+## to get wrong than a rotation on each of a hundred and thirty transforms.
+func _forged(length: float, thick: float) -> Mesh:
+	var c := CylinderMesh.new()
+	c.top_radius = thick * 0.42      # the point
+	c.bottom_radius = thick          # the head, where the hammer lands
+	c.height = length
+	c.radial_segments = 6
+	c.rings = 1
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# Turned to lie along +Z, and shifted so the head sits at the origin and the point goes out.
+	st.append_from(c, 0, Transform3D(Basis(Vector3(1, 0, 0), -PI * 0.5), Vector3.ZERO))
+	return st.commit()
+
+
+## The lug: the spike's head turned up, which is what stops a lashing walking off the end of it.
+## An L, not a T — it is the shape the rope is described as going round.
+func _lug_mesh() -> Mesh:
+	var c := CylinderMesh.new()
+	c.top_radius = 0.016
+	c.bottom_radius = 0.020
+	c.height = 0.085
+	c.radial_segments = 6
+	c.rings = 1
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# Standing up from the tip, so its foot is at the origin the transform puts at the spike's end.
+	st.append_from(c, 0, Transform3D(Basis(), Vector3(0.0, 0.040, 0.0)))
+	return st.commit()
+
+
+## The plug: a wooden bung in the drilled hole, its end flush with the face and a little proud
+## where the wood has swelled.
+func _plug_mesh() -> Mesh:
+	var c := CylinderMesh.new()
+	c.top_radius = 0.036
+	c.bottom_radius = 0.038
+	c.height = 0.016
+	c.radial_segments = 8
+	c.rings = 1
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.append_from(c, 0, Transform3D(Basis(Vector3(1, 0, 0), -PI * 0.5), Vector3.ZERO))
+	return st.commit()
 
 
 func _bank_box(size: Vector3, mat: Material) -> MultiMeshInstance3D:

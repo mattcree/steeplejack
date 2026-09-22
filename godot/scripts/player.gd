@@ -2278,25 +2278,33 @@ func _make_carried_ladder(skel: Skeleton3D) -> Node3D:
 	root.rotation = CARRY_TILT
 	att.add_child(root)
 
-	var wood := StandardMaterial3D.new()
-	wood.albedo_color = Color(0.46, 0.33, 0.19)
-	wood.roughness = 0.9
+	# The same timber as the stack he is about to lash it to — it is the same ladder, and it was
+	# the one piece still drawn in flat brown. Climbing behind him, this section is the single
+	# largest object on the screen, so it was also the most visible place the old material was
+	# still showing.
 	var length := 5.0
 	for side in [-0.22, 0.22]:
 		var rail := MeshInstance3D.new()
 		var rm := BoxMesh.new()
-		rm.size = Vector3(0.06, length, 0.06)
-		rm.material = wood
+		rm.size = Vector3(0.05, length, 0.092)
 		rail.mesh = rm
+		rail.material_override = Chimney.timber()
 		rail.position = Vector3(0.0, 0.0, side)
 		root.add_child(rail)
 	var h := -length * 0.5 + 0.28
 	while h < length * 0.5:
 		var rung := MeshInstance3D.new()
-		var gm := BoxMesh.new()
-		gm.size = Vector3(0.045, 0.045, 0.44)
-		gm.material = wood
+		var gm := CylinderMesh.new()
+		gm.top_radius = 0.022
+		gm.bottom_radius = 0.022
+		gm.height = 0.46
+		gm.radial_segments = 8
+		gm.rings = 1
 		rung.mesh = gm
+		rung.material_override = Chimney.timber()
+		# Laid across the stiles. Its own Y is the run across the ladder, which is the direction
+		# the grain has to follow — the same reason the stack's rungs are turned rather than scaled.
+		rung.rotation = Vector3(PI * 0.5, 0.0, 0.0)
 		rung.position = Vector3(0.0, h, 0.0)
 		root.add_child(rung)
 		h += 0.28
@@ -2409,7 +2417,7 @@ func _lash() -> void:
 	_lash_heading = INF
 	_lash_presses.clear()
 	jack.lash_begin()
-	chimney.set_ghost(ladder_top, lash_new_top)
+	chimney.set_ghost(ladder_top, lash_new_top, true)
 	# No message. The lashing panel is already on the screen saying the same words in the same
 	# second, and a transient line at the top edge saying them again only competes with it.
 

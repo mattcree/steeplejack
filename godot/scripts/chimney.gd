@@ -197,6 +197,15 @@ const TIMBER := preload("res://shaders/wood.gdshader")
 ## Sawn softwood, weathered, with the grain running down the length of the piece. The shader takes
 ## the piece's own size out of the instance transform, so one material does a stile and a rung and
 ## gets the grain the right way round on both.
+## Static, because the carried section is built by player.gd and is the same ladder as the ones on
+## the stack. Two definitions of "what a ladder is made of" is how one of them gets left behind.
+static func timber(weather: float = 0.42) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = TIMBER
+	m.set_shader_parameter("weather", weather)
+	return m
+
+
 func _timber(weather: float = 0.42) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = TIMBER
@@ -467,7 +476,18 @@ func _band_point(angle: float, h: float) -> Vector3:
 
 
 ## The section being lashed, from `from` to `to`, translucent. Zero length hides it.
-func set_ghost(from: float, to: float) -> void:
+##
+## `binding` separates the two jobs this one mesh does. Carrying a section past a dog you could
+## use, it is a *guide* — "that is where this would go" — and it has to be quiet, because it is on
+## the screen for the whole climb and it is a suggestion. With the rope actually going round it is
+## the section itself, held against the wall, and then it is the thing you are looking at.
+##
+## They were the same weight, and at chalk they were both loud: a bright pale ladder hanging over
+## you at all times, which reads as a second ladder rather than as advice.
+func set_ghost(from: float, to: float, binding: bool = false) -> void:
+	var gm := _ghost.multimesh.mesh.material as StandardMaterial3D
+	if gm != null:
+		gm.albedo_color.a = 0.42 if binding else 0.17
 	var mm := _ghost.multimesh
 	if mm == null:
 		return
