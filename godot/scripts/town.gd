@@ -21,6 +21,13 @@ const BRICK_PALE := Color(0.75, 0.52, 0.40)   # #C08466
 const SOOT       := Color(0.17, 0.15, 0.14)   # #2B2724
 const SOOT_WARM  := Color(0.25, 0.23, 0.21)   # #403A35
 const SLATE      := Color(0.20, 0.21, 0.23)
+## The site stands thirty metres away, not four hundred. BRICK is knocked back for distance — it is
+## the colour of a building seen through half a kilometre of Pennine air — and using it on the
+## boiler house put a black slab at the foot of the stack: a shaded face of a dark colour under a
+## dark sky is not dark, it is nothing.
+const SITE_BRICK := Color(0.56, 0.34, 0.25)
+const SITE_SOOT  := Color(0.33, 0.30, 0.27)
+const SITE_SLATE := Color(0.37, 0.38, 0.40)
 
 ## Nothing stands closer than this: the site has to stay clear, and a building you can walk into
 ## is a building somebody has to model properly.
@@ -95,21 +102,23 @@ func _site(rng: RandomNumberGenerator) -> void:
 	var across := Vector3(-out.z, 0.0, out.x)
 
 	_works(out * (SITE_FROM + 9.0), Vector3(19.0, 6.2, 13.0), 2.4, bearing,
-		BRICK.lerp(SOOT, 0.55))
+		SITE_BRICK.lerp(SITE_SOOT, 0.45))
 
 	# The mill itself: long, four storeys, windows too far off to model and too far off to miss.
 	var mill_at: Vector3 = out * (SITE_FROM + 34.0) + across * rng.randf_range(-14.0, 14.0)
-	_works(mill_at, Vector3(46.0, 15.0, 17.0), 4.0, bearing + PI * 0.5, BRICK.lerp(SOOT, 0.4))
+	_works(mill_at, Vector3(46.0, 15.0, 17.0), 4.0, bearing + PI * 0.5,
+		SITE_BRICK.lerp(SITE_SOOT, 0.3))
 
 	# The engine house, at right angles to the mill, and a weaving shed with a saw-tooth roof —
 	# which from the top of a chimney is the shape that says "this is a mill town" and nothing else.
 	var shed_at: Vector3 = -across * (SITE_FROM + 26.0) + out * rng.randf_range(-10.0, 18.0)
 	if _off_approach(shed_at) >= APPROACH_CLEAR_M:
-		_slab(shed_at + Vector3(0, 2.6, 0), Vector3(38.0, 5.2, 26.0), bearing, SOOT_WARM)
+		_slab(shed_at + Vector3(0, 2.6, 0), Vector3(38.0, 5.2, 26.0), bearing,
+			SITE_SOOT.lerp(SITE_BRICK, 0.25))
 		for i in 7:
 			var u := (float(i) - 3.0) * 3.6
 			_roof(shed_at + across * u + Vector3(0, 5.2, 0), Vector3(3.4, 1.7, 26.2), bearing,
-				SLATE)
+				SITE_SLATE)
 
 	# The yard wall, in runs. The gate is not placed — it is the run the walk in goes through,
 	# which is the only place a gate could honestly be.
@@ -119,7 +128,8 @@ func _site(rng: RandomNumberGenerator) -> void:
 		var at := Vector3(cos(a) * r, 1.15, sin(a) * r)
 		if _off_approach(at) < 9.0:
 			continue
-		_slab(at, Vector3(r * TAU / 16.0 * 0.92, 2.3, 0.45), -a, BRICK.lerp(SOOT, 0.66))
+		_slab(at, Vector3(r * TAU / 16.0 * 0.92, 2.3, 0.45), -a,
+			SITE_BRICK.lerp(SITE_SOOT, 0.55))
 
 	# Spoil, stacked brick, and the rubbish of a site that has been worked for a hundred years.
 	# Draws are taken whether the position is used or not, so the seed stays in step.
@@ -135,7 +145,7 @@ func _site(rng: RandomNumberGenerator) -> void:
 		# Knee-high, so it may stand much closer to the walk in than a building may.
 		if _off_approach(at) < 5.0:
 			continue
-		_slab(at, Vector3(w, h, w * squat), yaw, SOOT_WARM.lerp(BRICK, tint))
+		_slab(at, Vector3(w, h, w * squat), yaw, SITE_SOOT.lerp(SITE_BRICK, tint))
 
 
 ## A building with a roof on it, if it is clear of the walk in. Silently dropped if it is not: a
@@ -145,7 +155,7 @@ func _works(at: Vector3, size: Vector3, ridge: float, yaw: float, col: Color) ->
 	if _off_approach(at) < APPROACH_CLEAR_M + size.x * 0.5:
 		return
 	_slab(at + Vector3(0, size.y * 0.5, 0), size, yaw, col)
-	_roof(at + Vector3(0, size.y, 0), Vector3(size.x + 0.4, ridge, size.z + 0.4), yaw, SLATE)
+	_roof(at + Vector3(0, size.y, 0), Vector3(size.x + 0.4, ridge, size.z + 0.4), yaw, SITE_SLATE)
 
 
 ## One box, placed. Not a MultiMesh: these are a dozen buildings that each want their own colour,

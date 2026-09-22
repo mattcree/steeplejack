@@ -24,6 +24,10 @@ var _base_r: float = 1.0
 var _top_r: float = 1.0
 var _ladder_top: float = 0.0
 var _ladders := MultiMeshInstance3D.new()
+## Rungs in a bank of their own, because a rung is round and a stile is not. One mesh for both had
+## the man climbing a lattice of square sticks, which is the sort of thing you stop seeing after a
+## week of looking at it and a player notices in the first four seconds.
+var _rungs := MultiMeshInstance3D.new()
 var _ghost := MultiMeshInstance3D.new()
 ## The section bowing under him: between these heights, this far out at mid-span.
 var _bow_lo := 0.0
@@ -118,6 +122,9 @@ func build(jack: Jack) -> void:
 
 	_cradle()
 	_setup_multimesh(_ladders, Color(0.42, 0.30, 0.17))
+	_ladders.material_override = _timber()
+	_setup_multimesh(_rungs, Color(0.42, 0.30, 0.17), _rung_mesh())
+	_rungs.material_override = _timber()
 	# The section being lashed: where it will be, not where it is. In timber colour at 45% alpha it
 	# was a ladder — a frame taken mid-lash has it reading as solid, indistinguishable from the one
 	# the man is standing on, so the whole verb looked like it had already happened. Chalk instead,
@@ -131,6 +138,7 @@ func build(jack: Jack) -> void:
 	add_child(_ghost)
 	_setup_multimesh(_dogs, Color(0.18, 0.17, 0.16))
 	add_child(_ladders)
+	add_child(_rungs)
 	add_child(_dogs)
 	set_ladder_top(_ladder_top)
 
@@ -184,16 +192,44 @@ func _cap() -> void:
 	add_child(hole)
 
 
-func _setup_multimesh(node: MultiMeshInstance3D, colour: Color) -> void:
-	var box := BoxMesh.new()
-	box.size = Vector3.ONE
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = colour
-	mat.roughness = 0.9
-	box.material = mat
+const TIMBER := preload("res://shaders/wood.gdshader")
+
+## Sawn softwood, weathered, with the grain running down the length of the piece. The shader takes
+## the piece's own size out of the instance transform, so one material does a stile and a rung and
+## gets the grain the right way round on both.
+func _timber(weather: float = 0.42) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = TIMBER
+	m.set_shader_parameter("weather", weather)
+	return m
+
+
+## A rung: round, and chamfered nowhere, because it is a turned dowel driven through the stiles.
+## Eight sides — at the distance a hand is from it, eight reads as round and sixteen costs twice
+## as much for nothing.
+func _rung_mesh() -> Mesh:
+	var c := CylinderMesh.new()
+	c.top_radius = 0.5
+	c.bottom_radius = 0.5
+	c.height = 1.0
+	c.radial_segments = 8
+	c.rings = 1
+	return c
+
+
+func _setup_multimesh(node: MultiMeshInstance3D, colour: Color, mesh: Mesh = null) -> void:
+	var shape := mesh
+	if shape == null:
+		var box := BoxMesh.new()
+		box.size = Vector3.ONE
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = colour
+		mat.roughness = 0.9
+		box.material = mat
+		shape = box
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.mesh = box
+	mm.mesh = shape
 	mm.instance_count = 0
 	node.multimesh = mm
 
@@ -211,19 +247,20 @@ func _cradle() -> void:
 	node.position = at
 	add_child(node)
 
-	var timber := StandardMaterial3D.new()
-	timber.albedo_color = Color(0.42, 0.30, 0.17)
-	timber.roughness = 0.92
-
-	# Spare ladder sections, stacked flat. The pile is the level's ladder allowance made visible.
+	# Spare ladder sections, stacked flat. The pile is the level's ladder allowance made visible,
+	# and it is the first thing in the game the player walks up to and looks at.
+	#
+	# Unit boxes turned on their side rather than a 5 m box: the timber shader reads the piece's
+	# size and direction out of the instance transform, and its grain runs down the piece's local
+	# Y. A section lying flat has to be *turned*, not just stretched, or the grain runs across it.
 	for i in 5:
 		var m := BoxMesh.new()
-		m.size = Vector3(0.44, 0.09, 5.0)
-		m.material = timber
+		m.size = Vector3(0.44, 5.0, 0.11)
 		var inst := MeshInstance3D.new()
 		inst.mesh = m
-		inst.position = Vector3(0.0, 0.05 + 0.10 * i, 0.0)
-		inst.rotation.y = deg_to_rad(4.0 * i)
+		inst.material_override = _timber(0.55)
+		inst.position = Vector3(0.0, 0.06 + 0.115 * i, 0.0)
+		inst.rotation = Vector3(PI * 0.5, deg_to_rad(4.0 * i), 0.0)
 		node.add_child(inst)
 
 	# The dog crate, and a brazier, because a jack's pitch has a fire on it.
@@ -277,6 +314,7 @@ func set_ladder_top(top: float) -> void:
 		return
 	if top <= 0.0:
 		_ladders.multimesh.instance_count = 0
+		_rungs.multimesh.instance_count = 0
 		return
 
 	var rungs := int(floor(top / RUNG_GAP))
@@ -294,19 +332,34 @@ func set_ladder_top(top: float) -> void:
 			_bow_at(hi).dot(FACE) - _bow_at(lo).dot(FACE)) / maxf(hi - lo, 0.001)
 		var tilt := Basis(Vector3(0, 0, 1), atan(slope) * -FACE.x)
 		for side in [-RAIL_GAP * 0.5, RAIL_GAP * 0.5]:
+			# A stile is a plank on edge: narrow across the ladder, deep into the wall, which is
+			# the way round that carries the load and the way round a square section does not.
 			transforms.append(Transform3D(
-				tilt * Basis().scaled(Vector3(RAIL_THICK, hi - lo + 0.004, RAIL_THICK)),
+				tilt * Basis().scaled(Vector3(RAIL_THICK * 0.72, hi - lo + 0.004,
+					RAIL_THICK * 1.32)),
 				face_point(mid) + Vector3(0, 0, side) + _bow_at(mid)))
 
+	var rung: Array[Transform3D] = []
 	for i in range(1, rungs + 1):
 		var h := i * RUNG_GAP
-		transforms.append(Transform3D(
-			Basis().scaled(Vector3(RAIL_THICK * 0.8, RAIL_THICK * 0.8, RAIL_GAP)),
+		# The mesh's axis is its Y, so the rung is laid on its side — and its Y is then the run
+		# across the ladder, which is exactly the direction the grain has to follow.
+		# `rotation * Basis().scaled(v)`, not `rotation.scaled(v)`. Godot's `Basis.scaled` is
+		# `from_scale(v) * basis` — it scales in the *parent* frame, after the rotation — so the
+		# second form stretches the rung along the world's vertical instead of along its own
+		# length, and turns a rung into a disc. It is the form the stiles above already use, and
+		# the two are one line apart.
+		rung.append(Transform3D(
+			Basis(Vector3(1, 0, 0), PI * 0.5) * Basis().scaled(
+				Vector3(RAIL_THICK * 0.62, RAIL_GAP + RAIL_THICK * 0.3, RAIL_THICK * 0.62)),
 			face_point(h) + _bow_at(h)))
 
 	_ladders.multimesh.instance_count = transforms.size()
 	for i in transforms.size():
 		_ladders.multimesh.set_instance_transform(i, transforms[i])
+	_rungs.multimesh.instance_count = rung.size()
+	for i in rung.size():
+		_rungs.multimesh.set_instance_transform(i, rung[i])
 
 
 ## The section he is on bows out from the wall by `amount` at mid-span.

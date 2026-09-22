@@ -94,8 +94,62 @@ func _init() -> void:
 	_check(jack.stance_drain_rate(CHAIR) <= 0.01,
 		"which is what it was for: no grip going out at all")
 
+	await _the_whole_chain()
+
 	print("KIT: %s" % ("ok" if failures == 0 else "%d failure(s)" % failures))
 	quit(0 if failures == 0 else 1)
+
+
+## Shed to van to chimney, through the real screens and the real tin.
+##
+## Every part of this is covered somewhere — Career::Buy in doctest, the stance gate above — and
+## none of that says the chain works. It runs through three scenes and a file on disk, and the way
+## it breaks is that one of them writes the tin and the next one does not read it: the player buys
+## a chair, sees it on the cart, arrives on the chimney without one, and the game has no way to
+## tell them why.
+func _the_whole_chain() -> void:
+	var tin := "user://test_kit_career.json"
+	var seed_tin := FileAccess.open(tin, FileAccess.WRITE)
+	seed_tin.store_string('{"money": 400, "reputation": 30}')
+	seed_tin.close()
+
+	var yard: Node = load("res://scenes/yard.tscn").instantiate()
+	yard.career_path = tin
+	root.add_child(yard)
+	await process_frame
+	yard.shed_open = true
+	yard.shed_row = yard.SHED.find("bosunsChair")
+	yard.shed_choose()
+	_check(yard.jack.career_owns("bosunsChair"), "bought a chair in the yard")
+	_check(absf(float(yard.career.get("money", 0.0)) - 325.0) < 0.5,
+		"and £75 came out of the tin, not nothing and not twice")
+	yard.free()
+
+	var board: Node = load("res://scenes/jobs.tscn").instantiate()
+	board.career_path = tin
+	root.add_child(board)
+	await process_frame
+	_check(board.jack.career_owns("bosunsChair"), "the board reads the same tin the yard wrote")
+	board.open_van()
+	_check(board.jack.career_carrying("bosunsChair"), "and it is on the cart, because you bought it")
+
+	# Left in the shed, which is the state that has to survive the trip just as much as taking it.
+	board.van_toggle("bosunsChair")
+	_check(not board.jack.career_carrying("bosunsChair"), "the van can leave it behind")
+	board.van_toggle("bosunsChair")
+	_check(board.jack.career_carrying("bosunsChair"), "and pick it up again")
+	board.free()
+
+	var world: Node = load("res://scenes/steeplejack.tscn").instantiate()
+	var kit_player: Node = world.get_node("Player")
+	kit_player.career_path = tin
+	root.add_child(world)
+	await physics_frame
+	_check(kit_player.has_chair, "and the chimney knows there is a chair on the job")
+	_check(kit_player.jack.kit_chair(), "the sim knows it too, which is what the stance asks")
+	world.free()
+
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(tin))
 
 
 func _put_on_ladder(player: Node, chimney: Node, height: float) -> void:

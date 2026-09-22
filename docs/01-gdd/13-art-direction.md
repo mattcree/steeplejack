@@ -175,6 +175,19 @@ dropped on a field. A mill town from the air is stripes.
 The index into the bank picks the slot; the generator only decides what stands in it. Placing
 purely at random puts two rows through each other often enough to see.
 
+**Timber** (`godot/shaders/wood.gdshader`). The ladder is in every frame of the climbing half of
+the game and a stile is four inches from the camera for two hours at a time, and it was one flat
+value of brown. Grain now, weathered towards silver, with the hard bands standing proud the way
+softwood left out in a Pennine winter does.
+
+It is drawn in the *piece's* own space, not the world's: a ladder section is a sawn length and its
+grain runs down it, not down the chimney. The instance's scale comes out of `MODEL_MATRIX`'s column
+lengths, so `VERTEX * scale` is the position within that piece in metres, and grain along local Y
+means grain along the length of a stile and along the length of a rung from one material.
+
+Rungs are round — a separate MultiMesh with a cylinder — and stiles are planks on edge rather than
+square sections. One mesh for both had the man climbing a lattice of square sticks.
+
 **The site** — the works the chimney was built to draw for: a boiler house at its foot, the mill,
 a saw-tooth weaving shed, a yard wall. Nothing is built across the walk in, and the gate is
 wherever the walk in crosses the wall, which is the only place a gate could honestly be.
