@@ -23,6 +23,10 @@ const PIN := Color(0.72, 0.28, 0.20)
 
 const CARD_W := 430.0
 const CARD_GAP := 26.0
+const CARD_X := 48.0
+const CARD_H := 92.0
+const CARD_STEP := CARD_H + CARD_GAP
+const BOARD_TOP := 130.0
 
 ## The tin. Text, in the user directory, like everything else this game persists.
 const CAREER_PATH := "user://career.json"
@@ -163,6 +167,37 @@ func _reachable_stars() -> int:
 	return int(jack.career_reachable_stars(ids))
 
 
+# --- the board's geometry, shared by the drawing and the hit-testing --------------------------
+#
+# Thirteen jobs do not fit on a board, so the board scrolls. It only scrolls when it has to — a
+# list that slides about while you are reading it is worse than one that sits still — and it keeps
+# the selection a card clear of either edge so you can always see what is next.
+#
+# The options panel taught this repo to compute a menu's geometry once and let the drawing and the
+# clicking share it. The board then shipped with the drawing only and **no hit-testing at all**:
+# every mouse event fell through to a keyboard guard and was dropped, so clicking a card did
+# nothing whatever. That is the same lesson with the second copy missing rather than wrong, and it
+# is worse, because a menu that ignores the mouse looks broken rather than merely off by a row.
+
+## Which cards are on the board: [first, how many].
+func visible_rows() -> Vector2i:
+	var shown: int = maxi(int((size.y - 64.0 - BOARD_TOP) / CARD_STEP), 1)
+	var first: int = clampi(selected - shown / 2, 0, maxi(jobs.size() - shown, 0))
+	return Vector2i(first, clampi(shown, 0, maxi(jobs.size() - first, 0)))
+
+
+## Which job a point is over, or -1.
+func card_at(p: Vector2) -> int:
+	if p.x < CARD_X or p.x > CARD_X + CARD_W:
+		return -1
+	var rows := visible_rows()
+	for k in rows.y:
+		var y: float = BOARD_TOP + CARD_STEP * float(k)
+		if p.y >= y and p.y <= y + CARD_H:
+			return rows.x + k
+	return -1
+
+
 func _input(event: InputEvent) -> void:
 	if van_open and (event is InputEventMouseButton or event is InputEventMouseMotion):
 		var hit: Dictionary = van_hit(event.position)
@@ -172,6 +207,19 @@ func _input(event: InputEvent) -> void:
 					and event.button_index == MOUSE_BUTTON_LEFT and int(hit["step"]) != 0:
 				van_step(int(hit["step"]))
 		queue_redraw()
+		return
+	if event is InputEventMouseMotion or event is InputEventMouseButton:
+		var over := card_at(event.position)
+		if over >= 0:
+			selected = over
+			if event is InputEventMouseButton and event.pressed \
+					and event.button_index == MOUSE_BUTTON_LEFT:
+				# The same thing enter does: the van, not the job. What you load is the last
+				# decision of the yard, and clicking a card should not skip it.
+				open_van()
+		queue_redraw()
+		return
+	if event is InputEventMouseButton or event is InputEventMouseMotion:
 		return
 	if not (event is InputEventKey) or not event.pressed or event.echo:
 		return
@@ -311,21 +359,14 @@ func _draw() -> void:
 		"£%d in the tin        %s" % [int(float(career.get("money", 0.0))), stars],
 		HORIZONTAL_ALIGNMENT_RIGHT, 282, 16, PAPER)
 
-	# Thirteen jobs do not fit on a board, so the board scrolls. It only scrolls when it has to —
-	# a list that slides about while you are reading it is worse than one that sits still — and it
-	# keeps the selection a card clear of either edge so you can always see what is next.
-	var top := 130.0
-	var bottom: float = size.y - 64.0
-	var step := 118.0
-	var shown: int = maxi(int((bottom - top) / step), 1)
-	var first: int = clampi(selected - shown / 2, 0, maxi(jobs.size() - shown, 0))
-	var y := top
-	for i in range(first, mini(first + shown, jobs.size())):
-		y = _card(jobs[i], 48.0, y, i == selected)
+	var rows := visible_rows()
+	var y := BOARD_TOP
+	for i in range(rows.x, rows.x + rows.y):
+		y = _card(jobs[i], CARD_X, y, i == selected)
 	# And it says so, because a list that has more in it than it shows must admit that.
-	if jobs.size() > shown:
-		draw_string(_font, Vector2(48.0, top - 14.0),
-			"%d-%d of %d" % [first + 1, mini(first + shown, jobs.size()), jobs.size()],
+	if jobs.size() > rows.y:
+		draw_string(_font, Vector2(CARD_X, BOARD_TOP - 14.0),
+			"%d-%d of %d" % [rows.x + 1, rows.x + rows.y, jobs.size()],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(PAPER.r, PAPER.g, PAPER.b, 0.6))
 
 	draw_string(_font, Vector2(48, size.y - 36),

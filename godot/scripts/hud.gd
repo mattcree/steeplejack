@@ -131,7 +131,10 @@ func _draw() -> void:
 	_draw_steps()
 	_draw_markers()
 
-	var rows := _affordances()
+	# Not while a question is on the screen. A frame of the leave panel has "weathered mortar —
+	# looks fair" and eight key hints ghosting through it at 28% — dimmed enough to be unreadable
+	# and not enough to be gone, which is the worst of both.
+	var rows: Array = [] if player.leaving else _affordances()
 	var row_y := size.y - 44 - 17 * (rows.size() - 1)
 	for row in rows:
 		var text: String = "[%s]  %s" % [row[0], row[1]]
@@ -153,7 +156,7 @@ func _draw() -> void:
 
 	if player.work_mode:
 		_draw_work(jack)
-	elif not player.lashing:
+	elif not player.lashing and not player.leaving:
 		# Not while lashing. The caption and its bracket sit on the joint, the lashing panel sits
 		# in the middle of the screen, and on any frame where the joint is roughly ahead of you
 		# those are the same pixels — a frame taken mid-lash has "weathered mortar — looks fair"
@@ -169,7 +172,9 @@ func _draw() -> void:
 	if player.lashing:
 		_draw_lash(jack)
 
-	if player.options_open:
+	if player.leaving:
+		_draw_leaving()
+	elif player.options_open:
 		_draw_options()
 	elif not player.mouse_captured() and DisplayServer.get_name() != "headless" \
 			and not player.falling and player.fade_in <= 0.0:
@@ -406,7 +411,7 @@ func _draw_steps() -> void:
 	# Not while the rope is going round. Both of these are "what to do next", the lashing panel is
 	# the more specific of the two, and a frame taken mid-lash has one plate laid over the other
 	# with the darkening doubled where they cross.
-	if player.lashing:
+	if player.lashing or player.leaving:
 		return
 	if player.jack.slip_in_progress() or player.stack_info.get("buckling", false):
 		return
@@ -2005,6 +2010,27 @@ func _draw_vignette(jack: Jack) -> void:
 		_vignette_tex.height = 256
 	var a := 0.35 if band == 2 else 0.6
 	draw_texture_rect(_vignette_tex, Rect2(Vector2.ZERO, size), false, Color(1, 1, 1, a))
+
+
+## Leaving a job that is not finished.
+##
+## Two answers and no third one, because the only thing worse than having no way out of a level is
+## having one that fires by accident halfway up a chimney. It says what leaving costs — nothing
+## but the day, since the stack stays where you lashed it — because a player who does not know
+## that will assume the worst and carry on up a job they did not want.
+func _draw_leaving() -> void:
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.03, 0.03, 0.04, 0.82))
+	var mid := size.y * 0.42
+	_centre("Leave her?", mid - 40.0, Color(INK, 0.97), H1)
+	var built: int = player.jack.stack_sections().size()
+	var note := "Nothing is settled and nothing is lost. What you have lashed stays up."
+	if built == 0:
+		note = "You have not put a ladder on her yet."
+	_centre(note, mid + 4.0, Color(DIM, 0.88), BODY)
+	_centre("%d m of her laddered  ·  day's work not paid for" % int(player.ladder_top),
+		mid + 28.0, Color(FAINT, 0.80), SMALL)
+	_centre("[enter] back to the yard        [esc] stop where you are",
+		mid + 68.0, Color(INK, 0.92), H2)
 
 
 ## The motion options, F1. A plain list: the one being changed is bright, and the keys are said.

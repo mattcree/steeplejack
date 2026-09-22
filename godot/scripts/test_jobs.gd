@@ -36,6 +36,43 @@ func _init() -> void:
 		earlier = int(job["order"])
 	_check(ordered, "and the rest are in the order a career would meet them")
 
+	# --- the mouse ------------------------------------------------------------------------------
+	#
+	# The board shipped with no hit-testing at all: every mouse event fell through to a keyboard
+	# guard and was dropped, so clicking a card did nothing whatever and the whole screen looked
+	# broken. Geometry the drawing and the clicking share, and a test that a click lands on the
+	# card it is over.
+	var rows: Vector2i = board.visible_rows()
+	_check(rows.y > 0, "the board is showing %d of %d cards" % [rows.y, board.jobs.size()])
+
+	var on_first := Vector2(board.CARD_X + 40.0, board.BOARD_TOP + 20.0)
+	_check(board.card_at(on_first) == rows.x,
+		"a point on the first card is the first card (%d)" % board.card_at(on_first))
+	if rows.y > 1:
+		var on_second := Vector2(board.CARD_X + 40.0, board.BOARD_TOP + board.CARD_STEP + 20.0)
+		_check(board.card_at(on_second) == rows.x + 1, "and the next one is the next one")
+		# In the gap between two cards, which is board and not a job.
+		var between := Vector2(board.CARD_X + 40.0,
+			board.BOARD_TOP + board.CARD_H + board.CARD_GAP * 0.5)
+		_check(board.card_at(between) < 0, "and the gap between them is not a job")
+	_check(board.card_at(Vector2(board.CARD_X + board.CARD_W + 80.0, board.BOARD_TOP + 20.0)) < 0,
+		"nor is the letter beside them")
+
+	# And a click selects the card it is over.
+	if rows.y > 1:
+		board.van_open = false
+		board.selected = rows.x
+		var click := InputEventMouseButton.new()
+		click.button_index = MOUSE_BUTTON_LEFT
+		click.pressed = true
+		click.position = Vector2(board.CARD_X + 40.0, board.BOARD_TOP + board.CARD_STEP + 20.0)
+		board._input(click)
+		await process_frame
+		_check(board.selected == rows.x + 1,
+			"clicking the second card selects it (%d)" % board.selected)
+		_check(board.van_open, "and opens the van, which is what enter does")
+
+
 	for job in board.jobs:
 		if String(job["id"]) == "07-kershaws-yard":
 			_check(String(job["archetype"]) == "FELL", "Kershaw's is a felling")

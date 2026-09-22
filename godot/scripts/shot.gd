@@ -171,6 +171,9 @@ func _run(cmd: String) -> void:
 			await _drain_to(0.0, -1.0)
 		"options":
 			player.options_open = true
+		"leave":
+			# The "leave her?" panel, which is the only way out of a job that is not finished.
+			player.leaving = true
 		"walkfor":
 			# Walk forward for `a` seconds, to catch the run cycle mid-stride.
 			player.walk_input = Vector2(0.0, 1.0)

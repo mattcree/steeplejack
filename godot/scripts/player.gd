@@ -268,6 +268,12 @@ var _bob_phase := 0.0
 ## Whether the player wants the mouse captured. Esc is the only thing that says no.
 var mouse_wanted := true
 var options_open := false        ## the motion options overlay, on F1
+## Asking to walk away from a job that is not finished. There was no way to: the only key that
+## left a level was Enter *once the job was done*, so a player who took the wrong job, or who
+## wanted to stop, had the window button and nothing else. The stack you built stays up — the
+## checkpoint already remembers it and greets you with "your stack is still up there" — so
+## leaving is giving up the day, not the job.
+var leaving := false
 var options_row := 0
 
 ## The gin wheel — VERB-007. A pulley lashed to a dog, a rope to the yard.
@@ -884,6 +890,17 @@ func _look_at_stack() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Asked to leave, and waiting on an answer. Nothing else gets a look in — it is a question
+	# with two answers and the climb is not going anywhere.
+	if leaving:
+		if event is InputEventKey and event.pressed and not event.echo:
+			match event.keycode:
+				KEY_ENTER, KEY_KP_ENTER, KEY_Y:
+					back_to_the_board()
+				KEY_ESCAPE, KEY_N:
+					leaving = false
+					_capture_mouse(true)
+		return
 	if _options_input(event):
 		return
 	# The job is done. Enter takes you home.
@@ -897,6 +914,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if (at_top or not settlement.is_empty()) and event is InputEventKey and event.pressed \
 			and not event.echo and event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_ESCAPE]:
 		back_to_the_board()
+		return
+	# And out of an unfinished one. Not instantly — a key that throws away a climb you are halfway
+	# up should be asked twice — and not while you are in the air or hanging by one hand, where
+	# the last thing anybody needs is a menu.
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode == KEY_ESCAPE and not falling and not jack.slip_in_progress():
+		leaving = true
+		_capture_mouse(false)
 		return
 	# A click in the window with the mouse free takes it back. The click is spent on that, so it
 	# does not also start a hammer draw — except in a slip, where a click is the grab and must
@@ -2625,26 +2650,59 @@ func _joint_of_anchor_at(height: float) -> int:
 	return -1
 
 
+## F is "deal with what is here", and what is here at the foot of the stack is your gear.
+##
+## It did not used to be. A conductor run is earthed in a pit at the foot of the stack and a
+## straightening is cut from the ladder, and both of those were reached through this key *before*
+## it ever offered to hand you a ladder — so on a conductor or a straightening job the player
+## walked to the cradle, pressed F, and could not pick anything up at all. No ladder, no dogs,
+## nothing to climb with. That is four of the thirteen levels that could not be started, and it is
+## exactly what "one of the missions I couldn't even do anything cos there were no dogs" was.
+##
+## The ordering rule is the obvious one and it should have been here from the start: **you cannot
+## finish a job you were never able to start.** Gear first, everywhere, until there is no gear
+## left to take or the job has reached the step that ends at the cradle.
 func _pick_up() -> void:
-	# On a conductor job, F is the run: the terminal at the apex, a clip on the way down, and the
-	# earth pit when you get to the bottom.
+	if at_cradle():
+		# The earth pit is the last step of a run and only means anything once the terminal is on
+		# — before that, a man at the foot of a chimney with an empty bag wants his dogs.
+		var st: Dictionary = jack.conductor_state(0.0) if conductor_job else {}
+		if conductor_job and bool(st.get("terminal", false)) and not _cradle_has_anything():
+			_conductor_earth()
+			return
+		if _take_from_cradle():
+			return
+		if conductor_job:
+			_conductor_earth()
+			return
+		if plumb_job:
+			_plumb_cut()
+			return
+		_say("nothing left to take")
+		return
+
+	# Away from the cradle it is whatever this job does with a free hand.
 	if plumb_job:
 		_plumb_cut()
 		return
 	if conductor_job:
-		if at_cradle():
-			_conductor_earth()
-		else:
-			_conductor_act()
+		_conductor_act()
 		return
 	# On the ladder, F draws the dog in reach rather than telling you to go to the cradle. It is
 	# the same idea — picking your gear up — at the other end of the job.
-	if not at_cradle() and on_ladder:
+	if on_ladder:
 		_draw_dog()
 		return
-	if not at_cradle():
-		_say("the materials are in the cradle at the foot of the stack")
-		return
+	_say("the materials are in the cradle at the foot of the stack")
+
+
+func _cradle_has_anything() -> bool:
+	return (dogs_carried < DOG_BAG and dogs_at_base > 0) \
+		or (not carrying_ladder and ladders_at_base > 0)
+
+
+## Fill the bag and put a section on his shoulder. True if anything was taken.
+func _take_from_cradle() -> bool:
 	var took := false
 	while dogs_carried < DOG_BAG and dogs_at_base > 0:
 		dogs_carried += 1
@@ -2654,7 +2712,9 @@ func _pick_up() -> void:
 		carrying_ladder = true
 		ladders_at_base -= 1
 		took = true
-	_say(("ladder on your shoulder, %d dogs in the bag" % dogs_carried) if took else "nothing left to take")
+	if took:
+		_say("ladder on your shoulder, %d dogs in the bag" % dogs_carried)
+	return took
 
 
 ## Where the next dog should go: from 2.5 m above the last dog (less buys too little height) to a
