@@ -1058,6 +1058,7 @@ func _update_hud() -> void:
 	hud.timetable = _timetable() if _read_the_board else {}
 	hud.train_line = _authored["train_line"]
 	hud.act4 = _act4
+	hud.going = _fired
 	hud.packing = _packing / PACK_SECONDS
 	hud.burn_left = _burn_left
 	hud.safe_line = _authored["safe_line"]

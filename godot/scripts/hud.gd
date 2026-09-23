@@ -108,12 +108,20 @@ func _draw() -> void:
 	_draw_kit(bar + Vector2(0.0, 74.0), breath)
 
 	_draw_stack_gauge(jack)
-	_draw_wind(jack, Vector2(size.x - 108.0, 86.0))
-	_draw_hold_line()
-	_draw_conductor(jack)
-	_draw_band(jack)
-	_draw_survey(jack)
-	_draw_plumb(jack)
+	# Nothing that annotates the world, while the world is going past him.
+	#
+	# A frame taken mid-fall has the wind rose, the survey markers on the brickwork, the
+	# archetype panel and "Climb the stack. You can only go as high as you have built." all still
+	# on the screen, over a man dropping thirteen metres. None of it is anything he can act on and
+	# all of it says the game has not noticed.
+	var annotate: bool = not player.falling
+	if annotate:
+		_draw_wind(jack, Vector2(size.x - 108.0, 86.0))
+		_draw_hold_line()
+		_draw_conductor(jack)
+		_draw_band(jack)
+		_draw_survey(jack)
+		_draw_plumb(jack)
 	# The way out, on the jobs that do not end on the cap. Without it a player who has just
 	# finished a conductor run at the foot of the chimney has no idea the job is over.
 	if not player.settlement.is_empty() and not player.at_top:
@@ -139,7 +147,7 @@ func _draw() -> void:
 	# Not while a question is on the screen. A frame of the leave panel has "weathered mortar —
 	# looks fair" and eight key hints ghosting through it at 28% — dimmed enough to be unreadable
 	# and not enough to be gone, which is the worst of both.
-	var rows: Array = [] if player.leaving else _affordances()
+	var rows: Array = [] if player.leaving or player.options_open else _affordances()
 	var row_y := size.y - 44 - 17 * (rows.size() - 1)
 	for row in rows:
 		var text: String = "[%s]  %s" % [row[0], row[1]]
@@ -159,9 +167,9 @@ func _draw() -> void:
 		# ladder frame, and in work mode on the joint he was hammering.
 		_centre(player.message, size.y * 0.075, Color(0.94, 0.91, 0.86, 0.92 * _ease(ttl * 3.0)), 16)
 
-	if player.work_mode:
+	if player.work_mode and annotate:
 		_draw_work(jack)
-	elif not player.lashing and not player.leaving:
+	elif annotate and not player.lashing and not player.leaving and not player.options_open:
 		# Not while lashing. The caption and its bracket sit on the joint, the lashing panel sits
 		# in the middle of the screen, and on any frame where the joint is roughly ahead of you
 		# those are the same pixels — a frame taken mid-lash has "weathered mortar — looks fair"
@@ -169,7 +177,8 @@ func _draw() -> void:
 		# neither, and while the rope is going round the joint's verdict is not the question.
 		_draw_target_caption()
 
-	_draw_pip(jack)
+	if annotate:
+		_draw_pip(jack)
 
 	if player.rigging_to >= 0:
 		_draw_rig(jack)
@@ -212,7 +221,8 @@ func _draw() -> void:
 	# It yields to the transient line. Two centred instructions 60 px apart, both in white, both
 	# reading like they matter, is how a player learns to read neither — and it is exactly what a
 	# frame taken mid-lash showed: "lashing — hold the left button" stacked over "Climb the stack".
-	if player._now < 14.0 and not player.at_top and player.message_ttl() <= 0.0 and not player.lashing:
+	if player._now < 14.0 and not player.at_top and player.message_ttl() <= 0.0 \
+			and not player.lashing and annotate:
 		var fade := Color(0.92, 0.90, 0.86, 0.85 * _ease((14.0 - player._now) / 3.0))
 		_centre("Climb the stack. You can only go as high as you have built.", size.y * 0.14, fade)
 		# On a felling, this climb is Act 2 and not the job. A player who took the letter off the
@@ -416,7 +426,7 @@ func _draw_steps() -> void:
 	# Not while the rope is going round. Both of these are "what to do next", the lashing panel is
 	# the more specific of the two, and a frame taken mid-lash has one plate laid over the other
 	# with the darkening doubled where they cross.
-	if player.lashing or player.leaving:
+	if player.lashing or player.leaving or player.options_open:
 		return
 	if player.jack.slip_in_progress() or player.stack_info.get("buckling", false):
 		return

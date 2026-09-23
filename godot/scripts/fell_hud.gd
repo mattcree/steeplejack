@@ -290,10 +290,10 @@ func _draw_aim() -> void:
 			var a1: float = -PI * 0.5 + arc * float(i + 1) / float(steps)
 			draw_line(c + Vector2(cos(a0), sin(a0)) * 20.0,
 				c + Vector2(cos(a1), sin(a1)) * 20.0, TIMBER, 3.0)
-	if aim_verb == "":
+	if aim_verb == "" or going:
 		return
-	draw_string(_font, Vector2(c.x - 150, c.y + 34), aim_verb,
-		HORIZONTAL_ALIGNMENT_CENTER, 300, 14, INK)
+	draw_multiline_string(_font, Vector2(c.x - 230, c.y + 34), aim_verb,
+		HORIZONTAL_ALIGNMENT_CENTER, 460, 14, -1, INK)
 
 
 func _draw_message() -> void:
@@ -325,7 +325,17 @@ const MATCH := 2
 const BURNING := 3
 
 
+## True from the moment she starts moving. Everything that offers you a *choice* goes off the
+## screen then — you have made all of them, and what is left is watching.
+var going := false
+
 func _draw_act4() -> void:
+	# Nothing to strike once she is already going. A frame taken mid-collapse had
+	# "[L] strike a match" printed over "she's broken at 38 m", over the line about shielding the
+	# match from the wind: three messages in one place, two of them about a decision that is
+	# thirty metres of falling brickwork too late.
+	if going:
+		return
 	var c := Vector2(size.x * 0.5, size.y - 150.0)
 	if act4 == PACKING:
 		draw_string(_font, Vector2(c.x - 220, c.y), "packing the gob — hold F",
