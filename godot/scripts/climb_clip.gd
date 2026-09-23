@@ -57,8 +57,11 @@ const AIM := {
 	# Leaned in further than it was, because the hips now hang further back (player.gd's
 	# CLIMB_IN). The two go together: take the bum off the ladder without bringing the chest
 	# towards it and he is not climbing, he is sitting down in mid air.
-	"spine_01":   [Vector3(0.0, 0.92, 0.40), Vector3(0.0, 0.92, 0.40)],
-	"spine_02":   [Vector3(0.0, 0.94, 0.34), Vector3(0.0, 0.94, 0.34)],
+	# Nearly upright. The hips hang back (player.gd's CLIMB_IN) and the shoulders come back with
+	# them, so he stands straight up the ladder rather than folding over it — which is what takes
+	# the knees off the rails. Leaning the chest in was the wrong half of the fix.
+	"spine_01":   [Vector3(0.0, 0.985, 0.17), Vector3(0.0, 0.985, 0.17)],
+	"spine_02":   [Vector3(0.0, 0.991, 0.13), Vector3(0.0, 0.991, 0.13)],
 }
 
 ## Which child each posed bone points at. A bone has no direction of its own; it has the direction

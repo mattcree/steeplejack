@@ -22,7 +22,14 @@ uniform float course_height = 0.075;
 uniform float brick_length = 0.225;
 uniform float mortar_width = 0.010;
 // How much bricks differ from one another. Fired clay is never one colour.
-uniform float variation = 0.22;
+uniform float variation = 0.30;
+// How much a hand-laid wall wanders: courses that are not quite the same depth, a bond that is
+// not quite half a brick, joints that are not quite the same width. A wall built by eye out of
+// bricks fired in a clamp is regular the way handwriting is regular, and the giveaway on every
+// procedural brick wall ever made is that it is regular the way a spreadsheet is.
+uniform float wander = 1.0;
+// Repointing and replacement: patches where somebody has been at her since.
+uniform float repointed_share = 0.06;
 // Soot and bleach, as the stack weathers top to bottom. See chimney.gd's _weathered().
 uniform float stack_height = 55.0;
 uniform vec3 soot : source_color = vec3(0.09, 0.08, 0.07);
@@ -56,12 +63,17 @@ float hash(vec2 p) {
 // and a thing that silently disagrees with the colour the moment either is edited. Three samples
 // of a dozen cheap instructions is nothing, and the relief cannot drift away from the brick.
 float relief(vec2 p) {
+	// Every wobble the colour uses, repeated here. If these two disagree the wall gets lit along
+	// joints it has not got — which is worse than no relief at all.
 	float course = floor(p.y / course_height);
-	float shifted = p.x + mod(course, 2.0) * brick_length * 0.5;
+	float drift = (hash(vec2(0.0, course)) - 0.5) * 0.065 * wander;
+	float course_h = course_height * (1.0 + drift);
+	float bond = 0.5 + (hash(vec2(3.1, course)) - 0.5) * 0.22 * wander;
+	float shifted = p.x + mod(course, 2.0) * brick_length * bond;
 	float brick = floor(shifted / brick_length);
 
-	vec2 in_brick = vec2(fract(shifted / brick_length), fract(p.y / course_height));
-	vec2 to_edge = min(in_brick, 1.0 - in_brick) * vec2(brick_length, course_height);
+	vec2 in_brick = vec2(fract(shifted / brick_length), fract(p.y / course_h));
+	vec2 to_edge = min(in_brick, 1.0 - in_brick) * vec2(brick_length, course_h);
 	float d = min(to_edge.x, to_edge.y);
 
 	// Out of the joint and up onto the face over about 4 mm — the arris, which is rounded on
@@ -85,20 +97,30 @@ void fragment() {
 	float around = atan(world_pos.x, -world_pos.z) * r;
 	float h = world_pos.y;
 
+	// Courses are not all the same depth. Each one is up to 6% off, and because the offset
+	// accumulates up the wall, two courses ten apart are visibly not in step — which is what a
+	// wall laid by eye over a summer actually looks like.
 	float course = floor(h / course_height);
-	// Running bond: every other course shifted by half a brick.
-	float shifted = around + mod(course, 2.0) * brick_length * 0.5;
+	float drift = (hash(vec2(0.0, course)) - 0.5) * 0.065 * wander;
+	float course_h = course_height * (1.0 + drift);
+
+	// And the bond is not exactly half a brick. Half is what a drawing says; a wall is whatever
+	// the bricklayer's thumb said that morning.
+	float bond = 0.5 + (hash(vec2(3.1, course)) - 0.5) * 0.22 * wander;
+	float shifted = around + mod(course, 2.0) * brick_length * bond;
 	float brick = floor(shifted / brick_length);
 
 	// Where in its brick this pixel is, 0..1 each way.
-	vec2 in_brick = vec2(fract(shifted / brick_length), fract(h / course_height));
+	vec2 in_brick = vec2(fract(shifted / brick_length), fract(h / course_h));
 	// Distance to the nearest mortar line, in metres, each way.
-	vec2 to_edge = min(in_brick, 1.0 - in_brick) * vec2(brick_length, course_height);
+	vec2 to_edge = min(in_brick, 1.0 - in_brick) * vec2(brick_length, course_h);
 
 	// How wide a pixel is here, in metres. When mortar is thinner than that, stop drawing it and
 	// blend towards the average instead.
 	vec2 px = max(fwidth(vec2(around, h)), vec2(1e-5));
-	vec2 line = smoothstep(vec2(mortar_width * 0.5) - px, vec2(mortar_width * 0.5) + px, to_edge);
+	// Joints vary too — a struck joint is 8 to 14 mm depending on how the brick below sat.
+	float joint = mortar_width * (1.0 + (hash(vec2(brick, course * 7.0)) - 0.5) * 0.5 * wander);
+	vec2 line = smoothstep(vec2(joint * 0.5) - px, vec2(joint * 0.5) + px, to_edge);
 	float in_mortar = 1.0 - line.x * line.y;
 	float resolvable = clamp((mortar_width - max(px.x, px.y)) / mortar_width, 0.0, 1.0);
 
@@ -106,12 +128,23 @@ void fragment() {
 	vec3 fired = brick_colour * (1.0 - variation * 0.5 + variation * n);
 	// A little variation along the brick as well, so a face is not a set of flat tiles.
 	fired *= 0.94 + 0.06 * hash(vec2(floor(shifted / 0.04), course));
+	// One brick in fifteen or so is a different firing altogether — an overburnt header that came
+	// out of the clamp nearly blue, or a soft one that has weathered pale. These are what stop a
+	// wall reading as a tile sheet, and on a real stack you can pick them out from the ground.
+	float odd = hash(vec2(brick * 1.7, course * 2.3));
+	if (odd > 0.93) { fired *= 0.55; }
+	else if (odd < 0.05) { fired = mix(fired, bleach, 0.45); }
+
+	// And patches where somebody has repointed her: the joints are paler and wider, in blocks
+	// rather than brick by brick, because that is how a man with a bucket works.
+	float patch = hash(floor(vec2(shifted / (brick_length * 6.0), course / 9.0)));
+	float repointed = step(1.0 - repointed_share * 6.0, patch);
 
 	// The average of brick and mortar by area, for when the lines are too small to draw.
 	float mortar_share = mortar_width / course_height + mortar_width / brick_length;
 	vec3 average = mix(brick_colour, mortar_colour, mortar_share);
 
-	vec3 near = mix(fired, mortar_colour, in_mortar);
+	vec3 near = mix(fired, mix(mortar_colour, vec3(0.62, 0.60, 0.56), repointed), in_mortar);
 	vec3 col = mix(average, near, resolvable);
 
 	float u = clamp(h / max(stack_height, 1.0), 0.0, 1.0);

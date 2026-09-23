@@ -65,6 +65,11 @@ var _ik: Array[TwoBoneIK3D] = []
 var _target: Array[Node3D] = []
 var _pole: Array[Node3D] = []
 var _rung := [0, 0, 0, 0]           ## the rung index each limb holds
+## Which leg is through the rungs, or -1. Set by the player from the stance: a hooked leg is a
+## thing you can see, not a line of HUD text.
+var hooked := -1
+const HOOK_THROUGH := 0.30          ## how far past the rungs the foot goes, towards the wall
+const HOOK_DROP := 0.17             ## and how far below the rung the calf settles
 var _from := [Vector3.ZERO, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO]
 var _moving := -1                   ## the pair in the air, or -1
 var _step_t := 0.0
@@ -162,6 +167,17 @@ func _rung_point(limb: int, index: int) -> Vector3:
 	var along := Vector3(0, 0, 1)   # chimney.gd lays the stiles out along world Z
 	if limb < 2:
 		return base + along * float(SIDE[limb]) * HAND_SPREAD + out * HAND_PROUD
+	# A hooked leg goes THROUGH the ladder. The shin passes between two rungs, the calf lies over
+	# the lower one and the foot ends up on the wall side of it — which is the whole reason the
+	# stance works and why it leaves both hands free.
+	#
+	# Q used to change a word in the corner and a number on the grip bar and nothing else. "I need
+	# to see some visual feedback about what that's doing" was said twice, and the first time I
+	# answered it with a better read-out, which is the same mistake in a nicer typeface. This is
+	# the leg hooking through, done with the IK that is already solving for the feet.
+	if limb == hooked:
+		return base + along * float(SIDE[limb]) * FOOT_SPREAD * 0.5 \
+			- out * HOOK_THROUGH + Vector3.UP * (FOOT_LIFT - HOOK_DROP)
 	return base + along * float(SIDE[limb]) * FOOT_SPREAD + Vector3.UP * FOOT_LIFT
 
 

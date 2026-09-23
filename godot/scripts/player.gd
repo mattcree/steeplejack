@@ -913,10 +913,25 @@ func _begin_arrival() -> void:
 
 	_arrival_cam = Camera3D.new()
 	_arrival_cam.fov = camera.fov
-	get_parent().add_child(_arrival_cam)
-	_arrival_cam.make_current()
+	# Deferred, and nothing is done to it until it has landed.
+	#
+	# This runs from `_ready`, and a parent that is setting its children up refuses `add_child`
+	# outright: "Parent node is busy setting up children". The camera was never added, so
+	# `global_position` and `look_at` then failed on a node outside the tree — fifty-nine times,
+	# once a frame, for the whole five and a half seconds. The fly-in did not happen at all; it
+	# just filled the log. I never saw it because the only frames I looked at were captures, and
+	# the capture harness skips the arrival on purpose.
+	get_parent().add_child.call_deferred(_arrival_cam)
 	arriving = ARRIVAL_SECONDS
-	_update_arrival(0.0)
+
+
+## Headless skips the arrival because there is nobody to show it to, which also means no test
+## ever ran it. This is the way in for the one that does.
+func _begin_arrival_for_test() -> void:
+	_arrival_cam = Camera3D.new()
+	_arrival_cam.fov = camera.fov
+	get_parent().add_child.call_deferred(_arrival_cam)
+	arriving = ARRIVAL_SECONDS
 
 
 func skip_arrival() -> void:
@@ -924,7 +939,11 @@ func skip_arrival() -> void:
 		return
 	arriving = 0.0
 	if _arrival_cam != null:
-		_arrival_cam.queue_free()
+		if _arrival_cam.is_inside_tree():
+			_arrival_cam.queue_free()
+		else:
+			# Never made it into the tree, so free it directly — queue_free on an orphan leaks it.
+			_arrival_cam.free()
 		_arrival_cam = null
 	camera.make_current()
 	_capture_mouse(true)
@@ -938,6 +957,12 @@ func _update_arrival(dt: float) -> void:
 	if arriving <= 0.0 or _arrival_cam == null:
 		skip_arrival()
 		return
+	# It is added deferred, so the first frame or two of the shot has nowhere to put a camera.
+	if not _arrival_cam.is_inside_tree():
+		return
+	if not _arrival_cam.current:
+		_arrival_cam.make_current()
+
 	var t: float = 1.0 - (arriving / ARRIVAL_SECONDS)
 	# Eased, so it settles rather than stopping.
 	t = t * t * (3.0 - 2.0 * t)
@@ -2871,6 +2896,10 @@ func _update_grip(dt: float) -> void:
 	# sideways in the frozen climb pose, holding nothing.
 	var right_busy: bool = work_mode or lashing or hauling or _slipping \
 		or (_playing in ["tap", "strike", "windup"] and anim.is_playing())
+	# Which leg is through the rungs. A hooked leg is the stance you take to get both hands free
+	# without rigging anything, so from that stance up it is the trailing leg that does it — and
+	# you can watch it happen rather than read that it has.
+	grip.hooked = 3 if (climbing and jack.get_stance() >= 1) else -1
 	grip.update(dt, climbing, [not lashing, not right_busy, true, true])
 
 

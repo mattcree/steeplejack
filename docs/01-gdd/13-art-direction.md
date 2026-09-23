@@ -141,6 +141,37 @@ in the world.
   is unchanged and is now easier to satisfy, not harder.
 
 
+## The rule: if it happens, it happens where you can see it
+
+> "Basically everything you have to do should be visually happening, not just a status change,
+> because otherwise it isn't very sim-like." — the designer, 23 September 2026
+
+This is the standard every verb is held to, and it is the one this project keeps failing. The
+pattern is always the same and it is never noticed by a test:
+
+| The verb | What the sim did | What the screen showed |
+|---|---|---|
+| Banding | tracked twelve bolt tensions | a ring in the corner, and nothing on the chimney |
+| Conductor | metered the tape, judged the wander | a number, and no tape |
+| Straighten | 1.1° out of plumb, coming back over 36 hours | a perfectly upright chimney |
+| Lashing | counted turns of rope | a hoop growing in diameter |
+| Stance | changed the grip drain | a word in the corner |
+| Profile / cap | the level said square, octagonal, finial | one round tube, every time |
+
+A sim is not a spreadsheet with a viewport attached. The player's belief that they are doing a
+real job comes from watching the job happen — the rope going round, the leg hooking through the
+rungs, the shaft coming back onto itself. **A status change is not an event. If the only evidence
+that something occurred is a number changing, it did not occur as far as the player is concerned.**
+
+Three practical tests, to apply before calling a verb finished:
+
+1. **Name the noun in the instruction.** "Stand level with a band" — is there a band? "Run the
+   tape down" — is there a tape? "Hook your leg through" — does a leg hook through?
+2. **Cover the HUD with your hand.** Can you still tell what just happened? If not, the verb lives
+   in the HUD and not in the world.
+3. **Render a frame of it.** Not of the level it is in — of the verb, mid-action. See
+   [`make shot`](../06-workflow/03-verification.md) and `make ui-shot`.
+
 ## Built, September 2026 — what the surfaces actually are
 
 Everything here is procedural and in text, for the reason the brick shader's own header gives:

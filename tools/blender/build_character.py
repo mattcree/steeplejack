@@ -225,10 +225,29 @@ def build_body():
         tube(f"forearm.{n}", elbow, wrist, 0.045, 0.034, "skin", [f"lowerarm.{n}", f"upperarm.{n}"],
              rings=5)
         # Big working hands, a mitt shape, thumb along the front.
-        blob(f"hand.{n}", wrist + d * 0.075, Vector((0.045, 0.028, 0.075)), "skin", [f"hand.{n}"],
+        blob(f"hand.{n}", wrist + d * 0.075, Vector((0.045, 0.028, 0.065)), "skin", [f"hand.{n}"],
              segs=12, rings=8)
         blob(f"thumb.{n}", wrist + d * 0.04 + Vector((0.0, -0.035, 0.0)), Vector((0.017, 0.017, 0.04)),
              "skin", [f"hand.{n}"], segs=8, rings=6)
+        # Fingers. They were one mitt, and a mitt is fine on a character you watch from twenty
+        # feet — this one spends the whole game closed round a rung about a metre from the camera.
+        # Four of them, curled, because a hand on a ladder is never flat.
+        for f_i in range(4):
+            across = (f_i - 1.5) * 0.023
+            knuckle = wrist + d * 0.115 + Vector((across * side, 0.0, 0.0))
+            tip = knuckle + d * 0.045 + Vector((0.0, -0.030, -0.012))
+            tube(f"finger{f_i}.{n}", knuckle, tip, 0.0115, 0.0095, "skin", [f"hand.{n}"],
+                 segs=6, rings=2)
+
+        # Boots: a welted sole and a toe cap, which is what you look at for most of a climb —
+        # the camera is over his shoulder and his feet are on the rung below him.
+        box(f"sole.{n}", Vector((x, -0.055, 0.016)), Vector((0.125, 0.30, 0.028)), "leather",
+            [f"foot.{n}", f"ball.{n}"], bevel=0.008)
+        box(f"toecap.{n}", Vector((x, -0.155, 0.055)), Vector((0.112, 0.085, 0.085)), "boots",
+            [f"ball.{n}"], bevel=0.022)
+        for lace in range(3):
+            box(f"lace{lace}.{n}", Vector((x, -0.02, 0.105 + 0.032 * lace)),
+                Vector((0.085, 0.012, 0.007)), "button", [f"foot.{n}"], bevel=0.003)
 
     # Hips and seat of the trousers.
     tube("seat", Vector((0.0, 0.0, 0.84)), Vector((0.0, 0.0, 1.07)), 0.175, 0.17, "trousers",
@@ -241,6 +260,28 @@ def build_body():
     for i in range(4):
         blob(f"button{i}", Vector((0.0, -0.125, 1.08 + 0.075 * i)), Vector((0.009, 0.006, 0.009)),
              "button", ["spine_01" if i < 2 else "spine_02"], segs=8, rings=5)
+    # Braces. Period-correct, and the single most useful thing that can be added to a man you
+    # follow up a ladder: two hard diagonals across the back, which is the view the player has of
+    # him for the entire game.
+    for side, n in ((1.0, "l"), (-1.0, "r")):
+        front = Vector((0.062 * side, -0.150, 1.03))
+        over = Vector((0.115 * side, -0.010, 1.455))
+        back = Vector((0.090 * side, 0.146, 1.04))
+        tube(f"brace.front.{n}", front, over, 0.017, 0.017, "leather",
+             ["spine_01", "spine_02", f"clavicle.{n}"], segs=6, rings=4)
+        tube(f"brace.back.{n}", over, back, 0.017, 0.017, "leather",
+             ["spine_02", "spine_01", "pelvis"], segs=6, rings=4)
+        box(f"brace.clip.{n}", front + Vector((0.0, 0.006, -0.012)),
+            Vector((0.026, 0.016, 0.026)), "button", ["pelvis", "spine_01"], bevel=0.004)
+
+    # A watch pocket and its chain, and the hammer loop the tool belt needs to explain the hammer.
+    box("watchpocket", Vector((0.085, -0.150, 1.19)), Vector((0.052, 0.014, 0.046)), "waistcoat",
+        ["spine_01"], bevel=0.006)
+    tube("chain", Vector((0.060, -0.156, 1.175)), Vector((-0.010, -0.150, 1.130)), 0.004, 0.004,
+         "button", ["spine_01"], segs=5, rings=3)
+    torus("hammerloop", Vector((0.155, 0.02, 0.995)), 0.036, 0.011,
+          Matrix.Rotation(math.radians(90), 3, "X"), "leather", ["pelvis"], segs=12)
+
     # Shoulders: round the top of the torso into the sleeves.
     for side, n in ((1.0, "l"), (-1.0, "r")):
         blob(f"shoulder.{n}", Vector((0.15 * side, 0.005, 1.425)), Vector((0.08, 0.075, 0.07)), "shirt",
@@ -264,9 +305,21 @@ def build_body():
     box("moustache", Vector((0.0, -0.112, 1.622)), Vector((0.055, 0.02, 0.014)), "hair", ["head"],
         bevel=0.006)
 
+    # Brow and eye sockets. Not eyes — a face at three metres is shadow and shape, and two shiny
+    # spheres on a man this size read as a doll. A ridge and a hollow under it is all it takes.
+    blob("brow", Vector((0.0, -0.088, 1.700)), Vector((0.082, 0.030, 0.020)), "skin", ["head"],
+         segs=12, rings=6)
+    for side in (1.0, -1.0):
+        blob(f"socket{side:+.0f}", Vector((0.038 * side, -0.082, 1.674)),
+             Vector((0.026, 0.016, 0.016)), "hair", ["head"], segs=8, rings=6)
+
     # The flat cap: a soft crown pulled forward, and a short stiff peak.
     blob("cap", Vector((0.0, -0.02, 1.745)), Vector((0.108, 0.125, 0.045)), "cap", ["head"])
     box("peak", Vector((0.0, -0.13, 1.728)), Vector((0.16, 0.08, 0.012)), "cap", ["head"], bevel=0.005)
+    # The button on the crown, and the seam round it. A flat cap is eight panels sewn to a button
+    # and it is the one piece of him that is above the camera on a ladder.
+    blob("capbutton", Vector((0.0, -0.02, 1.788)), Vector((0.016, 0.016, 0.008)), "cap", ["head"],
+         segs=8, rings=5)
 
     # Leather tool belt, a pouch on the right hip, and the rope coil over the left shoulder.
     torus("belt", Vector((0.0, 0.0, 1.01)), 0.176, 0.02, Matrix.Identity(3), "leather", ["pelvis"],

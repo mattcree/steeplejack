@@ -23,6 +23,7 @@ func _init() -> void:
 	for id in LEVELS:
 		await _can_start(id)
 	await _can_leave()
+	await _arrival_runs()
 	print("START: %s" % ("ok" if failures == 0 else "%d failure(s)" % failures))
 	quit(0 if failures == 0 else 1)
 
@@ -106,3 +107,46 @@ func _key(code: int) -> InputEventKey:
 	e.keycode = code
 	e.pressed = true
 	return e
+
+
+## The establishing shot actually runs.
+##
+## It did not. `_begin_arrival` calls `add_child` from inside `_ready`, and a parent that is
+## setting its children up refuses it outright — so the camera was never in the tree, every frame
+## of the fly-in failed on `global_position` and `look_at`, and the log filled with fifty-nine
+## copies of the same two errors while the player looked at nothing happening.
+##
+## Nothing caught it because the only frames anybody looked at were captures, and the capture
+## harness skips the arrival on purpose. A mode that every test skips is a mode nobody has seen.
+func _arrival_runs() -> void:
+	root.set_meta("job_level", "00-greybox")
+	var world: Node = load("res://scenes/steeplejack.tscn").instantiate()
+	root.add_child(world)
+	var player: Node = world.get_node("Player")
+
+	# Headless has no display, so the arrival is skipped there by design. Drive it directly.
+	player._begin_arrival_for_test()
+	_check(player.arriving > 0.0, "the fly-in starts")
+	_check(player._arrival_cam != null, "with a camera of its own")
+
+	# Deferred adds land on the next frame.
+	await process_frame
+	await process_frame
+	_check(player._arrival_cam != null and player._arrival_cam.is_inside_tree(),
+		"which gets into the tree, where a camera can have a position")
+
+	# And it moves, which is the entire point of it.
+	# A second of a five-and-a-half second shot, eased, so it has only just got going — which is
+	# the point: the threshold is "it is moving", not "it has arrived".
+	var was: Vector3 = player._arrival_cam.global_position
+	for i in 70:
+		await physics_frame
+	var went: float = player._arrival_cam.global_position.distance_to(was)
+	_check(went > 1.5, "and flies in — %.1f m in the first second" % went)
+
+	# Any key gets on with it, and the camera goes back to the player's own.
+	player.skip_arrival()
+	_check(player.arriving == 0.0 and player._arrival_cam == null,
+		"a key skips it and puts the camera back")
+
+	world.free()
