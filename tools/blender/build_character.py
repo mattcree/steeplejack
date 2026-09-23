@@ -93,6 +93,9 @@ PALETTE = {
     "trousers": (0.24, 0.21, 0.18), "boots": (0.10, 0.07, 0.05), "cap": (0.30, 0.27, 0.23),
     "leather": (0.33, 0.19, 0.09), "rope": (0.62, 0.51, 0.33), "hair": (0.66, 0.65, 0.63),
     "button": (0.55, 0.50, 0.40),
+    # The neckerchief. The only colour on him, and deliberately so: a man who is a silhouette
+    # against a bright sky for most of the game needs one thing that is not grey or brown.
+    "scarf": (0.45, 0.13, 0.11),
 }
 
 
@@ -249,6 +252,20 @@ def build_body():
             box(f"lace{lace}.{n}", Vector((x, -0.02, 0.105 + 0.032 * lace)),
                 Vector((0.085, 0.012, 0.007)), "button", [f"foot.{n}"], bevel=0.003)
 
+    # Knees and elbows. A limb built as one smooth cone reads as a pipe; a joint is a lump, and
+    # the lump is most of what tells you a leg is a leg when it bends.
+    for side, n in ((1.0, "l"), (-1.0, "r")):
+        x = 0.10 * side
+        blob(f"knee.{n}", Vector((x, -0.012, 0.50)), Vector((0.072, 0.070, 0.075)), "trousers",
+             [f"thigh.{n}", f"calf.{n}"], segs=10, rings=7)
+        d = Vector((ARM_DIR.x * side, 0.0, ARM_DIR.z))
+        sh = Vector((0.175 * side, 0.01, 1.45))
+        blob(f"elbow.{n}", sh + d * 0.275, Vector((0.054, 0.054, 0.056)), "shirt",
+             [f"upperarm.{n}", f"lowerarm.{n}"], segs=10, rings=7)
+        # Turn-ups over the boot, which is the detail that dates a pair of working trousers.
+        tube(f"turnup.{n}", Vector((x, 0.012, 0.155)), Vector((x, 0.012, 0.225)), 0.070, 0.068,
+             "trousers", [f"calf.{n}", f"foot.{n}"], rings=1)
+
     # Hips and seat of the trousers.
     tube("seat", Vector((0.0, 0.0, 0.84)), Vector((0.0, 0.0, 1.07)), 0.175, 0.17, "trousers",
          ["pelvis", "thigh.l", "thigh.r", "spine_01"], squash=(1.0, 0.72), rings=4)
@@ -292,6 +309,14 @@ def build_body():
     tube("neck", Vector((0.0, 0.0, 1.46)), Vector((0.0, -0.005, 1.60)), 0.055, 0.052, "skin",
          ["neck_01", "head"], rings=3)
 
+    # A neckerchief, knotted at the throat. Every man who worked outdoors in this trade wore one,
+    # it is the one spot of colour on him, and it is exactly at the height the camera sits when
+    # you are below him on a ladder looking up.
+    torus("scarf", Vector((0.0, -0.004, 1.478)), 0.066, 0.019, Matrix.Identity(3), "scarf",
+          ["neck_01", "spine_02"], squash=(1.0, 0.92), segs=18)
+    blob("scarfknot", Vector((0.0, -0.062, 1.462)), Vector((0.026, 0.024, 0.022)), "scarf",
+         ["neck_01"], segs=8, rings=6)
+
     # Head: an older man's, broad in the jaw. No features beyond the shapes a silhouette and a
     # face at 4 m read by: nose, ears, grey hair at the back and sides, a moustache.
     blob("head", Vector((0.0, -0.012, 1.665)), Vector((0.093, 0.105, 0.118)), "skin", ["head"])
@@ -304,6 +329,19 @@ def build_body():
     blob("hair", Vector((0.0, 0.03, 1.665)), Vector((0.097, 0.09, 0.1)), "hair", ["head"])
     box("moustache", Vector((0.0, -0.112, 1.622)), Vector((0.055, 0.02, 0.014)), "hair", ["head"],
         bevel=0.006)
+    # Sixty-odd years of weather: a heavy brow, cheekbones, and the hollow under them. Shapes,
+    # not features — at three metres a face is light and shadow and the shape is all of it.
+    for side in (1.0, -1.0):
+        blob(f"cheek{side:+.0f}", Vector((0.058 * side, -0.072, 1.640)),
+             Vector((0.030, 0.026, 0.024)), "skin", ["head"], segs=8, rings=6)
+        # Sideburns, which is what the hair does on a man of his age under a cap.
+        blob(f"burn{side:+.0f}", Vector((0.084 * side, -0.012, 1.628)),
+             Vector((0.014, 0.030, 0.040)), "hair", ["head"], segs=8, rings=6)
+    # A working chin, and the soft throat of a man in his sixties.
+    blob("chin", Vector((0.0, -0.082, 1.578)), Vector((0.042, 0.038, 0.030)), "skin", ["head"],
+         segs=10, rings=7)
+    blob("throat", Vector((0.0, -0.040, 1.520)), Vector((0.044, 0.038, 0.040)), "skin",
+         ["neck_01", "head"], segs=10, rings=7)
 
     # Brow and eye sockets. Not eyes — a face at three metres is shadow and shape, and two shiny
     # spheres on a man this size read as a doll. A ridge and a hollow under it is all it takes.
@@ -326,6 +364,12 @@ def build_body():
           squash=(1.0, 0.72))
     box("pouch", Vector((-0.16, -0.05, 0.96)), Vector((0.06, 0.1, 0.12)), "leather", ["pelvis"],
         bevel=0.012)
+    # A second pouch for dogs, and a bolster in a loop. He is carrying a trade's worth of iron and
+    # up to now the belt had one bag on it.
+    box("dogbag", Vector((0.17, 0.045, 0.955)), Vector((0.055, 0.085, 0.115)), "leather",
+        ["pelvis"], bevel=0.012)
+    tube("bolster", Vector((-0.175, 0.09, 1.05)), Vector((-0.175, 0.10, 0.90)), 0.014, 0.011,
+         "button", ["pelvis"], segs=8, rings=2)
     box("buckle", Vector((0.0, -0.13, 1.01)), Vector((0.05, 0.012, 0.04)), "button", ["pelvis"])
     tilt = Matrix.Rotation(math.radians(90), 3, "Y") @ Matrix.Rotation(math.radians(-38), 3, "X")
     torus("rope", Vector((0.03, 0.0, 1.26)), 0.27, 0.028, Matrix.Rotation(math.radians(-50), 3, "Y"),

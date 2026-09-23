@@ -792,8 +792,18 @@ func _draw_work(jack: Jack) -> void:
 	var bar := Vector2(eye.x - bar_w * 0.5, eye.y + tolerance + 54.0)
 	draw_rect(Rect2(bar - Vector2(1, 1), Vector2(bar_w + 2, 8)), Color(0, 0, 0, 0.47))
 	draw_rect(Rect2(bar, Vector2(bar_w * player.dog_depth, 6)), Color(0.80, 0.71, 0.47, 0.94))
-	_centre("dog %.0f%%   %.1f° off" % [player.dog_depth * 100.0, err], bar.y + 20,
-		Color(0.85, 0.83, 0.80, 0.85), 13)
+	# The two ticks where the work changes hands: hole done, plug home. A bar with stages on it
+	# reads as a sequence rather than as one long fill, which is what the work actually is.
+	for stage_at in [Face.WORK_CHISEL_TO, Face.WORK_PLUG_TO]:
+		var mx: float = bar.x + bar_w * float(stage_at)
+		draw_line(Vector2(mx, bar.y - 2.0), Vector2(mx, bar.y + 8.0), Color(INK, 0.55), 1.0)
+
+	# Named, because "dog 42%" was the same sentence for chiselling a hole, driving a plug and
+	# driving the dog — three different things with three different tools.
+	var phase: int = Face.work_phase(player.dog_depth)
+	var doing: String = ["chiselling the hole", "driving the plug", "driving the dog"][phase]
+	_centre("%s   ·   %.1f° off" % [doing, err], bar.y + 20,
+		Color(0.88, 0.86, 0.82, 0.92), 13)
 
 	# How long this stance buys you, counted down in seconds. The flashing arc says "soon" and this
 	# says "four" — and the fairness contract is that the player can explain the fall afterwards,

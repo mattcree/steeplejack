@@ -66,8 +66,7 @@ float relief(vec2 p) {
 	// Every wobble the colour uses, repeated here. If these two disagree the wall gets lit along
 	// joints it has not got — which is worse than no relief at all.
 	float course = floor(p.y / course_height);
-	float drift = (hash(vec2(0.0, course)) - 0.5) * 0.065 * wander;
-	float course_h = course_height * (1.0 + drift);
+	float course_h = course_height;
 	float bond = 0.5 + (hash(vec2(3.1, course)) - 0.5) * 0.22 * wander;
 	float shifted = p.x + mod(course, 2.0) * brick_length * bond;
 	float brick = floor(shifted / brick_length);
@@ -97,15 +96,18 @@ void fragment() {
 	float around = atan(world_pos.x, -world_pos.z) * r;
 	float h = world_pos.y;
 
-	// Courses are not all the same depth. Each one is up to 6% off, and because the offset
-	// accumulates up the wall, two courses ten apart are visibly not in step — which is what a
-	// wall laid by eye over a summer actually looks like.
+	// Courses come off a single grid, and they have to: `course` is worked out by dividing by the
+	// nominal height, so measuring the position *within* a course against a different height
+	// means the two disagree and the courses overlap and gap their way up the wall. That is what
+	// "the brickwork pattern is really messed up" was — not too much irregularity, a broken tiling.
+	//
+	// The wall is still not regular. What varies is the bond, the joint width and the bricks
+	// themselves, none of which can put a course out of step with its own boundaries.
 	float course = floor(h / course_height);
-	float drift = (hash(vec2(0.0, course)) - 0.5) * 0.065 * wander;
-	float course_h = course_height * (1.0 + drift);
+	float course_h = course_height;
 
-	// And the bond is not exactly half a brick. Half is what a drawing says; a wall is whatever
-	// the bricklayer's thumb said that morning.
+	// The bond is not exactly half a brick. Half is what a drawing says; a wall is whatever the
+	// bricklayer's thumb said that morning.
 	float bond = 0.5 + (hash(vec2(3.1, course)) - 0.5) * 0.22 * wander;
 	float shifted = around + mod(course, 2.0) * brick_length * bond;
 	float brick = floor(shifted / brick_length);

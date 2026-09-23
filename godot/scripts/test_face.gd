@@ -117,6 +117,8 @@ func _init() -> void:
 
 
 func _done() -> void:
+	await _three_steps()
+
 	print("FACE: %s" % ("ok" if failures == 0 else "%d failure(s)" % failures))
 	quit(0 if failures == 0 else 1)
 
@@ -145,3 +147,54 @@ func _check(ok: bool, what: String) -> void:
 	else:
 		printerr("  FAIL  %s" % what)
 		failures += 1
+
+
+## Putting a dog in is three things, and you can see which one you are on.
+##
+## 16-how-it-was-actually-done.md gives the sequence and the game only ever drew the third of it:
+## chisel the hole, drive a wooden plug into it, drive the dog into the plug. The hold on the
+## right button was one unbroken "dog 42%" from first tap to seated, and the plug — which is where
+## most of the hold comes from, and which the research is emphatic about — appeared out of nowhere
+## the instant the dog went home.
+func _three_steps() -> void:
+	# The stages are in order and they cover the whole of the work.
+	_check(Face.WORK_CHISEL_TO > 0.0 and Face.WORK_CHISEL_TO < Face.WORK_PLUG_TO
+		and Face.WORK_PLUG_TO < 1.0,
+		"the hole, the plug and the dog take the work in that order")
+
+	_check(Face.work_phase(0.0) == 0, "a fresh joint is a chisel and a hole")
+	_check(Face.work_phase(Face.WORK_CHISEL_TO - 0.01) == 0, "still cutting just before the hole is out")
+	_check(Face.work_phase(Face.WORK_CHISEL_TO) == 1, "and the moment it is, the plug goes in")
+	_check(Face.work_phase(Face.WORK_PLUG_TO - 0.01) == 1, "which takes until the plug is home")
+	_check(Face.work_phase(Face.WORK_PLUG_TO) == 2, "and only then does the dog go into it")
+	_check(Face.work_phase(1.0) == 2, "right up to seated")
+
+	# And the world shows the one you are on — the hole from the first tap, the plug only once
+	# there is a hole to put it in, the dog only once the plug is home.
+	var world: Node = load("res://scenes/steeplejack.tscn").instantiate()
+	root.add_child(world)
+	await physics_frame
+	var face: Node = world.get_node("Face")
+	# A joint that exists. Ids are the sim's and do not start at zero on every chimney.
+	var chimney: Node = world.get_node("Chimney")
+	var jid: int = world.get_node("Player").jack.nearest_joint(
+		chimney.global_position + chimney.face_point(6.0) + Vector3(0, 0, 0.45), 1.5)
+	_check(jid >= 0, "found a joint to work on: %d" % jid)
+
+	face.set_work(jid, 0.05)
+	_check(face._work_hole.visible, "chiselling: there is a hole")
+	_check(not face._work_plug.visible and not face._work_dog.visible,
+		"and no plug and no dog, because neither has been touched yet")
+
+	face.set_work(jid, (Face.WORK_CHISEL_TO + Face.WORK_PLUG_TO) * 0.5)
+	_check(face._work_plug.visible, "plugging: the plug is in the hole")
+	_check(not face._work_dog.visible, "and the dog is still on his belt")
+
+	face.set_work(jid, 0.9)
+	_check(face._work_dog.visible and face._work_plug.visible,
+		"dogging: the dog goes into the plug, which is still there")
+
+	face.set_work(-1, 0.0)
+	_check(not face._work_hole.visible and not face._work_plug.visible
+		and not face._work_dog.visible, "and none of it is left on the screen afterwards")
+	world.free()

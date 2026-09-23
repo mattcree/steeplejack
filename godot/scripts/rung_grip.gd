@@ -22,6 +22,7 @@ const HAND_SPREAD := 0.15               ## off the ladder's centre line, along t
 const FOOT_SPREAD := 0.12
 const HAND_PROUD := 0.035               ## the wrist sits a little in front of the rung it grips
 const FOOT_LIFT := 0.06                 ## the ankle sits above the rung the sole is on
+const FOOT_BACK := 0.055                ## and behind it, so the rung is under the arch
 const HAND_ON_WALL_ABOVE_FEET := 1.55   ## at the head of the ladder, where a hand goes on the brick
 const WALL_PALM := 0.06                 ## the wrist, off the face of the brick
 const MIN_ANKLE_ABOVE_FEET := 0.20     ## the lowest a straight leg puts the ankle, plus a little bend
@@ -178,7 +179,12 @@ func _rung_point(limb: int, index: int) -> Vector3:
 	if limb == hooked:
 		return base + along * float(SIDE[limb]) * FOOT_SPREAD * 0.5 \
 			- out * HOOK_THROUGH + Vector3.UP * (FOOT_LIFT - HOOK_DROP)
-	return base + along * float(SIDE[limb]) * FOOT_SPREAD + Vector3.UP * FOOT_LIFT
+	# Back a little, so the rung lands under the arch rather than under his toes. The ankle is the
+	# thing the IK solves for and the boot hangs forward of it, so putting the ankle on the rung
+	# puts the *ball* of his foot on it — which is how you stand on a rung for ten seconds, not
+	# how you stand on one for an hour.
+	return base + along * float(SIDE[limb]) * FOOT_SPREAD + out * FOOT_BACK \
+		+ Vector3.UP * FOOT_LIFT
 
 
 func _out() -> Vector3:

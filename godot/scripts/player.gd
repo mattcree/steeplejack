@@ -1219,6 +1219,7 @@ func _physics_process(dt: float) -> void:
 	_update_wind_lean(dt)
 	_update_lean(dt)
 	_update_grip(dt)
+	_update_hammer()
 	_update_guides()
 	_update_gear()
 	_update_checkpoint(dt)
@@ -1814,6 +1815,8 @@ func _toggle_work_mode() -> void:
 		drawing = false
 		swing_power = 0.0
 		if work_joint >= 0 and dog_depth > 0.0:
+			# Whatever stage it had reached. Walk away from a half-chiselled hole and it is a
+			# half-chiselled hole when you come back, not a dog hanging out of the wall.
 			started_dogs[work_joint] = dog_depth
 			if face != null:
 				face.started_ids[work_joint] = dog_depth
@@ -1887,8 +1890,13 @@ func _release_strike() -> void:
 	_kick = 0.012 * (0.4 + swing_at_release)
 
 	if foley != null:
-		# Pitched by how hard he swung, so a half-drawn blow sounds like one.
-		foley.cue("hammer", 0.85 + 0.3 * (1.0 - swing_at_release))
+		# Pitched by how hard he swung, so a half-drawn blow sounds like one — and by what he is
+		# hitting. A chisel into brick is a sharp tick, a plug going into a hole is a dull knock,
+		# and a dog into a plug is the solid one. Three tools, three sounds; rule 8's visual half
+		# is the hole, the plug and the spike themselves.
+		var pitches: Array[float] = [1.45, 0.95, 0.8]
+		var on_phase: float = pitches[Face.work_phase(dog_depth)]
+		foley.cue("hammer", on_phase * (0.85 + 0.3 * (1.0 - swing_at_release)))
 
 	if r["bent"]:
 		if foley != null:
@@ -2523,23 +2531,48 @@ func _stow_carried_ladder() -> void:
 
 
 ## A hammer in his right hand. He was tapping and driving with nothing in it.
-func _give_hammer(skel: Skeleton3D) -> void:
-	var grip := BoneAttachment3D.new()
-	grip.bone_name = "hand.r"
-	skel.add_child(grip)
+## The hammer lives on his belt and comes out when there is something to hit.
+##
+## It was welded to his right hand for the whole game — climbing, hauling, lashing, standing on
+## the cap looking at the view, always holding a club hammer. A man carries his tools; he does not
+## climb ninety feet with one fist permanently closed round a hammer shaft. Two copies, one on
+## each attachment, and which one is drawn follows the verb.
+var _hammer_hand: Node3D
+var _hammer_belt: Node3D
 
+
+func _give_hammer(skel: Skeleton3D) -> void:
+	var in_hand := BoneAttachment3D.new()
+	in_hand.bone_name = "hand.r"
+	skel.add_child(in_hand)
+	_hammer_hand = Node3D.new()
+	in_hand.add_child(_hammer_hand)
+	_build_hammer(_hammer_hand, Vector3(0.0, 0.13, 0.0), Vector3(0.03, 0.30, 0.0), Basis())
+
+	# On the belt: head down, handle up, hanging off his right hip the way it sits in the loop.
+	var on_belt := BoneAttachment3D.new()
+	on_belt.bone_name = "pelvis"
+	skel.add_child(on_belt)
+	_hammer_belt = Node3D.new()
+	on_belt.add_child(_hammer_belt)
+	_hammer_belt.position = Vector3(-0.155, 0.02, 0.055)
+	_hammer_belt.basis = Basis(Vector3(0, 0, 1), deg_to_rad(9.0))
+	_build_hammer(_hammer_belt, Vector3(0.0, 0.16, 0.0), Vector3(0.03, -0.03, 0.0), Basis())
+	_hammer_belt.visible = false
+
+
+func _build_hammer(under: Node3D, shaft_at: Vector3, head_at: Vector3, _b: Basis) -> void:
 	var iron := StandardMaterial3D.new()
-	iron.albedo_color = Color(0.22, 0.22, 0.23)
+	# A club hammer, not a tack hammer. It has to read at 4 m against brick and a ladder, and the
+	# first one — a 12 cm head on a 3 cm handle, true to a jack's tapping hammer — was lost in
+	# both. The steel is lighter than it would be for the same reason.
+	iron.albedo_color = Color(0.46, 0.47, 0.50)
 	iron.metallic = 0.6
 	iron.roughness = 0.45
 	var ash := StandardMaterial3D.new()
 	ash.albedo_color = Color(0.55, 0.40, 0.24)
 	ash.roughness = 0.8
 
-	# A club hammer, not a tack hammer. It has to read at 4 m against brick and a ladder, and the
-	# first one — a 12 cm head on a 3 cm handle, true to a jack's tapping hammer — was lost in both.
-	# The steel is lighter than it would be for the same reason: it has to separate from the stack.
-	iron.albedo_color = Color(0.46, 0.47, 0.50)
 	var handle := MeshInstance3D.new()
 	var hm := CylinderMesh.new()
 	hm.top_radius = 0.018
@@ -2547,16 +2580,25 @@ func _give_hammer(skel: Skeleton3D) -> void:
 	hm.height = 0.36
 	hm.material = ash
 	handle.mesh = hm
-	handle.position = Vector3(0.0, 0.13, 0.0)
-	grip.add_child(handle)
+	handle.position = shaft_at
+	under.add_child(handle)
 
 	var head := MeshInstance3D.new()
 	var bm := BoxMesh.new()
 	bm.size = Vector3(0.17, 0.065, 0.065)
 	bm.material = iron
 	head.mesh = bm
-	head.position = Vector3(0.03, 0.30, 0.0)
-	grip.add_child(head)
+	head.position = head_at
+	under.add_child(head)
+
+
+## In his hand only while he is using it: driving a dog, sounding a joint, or taking a swing.
+func _update_hammer() -> void:
+	if _hammer_hand == null:
+		return
+	var wanted: bool = work_mode or tapping > 0.0 or _playing in ["tap", "strike", "windup"]
+	_hammer_hand.visible = wanted
+	_hammer_belt.visible = not wanted
 
 
 ## R: start lashing the ladder you are carrying to the highest dog in the wall.

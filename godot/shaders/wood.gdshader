@@ -63,8 +63,14 @@ void vertex() {
 	vec3 s = vec3(length(MODEL_MATRIX[0].xyz), length(MODEL_MATRIX[1].xyz),
 		length(MODEL_MATRIX[2].xyz));
 	piece = VERTEX * s;
-	// Stable per-piece: every section of ladder is a different age and a different tree.
-	piece_id = hash(MODEL_MATRIX[3].xz * 3.7 + MODEL_MATRIX[3].y);
+	// Stable per piece, and it has to be *stable*.
+	//
+	// It was hashed off the instance's x and z, and a ladder section bows under the man on it —
+	// which moves every piece of it horizontally, every frame, which re-rolled its colour and its
+	// weathering thirty times a second. The ladder shimmered. Height does not change when a
+	// section bows (the bow is horizontal), and INSTANCE_ID does not change at all, so between
+	// them they identify a piece without tracking it.
+	piece_id = hash(vec2(float(INSTANCE_ID) * 0.37, floor(MODEL_MATRIX[3].y * 2.0)));
 }
 
 void fragment() {

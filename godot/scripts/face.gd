@@ -57,8 +57,11 @@ var _chalk_bar: MultiMeshInstance3D
 var _dogs: MultiMeshInstance3D
 var _lugs: MultiMeshInstance3D
 var _plugs: MultiMeshInstance3D
+var _holes: MultiMeshInstance3D
 var _bracket: Node3D
 var _work_dog: MeshInstance3D
+var _work_hole: MeshInstance3D
+var _work_plug: MeshInstance3D
 var _work_id := -1
 var _work_depth := 0.0
 var _bent: MultiMeshInstance3D
@@ -130,20 +133,49 @@ func _ready() -> void:
 	# the spike, and it is the one part of this the player can see going soft.
 	_plugs = _wrap(_plug_mesh())
 	_plugs.multimesh.mesh.surface_set_material(0, _lit(Color(0.42, 0.33, 0.21), 0.95))
+	# Holes somebody started and left. They stay in the brickwork: a jack's own holes are the ones
+	# he uses next time he is on her, which is what the career's `leftIn` is about.
+	_holes = _wrap(_hole_mesh())
+	_holes.multimesh.mesh.surface_set_material(0, _lit(Color(0.05, 0.045, 0.04), 1.0))
 
 	_bracket = _make_bracket()
 	add_child(_bracket)
 	_bracket.visible = false
 
 	# The dog being driven, drawn at its real depth. The depth bar is the fallback; the dog going
-	# into the wall is the reading.
+	# into the wall is the reading. A forged spike, the same shape as the ones already in her.
 	_work_dog = MeshInstance3D.new()
-	var wd := BoxMesh.new()
-	wd.size = Vector3(0.05, 0.05, 0.22)
-	wd.material = _lit(Color(0.24, 0.23, 0.22), 0.5)
-	_work_dog.mesh = wd
+	_work_dog.mesh = _forged(0.22, 0.026)
+	_work_dog.mesh.surface_set_material(0, _lit(Color(0.24, 0.23, 0.22), 0.5))
 	_work_dog.visible = false
 	add_child(_work_dog)
+
+	# The other two thirds of putting a dog in. 16-how-it-was-actually-done.md gives the sequence
+	# in three steps and the game only ever showed the third: **chisel the hole, drive a wooden
+	# plug into it, drive the dog into the plug.** The hold on the right button was one continuous
+	# "dog 42%" and the plug — which is where the hold actually comes from, and which the research
+	# is emphatic about — appeared out of nowhere the instant the dog seated.
+	_work_hole = MeshInstance3D.new()
+	var hole := CylinderMesh.new()
+	hole.top_radius = 0.030
+	hole.bottom_radius = 0.026
+	hole.height = 0.09
+	hole.radial_segments = 10
+	hole.material = _lit(Color(0.05, 0.045, 0.04), 1.0)
+	_work_hole.mesh = hole
+	_work_hole.visible = false
+	add_child(_work_hole)
+
+	_work_plug = MeshInstance3D.new()
+	var plug := CylinderMesh.new()
+	plug.top_radius = 0.028
+	plug.bottom_radius = 0.030
+	plug.height = 0.115
+	plug.radial_segments = 10
+	plug.material = _lit(Color(0.45, 0.35, 0.22), 0.95)
+	_work_plug.mesh = plug
+	_work_plug.visible = false
+	add_child(_work_plug)
 
 	# Rope: one torus per turn round the lug. Finished lashings in one bank, the one going on now in
 	# another, so the live coil can be rebuilt every frame without touching the rest of the stack.
@@ -387,20 +419,65 @@ func _coil_turn(j: Dictionary, k: int) -> Transform3D:
 
 
 ## The dog going in: at `id`, `depth` of the way home. -1 hides it.
+## The three steps of putting a dog in, as three things you watch happen.
+##
+## From the trade, in order: **a hole chiselled in the brickwork, a wooden plug driven into the
+## hole, and the dog driven into the plug.** The hold on the right button was one unbroken "dog
+## 42%" from first tap to seated, and the plug — which is where most of the hold comes from — was
+## invisible until the moment the dog went home, at which point it appeared out of nowhere.
+##
+## One hold still, because three separate button presses to put in one dog is bookkeeping. What
+## changes is that the progress now *shows its stages*: the hole opens, the plug goes in, the dog
+## goes into the plug.
+const WORK_CHISEL_TO := 0.30     ## the share of the work that is making the hole
+const WORK_PLUG_TO := 0.55       ## and the share by which the plug is home
+
+## Which of the three you are on, for the HUD to name. 0 chisel, 1 plug, 2 dog.
+static func work_phase(depth: float) -> int:
+	if depth < WORK_CHISEL_TO:
+		return 0
+	return 1 if depth < WORK_PLUG_TO else 2
+
+
 func set_work(id: int, depth: float) -> void:
 	_work_id = id
 	_work_depth = depth
+	_work_dog.visible = false
+	_work_hole.visible = false
+	_work_plug.visible = false
 	if id < 0:
-		_work_dog.visible = false
 		return
 	var j := joint(id)
 	if j.is_empty():
-		_work_dog.visible = false
 		return
+	_lay_work(j, depth)
+
+
+## Where the hole, the plug and the dog sit at this much of the work done. Shared with `_rebuild`,
+## so a joint you walked away from half-chiselled looks the same as it did when you left it.
+func _lay_work(j: Dictionary, depth: float) -> void:
+	var phase := work_phase(depth)
+
+	# The hole. It deepens as it is cut and then stays, because the plug goes in it.
+	var cut: float = clampf(depth / WORK_CHISEL_TO, 0.0, 1.0)
+	_work_hole.visible = true
+	_work_hole.global_transform = _on_face(j, Vector2.ZERO, -0.045 * cut)
+	_work_hole.scale = Vector3(0.4 + 0.6 * cut, 1.0, 0.4 + 0.6 * cut)
+	if phase == 0:
+		return
+
+	# The plug: stands proud of the hole and is driven flush.
+	var home: float = clampf((depth - WORK_CHISEL_TO) / (WORK_PLUG_TO - WORK_CHISEL_TO), 0.0, 1.0)
+	_work_plug.visible = true
+	_work_plug.global_transform = _on_face(j, Vector2.ZERO, 0.055 * (1.0 - home) - 0.012)
+	if phase == 1:
+		return
+
+	# And the dog, into the plug. The spike is 0.22 m: unstarted it stands its full length out of
+	# the joint, home only the head shows, so the length sticking out *is* the depth.
+	var into: float = clampf((depth - WORK_PLUG_TO) / (1.0 - WORK_PLUG_TO), 0.0, 1.0)
 	_work_dog.visible = true
-	# The spike is 0.22 m. Unstarted, it stands its full length out of the joint; home, only the lug
-	# end shows. So the length sticking out *is* the depth, readable without the bar.
-	var out := 0.11 + 0.20 * (1.0 - clampf(depth, 0.0, 1.0))
+	var out := 0.11 + 0.20 * (1.0 - into)
 	_work_dog.global_transform = _on_face(j, Vector2.ZERO, out - 0.11)
 
 
@@ -440,6 +517,7 @@ func _rebuild() -> void:
 	var lugs: Array = []
 	var bent: Array = []
 	var plugs: Array = []
+	var holes: Array = []
 	var scars: Array = []
 	var rusty: Array = [[], [], []]
 
@@ -457,10 +535,22 @@ func _rebuild() -> void:
 		elif j["occupied"] and bent_ids.has(j["id"]):
 			bent.append(_on_face(j, Vector2(0.02, -0.03), 0.07, deg_to_rad(38.0)))
 		elif started_ids.has(j["id"]):
-			var left := 0.11 * (1.0 - clampf(float(started_ids[j["id"]]), 0.0, 1.0))
-			dogs.append(_on_face(j, Vector2.ZERO, 0.11 + left))
-			lugs.append(_on_face(j, Vector2(0.0, 0.0), 0.21 + left))
-			plugs.append(_on_face(j, Vector2.ZERO, 0.013))
+			# Half done, at whatever stage it got to. A joint you walked away from after cutting
+			# the hole is a hole in the wall, not a dog hanging out of one — which is what it
+			# looked like when every stage drew the spike.
+			var got: float = clampf(float(started_ids[j["id"]]), 0.0, 1.0)
+			var stage := work_phase(got)
+			holes.append(_on_face(j, Vector2.ZERO,
+				-0.045 * clampf(got / WORK_CHISEL_TO, 0.0, 1.0)))
+			if stage >= 1:
+				var home: float = clampf((got - WORK_CHISEL_TO)
+					/ (WORK_PLUG_TO - WORK_CHISEL_TO), 0.0, 1.0)
+				plugs.append(_on_face(j, Vector2.ZERO, 0.055 * (1.0 - home) - 0.012))
+			if stage >= 2:
+				var into: float = clampf((got - WORK_PLUG_TO) / (1.0 - WORK_PLUG_TO), 0.0, 1.0)
+				var left := 0.20 * (1.0 - into)
+				dogs.append(_on_face(j, Vector2.ZERO, 0.11 + left))
+				lugs.append(_on_face(j, Vector2(0.0, 0.0), 0.21 + left))
 		elif j["occupied"]:
 			# A driven dog: the spike standing out of the joint, and the lug across its end.
 			dogs.append(_on_face(j, Vector2.ZERO, 0.11))
@@ -504,6 +594,7 @@ func _rebuild() -> void:
 	_fill(_dogs, dogs)
 	_fill(_lugs, lugs)
 	_fill(_plugs, plugs)
+	_fill(_holes, holes)
 	_fill(_bent, bent)
 	_fill(_scars, scars)
 	for grade in 3:
@@ -594,6 +685,20 @@ func _lug_mesh() -> Mesh:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	# Standing up from the tip, so its foot is at the origin the transform puts at the spike's end.
 	st.append_from(c, 0, Transform3D(Basis(), Vector3(0.0, 0.040, 0.0)))
+	return st.commit()
+
+
+## The hole, before anything goes in it.
+func _hole_mesh() -> Mesh:
+	var c := CylinderMesh.new()
+	c.top_radius = 0.030
+	c.bottom_radius = 0.026
+	c.height = 0.09
+	c.radial_segments = 10
+	c.rings = 1
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.append_from(c, 0, Transform3D(Basis(Vector3(1, 0, 0), -PI * 0.5), Vector3.ZERO))
 	return st.commit()
 
 
