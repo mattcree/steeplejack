@@ -149,4 +149,18 @@ func _arrival_runs() -> void:
 	_check(player.arriving == 0.0 and player._arrival_cam == null,
 		"a key skips it and puts the camera back")
 
+	# And it ends BY ITSELF, which is the path that matters and the one that was broken: the
+	# tidy-up sat behind a guard that the natural ending had already made false, so the shot never
+	# finished, the player's camera never came back, and the fly-in camera was still hanging off
+	# the world at teardown.
+	player._begin_arrival_for_test()
+	await process_frame
+	await process_frame
+	_check(player._arrival_cam != null, "a second shot starts")
+	player.arriving = 0.05
+	for i in 12:
+		await physics_frame
+	_check(player.arriving == 0.0, "and runs out on its own")
+	_check(player._arrival_cam == null, "letting go of its camera without being told to")
+
 	world.free()

@@ -219,6 +219,18 @@ func card_at(p: Vector2) -> int:
 
 func _input(event: InputEvent) -> void:
 	if van_open and (event is InputEventMouseButton or event is InputEventMouseMotion):
+		# Buttons first: they sit inside the van's own rectangle, so a row hit-test that ran
+		# before them would swallow the click.
+		van_hot = UiButtons.hit(van_buttons(), event.position)
+		if van_hot >= 0:
+			if event is InputEventMouseButton and event.pressed \
+					and event.button_index == MOUSE_BUTTON_LEFT:
+				if van_hot == 0:
+					_take_it()
+				else:
+					van_open = false
+			queue_redraw()
+			return
 		var hit: Dictionary = van_hit(event.position)
 		if not hit.is_empty():
 			van_row = int(hit["row"])
@@ -527,6 +539,16 @@ const VAN_H := 340.0
 const VAN_ROW_H := 54.0
 
 
+## The two things you can do in the van, as things you can click.
+func van_buttons() -> Array:
+	var r := van_rect()
+	return UiButtons.rects(_font, ["Set off", "Think again"], 15,
+		r.position.x + r.size.x - 24.0, r.position.y + r.size.y - 16.0)
+
+
+var van_hot := -1
+
+
 func van_rect() -> Rect2:
 	return Rect2(Vector2((size.x - VAN_W) * 0.5, (size.y - VAN_H) * 0.5), Vector2(VAN_W, VAN_H))
 
@@ -610,6 +632,8 @@ func _draw_van() -> void:
 	if van_said != "":
 		draw_string(_font, Vector2(r.position.x + 28.0, r.position.y + VAN_H - 48.0), van_said,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.55, 0.18, 0.14))
-	draw_string(_font, Vector2(r.position.x + 28.0, r.position.y + VAN_H - 22.0),
-		"↑↓ choose   ←→ or click   ·   enter to set off   ·   esc to think again",
+	draw_string(_font, Vector2(r.position.x + 28.0, r.position.y + VAN_H - 26.0),
+		"↑↓ choose    ←→ or click",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, FADED)
+	UiButtons.draw_row(self, _font, van_buttons(), ["Set off", "Think again"], 15,
+		van_hot, 0, INK, Color(0.78, 0.66, 0.38))

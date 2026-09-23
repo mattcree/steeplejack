@@ -279,6 +279,7 @@ var options_open := false        ## the motion options overlay, on F1
 ## checkpoint already remembers it and greets you with "your stack is still up there" — so
 ## leaving is giving up the day, not the job.
 var leaving := false
+var leaving_hot := -1            ## which answer the pointer is over, or -1
 var options_row := 0
 
 ## The gin wheel — VERB-007. A pulley lashed to a dog, a rope to the yard.
@@ -935,17 +936,33 @@ func _begin_arrival_for_test() -> void:
 
 
 func skip_arrival() -> void:
-	if arriving <= 0.0:
+	if arriving <= 0.0 and _arrival_cam == null:
 		return
+	_end_arrival()
+
+
+## Put the camera back and let go of the one the shot was using.
+##
+## This was inside `skip_arrival`, behind a `if arriving <= 0.0: return` guard — and the natural
+## end of the shot sets `arriving` to zero and *then* calls it, so the guard fired every time and
+## the fly-in never ended. The camera stayed current for the rest of the level, the player's own
+## camera never came back, and the fly-in camera was still hanging off the world when the scene
+## was torn down. "1 RID allocation leaked at exit" in the logs was that.
+##
+## The lesson is the guard, not the leak: a function that both *finishes* a thing and *cancels* it
+## must not be able to no-op on the finish path.
+func _end_arrival() -> void:
 	arriving = 0.0
 	if _arrival_cam != null:
-		if _arrival_cam.is_inside_tree():
-			_arrival_cam.queue_free()
-		else:
-			# Never made it into the tree, so free it directly — queue_free on an orphan leaks it.
-			_arrival_cam.free()
+		if is_instance_valid(_arrival_cam):
+			if _arrival_cam.is_inside_tree():
+				_arrival_cam.queue_free()
+			else:
+				# Never made it into the tree; queue_free on an orphan leaks it.
+				_arrival_cam.free()
 		_arrival_cam = null
-	camera.make_current()
+	if camera != null and is_instance_valid(camera):
+		camera.make_current()
 	_capture_mouse(true)
 
 
@@ -954,8 +971,8 @@ func _update_arrival(dt: float) -> void:
 	if arriving <= 0.0:
 		return
 	arriving = maxf(arriving - dt, 0.0)
-	if arriving <= 0.0 or _arrival_cam == null:
-		skip_arrival()
+	if arriving <= 0.0 or _arrival_cam == null or not is_instance_valid(_arrival_cam):
+		_end_arrival()
 		return
 	# It is added deferred, so the first frame or two of the shot has nowhere to put a camera.
 	if not _arrival_cam.is_inside_tree():
@@ -1014,6 +1031,20 @@ func _unhandled_input(event: InputEvent) -> void:
 				KEY_ESCAPE, KEY_N:
 					leaving = false
 					_capture_mouse(true)
+		# And with the mouse, because a question with two answers should have two things to click.
+		# The mouse is free here: asking it was the thing that released it.
+		if event is InputEventMouseMotion or event is InputEventMouseButton:
+			var hud := get_node_or_null("../HUD")
+			if hud != null:
+				leaving_hot = UiButtons.hit(hud.leaving_buttons(), event.position)
+				if event is InputEventMouseButton and event.pressed \
+						and event.button_index == MOUSE_BUTTON_LEFT and leaving_hot >= 0:
+					if leaving_hot == 0:
+						back_to_the_board()
+					else:
+						leaving = false
+						leaving_hot = -1
+						_capture_mouse(true)
 		return
 	if _options_input(event):
 		return

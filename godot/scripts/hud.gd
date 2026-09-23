@@ -2037,6 +2037,14 @@ func _draw_arrival(jack: Jack) -> void:
 	_centre("any key to get on with it", size.y * 0.88, Color(GHOST, 0.75 * a), SMALL)
 
 
+## Where the two answers sit. Shared with the hit-testing in player.gd, because a button whose
+## click lands on the other button is worse than no button.
+func leaving_buttons() -> Array:
+	var boxes := UiButtons.rects(_font, ["Back to the yard", "Stop where you are"], 16,
+		size.x * 0.5 + 232.0, size.y * 0.42 + 96.0)
+	return boxes
+
+
 ## The scrim: a permanent, very soft darkening of the four edges, under everything else.
 ##
 ## This HUD lives against sky, and a British sky at ten in the morning is the brightest thing in
@@ -2131,8 +2139,10 @@ func _draw_leaving() -> void:
 	_centre(note, mid + 4.0, Color(DIM, 0.88), BODY)
 	_centre("%d m of her laddered  ·  day's work not paid for" % int(player.ladder_top),
 		mid + 28.0, Color(FAINT, 0.80), SMALL)
-	_centre("[enter] back to the yard        [esc] stop where you are",
-		mid + 68.0, Color(INK, 0.92), H2)
+	var boxes := leaving_buttons()
+	UiButtons.draw_row(self, _font, boxes, ["Back to the yard", "Stop where you are"], 16,
+		player.leaving_hot, 1, INK, Color(0.78, 0.66, 0.38))
+	_centre("enter  ·  esc", mid + 118.0, Color(GHOST, 0.6), SMALL)
 
 
 ## The motion options, F1. A plain list: the one being changed is bright, and the keys are said.

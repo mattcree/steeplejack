@@ -123,6 +123,15 @@ func _mouse(event: InputEvent) -> void:
 		queue_redraw()
 		return
 	if confirming:
+		confirm_hot = UiButtons.hit(confirm_buttons(), event.position)
+		if event is InputEventMouseButton and event.pressed \
+				and event.button_index == MOUSE_BUTTON_LEFT and confirm_hot >= 0:
+			if confirm_hot == 0:
+				_start_new()
+			else:
+				confirming = false
+				confirm_hot = -1
+		queue_redraw()
 		return
 	var row := row_at(event.position)
 	if row >= 0:
@@ -338,14 +347,34 @@ func _draw_smoke(x: float, top: float, h: float) -> void:
 			3.0 + pf * 9.0, Color(SMOKE, 0.10 * (1.0 - pf)))
 
 
-func _draw_confirm() -> void:
+var confirm_hot := -1
+
+
+## Where the two answers sit, shared by the drawing and the clicking.
+func confirm_buttons() -> Array:
+	var at := _confirm_rect()
+	return UiButtons.rects(_font, ["Start over", "Keep it"], 15,
+		at.position.x + at.size.x - 26.0, at.position.y + at.size.y - 20.0)
+
+
+## One rectangle, used by the drawing and by the buttons' geometry.
+func _confirm_rect() -> Rect2:
 	var w := 520.0
-	var h := 150.0
-	var at := Vector2((size.x - w) * 0.5, (size.y - h) * 0.5)
-	draw_rect(Rect2(at, Vector2(w, h)), Color(0.05, 0.05, 0.06, 0.9))
+	var h := 168.0
+	return Rect2(Vector2((size.x - w) * 0.5, (size.y - h) * 0.5), Vector2(w, h))
+
+
+func _draw_confirm() -> void:
+	var box := _confirm_rect()
+	var at := box.position
+	draw_rect(box, Color(0.05, 0.05, 0.06, 0.9))
 	_centre("Start a new career?", at.y + 46.0, INK, 22)
 	_centre("The season you have going will be gone for good.", at.y + 76.0, Color(DIM, 0.8), 15)
-	_centre("[Enter] start over      [Esc] keep it", at.y + 116.0, Color(WATCH, 0.9), 15)
+	# Buttons, because this one throws a career away. A destructive action offered as "press Y"
+	# with nothing on the screen to press is the worst case of keyboard-only: the safe answer is
+	# invisible and the dangerous one is a guess.
+	UiButtons.draw_row(self, _font, confirm_buttons(), ["Start over", "Keep it"], 15,
+		confirm_hot, 1, INK, Color(0.78, 0.66, 0.38))
 
 
 func _draw_options() -> void:

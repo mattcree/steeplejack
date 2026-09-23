@@ -163,6 +163,17 @@ func _input(event: InputEvent) -> void:
 
 func _shed_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton or event is InputEventMouseMotion:
+		shed_hot = UiButtons.hit(shed_buttons(), event.position)
+		if shed_hot >= 0:
+			if event is InputEventMouseButton and event.pressed \
+					and event.button_index == MOUSE_BUTTON_LEFT:
+				if shed_hot == 0:
+					shed_choose()
+				else:
+					shed_open = false
+					_said = ""
+			queue_redraw()
+			return
 		var r := shed_row_at(event.position)
 		if r >= 0:
 			shed_row = r
@@ -199,6 +210,16 @@ const SHED_ROW_H := 74.0
 func shed_rect() -> Rect2:
 	var h := 120.0 + SHED_ROW_H * float(SHED.size()) + 64.0
 	return Rect2(Vector2((size.x - SHED_W) * 0.5, (size.y - h) * 0.5), Vector2(SHED_W, h))
+
+
+var shed_hot := -1
+
+
+## Buy, and get out. Shared with the hit-testing below.
+func shed_buttons() -> Array:
+	var r := shed_rect()
+	return UiButtons.rects(_font, ["Buy", "Back to the yard"], 15,
+		r.position.x + r.size.x - 24.0, r.position.y + r.size.y - 14.0)
 
 
 func shed_row_at(p: Vector2) -> int:
@@ -247,8 +268,9 @@ func _draw_shed() -> void:
 
 	if _said != "":
 		_label(_said, r.position + Vector2(28, r.size.y - 52.0), Color(WATCH, 0.9), 15)
-	_label("↑↓ or the mouse   ·   enter to buy   ·   esc back to the yard",
-		r.position + Vector2(28, r.size.y - 24.0), Color(GHOST, 0.7), 13)
+	_label("↑↓ or the mouse", r.position + Vector2(28, r.size.y - 24.0), Color(GHOST, 0.7), 13)
+	UiButtons.draw_row(self, _font, shed_buttons(), ["Buy", "Back to the yard"], 15,
+		shed_hot, 0, INK, Color(0.78, 0.66, 0.38))
 
 
 func choose(what: String) -> void:
