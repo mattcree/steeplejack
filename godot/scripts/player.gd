@@ -3173,6 +3173,11 @@ func has_tapped_here() -> bool:
 var conductor_job := false
 var tape_at := -1.0            ## the height of the last clip, or -1 before the terminal is set
 var tape_paid := 0.0           ## let out since that clip, and the thing the Code measures
+## Every clip that has gone in: Vector2(height, how far off the climbing line). The lateral is
+## kept because the wander is the craft — the 1881 Code allows a run between two points no longer
+## than one and a half times the straight line — and a run that wandered ought to *look* like a
+## run that wandered, from the ground, for ever.
+var run_clips: Array = []
 
 
 func _conductor_setup() -> void:
@@ -3228,6 +3233,10 @@ func _conductor_descend(before: float) -> void:
 	var dropped: float = maxf(before - height_m(), 0.0)
 	# Round the face costs you as well as down it: the lateral shuffle is tape too.
 	tape_paid += dropped + absf(_shuffle - _shuffle_before) * 0.6
+	# The end in his hand, paying out as he goes. Cheap: one MultiMesh rebuild of a few dozen
+	# short pieces, and only on a conductor job with a terminal already on.
+	if not run_clips.is_empty():
+		_run_geometry()
 	_shuffle_before = _shuffle
 
 
@@ -3237,6 +3246,15 @@ var _shuffle_before := 0.0
 ## [F] at the apex sets the terminal; [F] on the way down fixes a clip. Same key, because it is the
 ## same act — putting the thing on the wall — and the game already uses F for "deal with what is
 ## in front of you".
+## The run, on the chimney. Called whenever a clip goes in and once a frame while tape is paying
+## out, so the loose end follows him down.
+func _run_geometry() -> void:
+	if not conductor_job or chimney == null:
+		return
+	chimney.set_run(run_clips, maxf(height_m(), 0.0),
+		bool(jack.conductor_state(0.0).get("terminal", false)))
+
+
 func _conductor_act() -> void:
 	if not conductor_job:
 		return
@@ -3251,6 +3269,8 @@ func _conductor_act() -> void:
 		jack.conductor_fix(here, 0.0, _clip_tightness())
 		tape_at = here
 		tape_paid = 0.0
+		run_clips = [Vector2(here, _shuffle)]
+		_run_geometry()
 		if foley != null:
 			foley.cue("seated", 1.2)
 		_say("terminal on. now run it down and clip it as you go")
@@ -3265,6 +3285,8 @@ func _conductor_act() -> void:
 
 	tape_at = here
 	tape_paid = 0.0
+	run_clips.append(Vector2(here, _shuffle))
+	_run_geometry()
 	if foley != null:
 		foley.cue("hammer", 1.15)
 	var after: Dictionary = jack.conductor_state(here)
@@ -3321,6 +3343,7 @@ func _conductor_earth() -> void:
 	# The continuity test IS the end of the job — "a lovely final beat: it turns, it points into
 	# the wind, the bell rings", as 05-mission-types.md puts it about the other archetype that
 	# ends in a test. A run that does not pass is finished too; it is just finished badly.
+	chimney.set_earth(ohms)
 	if ohms <= pass_at and String(st.get("verdict_name", "")) != "FAILED":
 		_settle_conductor(st)
 
@@ -3561,6 +3584,10 @@ func _plumb_tick(dt: float) -> void:
 	var hours: float = dt * SETTLE_HOURS_PER_SECOND
 	plumb_hours += hours
 	jack.plumb_step(hours)
+	# And on the chimney. The whole archetype is a shaft coming back onto itself over a day and a
+	# half, and it used to do that entirely inside a HUD read-out — she stood exactly as plumb
+	# before the cut as after it, and the oscillation the job is built on happened to a number.
+	chimney.set_lean(float(jack.plumb_state().get("lean_now", 0.0)))
 	if not bool(jack.plumb_state().get("settling", false)):
 		_settle_plumb()
 

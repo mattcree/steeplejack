@@ -250,6 +250,24 @@ func _run(cmd: String) -> void:
 			player._arrive_at_top()
 			player._cam_yaw = player._yaw
 			player._cam_pitch = player._pitch
+		"run":
+			# A conductor run already part way down: terminal on at the apex, then a clip every
+			# `a` metres to height `b`, wandering a little each time so the tape is not a plumb
+			# line. Through the real verb, so what is photographed is a state the game can be in.
+			player.jack.conductor_set_terminal()
+			var top: float = chimney.height_m
+			player.run_clips = [Vector2(top, 0.0)]
+			player.jack.conductor_fix(top, 0.0, 0.55)
+			var step: float = a if a > 0.5 else 4.0
+			var h: float = top - step
+			var wander := 0.0
+			while h > b:
+				wander = clampf(wander + randf_range(-0.28, 0.28), -0.5, 0.5)
+				player.jack.conductor_fix(h, step, 0.55)
+				player.run_clips.append(Vector2(h, wander))
+				h -= step
+			player.tape_at = h + step
+			player._run_geometry()
 		"gin":
 			# Rig the gin wheel on the highest dog in reach and start a haul from the cradle.
 			await _wait(2)

@@ -38,6 +38,10 @@ var _dogs := MultiMeshInstance3D.new()
 var _straps: Node3D
 var _bolts := MultiMeshInstance3D.new()
 var _band_specs: Array = []
+## The lightning conductor: a terminal at the apex, copper tape down the face, a holdfast at every
+## clip, and an earth plate in a pit at the foot.
+var _run := MultiMeshInstance3D.new()
+var _run_extras: Node3D
 
 # Not art direction — a legend. The level file says a band is ivy or a wind band, and until there
 # are real materials the stack is striped by band type so you can see the data by looking at it.
@@ -70,6 +74,13 @@ func build(jack: Jack) -> void:
 	_base_r = jack.radius_at(0.0)
 	_top_r = jack.radius_at(height_m)
 
+	# Out of plumb, if she is. A compass bearing, the same convention the wind uses: north is -Z.
+	var st: Dictionary = jack.structure()
+	var deg: float = float(st.get("lean_degrees", 0.0))
+	var bearing: float = deg_to_rad(float(st.get("lean_bearing", 0.0)))
+	_lean_dir = Vector3(sin(bearing), 0.0, -cos(bearing))
+	_lean_top = tan(deg_to_rad(deg)) * height_m
+
 	# One cylinder per band, each tapered to the batter at its own height.
 	for i in jack.band_count():
 		var b: Dictionary = jack.band(i)
@@ -92,7 +103,11 @@ func build(jack: Jack) -> void:
 
 		var inst := MeshInstance3D.new()
 		inst.mesh = mesh
-		inst.position = Vector3(0, (from + to) * 0.5, 0)
+		var mid: float = (from + to) * 0.5
+		inst.position = Vector3(0, mid, 0) + lean_offset(mid)
+		# Tagged so the lean can be changed later without rebuilding the stack: a straightening
+		# moves her a few centimetres a day and she has to move while the player is looking.
+		inst.set_meta("shaft_at", mid)
 		add_child(inst)
 
 	_cap()
@@ -121,7 +136,8 @@ func build(jack: Jack) -> void:
 			shape.height = hi - lo
 			var col := CollisionShape3D.new()
 			col.shape = shape
-			col.position = Vector3(0, (lo + hi) * 0.5, 0)
+			var cmid: float = (lo + hi) * 0.5
+			col.position = Vector3(0, cmid, 0) + lean_offset(cmid)
 			solid.add_child(col)
 
 	_cradle()
@@ -175,7 +191,11 @@ func _cap() -> void:
 		mesh.material = mat
 		var inst := MeshInstance3D.new()
 		inst.mesh = mesh
-		inst.position = Vector3(0, height_m + 0.275 + 0.55 * i, 0)
+		var at: float = height_m + 0.275 + 0.55 * float(i)
+		# The cap goes wherever the head of the shaft has got to. A stack that leans and a collar
+		# that does not is a chimney wearing its hat at the wrong angle.
+		inst.position = Vector3(0, at, 0) + lean_offset(height_m)
+		inst.set_meta("shaft_at", height_m)
 		add_child(inst)
 
 	# And the flue. A chimney with a solid top is a post.
@@ -192,7 +212,9 @@ func _cap() -> void:
 	hole.mesh = flue
 	# Its top a hair above the cap's, so the hole is what you see from the rim. Level with it, the
 	# cap's own top face covered the flue and the stack had no hole in it.
-	hole.position = Vector3(0, height_m + 0.275 + 0.55 * 3 + 0.275 - 1.5 + 0.01, 0)
+	hole.position = Vector3(0, height_m + 0.275 + 0.55 * 3 + 0.275 - 1.5 + 0.01, 0) \
+		+ lean_offset(height_m)
+	hole.set_meta("shaft_at", height_m)
 	add_child(hole)
 
 
@@ -309,7 +331,45 @@ func _cradle() -> void:
 
 ## Where the ladder sits at a height, in local space.
 func face_point(h: float) -> Vector3:
-	return FACE * (radius_at(h) + LADDER_STANDOFF) + Vector3(0, h, 0)
+	return FACE * (radius_at(h) + LADDER_STANDOFF) + Vector3(0, h, 0) + lean_offset(h)
+
+
+# --- the lean --------------------------------------------------------------------------------
+#
+# Pitchcombe Mill is one point one degrees over and the whole job is bringing her back. The level
+# has said `leanDegrees: 1.1` since it was written and nothing read it, so the chimney the player
+# was sent to straighten stood perfectly plumb — the defining fact of the level, invisible.
+#
+# It is a **shear**, not a rotation of this node: every axis is still vertical and every height is
+# still a height, so `chimney.global_position + chimney.face_point(h)` — which the player, the
+# tests and five other scripts all use to find the wall — keeps working untouched. At 1.1° the
+# difference between shearing a shaft and tilting it is under a millimetre anywhere on it.
+var _lean_dir := Vector3.ZERO
+var _lean_top := 0.0            ## how far the head is out of plumb, in metres
+
+## How far out of plumb the shaft is at `h`.
+func lean_offset(h: float) -> Vector3:
+	if _lean_top == 0.0 or height_m <= 0.0:
+		return Vector3.ZERO
+	return _lean_dir * (_lean_top * clampf(h / height_m, 0.0, 1.0))
+
+
+## She is coming back. Called as a straightening settles, so the shaft moves while you watch it.
+func set_lean(metres_at_top: float) -> void:
+	if absf(metres_at_top - _lean_top) < 0.002:
+		return
+	_lean_top = metres_at_top
+	for child in get_children():
+		if child is MeshInstance3D and child.has_meta("shaft_at"):
+			child.position.x = lean_offset(float(child.get_meta("shaft_at"))).x
+			child.position.z = lean_offset(float(child.get_meta("shaft_at"))).z
+	var solid := get_node_or_null("Solid")
+	if solid != null:
+		for col in solid.get_children():
+			if col is CollisionShape3D:
+				col.position.x = lean_offset(col.position.y).x
+				col.position.z = lean_offset(col.position.y).z
+	set_ladder_top(_ladder_top)
 
 
 ## The batter, for placing geometry. Anything that *decides* something asks the sim instead.
@@ -411,6 +471,133 @@ func bow_at(h: float) -> Vector3:
 ## Where the cradle is, in the world: for the marker that points a player at it.
 func cradle_point() -> Vector3:
 	return global_position + FACE * (_base_r + 4.5)
+
+
+# --- the lightning conductor ---------------------------------------------------------------------
+#
+# A conductor job is: a terminal at the very top, then run copper tape down her and clip it as you
+# go, then an earth pit at the foot. It shipped with a checklist, a panel that counted the tape
+# and the clips, a verdict — and, like the bands, nothing on the chimney. The player set a
+# terminal that did not appear, ran a tape that was not there, and clipped it to a wall that never
+# showed a single holdfast.
+#
+# The thing that matters most to get on the screen is the **wander**. The 1881 Code's rule is that
+# the run between two points may be no longer than one and a half times the straight line, and
+# keeping it straight is the craft — so the tape is drawn through the clips where they actually
+# went, laterally as well as vertically. A run that wandered looks like a run that wandered, from
+# the ground, for ever.
+
+const TAPE_OFF_LADDER := 0.62   ## clear of the right stile, so it is not inside the ladder
+const TAPE_PROUD := 0.035
+
+## `clips` is Vector2(height, lateral offset) per fixing, top first. `head` is where the tape has
+## been paid out to below the last clip — the loose end in his hand.
+func set_run(clips: Array, head: float, terminal: bool) -> void:
+	if _run.multimesh == null:
+		_setup_multimesh(_run, Color(0.52, 0.33, 0.16))
+		var rm := _run.multimesh.mesh.material as StandardMaterial3D
+		# Copper, and not new copper: a run goes green in a season and black in ten.
+		rm.albedo_color = Color(0.36, 0.30, 0.20)
+		rm.metallic = 0.65
+		rm.roughness = 0.44
+		add_child(_run)
+	if _run_extras == null:
+		_run_extras = Node3D.new()
+		_run_extras.name = "RunExtras"
+		add_child(_run_extras)
+	for child in _run_extras.get_children():
+		child.queue_free()
+
+	var xs: Array[Transform3D] = []
+	var points: Array[Vector3] = []
+	for c in clips:
+		points.append(_tape_point(float((c as Vector2).x), float((c as Vector2).y)))
+	# The loose end, below the last clip. It hangs on the line he is standing on.
+	if not clips.is_empty() and head < float((clips[clips.size() - 1] as Vector2).x) - 0.05:
+		points.append(_tape_point(head, float((clips[clips.size() - 1] as Vector2).y)))
+
+	for i in range(1, points.size()):
+		xs.append_array(_tape_run(points[i - 1], points[i]))
+	_run.multimesh.instance_count = xs.size()
+	for i in xs.size():
+		_run.multimesh.set_instance_transform(i, xs[i])
+
+	# A holdfast at every clip: a copper cleat driven into the joint, which is the thing the
+	# player is actually judged on — too hard and it is pinched, too loose and it works off.
+	var cleat := StandardMaterial3D.new()
+	cleat.albedo_color = Color(0.42, 0.34, 0.22)
+	cleat.metallic = 0.5
+	cleat.roughness = 0.5
+	for c in clips:
+		var at := _tape_point(float((c as Vector2).x), float((c as Vector2).y))
+		var m := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.10, 0.05, 0.13)
+		m.mesh = bm
+		m.material_override = cleat
+		m.position = at + FACE * 0.02
+		_run_extras.add_child(m)
+
+	if terminal:
+		# The finial: a copper rod standing off the cap, which is the one part of a conductor run
+		# anybody on the ground has ever been able to see.
+		var rod := MeshInstance3D.new()
+		var cy := CylinderMesh.new()
+		cy.top_radius = 0.012
+		cy.bottom_radius = 0.026
+		cy.height = 1.15
+		cy.radial_segments = 8
+		rod.mesh = cy
+		rod.material_override = cleat
+		rod.position = Vector3(0, height_m + 0.62, 0) + FACE * (_top_r * 0.55)
+		_run_extras.add_child(rod)
+
+
+## The earth pit at the foot: a plate in coke, which is where a run ends and is the only part of
+## the job that happens on the ground.
+func set_earth(ohms: float) -> void:
+	if _run_extras == null or ohms < 0.0:
+		return
+	var pit := MeshInstance3D.new()
+	var cy := CylinderMesh.new()
+	cy.top_radius = 0.75
+	cy.bottom_radius = 0.75
+	cy.height = 0.08
+	cy.radial_segments = 16
+	pit.mesh = cy
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.13, 0.12, 0.11)
+	m.roughness = 0.95
+	pit.material_override = m
+	pit.position = _tape_point(0.06, 0.0) + FACE * 0.7
+	_run_extras.add_child(pit)
+
+
+## Where the tape sits at a height, `lateral` metres to one side of the climbing line.
+func _tape_point(h: float, lateral: float) -> Vector3:
+	return face_point(h) + Vector3(0, 0, TAPE_OFF_LADDER + lateral) + FACE * -TAPE_PROUD
+
+
+## A straight length of tape from `a` to `b`, in short pieces so it hugs the batter.
+func _tape_run(a: Vector3, b: Vector3) -> Array[Transform3D]:
+	var out: Array[Transform3D] = []
+	var span := (b - a).length()
+	if span < 0.01:
+		return out
+	var pieces := maxi(int(span / 0.5), 1)
+	for k in pieces:
+		var lo: Vector3 = a.lerp(b, float(k) / float(pieces))
+		var hi: Vector3 = a.lerp(b, float(k + 1) / float(pieces))
+		var mid := (lo + hi) * 0.5
+		var d := hi - lo
+		var up := d.normalized()
+		var side := up.cross(Vector3(FACE.x, 0.0, FACE.z)).normalized()
+		if side.length() < 0.5:
+			side = Vector3(0, 0, 1)
+		var fwd := side.cross(up)
+		# 25 mm by 3 mm — the Code's own section, and flat against the wall.
+		out.append(Transform3D(Basis(side * 0.025, up * (d.length() + 0.01), fwd * 0.004), mid))
+	return out
 
 
 # --- the iron bands -----------------------------------------------------------------------------

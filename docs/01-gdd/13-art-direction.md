@@ -222,6 +222,29 @@ somewhere the player can see it, as a shape on the chimney rather than a number 
 The strap keeps a little sheen. Cold iron on sooty brick is two dark things, and the first thing
 the checklist asks is that you *find* a band.
 
+**The conductor run** (`Chimney.set_run`). Terminal at the apex, copper tape down the face, a
+holdfast at every clip, an earth plate in a pit at the foot. Like the bands, none of it existed:
+the player set a terminal that did not appear, ran a tape that was not there, and clipped it to a
+wall that never showed a single holdfast.
+
+The thing that most needed to be on the screen is the **wander**. The 1881 Code's rule is that the
+run between two points may be no longer than one and a half times the straight line, and keeping
+it straight is the craft — so the tape is drawn through the clips where they actually went,
+laterally as well as vertically. A run that wandered looks like a run that wandered, from the
+ground, for ever.
+
+**The lean** (`Chimney.lean_offset`). Pitchcombe Mill is 1.1° over and the whole job is bringing
+her back. The level file has said `leanDegrees: 1.1` since it was written and nothing read it, so
+the chimney the player was sent to straighten stood perfectly plumb. The defining fact of the
+level, invisible — and worse than the bands, because you judge a lean from the ground before you
+ever touch her.
+
+It is a **shear**, not a rotation of the node. Every axis stays vertical and every height stays a
+height, so `chimney.global_position + chimney.face_point(h)` — which the player, the tests and
+five other scripts use to find the wall — keeps working untouched. At 1.1° the difference between
+shearing a shaft and tilting it is under a millimetre anywhere on it. `set_lean` moves it without
+a rebuild, so she comes back onto herself while you stand and watch, which is the whole archetype.
+
 **The site** — the works the chimney was built to draw for: a boiler house at its foot, the mill,
 a saw-tooth weaving shed, a yard wall. Nothing is built across the walk in, and the gate is
 wherever the walk in crosses the wall, which is the only place a gate could honestly be.
