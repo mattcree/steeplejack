@@ -390,6 +390,7 @@ func _ready() -> void:
 	if skel != null:
 		ClimbClip.install(anim, skel)
 		_give_hammer(skel)
+		_dress(skel)
 		_carried_ladder = _make_carried_ladder(skel)
 		grip = RungGrip.new()
 		grip.name = "RungGrip"
@@ -2531,6 +2532,68 @@ func _stow_carried_ladder() -> void:
 
 
 ## A hammer in his right hand. He was tapping and driving with nothing in it.
+# --- what he is made of ---------------------------------------------------------------------
+#
+# Every surface on him was a flat colour and one roughness number, which is the ceiling on a man
+# built out of spheres and boxes: you can add primitives all night, and I have, twice, and more
+# lumps will not make a man. What tells you a sleeve is wool is not its outline — it is the weave
+# catching the light along the arm and going dark across it.
+#
+# This is not a sculpt and there are no painted maps, so it is not photoreal and will not become
+# photoreal. What it does is give him what the brickwork already has: a grain, a relief, and a
+# response to light that changes across the piece.
+
+const WORN := preload("res://shaders/worn.gdshader")
+
+## material name -> [kind, weave pitch in metres, relief in metres, roughness, sheen]
+## 0 cloth, 1 skin, 2 leather, 3 plain, 4 rope, 5 hair.
+##
+## Sheen is per fabric and it matters: it is light thrown back at the silhouette, so on a pale
+## cotton shirt the same figure that flatters dark wool turns the sleeves into lamps. A first pass
+## with one number for all of them had him glowing.
+const CLOTHED := {
+	"skin":      [1, 0.0016, 0.00022, 0.62, 0.0],
+	"shirt":     [0, 0.0011, 0.00030, 0.86, 0.14],   # cotton, fine, and nearly white
+	"waistcoat": [0, 0.0019, 0.00042, 0.90, 0.40],   # wool, coarse and dark
+	"trousers":  [0, 0.0023, 0.00052, 0.92, 0.34],   # moleskin, coarser still
+	"cap":       [0, 0.0018, 0.00040, 0.90, 0.34],
+	"scarf":     [0, 0.0013, 0.00030, 0.84, 0.22],
+	"boots":     [2, 0.0016, 0.00045, 0.55, 0.0],
+	"leather":   [2, 0.0016, 0.00050, 0.58, 0.0],
+	"rope":      [4, 0.0120, 0.00110, 0.95, 0.30],   # lay pitch, not weave pitch — see the shader
+	"hair":      [5, 0.0020, 0.00040, 0.72, 0.26],
+}
+
+
+## Walk his surfaces and give each one the material its name asks for.
+##
+## By material name rather than by mesh, because the model is built from a script that names its
+## materials and the two must not have to agree about anything else. A name this does not know
+## keeps whatever the .glb gave it, so adding a part to the character cannot break his shading.
+func _dress(skel: Skeleton3D) -> void:
+	for node in skel.find_children("*", "MeshInstance3D", true, false):
+		var mesh: Mesh = node.mesh
+		if mesh == null:
+			continue
+		for i in mesh.get_surface_count():
+			var had: Material = mesh.surface_get_material(i)
+			if had == null:
+				continue
+			var spec = CLOTHED.get(had.resource_name, null)
+			if spec == null:
+				continue
+			var m := ShaderMaterial.new()
+			m.shader = WORN
+			m.set_shader_parameter("tint", (had as StandardMaterial3D).albedo_color
+				if had is StandardMaterial3D else Color(0.5, 0.5, 0.5))
+			m.set_shader_parameter("kind", int(spec[0]))
+			m.set_shader_parameter("weave", float(spec[1]))
+			m.set_shader_parameter("relief", float(spec[2]))
+			m.set_shader_parameter("rough", float(spec[3]))
+			m.set_shader_parameter("sheen", float(spec[4]))
+			node.set_surface_override_material(i, m)
+
+
 ## The hammer lives on his belt and comes out when there is something to hit.
 ##
 ## It was welded to his right hand for the whole game — climbing, hauling, lashing, standing on

@@ -91,7 +91,7 @@ ORDER = ["pelvis", "spine_01", "spine_02", "neck_01", "head",
 PALETTE = {
     "skin": (0.72, 0.54, 0.44), "shirt": (0.82, 0.79, 0.70), "waistcoat": (0.16, 0.15, 0.15),
     "trousers": (0.24, 0.21, 0.18), "boots": (0.10, 0.07, 0.05), "cap": (0.30, 0.27, 0.23),
-    "leather": (0.33, 0.19, 0.09), "rope": (0.62, 0.51, 0.33), "hair": (0.66, 0.65, 0.63),
+    "leather": (0.33, 0.19, 0.09), "rope": (0.58, 0.48, 0.32), "hair": (0.40, 0.385, 0.365),
     "button": (0.55, 0.50, 0.40),
     # The neckerchief. The only colour on him, and deliberately so: a man who is a silhouette
     # against a bright sky for most of the game needs one thing that is not grey or brown.
@@ -371,9 +371,18 @@ def build_body():
     tube("bolster", Vector((-0.175, 0.09, 1.05)), Vector((-0.175, 0.10, 0.90)), 0.014, 0.011,
          "button", ["pelvis"], segs=8, rings=2)
     box("buckle", Vector((0.0, -0.13, 1.01)), Vector((0.05, 0.012, 0.04)), "button", ["pelvis"])
+    # The coil over his shoulder. This was one torus 540 mm across, hung off a rotation that was
+    # not the one computed for it — `tilt` was worked out here and then never passed, so the coil
+    # sat edge-on to the chest and read as a flat straw-coloured wedge, like a sash. A coil is
+    # several turns of the same rope lying against each other, and it is the turns that say rope.
     tilt = Matrix.Rotation(math.radians(90), 3, "Y") @ Matrix.Rotation(math.radians(-38), 3, "X")
-    torus("rope", Vector((0.03, 0.0, 1.26)), 0.27, 0.028, Matrix.Rotation(math.radians(-50), 3, "Y"),
-          "rope", ["spine_02", "spine_01"], squash=(0.95, 0.62), segs=32)
+    axis = tilt @ Vector((0.0, 0.0, 1.0))
+    # Over the left shoulder, hanging down across the chest — how you carry a coil up a ladder,
+    # because it has to come off over the head one-handed.
+    coil_c = Vector((0.115, 0.02, 1.31))
+    for turn, (off, major) in enumerate(((-0.030, 0.150), (0.0, 0.158), (0.030, 0.146))):
+        torus(f"rope.{turn}", coil_c + axis * off, major, 0.0135, tilt, "rope",
+              ["spine_02", "spine_01", "clavicle.l"], squash=(0.97, 0.80), segs=28)
 
 
 # ------------------------------------------------------------------------------------------- rig

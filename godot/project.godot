@@ -26,3 +26,14 @@ window/stretch/aspect="expand"
 [rendering]
 
 renderer/rendering_method="forward_plus"
+
+# Shadows. The sun is a soft light and Godot filters its penumbra with a dithered sample pattern,
+# so at the default filter quality the terminator is not soft, it is *speckled* — and on a dark
+# wool waistcoat, where a stray lit sample is the brightest thing in the garment, that dither is
+# the whole surface. It read as mud splatter on his back and as grit on the shaded half of every
+# chimney, and it survived turning off GI, reflections, indirect light and the character's own
+# normal maps, because none of those were doing it.
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=4
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality.mobile=3
+lights_and_shadows/positional_shadow/soft_shadow_filter_quality=4
+lights_and_shadows/directional_shadow/size=4096
