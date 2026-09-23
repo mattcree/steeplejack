@@ -42,7 +42,12 @@ const TURN_RATE := 12.0
 ## The stride of the run clip, in metres per second. Playback is scaled by how fast he is actually
 ## travelling, so his feet keep up with the ground instead of skating over it. Eyeballed — if the
 ## feet slip forwards, raise it; if he moonwalks, lower it.
-const RUN_CLIP_SPEED := 2.37        ## m/s the run clip covers: RUN_STRIDE_M / its length, in tools/blender/build_character.py
+const RUN_CLIP_SPEED := 3.32        ## m/s the run clip covers: RUN_STRIDE_M / its length, in tools/blender/build_character.py
+const WALK_CLIP_SPEED := 1.36       ## m/s the walk clip covers: WALK_STRIDE_M / its length, same file
+## Below this he walks, above it he jogs. There used to be one locomotion clip for every speed,
+## time-scaled, and a jog played at 0.55x is not a walk — it is a man mincing. The two clips
+## overlap either side of the crossing so neither is ever stretched far from its own pace.
+const WALK_TO_RUN := 2.1
 
 const BOOM_LENGTH := 3.0
 const BOOM_SIDE := 0.65
@@ -381,7 +386,7 @@ func _ready() -> void:
 
 	# glTF animations import unlooped, so idle and run play once and then he freezes mid-stride.
 	# Nothing warns about this; the character simply stops a second or two after you start.
-	for clip in ["idle", "run"]:
+	for clip in ["idle", "walk", "run"]:
 		if anim.has_animation(clip):
 			anim.get_animation(clip).loop_mode = Animation.LOOP_LINEAR
 
@@ -1592,8 +1597,9 @@ func _animate() -> void:
 	var speed := Vector2(velocity.x, velocity.z).length()
 	# Match the cycle to the ground he is covering. A run clip played at a fixed rate while the
 	# character accelerates is the thing that reads as feet skating.
-	anim.speed_scale = clampf(speed / RUN_CLIP_SPEED, 0.55, 1.8) if speed > 0.6 else 1.0
-	# Three clips is the whole vocabulary this model has that suits the game. There is no climbing
+	var pace: float = WALK_CLIP_SPEED if speed < WALK_TO_RUN else RUN_CLIP_SPEED
+	anim.speed_scale = clampf(speed / pace, 0.7, 1.4) if speed > 0.6 else 1.0
+	# There is no climbing
 	# animation in it, so on the ladder he holds still rather than pretending — a run cycle on a
 	# ladder reads worse than stillness.
 	var want := "idle"
@@ -1619,7 +1625,7 @@ func _animate() -> void:
 	elif not is_on_floor():
 		want = "air_jump"
 	elif speed > 0.6:
-		want = "run"
+		want = "run" if speed >= WALK_TO_RUN else "walk"
 	if want != _playing and anim.has_animation(want):
 		anim.play(want, CLIP_BLEND)
 		_playing = want

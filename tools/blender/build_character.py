@@ -34,7 +34,30 @@ from mathutils import Matrix, Quaternion, Vector
 
 FPS = 30
 RUN_FRAMES = 19          # 0.633 s, the length the game already paces
-RUN_STRIDE_M = 1.50      # ground covered in one run cycle (two steps), measured from the leg swing
+# Ground covered in one cycle (two steps). This is not a free number: it is 4 x leg x sin(hip),
+# and it has to match what the game actually moves him at, or the clip and the ground disagree and
+# the feet skate. At 1.50 m over 0.633 s the clip covered 2.37 m/s while the player ran at 4.2,
+# so it was stretched 1.8x and every foot slid backwards half a metre a second. That slide is what
+# reads as a shuffle, and no amount of work on the pose would ever have fixed it.
+RUN_STRIDE_M = 2.10
+WALK_FRAMES = 32         # 1.067 s
+WALK_STRIDE_M = 1.45     # 1.36 m/s, which is what a man walks at
+
+# --------------------------------------------------------------------------------------- the gait
+# Saunders, Inman & Eberhart, "The Major Determinants in Normal and Pathological Gait" (1953) —
+# the six things a trunk does while the legs swing, and the reason a keyframed pair of legs under
+# a rigid body reads as a man with a broom handle down his back. Four of the six were missing
+# here and could not have been added, because `_aim` cannot express a twist (see `_spin`).
+#
+#   1  pelvic rotation      the swing hip advances, about 4 deg each way; 8 running
+#   2  pelvic list          the swing side of the pelvis DROPS, about 5 deg
+#   3  stance knee flexion  the knee is not locked at midstance, it gives about 15 deg
+#   4  ankle mechanism      heel strikes first, toes up
+#   5  foot mechanism       the foot rolls off the forefoot at toe-off
+#   6  lateral displacement the pelvis shifts over the stance foot, about 30 mm
+#
+# and the one they left out because it is not a determinant of the CoM path but is most of what
+# you see: the shoulders counter-rotate against the hips.
 
 # --------------------------------------------------------------------------------------- skeleton
 # name: (head, tail, parent). Blender coordinates: Z up, the character faces -Y, his left is +X.
@@ -459,15 +482,38 @@ def _aim(arm_ob, name: str, direction: Vector):
     bpy.context.view_layer.update()
 
 
-def pose(arm_ob, aims: dict[str, tuple], frame: int, pelvis_z: float = 0.0, pelvis_y: float = 0.0):
+def _spin(arm_ob, name: str, radians: float):
+    """Twist a bone about its own axis, after it has been aimed.
+
+    `_aim` takes the *minimal* rotation onto a direction, and a minimal rotation carries no twist
+    by construction. That is a hole in the rig, not a detail: it means the pelvis and the thorax
+    could not rotate about the spine in any clip that has ever been built here, so the trunk was
+    one rigid mast from the hips to the cap. Counter-rotation — hips going one way, shoulders the
+    other — is most of what tells you a walk is a walk, and none of it could be expressed.
+    """
+    pb = arm_ob.pose.bones[name]
+    bpy.context.view_layer.update()
+    cur = pb.matrix.copy()
+    axis = (cur.to_3x3() @ Vector((0, 1, 0))).normalized()
+    head = cur.translation
+    q = Quaternion(axis, radians)
+    pb.matrix = Matrix.Translation(head) @ q.to_matrix().to_4x4() @ Matrix.Translation(-head) @ cur
+    bpy.context.view_layer.update()
+
+
+def pose(arm_ob, aims: dict[str, tuple], frame: int, pelvis_z: float = 0.0, pelvis_y: float = 0.0,
+         pelvis_x: float = 0.0, spin: dict[str, float] | None = None):
     for pb in arm_ob.pose.bones:
         pb.rotation_mode = "QUATERNION"
         pb.rotation_quaternion = Quaternion()
         pb.location = Vector()
-    arm_ob.pose.bones["pelvis"].location = Vector((0.0, pelvis_z, -pelvis_y))   # bone-local: Y is up
+    # bone-local: Y is up, X is his left, -Z is the way he faces.
+    arm_ob.pose.bones["pelvis"].location = Vector((pelvis_x, pelvis_z, -pelvis_y))
     for name in ORDER:
         if name in aims:
             _aim(arm_ob, name, Vector(aims[name]))
+        if spin is not None and name in spin:
+            _spin(arm_ob, name, spin[name])
     for pb in arm_ob.pose.bones:
         pb.keyframe_insert("rotation_quaternion", frame=frame)
         if pb.name == "pelvis":
@@ -493,10 +539,16 @@ def action(arm_ob, name: str, keys: list[tuple[int, dict, float]], loop_end: int
     act.use_fake_user = True
     arm_ob.animation_data_create()
     arm_ob.animation_data.action = act
-    for frame, aims, bob in keys:
-        pose(arm_ob, aims, frame, pelvis_z=bob)
+    for key in keys:
+        frame, aims, bob = key[0], key[1], key[2]
+        extra = key[3] if len(key) > 3 else {}
+        pose(arm_ob, aims, frame, pelvis_z=bob, pelvis_x=extra.get("x", 0.0),
+             spin=extra.get("spin"))
     if loop_end is not None:
-        pose(arm_ob, keys[0][1], loop_end, pelvis_z=keys[0][2])
+        k0 = keys[0]
+        e0 = k0[3] if len(k0) > 3 else {}
+        pose(arm_ob, k0[1], loop_end, pelvis_z=k0[2], pelvis_x=e0.get("x", 0.0),
+             spin=e0.get("spin"))
     # Stash it on the NLA so the exporter sees it as its own clip.
     track = arm_ob.animation_data.nla_tracks.new()
     track.name = name
@@ -513,24 +565,71 @@ def build_animations(arm_ob):
     breathe_out = {**spine_up, "spine_02": (0.0, -0.01, 1.0), **ARMS_DOWN, **STAND}
     action(arm_ob, "idle", [(0, breathe_out, 0.0), (21, breathe_in, 0.008)], loop_end=42)
 
-    # run — a heavy jog: contact, passing, contact (mirrored), passing. Legs swing ±27° at the hip,
-    # which covers RUN_STRIDE_M over the cycle; arms swing against the legs; the body leans in.
-    lean = {"spine_01": (0.0, -0.12, 1.0), "spine_02": (0.0, -0.06, 1.0), "neck_01": (0.0, -0.02, 1.0),
-            "head": (0.0, 0.03, 1.0)}
-    contact = {**lean,
-               "thigh.l": (0.0, -0.46, -0.89), "calf.l": (0.0, -0.1, -1.0), "foot.l": (0.0, -1.0, -0.1),
-               "thigh.r": (0.0, 0.40, -0.92), "calf.r": (0.0, 0.85, -0.55), "foot.r": (0.0, -0.3, -1.0),
-               "upperarm.l": (0.12, 0.35, -0.93), "lowerarm.l": (0.08, -0.35, -0.94),
-               "upperarm.r": (-0.12, -0.42, -0.9), "lowerarm.r": (-0.1, -0.95, -0.3)}
-    passing = {**lean,
-               "thigh.l": (0.0, 0.02, -1.0), "calf.l": (0.0, 0.15, -1.0), "foot.l": (0.0, -1.0, -0.2),
-               "thigh.r": (0.0, -0.45, -0.89), "calf.r": (0.0, 0.55, -0.83), "foot.r": (0.0, -0.8, -0.6),
-               "upperarm.l": (0.12, 0.0, -1.0), "lowerarm.l": (0.08, -0.6, -0.8),
-               "upperarm.r": (-0.12, 0.0, -1.0), "lowerarm.r": (-0.08, -0.6, -0.8)}
-    q = RUN_FRAMES / 4.0
-    action(arm_ob, "run", [(0, contact, -0.03), (round(q), passing, 0.02),
-                           (round(2 * q), _mirror(contact), -0.03), (round(3 * q), _mirror(passing), 0.02)],
-           loop_end=RUN_FRAMES)
+    # --- the trunk, for one step of either gait ----------------------------------------------
+    # Both cycles are keyed the same way: contact (heel strike, left) -> passing (left midstance)
+    # -> the mirror of each. So "left is the stance leg" holds for both keys, and the pelvis
+    # leans, lists and shifts toward his LEFT through the whole first half.
+    def trunk(yaw, counter, sway, list_, at_contact):
+        # `_spin` composes down the chain, so to leave the thorax at `counter` in world terms the
+        # spine has to undo the pelvis first and then some.
+        turn = yaw if at_contact else 0.0
+        cnt = counter if at_contact else 0.0
+        spin = {"pelvis": -turn,
+                "spine_01": (turn + cnt) * 0.55, "spine_02": (turn + cnt) * 0.45,
+                # The head does not ride the shoulders. Gaze stabilisation holds it on the horizon,
+                # and a head that yaws with the chest is the single clearest tell of a puppet.
+                "neck_01": -cnt * 0.6, "head": -cnt * 0.4}
+        # 2: the swing side drops. Left is stance, so the right hip falls and the pelvis "up" axis
+        # tips toward his right (-x). The lumbar puts the trunk back upright over it.
+        drop = list_ * (0.45 if at_contact else 1.0)
+        return spin, {"x": sway * (0.35 if at_contact else 1.0)}, -drop, drop
+
+    def gait(name, frames, hip, lift, lean, yaw, counter, sway, list_, bob_lo, bob_hi, arm):
+        out = []
+        for i, at_contact in ((0, True), (1, False), (2, True), (3, False)):
+            spin, extra, pel_x, spn_x = trunk(yaw, counter, sway, list_, at_contact)
+            mirrored = i >= 2
+            if mirrored:
+                spin = {k: -v for k, v in spin.items()}
+                extra = {"x": -extra["x"]}
+                pel_x, spn_x = -pel_x, -spn_x
+            body = {"pelvis": (pel_x, 0.0, 1.0),
+                    "spine_01": (spn_x, -lean, 1.0), "spine_02": (spn_x * 0.4, -lean * 0.5, 1.0),
+                    "neck_01": (0.0, -0.02, 1.0), "head": (0.0, lean * 0.25, 1.0)}
+            if at_contact:
+                # 4: heel strike — the leading knee all but straight, the toes up. 5: the trailing
+                # foot is rolling off its forefoot, so it points down and back.
+                legs = {"thigh.l": (0.0, -hip, -math.sqrt(1.0 - hip * hip)),
+                        "calf.l": (0.0, -hip * 0.30, -1.0), "foot.l": (0.0, -1.0, 0.26),
+                        "thigh.r": (0.0, hip * 0.80, -0.95),
+                        "calf.r": (0.0, hip * 0.80 + lift, -0.80), "foot.r": (0.0, -0.72, -0.69)}
+                arms = {"upperarm.l": (0.12, arm, -1.0), "lowerarm.l": (0.08, -arm * 0.9, -1.0),
+                        "upperarm.r": (-0.12, -arm, -1.0), "lowerarm.r": (-0.1, -arm * 2.2, -0.6)}
+                bob = bob_lo
+            else:
+                # 3: the stance knee is not locked — it gives, which is what flattens the arc the
+                # hips travel through. A locked stance leg vaults the whole man over a stiff pole.
+                legs = {"thigh.l": (0.0, 0.02, -1.0), "calf.l": (0.0, -0.20, -0.98),
+                        "foot.l": (0.0, -1.0, -0.18),
+                        "thigh.r": (0.0, -hip * 0.95, -math.sqrt(1.0 - (hip * 0.95) ** 2)),
+                        "calf.r": (0.0, lift + 0.30, -0.85), "foot.r": (0.0, -0.85, -0.52)}
+                arms = {"upperarm.l": (0.12, 0.0, -1.0), "lowerarm.l": (0.08, -arm * 1.4, -0.9),
+                        "upperarm.r": (-0.12, 0.0, -1.0), "lowerarm.r": (-0.08, -arm * 1.4, -0.9)}
+                bob = bob_hi
+            key = {**body, **legs, **arms}
+            out.append((round(i * frames / 4.0), _mirror(key) if mirrored else key, bob, extra))
+            out[-1][3]["spin"] = spin
+        action(arm_ob, name, out, loop_end=frames)
+
+    # walk — upright, unhurried, 1.36 m/s. A man carrying his own ladder does not jog.
+    gait("walk", WALK_FRAMES, hip=0.342, lift=0.34, lean=0.03, yaw=0.070, counter=0.075,
+         sway=0.028, list_=0.070, bob_lo=-0.018, bob_hi=0.016, arm=0.30)
+
+    # run — a heavy jog. Everything the walk does, further: the hips turn twice as far, the
+    # shoulders fight them twice as hard, and the trunk leans into it.
+    # hip=0.625 is sin(38.7 deg), which is what 2.10 m of stride costs over a 0.84 m leg.
+    gait("run", RUN_FRAMES, hip=0.625, lift=0.62, lean=0.12, yaw=0.115, counter=0.130,
+         sway=0.020, list_=0.060, bob_lo=-0.030, bob_hi=0.020, arm=0.58)
 
     # air_jump — in the air: arms up and out for balance, knees drawn up.
     air = {**spine_up, "upperarm.l": (0.8, -0.2, 0.3), "lowerarm.l": (0.5, -0.4, 0.6),

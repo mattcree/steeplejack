@@ -27,6 +27,7 @@
 #   top              all the way up, and onto the cap
 #   tea              belt on and brew up
 #   fall             come off, untied, from where he is
+#   strip <n> <s> [d]  n frames of him walking for s seconds, from d degrees round — a gait cycle
 #   gin              rig the gin wheel on the highest dog in reach, and start a haul
 #   haulfor <s> [1]  haul flat out for s seconds, steering against the swing if 1
 #   stance <0-4>     one hand / hooked leg / clipped / belted / chair
@@ -211,19 +212,26 @@ func _run(cmd: String) -> void:
 					for bolt in int(a):
 						player.jack.band_tighten(idx, bolt, 0.22)
 		"orbit":
-			# A camera of our own, parented to nothing and aimed by hand. The boom re-eases towards
-			# the player's facing every frame, so setting its rotation does not hold for a capture;
-			# and `cam` yaws the jack himself. Neither can photograph a man from the side while he
-			# keeps climbing, which is exactly what a knee bending the wrong way needs.
-			var eye := Camera3D.new()
-			eye.fov = player.get_node("Boom/Camera").fov
-			root.add_child(eye)
-			var chest: Vector3 = player.global_position + Vector3.UP * 1.1
-			var ang: float = player._yaw + deg_to_rad(a)
-			var back := Vector3(sin(ang), 0.0, cos(ang)) * maxf(b, 0.5)
-			eye.global_position = chest + back + Vector3.UP * (maxf(b, 0.5) * sin(deg_to_rad(c)))
-			eye.look_at(chest, Vector3.UP)
-			eye.make_current()
+			_orbit(a, b, c)
+		"strip":
+			# `a` frames, evenly spaced, of him walking for `b` seconds, photographed from `c`
+			# degrees round with the camera keeping pace.
+			#
+			# A gait is a cycle. One still of it says nothing — you cannot see a shuffle, a locked
+			# knee or a trunk that never rotates in a single frame, and every judgement anyone has
+			# made about this walk, mine included, was made from exactly that. `walkfor` cannot do
+			# it either: it drops the input at the end, so a short burst followed by a shot catches
+			# him already back in idle, which is how a capture can show you a man standing still
+			# and let you believe you have looked at his walk.
+			var n := maxi(int(a), 2)
+			var gap := maxi(int(maxf(b, 0.5) * 60.0 / float(n)), 1)
+			player.walk_input = Vector2(0.0, 1.0)
+			await _wait(50)                       # let him reach a steady pace first
+			for i in n:
+				await _wait(gap)
+				_orbit(c if c != 0.0 else 90.0, 3.4, 4.0)
+				await _shot("strip%d" % (i + 1))
+			player.walk_input = Vector2.ZERO
 		"boom":
 			player.get_node("Boom").spring_length = a
 			# Hold it: the camera eases towards its own framing every frame.
@@ -348,6 +356,22 @@ func _drain_to(grip: float, nerve_to: float) -> void:
 func _wait(frames: int) -> void:
 	for i in frames:
 		await physics_frame
+
+
+## A camera of our own, parented to nothing and aimed by hand. The boom re-eases towards the
+## player's facing every frame, so setting its rotation does not hold for a capture; and `cam`
+## yaws the jack himself. Neither can photograph a man from the side while he keeps moving, which
+## is exactly what a knee bending the wrong way needs.
+func _orbit(a: float, b: float, c: float) -> void:
+	var eye := Camera3D.new()
+	eye.fov = player.get_node("Boom/Camera").fov
+	root.add_child(eye)
+	var chest: Vector3 = player.global_position + Vector3.UP * 1.1
+	var ang: float = player._yaw + deg_to_rad(a)
+	var back := Vector3(sin(ang), 0.0, cos(ang)) * maxf(b, 0.5)
+	eye.global_position = chest + back + Vector3.UP * (maxf(b, 0.5) * sin(deg_to_rad(c)))
+	eye.look_at(chest, Vector3.UP)
+	eye.make_current()
 
 
 func _shot(name: String) -> void:
