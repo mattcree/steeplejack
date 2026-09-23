@@ -89,8 +89,10 @@ var _lash_wraps := 0
 var _lash_laid := 0.0
 var _rope: MultiMeshInstance3D
 var _rope_live: MultiMeshInstance3D
+var _rope_laying: MultiMeshInstance3D
 const ROPE := Color(0.64, 0.53, 0.35)
 const WRAP_PITCH := 0.030        ## height between turns of the coil
+const WRAP_R := 0.0685           ## how far the rope runs from the middle of the stile
 
 
 func _ready() -> void:
@@ -156,6 +158,14 @@ func _ready() -> void:
 	torus.material = _lit(ROPE, 0.95)
 	_rope = _wrap(torus)
 	_rope_live = _wrap(torus)
+	# The turn being laid, in short straight lengths rather than a ring, so it can be part-drawn.
+	var strand := CylinderMesh.new()
+	strand.top_radius = 1.0
+	strand.bottom_radius = 1.0
+	strand.height = 1.0
+	strand.radial_segments = 5
+	strand.material = _lit(ROPE, 0.95)
+	_rope_laying = _wrap(strand)
 
 	# Rusted dogs, in three grades of rust. Read at close range, as the design says it should be:
 	# from the ladder the lightly rusted and the flaking are plainly different, and from the ground
@@ -302,15 +312,54 @@ func set_lash(id: int, wraps: int, laid: float, _tension: float) -> void:
 	_lash_wraps = wraps
 	_lash_laid = laid
 	var xs: Array = []
+	var arc: Array = []
 	if id >= 0:
 		var j := joint(id)
 		if not j.is_empty():
 			xs = _coil(j, wraps)
-			if laid > 0.02:
-				# The turn going on, growing round the lug as the rope is laid.
-				var t: Transform3D = _coil_turn(j, wraps)
-				xs.append(Transform3D(t.basis.scaled(Vector3(laid, 1.0, laid)), t.origin))
+			arc = _laying(j, wraps, laid)
 	_fill(_rope_live, xs)
+	_fill(_rope_laying, arc)
+
+
+## The turn that is going on right now, as a length of rope travelling round.
+##
+## It used to be a whole ring scaled from nothing up to full size, which is a hoop growing in
+## diameter — not rope going anywhere. What the player is doing with the mouse is *drawing string
+## round something*, and the one thing the screen never showed was string going round something.
+##
+## So: an arc, laid a segment at a time, from where the rope comes off his hands to where it has
+## got to. Going round a full circle completes a turn, the arc snaps to a solid turn on the coil,
+## and the next one starts a rope's thickness higher. That is the whole verb, drawn.
+const ARC_STEPS := 28
+
+func _laying(j: Dictionary, k: int, laid: float) -> Array:
+	var out: Array = []
+	if laid <= 0.01:
+		return out
+	var centre: Vector3 = _coil_turn(j, k).origin
+	var steps: int = maxi(int(ceil(laid * float(ARC_STEPS))), 1)
+	# A turn climbs by its own thickness as it goes round, which is what stops a coil being a
+	# stack of rings and makes it a spiral — and it is visible at this range.
+	for i in steps:
+		var a0: float = TAU * (float(i) / float(ARC_STEPS))
+		var a1: float = TAU * (float(i + 1) / float(ARC_STEPS))
+		var h0: float = WRAP_PITCH * (float(i) / float(ARC_STEPS))
+		var h1: float = WRAP_PITCH * (float(i + 1) / float(ARC_STEPS))
+		var p0: Vector3 = centre + Vector3(cos(a0) * WRAP_R, h0, sin(a0) * WRAP_R)
+		var p1: Vector3 = centre + Vector3(cos(a1) * WRAP_R, h1, sin(a1) * WRAP_R)
+		out.append(_segment(p0, p1))
+	return out
+
+
+## One short length of rope from `a` to `b`: a unit cylinder turned to lie along it.
+func _segment(a: Vector3, b: Vector3) -> Transform3D:
+	var d := b - a
+	var len := maxf(d.length(), 0.0001)
+	var y := d / len
+	var x := y.cross(Vector3.UP if absf(y.y) < 0.95 else Vector3.RIGHT).normalized()
+	var z := x.cross(y)
+	return Transform3D(Basis(x * 0.025, y * (len * 1.25), z * 0.025), (a + b) * 0.5)
 
 
 ## A finished lashing stays on the stack. You can count them, and a hitch looks like three turns.

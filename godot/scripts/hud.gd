@@ -1315,21 +1315,27 @@ func _draw_lash(jack: Jack) -> void:
 	var hitch := int(jack.tuning_f("lashWrapsQuickHitch", 3))
 	var full := int(jack.tuning_f("lashWrapsFull", 6))
 
-	var c := Vector2(size.x * 0.5, size.y * 0.40)
-	var r := 64.0
+	# Low, not in the middle of the screen.
+	#
+	# The whole point of this verb is watching the rope go round, and the panel that explains it
+	# was parked exactly on top of the thing it explains — a frame taken mid-wrap has the turn
+	# counter covering the dog, the stile and every inch of rope. The instruments go where the
+	# hands are not.
+	var c := Vector2(size.x * 0.5, size.y * 0.795)
+	var r := 52.0
 
 	# A plate under the whole thing. It is a modal verb — nothing else you can do while the rope is
 	# going round — so it is allowed to own its part of the screen, and it has to be readable over
 	# whatever brickwork happens to be behind it.
-	var plate := Rect2(Vector2(c.x - 268.0, c.y - r - 72.0), Vector2(536.0, r * 2.0 + 198.0))
+	var plate := Rect2(Vector2(c.x - 268.0, c.y - r - 64.0), Vector2(536.0, r * 2.0 + 176.0))
 	draw_rect(plate, Color(0.05, 0.05, 0.06, 0.46))
 	draw_rect(Rect2(plate.position, Vector2(plate.size.x, 2.0)), Color(0.86, 0.84, 0.78, 0.26))
 
 	# What is going on, in words: the new section is stood on the old one, and the rope is what
 	# holds it to the dog. Without this the ring and the count were a minigame about nothing.
-	_centre("Roping the new section to the dog", c.y - r - 52.0, Color(0.97, 0.95, 0.90, 0.95), 18)
+	_centre("Roping the new section to the dog", c.y - r - 44.0, Color(0.97, 0.95, 0.90, 0.95), 17)
 	_centre("each circle of the mouse is one turn of rope round the dog and the ladder",
-		c.y - r - 30.0, Color(0.86, 0.84, 0.80, 0.85), 13)
+		c.y - r - 24.0, Color(0.86, 0.84, 0.80, 0.85), 12)
 
 	# The turn in progress, filling round the ring, from the top, the way a clock hand goes.
 	draw_arc(c, r, 0, TAU, 64, Color(0.9, 0.88, 0.84, 0.18), 6.0)
