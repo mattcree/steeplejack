@@ -119,6 +119,18 @@ public:
     void  Carry(const std::string& item, bool take);
     bool  Carrying(const std::string& item) const noexcept;
 
+    // --- the ladders -----------------------------------------------------------------------
+    //
+    // Sections are stock, not a number you dial in before each job. You buy them, you keep them,
+    // and a chimney you have not got the ladders for is a chimney you cannot take — which is the
+    // cheapest honest lock in the game and the one reason the shop needs to exist.
+    //
+    // They were a slider in the van, and the question that killed it was the right one: what is
+    // the penalty for choosing wrong? Either the number the reachability gate proved is correct
+    // and the player should not be invited to get it wrong, or it is not and the gate is a lie.
+    int32_t Ladders() const noexcept { return ladders_; }
+    bool    BuyLadders(int32_t howMany, float costEach);
+
     // Days since the season started. The board shows weather by the day and some jobs have
     // deadlines, so this is the clock the whole meta layer hangs off.
     int32_t Day() const noexcept { return day_; }
@@ -187,6 +199,9 @@ private:
     float   money_{};
     int32_t day_{};
     int32_t engineParts_{};
+    // Enough for the first three jobs, so the shop arrives when there is money to spend in it
+    // rather than as a wall on day one. See the schedule in the commit that added this.
+    int32_t ladders_{11};   // literal: the starting stock, chosen against the fee schedule
     std::vector<std::pair<std::string, std::vector<float>>> leftIn_;
     std::vector<std::pair<std::string, std::string>> salvage_;
     int32_t reputation_{};

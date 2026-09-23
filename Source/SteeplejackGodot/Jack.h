@@ -423,6 +423,8 @@ public:
 
 	/// The shed. `career_kit_cost` reads economy.json's own `costs` block, so the price on the
 	/// screen and the price taken out of the tin are the same number read from the same place.
+	int64_t career_ladders() const;
+	bool career_buy_ladders(int64_t how_many);
 	bool career_owns(const godot::String& item) const;
 	bool career_buy_kit(const godot::String& item);
 	double career_kit_cost(const godot::String& item) const;

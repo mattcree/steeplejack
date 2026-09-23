@@ -70,6 +70,11 @@ func _draw() -> void:
 	var hand := Vector2(HAND.x, size.y + HAND.y)
 	var now := float(Time.get_ticks_msec()) / 1000.0
 
+	# Arriving: the establishing shot owns the screen, and what belongs on it is what you have
+	# been sent to do — not a grip bar for a man who is not holding anything yet.
+	if player.arriving > 0.0:
+		_draw_arrival(jack)
+		return
 	_draw_scrim()
 	_draw_vignette(jack)
 
@@ -105,7 +110,8 @@ func _draw() -> void:
 		Color(0.42, 0.58, 0.78, nerve_a), nerve_a, false)
 	# The nerve bar breathes, which is the visual half of rule 8 for the breathing audio and was
 	# the one thing the arcs did better than a bar would.
-	_draw_kit(bar + Vector2(0.0, 74.0), breath)
+	_draw_stance(bar + Vector2(0.0, 74.0), jack, grip_a)
+	_draw_kit(bar + Vector2(0.0, 100.0), breath)
 
 	_draw_stack_gauge(jack)
 	# Nothing that annotates the world, while the world is going past him.
@@ -1763,6 +1769,41 @@ func _draw_meter(at: Vector2, name_: String, fraction: float, col: Color, alpha:
 			Color(DANGER, 0.5 * alpha), false, 2.0)
 
 
+## What the stance is doing for you, beside the bar it is doing it to.
+##
+## Q was a word in a corner and twenty seconds of a progress ring, and then nothing: once you were
+## belted on, the game never mentioned it again. The grip bar drained slower and you were left to
+## work out why — or, far more likely, not to notice at all, which makes the one decision the
+## whole climbing system is built on invisible the moment it is made.
+##
+## So: what you are on, what it is costing, and — while you are climbing — the fact that it is
+## costing less than standing here one-handed would. The rate is drawn as a row of pips rather
+## than a number, because it is a comparison and eight against one reads instantly.
+func _draw_stance(at: Vector2, jack: Jack, alpha: float) -> void:
+	if not player.on_ladder or player.at_top or player.falling:
+		return
+	var name_ := String(jack.stance_name())
+	var rate: float = jack.stance_drain_rate(jack.get_stance())
+	var worst: float = jack.stance_drain_rate(0)
+	var col := Color(INK, maxf(alpha, 0.62))
+
+	_label(name_.to_upper(), at, Color(GHOST, 0.85), TINY)
+	var w: float = _font.get_string_size(name_.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, TINY).x
+
+	# One pip per grip a second, against the eight a one-handed hold costs. Full pips are what
+	# this stance is taking; the hollow ones are what it is saving you.
+	var pips: int = maxi(int(round(worst)), 1)
+	var lit: int = clampi(int(round(rate)), 0, pips)
+	for i in pips:
+		var p := at + Vector2(w + 14.0 + 7.0 * float(i), -3.5)
+		if i < lit:
+			draw_rect(Rect2(p, Vector2(4.0, 4.0)), Color(GRIP_COL, maxf(alpha, 0.75)))
+		else:
+			draw_rect(Rect2(p, Vector2(4.0, 4.0)), Color(GOOD, 0.45), false, 1.0)
+	var said := "no grip at all" if rate <= 0.01 else "%d grip a second" % roundi(rate)
+	_label(said, at + Vector2(w + 22.0 + 7.0 * float(pips), 0.0), col, TINY)
+
+
 ## What he is carrying, as counts rather than a sentence. "no ladder   0 dogs in the bag   top 15m"
 ## was three unrelated facts welded together; these are three chips that dim when empty instead of
 ## vanishing, so the slot keeps its place and the eye learns where to look.
@@ -1957,6 +1998,37 @@ func _centre(text: String, y: float, col: Color, px: int = 15) -> void:
 func _ease(t: float) -> float:
 	t = clampf(t, 0.0, 1.0)
 	return t * t * (3.0 - 2.0 * t)
+
+
+## The card that plays over the fly-in: her name, how tall she is, and what the job is.
+##
+## The walk in used to be twenty-four seconds of holding W across a field, and the only thing it
+## told you was that the chimney was far away. This is the same information in five seconds, plus
+## the three numbers a jack would actually want before he touched her.
+func _draw_arrival(jack: Jack) -> void:
+	var t: float = player.arriving / maxf(player.ARRIVAL_SECONDS, 0.01)
+	# Up at the start, gone by the end, so the last second of the shot is clean.
+	var a: float = _ease(clampf((t - 0.12) / 0.3, 0.0, 1.0))
+	draw_rect(Rect2(0.0, 0.0, size.x, size.y * 0.30), Color(0.04, 0.04, 0.05, 0.55 * a))
+	draw_rect(Rect2(0.0, size.y * 0.80, size.x, size.y * 0.20), Color(0.04, 0.04, 0.05, 0.55 * a))
+
+	var x := size.x * 0.09
+	_label(String(jack.level_name()).to_upper(), Vector2(x, size.y * 0.15), Color(INK, 0.97 * a), H1)
+	var arch := String(jack.level_archetype())
+	var what := {
+		"SURVEY": "go up, look at her, and say what is wrong",
+		"CONDUCTOR": "a terminal at the top and copper down her side",
+		"BAND": "iron round her, pulled up in a star",
+		"STRAIGHTEN": "she is out of upright, and they want her saved",
+		"FELL": "she is to come down — strip her out first",
+		"TOP": "by hand, from the top, brick by brick",
+	}.get(arch, "")
+	_label(what, Vector2(x, size.y * 0.15 + 30.0), Color(DIM, 0.90 * a), BODY)
+
+	var facts := "%.0f m   ·   %d sections on the cart" % [
+		jack.total_height(), player.ladders_at_base]
+	_label(facts, Vector2(x, size.y * 0.15 + 56.0), Color(FAINT, 0.85 * a), SMALL)
+	_centre("any key to get on with it", size.y * 0.88, Color(GHOST, 0.75 * a), SMALL)
 
 
 ## The scrim: a permanent, very soft darkening of the four edges, under everything else.

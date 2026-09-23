@@ -244,6 +244,9 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("career_sleep"), &Jack::career_sleep);
 	ClassDB::bind_method(D_METHOD("career_buy_engine_part", "cost"),
 	                     &Jack::career_buy_engine_part);
+	ClassDB::bind_method(D_METHOD("career_ladders"), &Jack::career_ladders);
+	ClassDB::bind_method(D_METHOD("career_buy_ladders", "how_many"),
+	                     &Jack::career_buy_ladders);
 	ClassDB::bind_method(D_METHOD("career_owns", "item"), &Jack::career_owns);
 	ClassDB::bind_method(D_METHOD("career_buy_kit", "item"), &Jack::career_buy_kit);
 	ClassDB::bind_method(D_METHOD("career_kit_cost", "item"), &Jack::career_kit_cost);
@@ -1847,6 +1850,17 @@ void Jack::career_sleep()
 	career.SleepOneNight();
 }
 
+int64_t Jack::career_ladders() const
+{
+	return career.Ladders();
+}
+
+bool Jack::career_buy_ladders(int64_t how_many)
+{
+	return career.BuyLadders(static_cast<int32_t>(how_many),
+	                         static_cast<float>(tuning_f("costs.ladderSection", 22.0)));
+}
+
 bool Jack::career_owns(const String& item) const
 {
 	return career.Owns(std::string(item.utf8().get_data()));
@@ -1915,6 +1929,7 @@ Dictionary Jack::career_state() const
 		jobs.push_back(r);
 	}
 	d["jobs"] = jobs;
+	d["ladders"] = static_cast<int64_t>(career.Ladders());
 	d["owned"] = career_owned();
 	d["carried"] = career_carried();
 	return d;

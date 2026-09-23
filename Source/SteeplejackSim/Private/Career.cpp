@@ -254,6 +254,22 @@ void Career::Carry(const std::string& item, bool take)
     }
 }
 
+bool Career::BuyLadders(int32_t howMany, float costEach)
+{
+    if (howMany <= 0 || costEach < 0.0f)
+    {
+        return false;
+    }
+    const float total = costEach * static_cast<float>(howMany);
+    if (total > money_)
+    {
+        return false;
+    }
+    money_ -= total;
+    ladders_ += howMany;
+    return true;
+}
+
 bool Career::BuyEnginePart(float costGbp) noexcept
 {
     if (costGbp < 0.0f || costGbp > money_)
@@ -270,6 +286,7 @@ std::string Career::ToJson() const
     std::ostringstream out;
     out << "{\n  \"money\": " << money_ << ",\n  \"reputation\": " << reputation_
         << ",\n  \"day\": " << day_ << ",\n  \"engineParts\": " << engineParts_
+        << ",\n  \"ladders\": " << ladders_
         << ",\n  \"jobs\": [";
     for (std::size_t i = 0; i < jobs_.size(); ++i)
     {
@@ -327,6 +344,10 @@ Career Career::FromJson(const std::string& json, const std::string& origin)
     if (doc.Has("engineParts"))
     {
         c.engineParts_ = static_cast<int32_t>(doc.At("engineParts").AsNumber());
+    }
+    if (doc.Has("ladders"))
+    {
+        c.ladders_ = static_cast<int32_t>(doc.At("ladders").AsNumber());
     }
     if (doc.Has("salvage"))
     {

@@ -180,29 +180,50 @@ func _the_van() -> void:
 	_check(not board.van_open, "the van is shut until you take a job")
 	board.open_van()
 	_check(board.van_open, "and enter opens it rather than setting off")
-	_check(board.van_ladders == int(job["ladders"]),
-		"loaded with what the level packed: %d ladders" % board.van_ladders)
-	_check(board.van_dogs == int(job["dogs"]), "and %d dogs" % board.van_dogs)
 
-	# The span is the decision. Fewer ladders is a longer section and the game should say so.
-	var packed_span: float = board.van_span(job)
-	for i in 6:
-		board.van_step(-1)
-	_check(board.van_span(job) > packed_span,
-		"six ladders fewer is a longer section: %.1f m -> %.1f m" % [packed_span, board.van_span(job)])
-	_check(board.van_ladders >= 1, "and it will not go below one ladder")
-	for i in 60:
-		board.van_step(-1)
-	_check(board.van_ladders == 1, "however hard you hold the key: %d" % board.van_ladders)
+	# Sections are stock, not a dial. The van reports what you own; it does not ask.
+	_check(board.van_ladders == board.jack.career_ladders(),
+		"the van is loaded with what you own: %d sections" % board.van_ladders)
 
-	# What is loaded is what turns up at the chimney.
-	board.van_ladders = 9
-	board.van_dogs = 30
+	# --- a chimney you have not got the ladders for is one you cannot take ----------------------
+	#
+	# This is the whole reason the shop exists, and the refusal has to say what to do about it:
+	# a closed door with no handle is a bug with good manners.
+	var want: int = int(job["ladders"])
+	_check(want > board.jack.career_ladders(),
+		"the Grey Box wants %d sections and you own %d" % [want, board.jack.career_ladders()])
+	_check(board.short_by(job) == want - board.jack.career_ladders(),
+		"so you are %d short" % board.short_by(job))
+	board.van_said = ""
 	board._take_it()
 	await process_frame
-	_check(int(root.get_meta("job_ladders", -1)) == 9,
-		"what you load is what the job is told about: %d ladders"
-			% root.get_meta("job_ladders", -1))
-	_check(int(root.get_meta("job_dogs", -1)) == 30, "and the dogs with it")
+	_check(not root.has_meta("job_level") or String(root.get_meta("job_level")) != String(job["id"]),
+		"and she will not let you set off")
+	_check(board.van_said.contains("short") or board.van_said.contains("sections"),
+		"saying why, and where to fix it: %s" % board.van_said)
+
+	# Buy the difference and she lets you go.
+	board.jack.career_load('{"money": 9000, "reputation": 60}')
+	_check(board.jack.career_buy_ladders(want), "bought %d sections" % want)
+	_check(board.short_by(job) == 0, "and now nothing is short")
+
+	# A felling whose bands are already off is ground work, so it needs no ladders at all.
+	for j in board.jobs:
+		if String(j["archetype"]) == "FELL":
+			board.jack.career_mark_stripped(String(j["id"]))
+			_check(board.short_by(j) == 0,
+				"a stripped felling asks for no sections — it is a bar and a match")
+			break
+
+	# What turns up at the chimney is what you own. Read the number first: taking the job frees
+	# the board, and asking a freed node what it owns is how this test learned that lesson.
+	var owned_now: int = board.jack.career_ladders()
+	board.selected = board.jobs.find(job)
+	board.open_van()
+	board._take_it()
+	await process_frame
+	_check(int(root.get_meta("job_ladders", -1)) == owned_now,
+		"the job is told what you own: %d sections" % root.get_meta("job_ladders", -1))
+	_check(int(root.get_meta("job_dogs", -1)) > 0, "and dogs, which cost nothing and never run out")
 
 	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://test-career-van.json"))

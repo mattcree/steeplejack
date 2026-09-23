@@ -24,11 +24,16 @@ const LEAN_RATE := 14.0          ## fast enough to arrive before the tap's conta
 const CHECKPOINT_EVERY := 2.0    ## seconds between looks at whether the stack changed
 ## How much closer to the rungs the drawn body hangs than the capsule does.
 ##
-## Small on purpose. A climber's hips hang *back* off a ladder — that is how the knees stay on
-## their own side of the rungs and how the arms stay bent enough to pull on. Pulling the body in
-## to 0.30 m made the legs nearly straight and drove the bent one through the rails; rung_grip.gd
-## now lowers the hips to suit whatever standoff this leaves, so the two cannot disagree.
-const CLIMB_IN := 0.03
+## Negative: the drawn body hangs FURTHER OUT than the capsule, not closer in.
+##
+## A climber's hips hang back off a ladder. That is how the knees stay on their own side of the
+## rungs, and at +0.03 they did not — the bent knee went through the rails on every stride, which
+## is the note that has come back twice now. Moving the *capsule* out is not the fix and was tried:
+## the capsule is where his reach is measured from, so at 0.52 his hands came up a quarter of a
+## metre short of the rung they were holding. This moves only what you can see. The hands and feet
+## stay IK'd to the rungs they are actually on, the arms simply straighten to suit, and the spine
+## leans further in to keep his chest where a climber's chest is — hips back, chest in.
+const CLIMB_IN := -0.075
 const RAIL_HALF := 0.22          ## half the gap between the stiles; chimney.gd's RAIL_GAP / 2
 const WALL_FOLLOW_DELAY := 1.5   ## seconds after the mouse last moved before the ladder view squares up
 const WALL_FOLLOW_RATE := 1.2    ## how fast it does, per second — a drift, not a snap
@@ -354,8 +359,11 @@ func _ready() -> void:
 	_load_kit()
 	if jack.loadout_ladders() > 0:
 		ladders_at_base = jack.loadout_ladders()
-	if jack.loadout_dogs() > 0:
-		dogs_at_base = jack.loadout_dogs()
+	# Dogs cost nothing and never run out. They were a number in the van and a number at the
+	# cradle, and both were micromanagement of sixpenny ironmongery — the last thing anybody wants
+	# to be told at forty metres is that they are out of dogs. The bag still holds what it holds,
+	# so you still go down for more; you just never find the cradle empty.
+	dogs_at_base = maxi(jack.loadout_dogs(), 1) * 4
 	# What you left in this chimney last time, still in it. The trade did exactly this — jacks
 	# with a standing contract left their dogs in — and the consequence the record reports is the
 	# one that matters here: the next crew "had used the old dog holes and it wandered a bit".
@@ -413,6 +421,7 @@ func _ready() -> void:
 	# it aimed at the ground and the opening shot came out flat and pointed at a field.
 	_look_at_stack()
 	chimney.set_ladder_top(ladder_top)
+	_begin_arrival()
 	# Only when there is a window to capture it in. A headless server has no mouse, and asking for
 	# one there hangs the process with no output at all, which is a miserable thing to debug.
 	_capture_mouse(true)
@@ -872,6 +881,80 @@ func _follow_wall(dt: float) -> void:
 	_yaw = lerp_angle(_yaw, want, k)
 
 
+# --- arriving ------------------------------------------------------------------------------------
+#
+# You used to spawn seventy metres out and walk in. That was there for a good reason — from thirty
+# metres a seventy metre stack is off the top of the screen, and the first thing a player sees
+# should be the whole of what they have been sent to climb — but the reason wanted a *view*, not a
+# walk, and it was paid for with twenty-four seconds of holding W across an empty field. Every
+# single job. The establishing shot does the seeing; you start at the cradle with your hand on
+# the gear.
+#
+# It is skippable on any key, because the second time you take a chimney you have already met it.
+
+const ARRIVAL_SECONDS := 5.5
+var arriving := 0.0
+var _arrival_cam: Camera3D
+
+
+func _begin_arrival() -> void:
+	if DisplayServer.get_name() == "headless":
+		return           # tests drive the player directly; there is nobody to show anything to
+	# At the cradle, where the ladders are — and a couple of paces back from it, so the gear is
+	# in front of him rather than round his feet. Standing *on* the cradle point put the camera
+	# inside the brazier.
+	var at := chimney.global_position + chimney.cradle_point()
+	var out := at - chimney.global_position
+	out.y = 0.0
+	at += out.normalized() * 2.6
+	global_position = Vector3(at.x, global_position.y, at.z)
+	_spawn = global_position
+	_look_at_stack()
+
+	_arrival_cam = Camera3D.new()
+	_arrival_cam.fov = camera.fov
+	get_parent().add_child(_arrival_cam)
+	_arrival_cam.make_current()
+	arriving = ARRIVAL_SECONDS
+	_update_arrival(0.0)
+
+
+func skip_arrival() -> void:
+	if arriving <= 0.0:
+		return
+	arriving = 0.0
+	if _arrival_cam != null:
+		_arrival_cam.queue_free()
+		_arrival_cam = null
+	camera.make_current()
+	_capture_mouse(true)
+
+
+## The fly-in: from well back and high, down and in to over his shoulder at the cradle.
+func _update_arrival(dt: float) -> void:
+	if arriving <= 0.0:
+		return
+	arriving = maxf(arriving - dt, 0.0)
+	if arriving <= 0.0 or _arrival_cam == null:
+		skip_arrival()
+		return
+	var t: float = 1.0 - (arriving / ARRIVAL_SECONDS)
+	# Eased, so it settles rather than stopping.
+	t = t * t * (3.0 - 2.0 * t)
+
+	var base: Vector3 = chimney.global_position
+	var out: Vector3 = (global_position - base)
+	out.y = 0.0
+	out = out.normalized() if out.length() > 0.01 else Vector3.FORWARD
+	var far_off: float = maxf(chimney.height_m * 1.45, 40.0)
+	var eye_far: Vector3 = base + out * far_off + Vector3.UP * (chimney.height_m * 0.42)
+	var eye_near: Vector3 = global_position + out * 5.0 + Vector3.UP * 2.6
+	_arrival_cam.global_position = eye_far.lerp(eye_near, t)
+	# Looking at her middle at first and at her foot by the end, which is where the work starts.
+	var look: Vector3 = base + Vector3.UP * lerpf(chimney.height_m * 0.5, 3.0, t)
+	_arrival_cam.look_at(look, Vector3.UP)
+
+
 func _look_at_stack() -> void:
 	var to := chimney.global_position - global_position
 	to.y = 0.0
@@ -890,6 +973,12 @@ func _look_at_stack() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Any key or click gets on with it. Somebody taking a chimney for the second time has met her.
+	if arriving > 0.0:
+		if (event is InputEventKey and event.pressed) \
+				or (event is InputEventMouseButton and event.pressed):
+			skip_arrival()
+		return
 	# Asked to leave, and waiting on an answer. Nothing else gets a look in — it is a question
 	# with two answers and the climb is not going anywhere.
 	if leaving:
@@ -932,7 +1021,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		if not jack.slip_in_progress():
 			get_viewport().set_input_as_handled()
 			return
-	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+	# While the rope is going round, or the rope is coming up, the mouse belongs to the rope.
+	#
+	# It did not: the lash handler read the motion to wrap with AND this ran, so going round in
+	# circles spun the camera round in circles at the same time. You cannot watch what your hands
+	# are doing if the act of doing it turns your head — and the wrap is a verb you are meant to
+	# be able to look at.
+	if event is InputEventMouseMotion and (lashing or hauling):
+		pass
+	elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if work_mode:
 			# In work mode the mouse stops steering your head and starts steering the hammer. That
 			# separation is the whole feel of the verb: you are holding on with one hand.
@@ -1056,6 +1153,7 @@ func _physics_process(dt: float) -> void:
 	_update_stack(dt)
 	_update_recovery()
 	_update_fall(dt)
+	_update_arrival(dt)
 	if _carried_ladder != null:
 		# On his back whenever he has one and is not holding it up to lash it — then it is the
 		# translucent section on the stack instead, and it cannot be in two places.

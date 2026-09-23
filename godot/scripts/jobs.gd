@@ -53,7 +53,15 @@ var van_said := ""
 ## could reach by pressing Q four times on any job, on any chimney, having never heard of one; now
 ## it is £75 in the yard and a line on this screen, and by the time you rig one you know what it is
 ## and why you are carrying it up a chimney.
-const VAN_ROWS := ["ladders", "dogs", "gloves", "bosunsChair"]
+## The van is a kit list now, not a pair of dials.
+##
+## It used to ask you how many ladders and how many dogs to take, and the question that killed it
+## is the right one: **what is the penalty for choosing wrong?** Either the figure the reachability
+## gate proved is the correct one — in which case inviting the player to get it wrong is a trap —
+## or it is not, and the gate is a lie. Ladders are stock you buy and keep, and a job you have not
+## got the sections for is one you cannot take. Dogs are free: nobody wants to be told they have
+## run out of sixpenny ironmongery at forty metres.
+const VAN_ROWS := ["gloves", "bosunsChair"]
 const KIT_ROWS := ["gloves", "bosunsChair"]
 const KIT_NAME := {"gloves": "Gloves", "bosunsChair": "Bosun's chair"}
 const KIT_WHY := {
@@ -149,6 +157,17 @@ func save_career() -> void:
 ## A gate you could not reach even by doing every job that exists is not locked, it is a gap: the
 ## levels that would have earned it are designed and have no data yet. Those are offered, with the
 ## reason on the card, and they will start enforcing themselves the moment the levels between land.
+## How many sections short you are for this one. Zero means you can ladder her.
+##
+## Only for the half of a job that is a climb. A felling whose bands are already off is ground
+## work — pegs, a bar and a match — and asking a man to own seventeen ladders before he may walk
+## round a chimney he has already stripped is the gate misfiring on its own second act.
+func short_by(job: Dictionary) -> int:
+	if String(scene_for(job)).contains("felling"):
+		return 0
+	return maxi(int(job.get("ladders", 0)) - jack.career_ladders(), 0)
+
+
 func locked(job: Dictionary) -> bool:
 	if jack.career_can_take(int(job["gate"])):
 		return false
@@ -269,10 +288,12 @@ func open_van() -> void:
 	var job: Dictionary = jobs[selected]
 	if locked(job):
 		return
-	van_ladders = maxi(int(job.get("ladders", 0)), 1)
+	van_said = ""
+	if short_by(job) > 0:
+		van_said = "%d sections short — there are ladders for sale in the yard" % short_by(job)
+	van_ladders = jack.career_ladders()
 	van_dogs = maxi(int(job.get("dogs", 0)), 1)
 	van_row = 0
-	van_said = ""
 	van_open = true
 
 
@@ -292,15 +313,8 @@ func _van_key(key: int) -> void:
 			_take_it()
 
 
-func van_step(dir: int) -> void:
-	var row: String = VAN_ROWS[van_row]
-	if row == "ladders":
-		van_ladders = clampi(van_ladders + dir, 1, 40)
-		return
-	if row == "dogs":
-		van_dogs = clampi(van_dogs + dir * 2, 2, 120)
-		return
-	van_toggle(row)
+func van_step(_dir: int) -> void:
+	van_toggle(VAN_ROWS[van_row])
 
 
 ## A kit row is on or off, and either arrow does the same thing — there is no more or less of a
@@ -333,11 +347,17 @@ func _take_it() -> void:
 	var job: Dictionary = jobs[selected]
 	if locked(job):
 		return
+	# You cannot ladder her, so you cannot take her. Said plainly and with the remedy in the same
+	# sentence — a refusal that does not say what to do about it is a bug with good manners.
+	if short_by(job) > 0:
+		van_said = "You have %d sections and she wants %d. Buy %d more in the yard." % [
+			jack.career_ladders(), int(job.get("ladders", 0)), short_by(job)]
+		return
 	var packed: PackedScene = load(scene_for(job))
 	# On the tree root rather than on the scene, because the climbing scene's root is a plain
 	# Node3D with no script on it and the felling scene's is not. One way in for both.
 	get_tree().root.set_meta("job_level", String(job["id"]))
-	get_tree().root.set_meta("job_ladders", van_ladders)
+	get_tree().root.set_meta("job_ladders", jack.career_ladders())
 	get_tree().root.set_meta("job_dogs", van_dogs)
 	var world: Node = packed.instantiate()
 	get_tree().root.add_child(world)
@@ -503,7 +523,7 @@ func _letter(job: Dictionary, x: float, y: float) -> void:
 # is yours.
 
 const VAN_W := 560.0
-const VAN_H := 420.0
+const VAN_H := 340.0
 const VAN_ROW_H := 54.0
 
 
@@ -550,65 +570,43 @@ func _draw_van() -> void:
 		if on:
 			draw_rect(Rect2(Vector2(r.position.x + 16.0, y - 26.0),
 				Vector2(VAN_W - 32.0, 36.0)), Color(0.16, 0.14, 0.12, 0.07))
-		# A rule between the numbers and the kit. They are answers to different questions and the
-		# line is cheaper than a heading.
-		if key == KIT_ROWS[0]:
-			draw_rect(Rect2(Vector2(r.position.x + 28.0, y - 40.0),
-				Vector2(VAN_W - 56.0, 1.0)), Color(0.16, 0.14, 0.12, 0.18))
+		var owned: bool = jack.career_owns(key)
+		var taking: bool = jack.career_carrying(key)
+		var col: Color = (INK if on else FADED) if owned else Color(0.16, 0.14, 0.12, 0.3)
+		draw_string(_font, Vector2(r.position.x + 28.0, y), String(KIT_NAME.get(key, key)),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 17, col)
+		draw_string(_font, Vector2(r.position.x + 28.0, y + 17.0),
+			String(KIT_WHY.get(key, "")) if owned
+				else "£%.0f at the yard" % jack.career_kit_cost(key),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.16, 0.14, 0.12, 0.45))
+		# A drawn box rather than a word: it is the one row on this screen whose state you
+		# should be able to take in without reading anything.
+		var box := Rect2(Vector2(r.position.x + VAN_W - 132.0, y - 15.0), Vector2(18, 18))
+		draw_rect(box, Color(0.16, 0.14, 0.12, 0.5), false, 1.5)
+		if taking:
+			draw_rect(Rect2(box.position + Vector2(4, 4), Vector2(10, 10)), INK)
+		draw_string(_font, Vector2(r.position.x + VAN_W - 104.0, y),
+			"on the cart" if taking else ("in the shed" if owned else "not bought"),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, col)
 
-		if key in KIT_ROWS:
-			var owned: bool = jack.career_owns(key)
-			var taking: bool = jack.career_carrying(key)
-			var col: Color = (INK if on else FADED) if owned else Color(0.16, 0.14, 0.12, 0.3)
-			draw_string(_font, Vector2(r.position.x + 28.0, y), String(KIT_NAME.get(key, key)),
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 17, col)
-			draw_string(_font, Vector2(r.position.x + 28.0, y + 17.0),
-				String(KIT_WHY.get(key, "")) if owned
-					else "£%.0f at the yard" % jack.career_kit_cost(key),
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.16, 0.14, 0.12, 0.45))
-			# A drawn box rather than a word: it is the one row on this screen whose state you
-			# should be able to take in without reading anything.
-			var box := Rect2(Vector2(r.position.x + VAN_W - 132.0, y - 15.0), Vector2(18, 18))
-			draw_rect(box, Color(0.16, 0.14, 0.12, 0.5), false, 1.5)
-			if taking:
-				draw_rect(Rect2(box.position + Vector2(4, 4), Vector2(10, 10)), INK)
-			draw_string(_font, Vector2(r.position.x + VAN_W - 104.0, y),
-				"on the cart" if taking else ("in the shed" if owned else "not bought"),
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, col)
-			continue
 
-		var what := "Ladder sections" if key == "ladders" else "Dogs"
-		draw_string(_font, Vector2(r.position.x + 28.0, y), what,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK if on else FADED)
-		var n: int = van_ladders if key == "ladders" else van_dogs
-		draw_string(_font, Vector2(r.position.x + VAN_W - 150.0, y), "‹" if on else " ",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK)
-		draw_string(_font, Vector2(r.position.x + VAN_W - 118.0, y), "%d" % n,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 21, INK)
-		draw_string(_font, Vector2(r.position.x + VAN_W - 66.0, y), "›" if on else " ",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK)
 
-	# What the choice actually means, in the units the job is in. A player should not have to do
-	# this division at fifty metres with one hand on a rung.
-	var span := van_span(job)
-	var verdict := "rigid"
-	var col := Color(0.20, 0.42, 0.24)
-	if span > 8.0:
-		verdict = "past buckling — she will not hold"
-		col = RED_INK
-	elif span > 6.0:
-		verdict = "swaying"
-		col = RED_INK
-	elif span > 4.0:
-		verdict = "flexing"
-		col = Color(0.55, 0.38, 0.10)
-	draw_string(_font, Vector2(r.position.x + 28.0, r.position.y + VAN_H - 100.0),
-		"%.1f m a section over %.0f m — %s" % [span, float(job.get("height", 0.0)), verdict],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, col)
-	draw_string(_font, Vector2(r.position.x + 28.0, r.position.y + VAN_H - 76.0),
-		"%d dogs — %s" % [van_dogs,
-			"plenty" if van_dogs >= van_ladders * 2 else "you will be going back down for more"],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, FADED)
+	# What is on the cart, stated rather than chosen. The sections are stock; the dogs are dogs.
+	var want: int = int(job.get("ladders", 0))
+	var have: int = jack.career_ladders()
+	var short: int = maxi(want - have, 0)
+	draw_string(_font, Vector2(r.position.x + 28.0, r.position.y + VAN_H - 104.0),
+		"%d ladder sections  ·  she wants %d" % [have, want],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, RED_INK if short > 0 else INK)
+	draw_string(_font, Vector2(r.position.x + 28.0, r.position.y + VAN_H - 82.0),
+		("%d short — there are more for sale in the yard" % short) if short > 0
+			else "%.1f m a section over %.0f m" % [
+				float(job.get("height", 0.0)) / maxf(float(want), 1.0),
+				float(job.get("height", 0.0))],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, RED_INK if short > 0 else FADED)
+	draw_string(_font, Vector2(r.position.x + 28.0, r.position.y + VAN_H - 60.0),
+		"dogs and rope — as many as you can carry, and they cost nothing",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, FADED)
 	if van_said != "":
 		draw_string(_font, Vector2(r.position.x + 28.0, r.position.y + VAN_H - 48.0), van_said,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.55, 0.18, 0.14))

@@ -65,14 +65,18 @@ func _init() -> void:
 			board.selected = i
 	board.open_van()
 	_check(board.van_open, "enter opens the van")
-	board.van_ladders = 5
-	board.van_dogs = 14
+	# Sections are stock now, not a dial in the van. What goes on the cart is what you own, and
+	# the Back Yard wants four of the eleven you start with, so this one lets you go.
+	var owned: int = board.jack.career_ladders()
+	_check(board.short_by(board.jobs[board.selected]) == 0,
+		"and the back yard is one you have the sections for")
 	board._take_it()
 	await process_frame
 	await process_frame
 	_check(root.has_meta("job_level"), "and setting off names the job: %s"
 		% root.get_meta("job_level", ""))
-	_check(int(root.get_meta("job_ladders", -1)) == 5, "with the van's ladders")
+	_check(int(root.get_meta("job_ladders", -1)) == owned,
+		"with the sections you own: %d" % root.get_meta("job_ladders", -1))
 
 	var world: Node = _current()
 	var player: Node = world.get_node_or_null("Player") if world != null else null
@@ -83,9 +87,10 @@ func _init() -> void:
 	# Several frames: the loadout is read in _ready and the cradle filled from it.
 	for i in 8:
 		await physics_frame
-	_check(player.ladders_at_base == 5,
-		"and the cradle holds what the van loaded: %d" % player.ladders_at_base)
-	_check(player.dogs_at_base == 14, "dogs too: %d" % player.dogs_at_base)
+	_check(player.ladders_at_base == owned,
+		"and the cradle holds every section you own: %d" % player.ladders_at_base)
+	# Dogs cost nothing and do not run out — you go down for more, you never find none.
+	_check(player.dogs_at_base > 0, "with dogs enough not to think about: %d" % player.dogs_at_base)
 
 	# --- and home again ---------------------------------------------------------------------
 	player.back_to_the_board()

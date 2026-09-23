@@ -299,9 +299,13 @@ func _cradle() -> void:
 		node.add_child(inst)
 
 	# The dog crate, and a brazier, because a jack's pitch has a fire on it.
+	# Not black. At 0.18 the brazier and the dog crate read as holes cut in the ground — cast iron
+	# in daylight is a mid grey with a sheen on it, and these two are the first objects in the
+	# game the player walks up to.
 	var iron := StandardMaterial3D.new()
-	iron.albedo_color = Color(0.18, 0.17, 0.16)
-	iron.roughness = 0.75
+	iron.albedo_color = Color(0.31, 0.29, 0.28)
+	iron.roughness = 0.55
+	iron.metallic = 0.4
 
 	var crate := BoxMesh.new()
 	crate.size = Vector3(1.1, 0.5, 0.8)

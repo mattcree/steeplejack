@@ -233,7 +233,12 @@ func _draw_shed() -> void:
 			Color(GHOST, 0.8 if on else 0.55), 13)
 		var cost: float = jack.career_kit_cost(item)
 		var right := Vector2(r.position.x + SHED_W - 118.0, y)
-		if owned:
+		if item == "ladderSection":
+			_label("%d" % jack.career_ladders(), Vector2(right.x - 44.0, y), Color(DIM, 0.9), 17)
+			_label("£%.0f" % cost, right,
+				Color(WATCH, 0.95) if cost <= float(career.get("money", 0.0))
+					else Color(0.72, 0.42, 0.34, 0.9), 20)
+		elif owned:
 			_label("yours", right, Color(GOOD, 0.9), 17)
 		elif cost > float(career.get("money", 0.0)):
 			_label("£%.0f" % cost, right, Color(0.72, 0.42, 0.34, 0.9), 20)
@@ -273,9 +278,13 @@ func choose(what: String) -> void:
 # pressing Q until something happens is a stance nobody understands; one you paid for, and then
 # chose to put on the cart, is one you know the name of before you ever rig it.
 
-const SHED := ["gloves", "bosunsChair"]
-const SHED_NAME := {"gloves": "A pair of gloves", "bosunsChair": "A bosun's chair"}
+## Ladder sections come first because they are the only thing in here you *have* to buy. The two
+## below are choices; sections are the difference between a job you can take and one you cannot.
+const SHED := ["ladderSection", "gloves", "bosunsChair"]
+const SHED_NAME := {"ladderSection": "A ladder section", "gloves": "A pair of gloves",
+	"bosunsChair": "A bosun's chair"}
 const SHED_WHY := {
+	"ladderSection": "five metres of her. A chimney you have not the sections for is one you cannot take",
 	"gloves": "less grip going out of you — and a tier worse at reading a joint by sound",
 	"bosunsChair": "sit in it and work. No grip going out at all, and 20 s to rig on the stack",
 }
@@ -292,6 +301,17 @@ func _open_shed() -> void:
 
 func shed_choose() -> void:
 	var item: String = SHED[shed_row]
+	if item == "ladderSection":
+		# Stock, not a one-off. You buy them by the section and you keep them.
+		if not jack.career_buy_ladders(1):
+			_said = "£%.0f short of another section." % (
+				jack.career_kit_cost(item) - float(career.get("money", 0.0)))
+			return
+		_save_career()
+		career = jack.career_state()
+		_said = "£%.0f. that is %d sections in the yard." % [
+			jack.career_kit_cost(item), jack.career_ladders()]
+		return
 	if jack.career_owns(item):
 		# Owned kit is loaded in the van, not here. Two screens that both decide the same thing is
 		# how a player ends up certain they took the chair and arrives without it.

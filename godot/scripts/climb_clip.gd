@@ -54,8 +54,11 @@ const AIM := {
 
 	# Leaning in. A climber's weight is over his feet and his chest is near the rungs, not upright
 	# like a man waiting for a bus.
-	"spine_01":   [Vector3(0.0, 0.97, 0.26), Vector3(0.0, 0.97, 0.26)],
-	"spine_02":   [Vector3(0.0, 0.98, 0.20), Vector3(0.0, 0.98, 0.20)],
+	# Leaned in further than it was, because the hips now hang further back (player.gd's
+	# CLIMB_IN). The two go together: take the bum off the ladder without bringing the chest
+	# towards it and he is not climbing, he is sitting down in mid air.
+	"spine_01":   [Vector3(0.0, 0.92, 0.40), Vector3(0.0, 0.92, 0.40)],
+	"spine_02":   [Vector3(0.0, 0.94, 0.34), Vector3(0.0, 0.94, 0.34)],
 }
 
 ## Which child each posed bone points at. A bone has no direction of its own; it has the direction
