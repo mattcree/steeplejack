@@ -65,6 +65,11 @@ func _init() -> void:
 	_check(again._step == 1, "and the list has moved on to the survey")
 	again._at = again._on_bearing(again._peg,
 		float(again.jack.structure().get("base_radius", 3.2)) + 3.0)
+	# Walking moves the camera too — the game does this every frame, and the bar goes in where
+	# you are *looking*, not where your feet are. Without it the test aims from the spawn and
+	# depends on the spawn being close enough to the brickwork to cut from, which it is not: you
+	# now start far enough back to see the whole of her.
+	again._place_camera()
 	again._cut()
 	_check(float(again.jack.gob_state().get("cut_arc", 0.0)) > 0.0, "and now she cuts")
 

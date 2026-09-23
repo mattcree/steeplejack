@@ -24,6 +24,13 @@ func _init() -> void:
 	var jack = w.jack
 	var ring = w.ring
 	w._stripped = true
+	# Standing where the work is. This cuts through the sim rather than by walking in and swinging
+	# a bar, so nothing moves him — and the assertion at the end of this test is precisely that a
+	# man cutting her out from underneath is underneath her. He used to be there by accident,
+	# because the scene spawned you sixteen metres from the foot of a seventy metre chimney; you
+	# now start far enough back to see the whole of her, so the test has to walk him in itself.
+	w._at = w._on_bearing(w._peg, float(jack.structure().get("base_radius", 3.2)) + 3.0)
+	w._place_camera()
 
 	_check(String(jack.gob_state().get("status_name", "")) == "SAFE", "she starts standing easy")
 

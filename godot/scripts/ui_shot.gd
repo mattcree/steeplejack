@@ -79,6 +79,15 @@ func _run(cmd: String) -> void:
 			await _shot(arg if arg != "" else "ui")
 		"wait":
 			await _wait(int(arg) if arg != "" else 10)
+		"tick":
+			# Push a scene that runs on a clock forward without waiting for it. The ending is 64
+			# seconds of road and a tally that reveals a line at a time; a capture that waits for
+			# it in real time is a capture nobody takes, so the frames nobody looks at are the
+			# ones at the end of it.
+			if "_t" in screen:
+				screen._t = float(arg)
+				screen.queue_redraw()
+			await _wait(3)
 		"money":
 			_tin(float(arg))
 		"own":

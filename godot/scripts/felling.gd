@@ -139,7 +139,18 @@ func _ready() -> void:
 	hud.level_name = jack.level_name()
 	hud.set_meta("exclusions", _authored.get("exclusions", []))
 	_peg = _corridor_centre()
-	_at = _on_bearing(_peg, 16.0)
+	# Far enough back to see the whole of her.
+	#
+	# It was a flat sixteen metres. At sixteen metres the top of a thirty-five metre chimney is
+	# sixty-five degrees up and the camera's half-angle is about thirty-six, so the first frame of
+	# a felling was a wall of brick with no chimney in it — you are asked to drop something you
+	# cannot see the shape of. The climbing scene fixed exactly this and wrote down why; the
+	# felling half never got the same treatment.
+	#
+	# Far back rather than tilted up: the pitch is the player's, and the gob is at the *foot* of
+	# her. Opening with the camera angled at her head means a player who walks in to cut is aiming
+	# above the brickwork and the bar will not go in — which a test caught the moment I tried it.
+	_at = _on_bearing(_peg, maxf(jack.total_height() * 1.8, 40.0))
 	_face_the_chimney()
 	_peg_marks = Node3D.new()
 	add_child(_peg_marks)
@@ -470,6 +481,14 @@ func _place_body() -> void:
 		return
 	body.position = _at
 	body.rotation.y = _facing if _moving > 0.1 else _yaw
+	# Shadow only, until the camera comes out from behind his eyes.
+	#
+	# "In first person you only see his shadow" is what this was always for, and it was never
+	# implemented: the model was drawn solid with the camera at 1.62 m, which is inside its head.
+	# The opening frame of every felling in the game was the inside of the jack's own face — a
+	# featureless brown mass with the whole site behind it. In Act 4 the camera pulls back to
+	# twelve feet and he has to be there, so the switch goes with the camera.
+	_show_body(_act4 == BURNING)
 	var anim := body.get_node_or_null("AnimationPlayer")
 	if anim == null:
 		return
@@ -479,6 +498,17 @@ func _place_body() -> void:
 			anim.get_animation(want).loop_mode = Animation.LOOP_LINEAR
 			anim.play(want, 0.15)
 		anim.speed_scale = clampf(_moving / RUN_CLIP_SPEED, 0.6, 1.9) if _moving > 0.5 else 1.0
+
+
+var _body_shown := true
+
+func _show_body(solid: bool) -> void:
+	if solid == _body_shown:
+		return
+	_body_shown = solid
+	for node in body.find_children("*", "GeometryInstance3D", true, false):
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if solid \
+			else GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 
 
 func _place_camera() -> void:

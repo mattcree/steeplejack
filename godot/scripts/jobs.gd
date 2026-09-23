@@ -455,15 +455,29 @@ func _letter(job: Dictionary, x: float, y: float) -> void:
 	var w: float = size.x - x - 48.0
 	var briefing: Dictionary = job["briefing"]
 	var lines: Array = briefing.get("lines", [])
-	var h: float = 130.0 + float(lines.size()) * 22.0
+	# Wrapped, not clipped.
+	#
+	# `draw_string`'s width argument cuts the text off; it does not fold it. At 1600 px the
+	# longest authored briefing line is 86 characters and fits, so this looked correct — and in a
+	# 1024-wide window the same line loses its last third, silently, in the middle of a word. The
+	# letters are the only authored prose in the game and they are the thing that tells you what
+	# the job is. Measure what each one actually takes and give the paper that much room.
+	var text_w := int(w - 52)
+	var rows: Array = []
+	var h := 130.0
+	for line in lines:
+		var tall: float = maxf(_font.get_multiline_string_size(String(line),
+			HORIZONTAL_ALIGNMENT_LEFT, text_w, 14).y, 22.0)
+		rows.append([String(line), tall])
+		h += tall
 	draw_rect(Rect2(x, y, w, h), PAPER)
 	draw_string(_font, Vector2(x + 26, y + 40), String(job["name"]),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 19, INK)
 	var ly := y + 74.0
-	for line in lines:
-		draw_string(_font, Vector2(x + 26, ly), String(line), HORIZONTAL_ALIGNMENT_LEFT,
-			int(w - 52), 14, INK)
-		ly += 22.0
+	for row in rows:
+		draw_multiline_string(_font, Vector2(x + 26, ly), String(row[0]),
+			HORIZONTAL_ALIGNMENT_LEFT, text_w, 14, -1, INK)
+		ly += float(row[1])
 	var who := String(briefing.get("from", ""))
 	if who != "":
 		draw_string(_font, Vector2(x + 26, ly + 14), "— %s" % who,

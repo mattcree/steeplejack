@@ -67,6 +67,11 @@ func _init() -> void:
 	_check(not unstripped._stripped, "and it has not been done")
 	unstripped._at = unstripped._on_bearing(unstripped._peg,
 		float(unstripped.jack.structure().get("base_radius", 3.2)) + 3.0)
+	# Walking moves the camera too. The game calls this every frame, so `_at` and the camera can
+	# never disagree there; a test that moves one and not the other is aiming from wherever the
+	# player happened to spawn, and quietly depends on the spawn being within a bar's reach of
+	# the brickwork. It is not any more — you start far enough back to see the whole of her.
+	unstripped._place_camera()
 	unstripped._cut()
 	_check(float(unstripped.jack.gob_state().get("cut_arc", 0.0)) == 0.0,
 		"so the bar will not go in — not a brick out of her")

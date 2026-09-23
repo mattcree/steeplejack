@@ -117,7 +117,12 @@ func _draw() -> void:
 	# The way out, on the jobs that do not end on the cap. Without it a player who has just
 	# finished a conductor run at the foot of the chimney has no idea the job is over.
 	if not player.settlement.is_empty() and not player.at_top:
-		_centre("the job is done  ·  [enter] to go home", size.y - 96.0, Color(INK, 0.92), H2)
+		# With what it paid. A conductor run and a straightening both end at the *foot* of her, and
+		# the settlement figures were only ever drawn inside `_draw_top` — so on those two
+		# archetypes you finished the job, the money went in the tin, and the game told you
+		# nothing but "done". The number is the point of the day.
+		_centre(_settled_line(), size.y - 122.0, Color(INK, 0.95), H2)
+		_centre("the job is done  ·  [enter] to go home", size.y - 96.0, Color(DIM, 0.90), BODY)
 
 	# Only once there is something to span *from*. With no dogs driven, the span is measured from
 	# the ground and reads "62.0 m span — about to buckle" at the top of a ladder that is lashed all
@@ -961,6 +966,22 @@ func _draw_recovery(jack: Jack, hand: Vector2) -> void:
 ## tenth dog (the taps), did they take the risky span (the long spans), did the verbs have a curve
 ## (the ratings). Shown plainly, as facts about their climb, with no score attached — a score would
 ## turn a climb into a grade.
+## What the job paid, in one line. Shared by the two places a job can end — the cap, and the foot
+## of her — because they are the same sentence and the second one did not have it.
+func _settled_line() -> String:
+	var paid: Dictionary = player.settlement
+	if paid.is_empty():
+		return ""
+	var fee := float(paid.get("paid", paid.get("fee", 0.0)))
+	var rep := int(paid.get("reputation_delta", 0))
+	var said := "a favour, and he will remember it" if fee <= 0.0 else "£%d" % int(fee)
+	if rep > 0:
+		said += "   ·   +%d to your name" % rep
+	if not bool(paid.get("first_time", true)):
+		said += "   (you have done this one before)"
+	return said
+
+
 func _draw_top() -> void:
 	var s: Dictionary = player.top_summary
 	var age: float = player._now - player.top_since
@@ -999,14 +1020,7 @@ func _draw_top() -> void:
 			money + 30.0, Color(0.86, 0.84, 0.80, 0.6 * c), 13)
 		return
 	if not paid.is_empty():
-		var fee := float(paid.get("fee", 0.0))
-		var rep := int(paid.get("reputation_delta", 0))
-		var said := "a favour, and he will remember it" if fee <= 0.0 else "£%d" % int(fee)
-		if rep > 0:
-			said += "   ·   +%d to your name" % rep
-		if not bool(paid.get("first_time", true)):
-			said += "   (you have done this one before)"
-		_centre(said, money, Color(0.95, 0.93, 0.88, 0.9 * c), 16)
+		_centre(_settled_line(), money, Color(0.95, 0.93, 0.88, 0.9 * c), 16)
 	_centre("enter — back to the board", money + 30.0,
 		Color(0.86, 0.84, 0.80, 0.6 * c), 13)
 	_centre("[S] back over the edge   ·   [V] look at the view", y + 160.0,

@@ -125,10 +125,48 @@ func _state_top() -> float:
 	return 50.0 + 19.0 * float(STEPS.size()) + 16.0
 
 
+## How tall the state block is, from the same conditionals that draw it.
+##
+## Worked out rather than guessed because the panel used to be one fixed 620 by 500 slab covering
+## the checklist, the margin, the clock and the line all at once — four different questions inside
+## one black rectangle, which is the definition of a wall of text. Two plates sized to what is on
+## them reads as two things.
+func _state_height() -> float:
+	if state.is_empty():
+		return 0.0
+	var h := 24.0 + 30.0 + 20.0                  # status, the big margin, gob and props
+	if int(state.get("props_split", 0)) > 0:
+		h += 19.0
+	h += 26.0 + 19.0                             # the lean, the pegs
+	if not timetable.is_empty():
+		h += 22.0
+	if not shift.is_empty():
+		h += 22.0 + 26.0                         # the clock, its bar, the trade note
+	if not prediction.is_empty():
+		h += 32.0 + 18.0
+		if not (prediction.get("threatened", []) as Array).is_empty():
+			h += 19.0
+	return h + 22.0
+
+
+## The width both plates take: the longest line on either of them, and no more. It was a flat 620,
+## which is a third of the screen held open for a panel whose longest row is four hundred.
+func _panel_width() -> float:
+	var w := _font.get_string_size("FELLING — %s" % level_name,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
+	for step in STEPS:
+		w = maxf(w, _font.get_string_size("x %s" % step, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x)
+	return w + 48.0
+
+
 func _draw_steps() -> void:
 	# A scrim. The first render of this put pale text straight onto a bright sky and half of it
 	# could not be read, which for a panel whose whole job is telling you what to do is fatal.
-	draw_rect(Rect2(0, 0, 620, _state_top() + 240.0), Color(0.05, 0.05, 0.06, 0.55))
+	var w := _panel_width()
+	draw_rect(Rect2(0, 0, w, _state_top() - 10.0), Color(0.05, 0.05, 0.06, 0.55))
+	var below := _state_height()
+	if below > 0.0:
+		draw_rect(Rect2(0, _state_top() + 4.0, w, below), Color(0.05, 0.05, 0.06, 0.55))
 	var y := 26.0
 	draw_string(_font, Vector2(24, y), "FELLING — %s" % level_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK)
 	y += 24.0
@@ -148,8 +186,8 @@ func _draw_state() -> void:
 	var name_ := String(state.get("status_name", "SAFE"))
 	var colour: Color = BAND_COLOUR.get(name_, INK)
 	var y := _state_top()
-	draw_rect(Rect2(24, y, 320, 3), colour)
-	y += 24.0
+	draw_rect(Rect2(24, y + 10.0, _panel_width() - 48.0, 3), colour)
+	y += 34.0
 	draw_string(_font, Vector2(24, y), "%s — %s" % [name_, BAND_WORDS.get(name_, "")],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, colour)
 	# The margin, big, because it is the number that decides whether she stands up while you are
@@ -208,9 +246,8 @@ func _draw_state() -> void:
 				int(left / 60.0), int(whole / 60.0), height_removed],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, clock)
 		# The bar, because a number counting down is not a feeling and a bar emptying is.
-		var w: float = 320.0
-		draw_rect(Rect2(24, y + 8, w, 4), Color(0.25, 0.24, 0.23))
-		draw_rect(Rect2(24, y + 8, w * clampf(left / whole, 0.0, 1.0), 4), clock)
+		draw_rect(Rect2(24, y + 8, 320.0, 4), Color(0.25, 0.24, 0.23))
+		draw_rect(Rect2(24, y + 8, 320.0 * clampf(left / whole, 0.0, 1.0), 4), clock)
 		# Clear of the bar. At +16 the note was drawn straight through it.
 		y += 26.0
 		draw_string(_font, Vector2(24, y), TRADE, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, DIM)
@@ -264,8 +301,18 @@ func _draw_message() -> void:
 		return
 	# Out of the way of the run panel, which is the only thing that matters while it is up.
 	var y: float = size.y - (232.0 if act4 == BURNING else 120.0)
-	draw_string(_font, Vector2(size.x * 0.5 - 300, y), message,
-		HORIZONTAL_ALIGNMENT_CENTER, 600, 16, INK)
+	# `draw_string` does not wrap — it *clips*. The width argument is a cut, not a margin, so the
+	# opening line of a felling ("Take the job from the board and climb her first") arrived on
+	# screen as "...Take the job fro" and stopped. A truncated sentence is not a rough edge, it is
+	# an instruction the player cannot follow.
+	const WIDE := 760.0
+	var lines: int = _font.get_multiline_string_size(message, HORIZONTAL_ALIGNMENT_CENTER, WIDE,
+		16).y > 22.0 and 2 or 1
+	var plate := Rect2(Vector2(size.x * 0.5 - WIDE * 0.5 - 16.0, y - 26.0),
+		Vector2(WIDE + 32.0, 14.0 + 22.0 * float(lines) + 10.0))
+	draw_rect(plate, Color(0.05, 0.05, 0.06, 0.55))
+	draw_multiline_string(_font, Vector2(size.x * 0.5 - WIDE * 0.5, y), message,
+		HORIZONTAL_ALIGNMENT_CENTER, WIDE, 16, -1, INK)
 
 
 # ---------------------------------------------------------------- Act 4
@@ -495,18 +542,32 @@ func _draw_verdict() -> void:
 	# Sized from what it has to say, not from a number written down once. Three separate times
 	# tonight a fixed height has been right when it was typed and wrong one edit later — the step
 	# list, the state panel, and this, which ended up printing the money over its own footer.
-	var high: float = 60.0 + 22.0 * float(lines.size()) + 34.0
-	var panel := Rect2(size.x * 0.5 - 330, size.y - high - 36.0, 660, high)
+	# Measured from what each line actually takes once it is wrapped, not from a line count.
+	# "you hit: ..." grows with the number of things in the fan, and on a bad drop that is the
+	# sentence the player most needs to read.
+	const WIDE := 660.0
+	var rows: Array = []
+	var body := 0.0
+	for line in lines:
+		var tall: float = 22.0 if String(line) == "" else maxf(
+			_font.get_multiline_string_size(String(line), HORIZONTAL_ALIGNMENT_CENTER,
+				WIDE - 40.0, 15).y, 22.0)
+		rows.append([String(line), tall])
+		body += tall
+	var high: float = 60.0 + body + 34.0
+	var panel := Rect2(size.x * 0.5 - WIDE * 0.5, size.y - high - 36.0, WIDE, high)
 	draw_rect(panel, Color(0.05, 0.05, 0.06, 0.88))
 
 	var y := panel.position.y + 36.0
 	draw_string(_font, Vector2(panel.position.x, y), grade, HORIZONTAL_ALIGNMENT_CENTER,
 		panel.size.x, 26, colour)
 	y += 34.0
-	for line in lines:
-		draw_string(_font, Vector2(panel.position.x, y), line, HORIZONTAL_ALIGNMENT_CENTER,
-			panel.size.x, 15, INK if line.begins_with("£") else DIM)
-		y += 22.0
+	for row in rows:
+		var line := String(row[0])
+		draw_multiline_string(_font, Vector2(panel.position.x + 20.0, y), line,
+			HORIZONTAL_ALIGNMENT_CENTER, WIDE - 40.0, 15, -1,
+			INK if line.begins_with("fee") or line.begins_with("no fee") else DIM)
+		y += float(row[1])
 	draw_string(_font, Vector2(panel.position.x, panel.position.y + panel.size.y - 14),
 		"enter — back to the board        R — the same chimney again",
 		HORIZONTAL_ALIGNMENT_CENTER, panel.size.x, 12, DIM)
