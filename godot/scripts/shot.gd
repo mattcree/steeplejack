@@ -351,6 +351,10 @@ func _wait(frames: int) -> void:
 
 
 func _shot(name: String) -> void:
+	# A capture wants the frame it asked for. The establishing shot is five seconds long and puts
+	# a title card over everything, and `_ready` starts it after this script has taken its
+	# reference to the player, so skipping it once at startup is not enough.
+	player.skip_arrival()
 	# Two settles, because the spring arm interpolates and the first frame after a pose catches the
 	# camera mid-flight. Every automated capture on the last engine came out smeared for want of it.
 	await _wait(SETTLE_FRAMES)

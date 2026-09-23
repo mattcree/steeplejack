@@ -1247,6 +1247,11 @@ Dictionary Jack::structure() const
 	d["lean_degrees"] = static_cast<double>(s.leanDegrees);
 	d["lean_bearing"] = static_cast<double>(s.leanBearing);
 	d["seed"] = static_cast<int64_t>(s.weatherSeed);
+	// The shape of her. Authored since the level schema was written and never once read by the
+	// thing that builds the chimney, so every stack in the game — the square one in a back yard,
+	// the octagonal corn mill, the spire at St Anne's — came out as the same round tube.
+	d["profile"] = String(s.profile.c_str());
+	d["cap"] = String(s.cap.c_str());
 	return d;
 }
 

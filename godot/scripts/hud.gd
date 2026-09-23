@@ -2015,7 +2015,7 @@ func _draw_arrival(jack: Jack) -> void:
 	var x := size.x * 0.09
 	_label(String(jack.level_name()).to_upper(), Vector2(x, size.y * 0.15), Color(INK, 0.97 * a), H1)
 	var arch := String(jack.level_archetype())
-	var what := {
+	var what: String = {
 		"SURVEY": "go up, look at her, and say what is wrong",
 		"CONDUCTOR": "a terminal at the top and copper down her side",
 		"BAND": "iron round her, pulled up in a star",

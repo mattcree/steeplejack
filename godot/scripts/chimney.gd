@@ -38,6 +38,29 @@ var _dogs := MultiMeshInstance3D.new()
 var _straps: Node3D
 var _bolts := MultiMeshInstance3D.new()
 var _band_specs: Array = []
+## How many sides she has, and what is on top of her. From the level, not from taste.
+const SIDES := {"round": 64, "octagonal": 8, "square": 4}
+var _sides := 64
+var _cap_kind := "corbelled-oversail"
+
+
+## The circumradius the mesh wants, from the half-width across the flats that the level states.
+##
+## A level's `baseRadius` is the distance to the *wall*, because that is the number the ladder
+## stands off and the joints are laid on. For a round shaft they are the same thing; for a square
+## one the corners are 41% further out, and building the mesh at the wall distance would put the
+## flats inside the brickwork the player is climbing.
+func _mesh_radius(h: float) -> float:
+	if _sides >= 32:
+		return radius_at(h)
+	return radius_at(h) / cos(PI / float(_sides))
+
+
+## Turned so a flat faces the climbing line. CylinderMesh puts a vertex at angle zero; half a
+## segment of spin puts a face centre there instead, and the ladder lies on brickwork rather than
+## bridging a corner.
+func _profile_spin() -> float:
+	return 0.0 if _sides >= 32 else PI / float(_sides)
 ## The lightning conductor: a terminal at the apex, copper tape down the face, a holdfast at every
 ## clip, and an earth plate in a pit at the foot.
 var _run := MultiMeshInstance3D.new()
@@ -74,8 +97,16 @@ func build(jack: Jack) -> void:
 	_base_r = jack.radius_at(0.0)
 	_top_r = jack.radius_at(height_m)
 
-	# Out of plumb, if she is. A compass bearing, the same convention the wind uses: north is -Z.
+	# What shape she is. The schema has carried `profile` and `cap` since it was written and
+	# nothing has ever read either, so the square chimney in a back yard, the octagonal corn mill
+	# and the spire at St Anne's all came out as the same sixty-four-sided tube. Photographs of
+	# real mill chimneys are the argument: square and octagonal shafts are everywhere, and the top
+	# is where a builder showed off.
 	var st: Dictionary = jack.structure()
+	_sides = SIDES.get(String(st.get("profile", "round")), 64)
+	_cap_kind = String(st.get("cap", "corbelled-oversail"))
+
+	# Out of plumb, if she is. A compass bearing, the same convention the wind uses: north is -Z.
 	var deg: float = float(st.get("lean_degrees", 0.0))
 	var bearing: float = deg_to_rad(float(st.get("lean_bearing", 0.0)))
 	_lean_dir = Vector3(sin(bearing), 0.0, -cos(bearing))
@@ -87,10 +118,10 @@ func build(jack: Jack) -> void:
 		var from: float = b["from"]
 		var to: float = b["to"]
 		var mesh := CylinderMesh.new()
-		mesh.top_radius = jack.radius_at(to)
-		mesh.bottom_radius = jack.radius_at(from)
+		mesh.top_radius = _mesh_radius(to)
+		mesh.bottom_radius = _mesh_radius(from)
 		mesh.height = to - from
-		mesh.radial_segments = 64
+		mesh.radial_segments = _sides
 
 		# Brick, courses and all, from the level's own jointGrid numbers. Weathering is done in the
 		# shader per pixel now rather than once per band, so soot fades up the stack instead of
@@ -105,6 +136,7 @@ func build(jack: Jack) -> void:
 		inst.mesh = mesh
 		var mid: float = (from + to) * 0.5
 		inst.position = Vector3(0, mid, 0) + lean_offset(mid)
+		inst.rotation.y = _profile_spin()
 		# Tagged so the lean can be changed later without rebuilding the stack: a straightening
 		# moves her a few centimetres a day and she has to move while the player is looking.
 		inst.set_meta("shaft_at", mid)
@@ -175,45 +207,101 @@ func _weathered(base: Color, h: float) -> Color:
 ##
 ## Without it the stack simply stopped, as a flat disc, and the top of a seventy metre climb looked
 ## like a mesh that had run out. The top is the thing the whole game is about arriving at.
+## What is on top of her, which on a real chimney is the only place the builder showed off.
+##
+## Four kinds, all of them already in the level files and none of them ever read: a plain shaft
+## that just stops, the corbelled oversail every mill chimney has, a capped one with a slab over
+## the flue, and a spire with a finial on it. Photographs are the argument — the tops are what
+## make one chimney recognisably not another from half a mile away.
 func _cap() -> void:
-	var r: float = radius_at(height_m)
-	var courses := 4
-	for i in courses:
-		var flare: float = 1.0 + 0.10 * float(i + 1)
-		var mesh := CylinderMesh.new()
-		mesh.top_radius = r * flare
-		mesh.bottom_radius = r * (flare - 0.10)
-		mesh.height = 0.55
-		mesh.radial_segments = 32
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = _weathered(BAND_COLOURS["plain"], height_m).lightened(0.06)
-		mat.roughness = 0.9
-		mesh.material = mat
-		var inst := MeshInstance3D.new()
-		inst.mesh = mesh
-		var at: float = height_m + 0.275 + 0.55 * float(i)
-		# The cap goes wherever the head of the shaft has got to. A stack that leans and a collar
-		# that does not is a chimney wearing its hat at the wrong angle.
-		inst.position = Vector3(0, at, 0) + lean_offset(height_m)
-		inst.set_meta("shaft_at", height_m)
-		add_child(inst)
+	var r: float = _mesh_radius(height_m)
+	var stone := StandardMaterial3D.new()
+	stone.albedo_color = _weathered(BAND_COLOURS["plain"], height_m).lightened(0.06)
+	stone.roughness = 0.9
 
-	# And the flue. A chimney with a solid top is a post.
+	match _cap_kind:
+		"plain":
+			# Two courses of header brick and nothing else. A working chimney in a back yard.
+			_cap_ring(r * 1.06, r * 1.04, 0.36, height_m + 0.18, stone)
+			_flue(r * 0.58, height_m + 0.36)
+		"capped":
+			# Slabbed over: a flue taken out of service, which is why she is a gasworks job.
+			_cap_ring(r * 1.10, r * 1.06, 0.44, height_m + 0.22, stone)
+			var lid := MeshInstance3D.new()
+			var lm := CylinderMesh.new()
+			lm.top_radius = r * 1.12
+			lm.bottom_radius = r * 1.12
+			lm.height = 0.22
+			lm.radial_segments = _sides
+			lm.material = stone
+			lid.mesh = lm
+			lid.position = Vector3(0, height_m + 0.55, 0) + lean_offset(height_m)
+			lid.rotation.y = _profile_spin()
+			lid.set_meta("shaft_at", height_m)
+			add_child(lid)
+		"finial":
+			# A spire, not a shaft. She tapers to almost nothing and carries an iron finial, and
+			# the whole job at St Anne's is that the last five metres are a spike.
+			for i in 3:
+				var f: float = 1.0 - 0.22 * float(i)
+				_cap_ring(r * (f + 0.10), r * f, 0.5, height_m + 0.25 + 0.5 * float(i), stone)
+			var spike := MeshInstance3D.new()
+			var sm := CylinderMesh.new()
+			sm.top_radius = 0.02
+			sm.bottom_radius = 0.09
+			sm.height = 2.2
+			sm.radial_segments = 8
+			var iron := StandardMaterial3D.new()
+			iron.albedo_color = Color(0.29, 0.27, 0.25)
+			iron.metallic = 0.55
+			iron.roughness = 0.45
+			sm.material = iron
+			spike.mesh = sm
+			spike.position = Vector3(0, height_m + 2.8, 0) + lean_offset(height_m)
+			spike.set_meta("shaft_at", height_m)
+			add_child(spike)
+		_:
+			# The corbelled oversail: four courses stepping out, which is the one nearly every
+			# mill chimney in the country has.
+			for i in 4:
+				var flare: float = 1.0 + 0.10 * float(i + 1)
+				_cap_ring(r * flare, r * (flare - 0.10), 0.55,
+					height_m + 0.275 + 0.55 * float(i), stone)
+			_flue(r * 0.62, height_m + 0.275 + 0.55 * 3.0 + 0.275 - 1.5 + 0.01)
+
+
+## One course of the cap: a ring `top` wide at the top and `bottom` at the bottom.
+func _cap_ring(top: float, bottom: float, tall: float, at: float,
+		mat: StandardMaterial3D) -> void:
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = top
+	mesh.bottom_radius = bottom
+	mesh.height = tall
+	mesh.radial_segments = _sides
+	mesh.material = mat
+	var inst := MeshInstance3D.new()
+	inst.mesh = mesh
+	inst.position = Vector3(0, at, 0) + lean_offset(height_m)
+	inst.rotation.y = _profile_spin()
+	inst.set_meta("shaft_at", height_m)
+	add_child(inst)
+
+
+## The hole. A chimney with a solid top is a post.
+func _flue(r: float, at: float) -> void:
 	var flue := CylinderMesh.new()
-	flue.top_radius = r * 0.62
-	flue.bottom_radius = r * 0.62
+	flue.top_radius = r
+	flue.bottom_radius = r
 	flue.height = 3.0
-	flue.radial_segments = 24
+	flue.radial_segments = maxi(_sides, 12)
 	var dark := StandardMaterial3D.new()
 	dark.albedo_color = Color(0.03, 0.03, 0.03)
 	dark.roughness = 1.0
 	flue.material = dark
 	var hole := MeshInstance3D.new()
 	hole.mesh = flue
-	# Its top a hair above the cap's, so the hole is what you see from the rim. Level with it, the
-	# cap's own top face covered the flue and the stack had no hole in it.
-	hole.position = Vector3(0, height_m + 0.275 + 0.55 * 3 + 0.275 - 1.5 + 0.01, 0) \
-		+ lean_offset(height_m)
+	hole.position = Vector3(0, at, 0) + lean_offset(height_m)
+	hole.rotation.y = _profile_spin()
 	hole.set_meta("shaft_at", height_m)
 	add_child(hole)
 
