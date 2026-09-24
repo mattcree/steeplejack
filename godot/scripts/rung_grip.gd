@@ -24,13 +24,16 @@ extends Node
 ## raw ask against the limb's own length, and it read 1.07 of it.
 const HAND_ABOVE_FEET := [1.54, 1.26]
 const FOOT_ABOVE_FEET := [0.16, 0.44]   ## and its foot rung, a rung apart. A leg is 0.84 m: lower than 0.15 it cannot reach, higher than this it jack-knifes
-## Off the ladder's centre line, along the rung.
+## Off the ladder's centre line, so the hand falls out by the stile rather than in the middle of
+## the rung.
 ##
-## Was 0.15, and the stiles are at 0.22 — so the wrist sat 70 mm inside the rail and the hand mesh,
-## which is 90 mm across, reached to within 25 mm of it. Reported from play as "he holds the side
-## of the ladder rather than the rungs", and from four metres away that is exactly what it looks
-## like. At 0.11 the whole hand is clear of the rail and on the rung it is holding.
-const HAND_SPREAD := 0.11
+## Moved in to 0.11 once, to put the whole hand clear of the rail, on the strength of "he holds the
+## side of the ladder rather than the rungs" — which was an observation and not a complaint, and
+## the observation is of the right thing. **You climb a ladder holding the stiles.** It is what the
+## trade does and what every ladder-safety instruction says: your hands slide up the rails, they
+## do not let go and re-grip a rung, and a hand wrapped round a stile cannot come off it sideways.
+## Back to 0.15, which puts the wrist just inboard of the rail with the hand over it.
+const HAND_SPREAD := 0.15
 const FOOT_SPREAD := 0.12
 const HAND_PROUD := 0.035               ## the wrist sits a little in front of the rung it grips
 const FOOT_LIFT := 0.06                 ## the ankle sits above the rung the sole is on
