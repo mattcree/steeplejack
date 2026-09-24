@@ -8,6 +8,7 @@
 #   make ui-shot UI_SCENE=res://scenes/jobs.tscn CMDS="key:enter,shot the-van"
 #   make ui-shot UI_SCENE=res://scenes/yard.tscn CMDS="down,down,enter,shot the-shed"
 #   make ui-shot UI_SCENE=res://scenes/yard.tscn CMDS="did 06-waterside,did 12-great-aire,shot town"
+#   make ui-shot UI_SCENE=res://scenes/yard.tscn CMDS="part 20,shot engine"   # her, half rebuilt
 #
 # Commands, comma separated:
 #   up down left right enter esc space   one key press
@@ -105,6 +106,26 @@ func _run(cmd: String) -> void:
 					% ", ".join(recs))
 				if "career" in screen:
 					screen.career = j2.career_state()
+			screen.queue_redraw()
+			await _wait(2)
+		"part":
+			# Buy `arg` pieces of the traction engine, so the yard can be photographed part way
+			# through the restoration. She is the game's long carrot and she is drawn
+			# progressively — wheels, boiler, motion, brasswork, paint — and every capture of this
+			# screen until now was taken on day one with her still under the sheet.
+			var j3 = _jack()
+			if j3 != null and "next_part_cost" in screen:
+				# The tin ONCE, outside the loop. `_tin` goes through career_load, which replaces
+				# the whole career — so topping it up between purchases wiped the parts it had
+				# just bought and photographed three identical tarpaulins.
+				_tin(20000.0)
+				if "career" in screen:
+					screen.career = j3.career_state()
+				for i in int(arg):
+					if not j3.career_buy_engine_part(screen.next_part_cost()):
+						break
+					if "career" in screen:
+						screen.career = j3.career_state()
 			screen.queue_redraw()
 			await _wait(2)
 		"money":

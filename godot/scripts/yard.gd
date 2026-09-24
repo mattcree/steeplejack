@@ -721,27 +721,106 @@ func _draw_engine(at: Vector2, scale: float) -> void:
 		_label("under a tarpaulin", at + Vector2(-w * 0.5, 26.0), Color(GHOST, 0.5), 13)
 		return
 
-	# Wheels first, then boiler, then motion, then brasswork, then paint — in the order they are
-	# bought, so the yard shows you what your money did.
-	var body := GREEN if engine_done() else RUST
-	var rear := h * 0.40
-	var front := h * 0.22
-	draw_arc(at + Vector2(-w * 0.26, -rear), rear, 0.0, TAU, 26, Color(body, 0.95), 5.0)
-	draw_arc(at + Vector2(w * 0.28, -front), front, 0.0, TAU, 20, Color(body, 0.95), 4.0)
-	if done >= 1:
-		draw_rect(Rect2(at + Vector2(-w * 0.34, -h * 0.72), Vector2(w * 0.60, h * 0.34)),
-			Color(body, 0.95))
-		draw_rect(Rect2(at + Vector2(w * 0.16, -h * 1.10), Vector2(w * 0.10, h * 0.42)),
-			Color(body, 0.95))
-	if done >= 2:
-		draw_line(at + Vector2(-w * 0.26, -rear), at + Vector2(w * 0.10, -h * 0.50),
-			Color(0.72, 0.68, 0.60, 0.9), 3.0)
+	# Wheels first, then boiler, then motion, then brasswork, then chimney and paint — in the order
+	# they are bought, so the yard shows you what your money did. The six part-bearing stages in
+	# economy.json are the six things that appear, and the seventh, the boiler certificate, puts
+	# her nameplate on: she is not finished until somebody official says she may be lit.
+	#
+	# She is the only thing in this game that gets BIGGER, and the one object with real colour on
+	# it. Drawn as a rectangle, two circles and a stick she was a diagram of a reward rather than
+	# one, which for £9,000 and a whole career is not enough of a thing to want.
+	var green: bool = done >= 5
+	var body := GREEN if green else RUST
+	var iron := Color(0.30, 0.28, 0.26, 0.95)
+	var brass := Color(0.85, 0.72, 0.36, 0.95)
+	var rear := h * 0.42
+	var front := h * 0.21
+	var rear_c := at + Vector2(-w * 0.24, -rear)
+	var front_c := at + Vector2(w * 0.32, -front)
+
+	# --- 1: wheels and axles --------------------------------------------------------------------
+	_wheel(rear_c, rear, 12, body, 5.0 * scale)
+	_wheel(front_c, front, 8, body, 4.0 * scale)
+	# The hornplates: the iron sides she is all built on, and the reason the wheels line up.
+	draw_rect(Rect2(at + Vector2(-w * 0.34, -h * 0.50), Vector2(w * 0.66, h * 0.08)),
+		Color(iron.r, iron.g, iron.b, 0.9))
+
+	if done < 2:
+		_label("under restoration  ·  wheels and axles", at + Vector2(-w * 0.5, 26.0),
+			Color(GHOST, 0.6), 13)
+		return
+
+	# --- 2: the boiler --------------------------------------------------------------------------
+	# The barrel, the smokebox at the front and the firebox at the back: a traction engine is a
+	# boiler that happens to have wheels on it, and until it is there she is a cart.
+	draw_rect(Rect2(at + Vector2(-w * 0.22, -h * 0.80), Vector2(w * 0.46, h * 0.30)),
+		Color(body, 0.95))
+	draw_rect(Rect2(at + Vector2(w * 0.20, -h * 0.86), Vector2(w * 0.10, h * 0.36)),
+		Color(body.darkened(0.18), 0.95))
+	draw_rect(Rect2(at + Vector2(-w * 0.40, -h * 0.90), Vector2(w * 0.20, h * 0.40)),
+		Color(body.darkened(0.10), 0.95))
+
+	# --- 3: the motion ---------------------------------------------------------------------------
+	# The flywheel is the thing you watch, so it is the thing that has to be there.
 	if done >= 3:
-		draw_circle(at + Vector2(-w * 0.04, -h * 0.80), 5.0, Color(0.85, 0.72, 0.36, 0.95))
-		draw_circle(at + Vector2(w * 0.06, -h * 0.80), 5.0, Color(0.85, 0.72, 0.36, 0.95))
+		var fly := at + Vector2(-w * 0.02, -h * 0.60)
+		_wheel(fly, h * 0.26, 8, iron, 4.0 * scale)
+		var crank := fly + Vector2(cos(-0.7), sin(-0.7)) * h * 0.18
+		draw_line(crank, at + Vector2(w * 0.20, -h * 0.66), Color(0.74, 0.70, 0.62, 0.95),
+			3.5 * scale)
+		# The crosshead, sliding on its bars above the boiler.
+		draw_rect(Rect2(at + Vector2(w * 0.17, -h * 0.70), Vector2(w * 0.05, h * 0.06)), iron)
+
+	# --- 4: gauges, injector, brasswork ----------------------------------------------------------
+	if done >= 4:
+		# The steam dome and the safety valve, which are the two brass things on any engine you
+		# can see from across a yard.
+		draw_arc(at + Vector2(-w * 0.06, -h * 0.80), h * 0.10, PI, TAU, 14, brass, 4.0 * scale)
+		draw_rect(Rect2(at + Vector2(-w * 0.34, -h * 0.98), Vector2(w * 0.05, h * 0.09)), brass)
+		draw_circle(at + Vector2(-w * 0.26, -h * 0.74), 4.0 * scale, brass)
+
+	# --- 5: canopy, chimney, paint ----------------------------------------------------------------
+	if done >= 5:
+		# The chimney, with its cap. She is a chimney on wheels, in a game about chimneys, and
+		# that is not an accident anybody planned but it is certainly the right object.
+		draw_rect(Rect2(at + Vector2(w * 0.22, -h * 1.30), Vector2(w * 0.06, h * 0.46)),
+			Color(iron.r, iron.g, iron.b, 0.95))
+		draw_rect(Rect2(at + Vector2(w * 0.19, -h * 1.36), Vector2(w * 0.12, h * 0.08)),
+			Color(iron.r, iron.g, iron.b, 0.95))
+		# The canopy over the footplate, on its posts.
+		draw_rect(Rect2(at + Vector2(-w * 0.46, -h * 1.26), Vector2(w * 0.34, h * 0.05)),
+			Color(body, 0.95))
+		draw_rect(Rect2(at + Vector2(-w * 0.44, -h * 1.26), Vector2(3.0 * scale, h * 0.36)),
+			Color(body, 0.9))
+		draw_rect(Rect2(at + Vector2(-w * 0.16, -h * 1.26), Vector2(3.0 * scale, h * 0.36)),
+			Color(body, 0.9))
+		# The lining out. One red line down the length of her is what turns a green machine into a
+		# finished one, and it is the last thing anybody does.
+		draw_line(at + Vector2(-w * 0.22, -h * 0.66), at + Vector2(w * 0.24, -h * 0.66),
+			Color(0.80, 0.24, 0.20, 0.95), 2.5 * scale)
+		draw_line(at + Vector2(-w * 0.40, -h * 0.84), at + Vector2(-w * 0.20, -h * 0.84),
+			Color(0.80, 0.24, 0.20, 0.95), 2.0 * scale)
+
+	# --- 6: the certificate -----------------------------------------------------------------------
 	if engine_done():
-		draw_line(at + Vector2(-w * 0.34, -h * 0.55), at + Vector2(w * 0.26, -h * 0.55),
-			Color(0.80, 0.24, 0.20, 0.9), 3.0)
+		# Her plate. She may be lit.
+		draw_rect(Rect2(at + Vector2(-w * 0.14, -h * 0.72), Vector2(w * 0.16, h * 0.10)), brass)
+		_label("in steam", at + Vector2(-w * 0.5, 26.0), Color(GOOD, 0.85), 13)
+	else:
+		var st_name := String(stages[mini(stage_index(), stages.size() - 1)].get("name", ""))
+		_label("under restoration  ·  %s" % st_name.to_lower(),
+			at + Vector2(-w * 0.5, 26.0), Color(GHOST, 0.6), 13)
+
+
+## One wheel: a rim, a hub and spokes between them. A traction engine's rear wheel is most of what
+## she looks like from the side, and two circles were not it.
+func _wheel(c: Vector2, r: float, spokes: int, col: Color, rim: float) -> void:
+	draw_arc(c, r, 0.0, TAU, 34, col, rim)
+	draw_arc(c, r * 0.20, 0.0, TAU, 12, col, rim * 0.8)
+	for i in spokes:
+		var a: float = TAU * float(i) / float(spokes)
+		var d := Vector2(cos(a), sin(a))
+		draw_line(c + d * r * 0.20, c + d * (r - rim * 0.5), col, maxf(rim * 0.35, 1.0))
 
 
 func _label(text: String, at: Vector2, col: Color, px: int) -> void:
