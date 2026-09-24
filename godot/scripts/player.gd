@@ -522,6 +522,13 @@ func _settle_the_job() -> void:
 	# actually did to the chimney was worth nothing at all.
 	if plumb_job:
 		return
+	# And topping is like the conductor run in the one respect that matters here: reaching the cap
+	# is where the job STARTS. Without this it fell to the general case and paid the whole fee for
+	# climbing her, before a single brick had come off — which is the same mistake the survey
+	# settlement and the banding settlement each made once, and both of their comments are three
+	# paragraphs above this one. She settles when she is down to the line.
+	if top_job and not bool(jack.top_state().get("done", false)):
+		return
 	var text := ""
 	if FileAccess.file_exists(career_path):
 		var f := FileAccess.open(career_path, FileAccess.READ)
@@ -570,6 +577,27 @@ func _settle_the_job() -> void:
 			ob.store_string(jack.career_json())
 			ob.close()
 		_say("%d of %d bands on her and true" % [seated, list.size()])
+		return
+	# What a topping job is worth: how much of her came down, and how much of it came down whole.
+	#
+	# The client has a buyer for the brick and the letter says so before you leave the yard — "we
+	# will pay you by what comes out whole, and anything you break is ours to cart away and yours
+	# to explain". That sentence is this arithmetic, and it is the entire argument against hurrying
+	# a stroke.
+	if top_job:
+		var st: Dictionary = jack.top_state()
+		var want: float = float(_mission().get("takeDownToM", 0.0))
+		var asked: float = maxf(jack.total_height() - want, 0.01)
+		var got: float = clampf(float(st.get("removed_m", 0.0)) / asked, 0.0, 1.0)
+		var whole: float = clampf(float(st.get("clean_share", 0.0)), 0.0, 1.0)
+		var floor_t: float = jack.tuning_f("surveyFeeFloorShare", 0.35)
+		settlement = jack.career_settle_climb(_level_id(),
+			_level_fee() * got * (floor_t + (1.0 - floor_t) * whole), true)
+		var ot := FileAccess.open(career_path, FileAccess.WRITE)
+		if ot != null:
+			ot.store_string(jack.career_json())
+			ot.close()
+		_say("%.1f m off her, %d%% of it whole" % [float(st.get("removed_m", 0.0)), int(whole * 100.0)])
 		return
 	if String(jack.level_archetype()) == "FELL":
 		# On a felling, getting to the top is not the job — it is Act 2, the strip-out. The bands

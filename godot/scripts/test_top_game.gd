@@ -159,6 +159,23 @@ func _init() -> void:
 		_check(dead > 0, "%d collision segments above the new top are switched off" % dead)
 		_check(live > 0, "%d below it are still there to stand on" % live)
 
+	# --- and it does not pay for the climb --------------------------------------------------------
+	# Reaching the cap on a topping job is where the work STARTS. The general settlement path pays
+	# the level fee for getting to the top, and topping fell straight into it — the whole £1,040
+	# for climbing a chimney and touching nothing.
+	player.career_path = "user://test-top-career.json"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(player.career_path))
+	player.settlement = {}
+	player._settle_the_job()
+	_check(not player.settlement.is_empty(),
+		"with her down to the line the job settles")
+	var paid: float = float(player.settlement.get("paid", 0.0))
+	_check(paid > 0.0, "and it pays: £%.0f" % paid)
+	_check(paid < float(player._level_fee()),
+		"but less than the full £%d, because most of her came down broken"
+			% int(player._level_fee()))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(player.career_path))
+
 	if failures > 0:
 		printerr("TOP GAME: %d failure(s)" % failures)
 	print("TOP GAME: she comes down brick by brick, and she is shorter for it.")
