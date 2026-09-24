@@ -33,7 +33,7 @@ const FOOT_ABOVE_FEET := [0.16, 0.44]   ## and its foot rung, a rung apart. A le
 ## trade does and what every ladder-safety instruction says: your hands slide up the rails, they
 ## do not let go and re-grip a rung, and a hand wrapped round a stile cannot come off it sideways.
 ## Back to 0.15, which puts the wrist just inboard of the rail with the hand over it.
-const HAND_SPREAD := 0.15
+const HAND_SPREAD := 0.20
 const FOOT_SPREAD := 0.12
 const HAND_PROUD := 0.035               ## the wrist sits a little in front of the rung it grips
 const FOOT_LIFT := 0.06                 ## the ankle sits above the rung the sole is on
@@ -459,9 +459,17 @@ func capture(skel: Skeleton3D) -> void:
 		# which `_within_reach` has already pulled in, so it reads NEVER_STRAIGHT whenever the
 		# clamp fires and can never tell you BY HOW MUCH. Both hands sat at 0.960 for a day while
 		# the rung they were pointing at was 1.33 of an arm away.
-		_watch[i] = ("%-7s straight %.3f  RAW %.3f  up %+.2f  out %.2f  rung %d  lower %5.1f deg") % [
+		# And where things sit ACROSS the ladder, which is the axis a side-on screenshot cannot
+		# show you and the one that decides whether a hand is on a rail or out in the air.
+		var h_here: float = maxf(float(_rung[i]), 0.0) * chimney.RUNG_GAP
+		var line_mid: Vector3 = chimney.global_position + chimney.face_point(h_here)
+		var across := Vector3(0.0, 0.0, 1.0)
+		_watch[i] = ("%-7s straight %.3f  RAW %.3f  up %+.2f  out %.2f  ACROSS tgt %+.3f " +
+			"body %+.3f  rung %d") % [
 			names[i], straight, float(_raw[i]), rp.y - rr.y,
-			Vector2(rp.x - rr.x, rp.z - rr.z).length(), _rung[i], lean]
+			Vector2(rp.x - rr.x, rp.z - rr.z).length(),
+			across.dot(rp - line_mid),
+			across.dot(skel.global_transform.origin - line_mid), _rung[i]]
 
 
 func describe_limbs() -> String:

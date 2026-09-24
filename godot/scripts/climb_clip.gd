@@ -69,8 +69,8 @@ const AIM := {
 	#
 	# A climber's chest is near the rungs and his weight is over his feet. It is the hips that
 	# hang back, and only the hips.
-	"spine_01":   [Vector3(0.0, 0.66, 0.75), Vector3(0.0, 0.66, 0.75)],
-	"spine_02":   [Vector3(0.0, 0.74, 0.67), Vector3(0.0, 0.74, 0.67)],
+	"spine_01":   [Vector3(0.0, 0.89, 0.45), Vector3(0.0, 0.89, 0.45)],
+	"spine_02":   [Vector3(0.0, 0.93, 0.37), Vector3(0.0, 0.93, 0.37)],
 }
 
 ## Which child each posed bone points at. A bone has no direction of its own; it has the direction
