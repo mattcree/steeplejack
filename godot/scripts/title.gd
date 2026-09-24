@@ -29,7 +29,7 @@ const WATCH := Color(0.95, 0.76, 0.33)
 
 const H_TITLE := 74
 const H_ROW := 22
-const ROW_GAP := 40.0
+const ROW_GAP := 46.0
 
 ## Rows are built in `_ready` because Continue is only there when there is something to continue.
 var rows: Array = []
@@ -188,11 +188,16 @@ func _rows_origin() -> Vector2:
 	return Vector2(size.x * 0.09, size.y * 0.68)
 
 
-func row_at(p: Vector2) -> int:
+## One menu row's panel. Shared by the drawing and the clicking, so a row cannot be moved without
+## its hit box coming with it.
+func row_rect(i: int) -> Rect2:
 	var at := _rows_origin()
+	return Rect2(Vector2(at.x - 26.0, at.y + ROW_GAP * float(i) - 26.0), Vector2(300.0, 34.0))
+
+
+func row_at(p: Vector2) -> int:
 	for i in rows.size():
-		var y: float = at.y + ROW_GAP * float(i)
-		if p.y >= y - 22.0 and p.y <= y + 10.0 and p.x >= at.x - 20.0 and p.x <= at.x + 320.0:
+		if row_rect(i).has_point(p):
 			return i
 	return -1
 
@@ -263,14 +268,26 @@ func _draw() -> void:
 	# A panel of shade under the list. The skyline behind it is the point of the screen, so it is
 	# not moved out of the way — but a menu you have to squint at is not a menu, and this project
 	# has learned that twice already (the wind rose, and every label in the HUD).
-	draw_rect(Rect2(Vector2(at.x - 40.0, at.y - 44.0),
-		Vector2(310.0, ROW_GAP * float(rows.size()) + 40.0)), Color(0.05, 0.05, 0.06, 0.55))
+	# Hung, each one off the one above it, the top one off a dog. The same language as the yard and
+	# the instruments, and for the same reason: this is a game about being only as safe as the
+	# thing you tied to, and one flat grey box laid over the skyline is the one object on the first
+	# screen of it that looks like it came from somewhere else.
 	for i in rows.size():
 		var y: float = at.y + ROW_GAP * float(i)
 		var on: bool = i == selected
-		if on:
-			# A chalk mark against the row, the same one the tap test leaves on a joint.
-			draw_rect(Rect2(Vector2(at.x - 22.0, y - 14.0), Vector2(4.0, 16.0)), WATCH)
+		var box := row_rect(i)
+		var tie_x: float = box.position.x + 22.0
+		var from_y: float = row_rect(i - 1).end.y if i > 0 else at.y - 84.0
+		draw_line(Vector2(tie_x, from_y), Vector2(tie_x, box.position.y),
+			Color(WATCH.r, WATCH.g, WATCH.b, 0.5) if on
+			else Color(GHOST.r, GHOST.g, GHOST.b, 0.26), 1.0)
+		if i == 0:
+			draw_line(Vector2(tie_x - 7.0, from_y), Vector2(tie_x + 7.0, from_y),
+				Color(WATCH.r, WATCH.g, WATCH.b, 0.6), 2.0)
+		draw_rect(box, Color(0.05, 0.05, 0.06, 0.62 if on else 0.40))
+		draw_rect(Rect2(box.position, Vector2(box.size.x, 2.0)),
+			Color(WATCH.r, WATCH.g, WATCH.b, 0.9) if on
+			else Color(GHOST.r, GHOST.g, GHOST.b, 0.22))
 		_label(String(rows[i][1]), Vector2(at.x, y), INK if on else Color(DIM, 0.72), H_ROW)
 
 	_label("↑↓ or the mouse   ·   enter to take it",
