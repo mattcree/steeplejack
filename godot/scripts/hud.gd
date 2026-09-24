@@ -155,14 +155,13 @@ func _draw() -> void:
 	# and not enough to be gone, which is the worst of both.
 	var rows: Array = [] if player.leaving or player.options_open else _affordances()
 	var row_y := size.y - 44 - 17 * (rows.size() - 1)
+	# Only what he can actually do. Half this list used to be greyed-out verbs with the reason
+	# printed beside them, and a list that is half unusable teaches the player to stop reading it —
+	# which costs you the other half too. The reasons are not lost: press the key and it tells you.
 	for row in rows:
-		var text: String = "[%s]  %s" % [row[0], row[1]]
-		if not row[2] and row[3] != "":
-			text += " — " + row[3]
-		var col := Color(0.93, 0.90, 0.84, 0.88) if row[2] else Color(0.72, 0.70, 0.68, 0.66)
-		var w := _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
-		_label(text, Vector2(size.x - w - 28, row_y), col, 13)
-		row_y += 17
+		if not row[2]:
+			continue
+		row_y += _controls_row(String(row[0]), String(row[1]), row_y)
 
 	# The transient line fades out rather than sitting there for ever. Two permanent instructions
 	# saying different things — one at the top, one in the middle — is how the player learns to stop
@@ -578,50 +577,154 @@ func _ring_at_joint(jid: int, text: String, col: Color) -> void:
 	_label(text, at + Vector2(r + 12.0, 5.0), col, 14)
 
 
-## [key, verb, available, why-not]
+# ------------------------------------------------------------------------------------------ keys
+# A key should look like a key. "[E]" is a programmer's notation for a keyboard, not a picture of
+# one, and this game already asks the player to learn a trade they have never heard of — sounding
+# joints, seating dogs, pulling a band up in a star. The one thing that should cost them nothing
+# is working out which button to press.
+const CAP_H := 17.0
+const CAP_PAD := 5.0
+const CAP_GAP := 3.0
+const MOUSE_W := 13.0
+
+
+func _cap_width(label: String) -> float:
+	return maxf(CAP_H, _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+		+ CAP_PAD * 2.0)
+
+
+func _draw_cap(label: String, at: Vector2, col: Color) -> float:
+	var w := _cap_width(label)
+	draw_rect(Rect2(at, Vector2(w, CAP_H)), Color(0.09, 0.09, 0.10, col.a * 0.62), true)
+	draw_rect(Rect2(at, Vector2(w, CAP_H)), Color(col.r, col.g, col.b, col.a * 0.70), false, 1.0)
+	# The lip along the bottom edge. It is two pixels and it is the whole difference between a
+	# keycap and a rectangle with a letter in it.
+	draw_line(at + Vector2(2.0, CAP_H - 2.0), at + Vector2(w - 2.0, CAP_H - 2.0),
+		Color(col.r, col.g, col.b, col.a * 0.32), 1.5)
+	var tw := _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+	draw_string(_font, at + Vector2((w - tw) * 0.5, CAP_H - 5.0), label,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(col.r, col.g, col.b, col.a * 0.95))
+	return w
+
+
+## A mouse seen from above, with the button that matters filled in. "RMB" is three letters the
+## player has to decode; a lit right button is not.
+func _draw_mouse(which: String, at: Vector2, col: Color) -> float:
+	var body := Rect2(at, Vector2(MOUSE_W, CAP_H))
+	draw_rect(body, Color(0.09, 0.09, 0.10, col.a * 0.62), true)
+	var line := Color(col.r, col.g, col.b, col.a * 0.70)
+	draw_rect(body, line, false, 1.0)
+	var split := CAP_H * 0.42
+	draw_line(at + Vector2(0.0, split), at + Vector2(MOUSE_W, split), line, 1.0)
+	draw_line(at + Vector2(MOUSE_W * 0.5, 0.0), at + Vector2(MOUSE_W * 0.5, split), line, 1.0)
+	var lit := Color(col.r, col.g, col.b, col.a * 0.85)
+	if which == "L":
+		draw_rect(Rect2(at + Vector2(1.0, 1.0), Vector2(MOUSE_W * 0.5 - 1.5, split - 2.0)), lit, true)
+	elif which == "R":
+		draw_rect(Rect2(at + Vector2(MOUSE_W * 0.5 + 0.5, 1.0),
+			Vector2(MOUSE_W * 0.5 - 1.5, split - 2.0)), lit, true)
+	return MOUSE_W
+
+
+## What a control's key draws as: a run of caps, or a mouse with one button lit.
+func _glyphs(key: String) -> Array:
+	match key:
+		"RMB": return [["m", "R"]]
+		"LMB": return [["m", "L"]]
+		"mouse": return [["m", ""]]
+		"WASD": return [["c", "W"], ["c", "A"], ["c", "S"], ["c", "D"]]
+		"W/S": return [["c", "W"], ["c", "S"]]
+		"C / V": return [["c", "C"], ["c", "V"]]
+		_: return [["c", key]]
+
+
+## One line of the control list, right-aligned: the keys as keys, then what they do.
+## Returns the height it used.
+func _controls_row(key: String, text: String, baseline: float) -> float:
+	var col := Color(0.93, 0.90, 0.84, 0.90)
+	var gl := _glyphs(key)
+	var gw := 0.0
+	for g in gl:
+		gw += (MOUSE_W if g[0] == "m" else _cap_width(String(g[1]))) + CAP_GAP
+	var tw := _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+	var x: float = size.x - 28.0 - (gw + 8.0 + tw)
+	var top := baseline - CAP_H + 4.0
+	for g in gl:
+		if g[0] == "m":
+			x += _draw_mouse(String(g[1]), Vector2(x, top), col) + CAP_GAP
+		else:
+			x += _draw_cap(String(g[1]), Vector2(x, top), col) + CAP_GAP
+	_label(text, Vector2(x + 5.0, baseline), col, 13)
+	return 22.0
+
+
+## Why the key you just pressed did nothing, or "" if it was a fair press.
+##
+## The list on screen shows only what he can do, so the reasons had nowhere left to live — and they
+## were the only explanation this game offered of its own trade. "no dogs in the bag", "you are
+## standing on it", "stand level with a band to work on it": that is the game teaching itself.
+## Now it teaches at the moment the player asks the question, by pressing the key.
+func refusal_for(id: String) -> String:
+	for row in _affordances():
+		if row.size() > 4 and String(row[4]) == id and not row[2]:
+			return String(row[3])
+	return ""
+
+
+## [key, verb, available, why-not, id]
+##
+## Everything this job offers, available or not. The DRAWING filters it to what he can actually do
+## — see `_controls_row`; the reasons are not thrown away, they are what `refusal_for` hands back
+## the moment you press the key.
 func _affordances() -> Array:
 	if player.at_top or player.falling or player.fade_in > 0.3:
 		return []
 	if player.jack.slip_in_progress():
-		return [["SPACE", "grab", true, ""]]
+		# Spending the budget does not stop the slip, it makes the window zero-length — so the
+		# screen used to print GRAB at 46pt over "nothing left to catch with" at 14, and the
+		# player pressed the key it told them to press and died. It is not an available verb.
+		return [["SPACE", "grab", player.jack.can_slip_save(),
+			"your save is spent — one a minute, and you used it", "SPACE"]]
 	if player.rigging_to >= 0:
-		return [[Q_KEY, "stop rigging", true, ""]]
+		return [[Q_KEY, "stop rigging", true, "", "Q"]]
 	if player.lashing or player.hauling:
 		return []
 	if player.work_mode:
 		return [
-			["mouse", "place the dog", true, ""],
-			["hold LMB", "draw, release to strike", true, ""],
-			["RMB", "back out", true, ""],
+			["mouse", "place the dog", true, "", "MOUSE"],
+			["LMB", "hold to draw, release to strike", true, "", "LMB"],
+			["RMB", "back out", true, "", "RMB"],
 		]
 	if not player.on_ladder:
 		return [
-			["WASD", "walk", true, ""],
-			["mouse", "look", true, ""],
-			["F", "take a ladder and dogs", player.at_cradle(), "only at the cradle, at the foot of the stack"],
-			[Q_KEY, "stance — rig it on the stack", false, "you rig a stance up there, not down here"],
-			["F1", "motion and vertigo options", true, ""],
+			["WASD", "walk", true, "", "WASD"],
+			["mouse", "look", true, "", "MOUSE"],
+			["F", "take a ladder and dogs", player.at_cradle(),
+				"only at the cradle, at the foot of the stack", "F"],
+			[Q_KEY, "stance — rig it on the stack", false,
+				"you rig a stance up there, not down here", "Q"],
+			["F1", "motion and vertigo options", true, "", "F1"],
 		]
 	var has_target: bool = player.target_id >= 0
 	var sounded: bool = player.target_tapped()
 	var rows := [
-		["W/S", "climb", true, ""],
+		["W/S", "climb", true, "", "WS"],
 		["E", "sound this joint" if not sounded else "sound it again", has_target,
-			"no joint in reach — look at the brickwork"],
+			"no joint in reach — look at the brickwork", "E"],
 		["RMB", _drive_label(), has_target and player.dogs_carried > 0,
-			"no joint in reach" if not has_target else "no dogs in the bag"],
-		["R", _r_label(), _r_live(), _r_why()],
-		["F", _f_label(), _f_live(), _f_why()],
-		[Q_KEY, _next_stance_label(), true, ""],
+			"no joint in reach" if not has_target else "no dogs in the bag", "RMB"],
+		["R", _r_label(), _r_live(), _r_why(), "R"],
+		["F", _f_label(), _f_live(), _f_why(), "F"],
+		[Q_KEY, _next_stance_label(), true, "", "Q"],
 		["B", _b_label(), player.band_job and player._band_here() >= 0,
-			"stand level with a band to work on it"],
+			"stand level with a band to work on it", "B"],
 		["X", "dial the cut — %.0f mm, brings her back %.2f m" % [player.plumb_take_out,
 			float(player.plumb_here().get("brings_back", 0.0))] if player.plumb_job else "",
-			player.plumb_job and not player.plumb_cut_done, "she is cut"],
+			player.plumb_job and not player.plumb_cut_done, "she is cut", "X"],
 		["T", "brew up", jack_free_hands(),
-			"you need both hands — belt on first"],
-		["G", _gin_label(), true, ""],
-		["C / V", "a cigarette  ·  look at the view (hold)", true, ""],
+			"you need both hands — belt on first", "T"],
+		["G", _gin_label(), true, "", "G"],
+		["C / V", "a cigarette  ·  look at the view (hold)", true, "", "CV"],
 	]
 	# A key with nothing to say on this job is not dimmed, it is absent. The list is what THIS job
 	# wants, not an index of everything the game can do.
@@ -1480,16 +1583,24 @@ func _draw_slip(jack: Jack) -> void:
 	# And it closes inwards as well as round, so the shape alone carries the time.
 	draw_arc(eye, r * (0.25 + 0.55 * left), 0, TAU, 48, Color(0.95, 0.31, 0.22, 0.55), 3.0)
 
-	_centre("GRAB", eye.y - 8.0, Color(0.98, 0.95, 0.90, 0.95), 46)
-	_centre("SPACE", eye.y + 34.0, Color(0.95, 0.92, 0.88, 0.88), 20)
+	# Only prompt for the grab if there is a grab to be had. A spent budget is a zero-length
+	# window: the key cannot work, the sim has already decided so, and this used to print GRAB at
+	# 46pt with "nothing left to catch with" at 14pt underneath it. The player pressed the button
+	# the game told them to press, and fell. Telling someone to do a thing while telling them it
+	# will not work is worse than telling them nothing.
+	if jack.can_slip_save():
+		_centre("GRAB", eye.y - 8.0, Color(0.98, 0.95, 0.90, 0.95), 46)
+		_draw_prompt_key("SPACE", eye.y + 40.0, Color(0.95, 0.92, 0.88, 0.90))
+		_centre("your grip went", eye.y + r + 34.0, Color(0.90, 0.86, 0.82, 0.80), 15)
+	else:
+		_centre("NOTHING TO CATCH WITH", eye.y - 8.0, Color(0.96, 0.42, 0.32, 0.95), 34)
+		_centre("one save a minute, and you have had it", eye.y + r + 34.0,
+			Color(0.92, 0.70, 0.66, 0.85), 15)
 
-	# Why this is happening, in three words, while it happens. Afterwards is too late to learn it.
-	_centre("your grip went", eye.y + r + 34.0, Color(0.90, 0.86, 0.82, 0.80), 15)
 
-	# And whether there was ever anything to grab at. A window that is already spent looks exactly
-	# like one you missed, unless it says so.
-	if not jack.can_slip_save():
-		_centre("nothing left to catch with", eye.y + r + 56.0, Color(0.95, 0.45, 0.35, 0.85), 14)
+## A single key, drawn as a key, centred. For the prompts that are the whole screen.
+func _draw_prompt_key(label: String, y: float, col: Color) -> void:
+	_draw_cap(label, Vector2((size.x - _cap_width(label)) * 0.5, y - CAP_H), col)
 
 
 

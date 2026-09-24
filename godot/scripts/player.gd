@@ -1131,6 +1131,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event is InputEventKey and event.pressed and not event.echo:
+		# A key the HUD is not offering still answers — it says why not. The control list only
+		# shows what he can do now, so this is where the reasons went: they arrive when the player
+		# asks the question, which is the moment they press the key, instead of sitting greyed out
+		# on screen for the whole shift being ignored.
+		if _refused(KEY_IDS.get(event.keycode, "")):
+			return
 		match event.keycode:
 			KEY_E: _tap()
 			KEY_R: _lash()
@@ -1146,6 +1152,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_RIGHT:
+			if _refused("RMB"):
+				return
 			_toggle_work_mode()
 		elif event.button_index == MOUSE_BUTTON_LEFT and work_mode:
 			drawing = true
@@ -1157,6 +1165,27 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and not event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT and drawing:
 			_release_strike()
+
+
+## Keycode -> the id the HUD's affordance table knows it by.
+const KEY_IDS := {
+	KEY_E: "E", KEY_R: "R", KEY_F: "F", KEY_Q: "Q", KEY_G: "G", KEY_B: "B", KEY_X: "X",
+	KEY_T: "T", KEY_SPACE: "SPACE",
+}
+
+
+## True if the HUD is refusing this control right now, having said why.
+func _refused(id: String) -> bool:
+	if id == "":
+		return false
+	var hud := get_node_or_null("../HUD")
+	if hud == null or not hud.has_method("refusal_for"):
+		return false
+	var why: String = String(hud.refusal_for(id))
+	if why == "":
+		return false
+	_say(why)
+	return true
 
 
 func _physics_process(dt: float) -> void:
