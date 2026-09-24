@@ -127,6 +127,7 @@ func _draw() -> void:
 		_draw_conductor(jack)
 		_draw_band(jack)
 		_draw_survey(jack)
+		_draw_topping(jack)
 		_draw_plumb(jack)
 	# The way out, on the jobs that do not end on the cap. Without it a player who has just
 	# finished a conductor run at the foot of the chimney has no idea the job is over.
@@ -575,6 +576,96 @@ func _ring_at_joint(jid: int, text: String, col: Color) -> void:
 	draw_arc(at, r, 0, TAU, 32, col, 2.5)
 	draw_arc(at, r + 7.0, 0, TAU, 32, Color(col.r, col.g, col.b, col.a * 0.4), 1.5)
 	_label(text, at + Vector2(r + 12.0, 5.0), col, 14)
+
+
+# ------------------------------------------------------------------- topping her out, on screen
+#
+# The TOP archetype's instrument, and it did not exist. I wired the verb, the level, the bindings
+# and the settlement in one night and gave the player a label in the control list saying "she is at
+# 78% of her give" — which is a number in a corner, not an instrument, and this project has a
+# standard about that: if the only evidence is a number changing, it did not happen.
+#
+# Three things a man taking a chimney down actually watches:
+#
+#   THE STROKE   how hard he is leaning, against the point where this brick lets go. That point is
+#                only drawn if he SOUNDED the joint first, and the difference between the two
+#                read-outs is the entire argument for sounding. Nothing has to say it.
+#   THE FLUE     filling with the brick he is dropping down it, because when it packs the
+#                afternoon becomes a gin wheel and a weight.
+#   THE LINE     how far down she has come, and how much of her came down whole, which is what he
+#                is paid on.
+const TOP_BAR_H := 132.0
+const TOP_BAR_W := 26.0
+
+
+## (`_draw_top`, without an argument, is the card for arriving at the summit — a different sense of
+## the word that this one nearly collided with.)
+func _draw_topping(jack: Jack) -> void:
+	if not player.top_job:
+		return
+	var st: Dictionary = jack.top_state()
+	if st.is_empty():
+		return
+	var at := Vector2(size.x - 210.0, 214.0)
+
+	# --- the stroke ------------------------------------------------------------------------------
+	var load: float = clampf(float(st.get("load", 0.0)), 0.0, 1.0)
+	var give: float = float(st.get("give", -1.0))
+	var sounded: bool = bool(st.get("sounded", false))
+	var bar := Rect2(at, Vector2(TOP_BAR_W, TOP_BAR_H))
+	var panel := Rect2(at - Vector2(18.0, 36.0), Vector2(188.0, TOP_BAR_H + 96.0))
+	draw_rect(panel, Color(0.05, 0.04, 0.03, 0.54))
+	# Hung, like everything else. The heavy edge is along the top because that is the edge
+	# carrying the weight.
+	draw_rect(Rect2(panel.position, Vector2(panel.size.x, 2.0)), Color(WATCH, 0.8))
+	draw_line(Vector2(panel.position.x + 24.0, panel.position.y - 26.0),
+		Vector2(panel.position.x + 24.0, panel.position.y), Color(WATCH, 0.4), 1.0)
+	_label("THE STROKE", at - Vector2(0.0, 14.0), Color(GHOST, 0.85), TINY)
+	draw_rect(bar, Color(0.10, 0.09, 0.08, 0.9))
+
+	# Past the give point you are no longer loading the joint, you are loading the brick. Drawn as
+	# a different colour rather than a warning, because it is a different thing happening.
+	var over: bool = give >= 0.0 and load > give
+	var fill_h: float = TOP_BAR_H * load
+	draw_rect(Rect2(Vector2(bar.position.x, bar.end.y - fill_h), Vector2(TOP_BAR_W, fill_h)),
+		Color(DANGER if over else WATCH, 0.85))
+
+	if sounded and give >= 0.0:
+		# Where she lets go, and the window you have to let go IN. He earned this by sounding.
+		var gy: float = bar.end.y - TOP_BAR_H * give
+		draw_line(Vector2(bar.position.x - 7.0, gy), Vector2(bar.end.x + 7.0, gy),
+			Color(GOOD, 0.95), 2.0)
+		var win: float = TOP_BAR_H * (1.0 / maxf(jack.tuning_f("prisePerBrickSeconds", 1.0), 0.01)
+			/ 1000.0) * jack.tuning_f("giveWindowMs.sharpBolster", 90.0)
+		draw_rect(Rect2(Vector2(bar.position.x, gy - win), Vector2(TOP_BAR_W, win)),
+			Color(GOOD, 0.22))
+		_label("let go here", Vector2(at.x + 74.0, gy + 4.0), Color(GOOD, 0.95), TINY)
+	else:
+		# The absence IS the teaching. He can see how hard he is leaning and he cannot see where
+		# she lets go, and the only thing that changes that is tapping the joint first.
+		_label("not sounded —", Vector2(at.x + 74.0, bar.position.y + 44.0), Color(FAINT, 0.85), TINY)
+		_label("you cannot see", Vector2(at.x + 74.0, bar.position.y + 58.0), Color(FAINT, 0.85), TINY)
+		_label("where she gives", Vector2(at.x + 74.0, bar.position.y + 72.0), Color(FAINT, 0.85), TINY)
+
+	# --- the flue --------------------------------------------------------------------------------
+	var flue: float = clampf(float(st.get("flue_full", 0.0)), 0.0, 1.0)
+	var jammed: bool = bool(st.get("jammed", false))
+	var ftube := Rect2(Vector2(at.x + 44.0, at.y), Vector2(14.0, TOP_BAR_H))
+	draw_rect(ftube, Color(0.10, 0.09, 0.08, 0.9))
+	draw_rect(Rect2(Vector2(ftube.position.x, ftube.end.y - TOP_BAR_H * flue),
+		Vector2(14.0, TOP_BAR_H * flue)), Color(DANGER if jammed else FAINT, 0.8))
+	draw_rect(ftube, Color(GHOST, 0.4), false, 1.0)
+	_label("jammed" if jammed else "flue", Vector2(ftube.position.x - 6.0, ftube.end.y + 16.0),
+		Color(DANGER if jammed else GHOST, 0.9), TINY)
+
+	# --- the line --------------------------------------------------------------------------------
+	var to_go: float = maxf(float(st.get("to_go_m", 0.0)), 0.0)
+	var whole: int = int(round(100.0 * float(st.get("clean_share", 0.0))))
+	_label("%.1f m to go" % to_go, Vector2(at.x, bar.end.y + 38.0), INK, SMALL)
+	# Nothing to say about how much of her came down whole until some of her has.
+	if int(st.get("clean", 0)) + int(st.get("snapped", 0)) > 0:
+		_label("%d%% of her whole" % whole, Vector2(at.x, bar.end.y + 54.0),
+			Color(GOOD if whole >= 65 else WATCH, 0.9), TINY)
 
 
 # ------------------------------------------------------------------------------------------ keys

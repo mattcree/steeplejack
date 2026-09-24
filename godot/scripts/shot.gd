@@ -28,6 +28,7 @@
 #   tea              belt on and brew up
 #   fall             come off, untied, from where he is
 #   strip <n> <s> [d]  n frames of him walking for s seconds, from d degrees round — a gait cycle
+#   prise <load> [raw]  a topping stroke leaned to `load` (0..1); raw>0 skips sounding it first
 #   gin              rig the gin wheel on the highest dog in reach, and start a haul
 #   haulfor <s> [1]  haul flat out for s seconds, steering against the swing if 1
 #   stance <0-4>     one hand / hooked leg / clipped / belted / chair
@@ -247,6 +248,19 @@ func _run(cmd: String) -> void:
 			for i in int(a * 60.0):
 				player._lash_spin += TAU * rate / 60.0
 				await physics_frame
+		"prise":
+			# Sound the joint, bolster in, and lean on the bar to `a` of a full load — so the
+			# topping instrument can be photographed mid-pull, which is the only state it says
+			# anything in. `b` > 0 skips the sounding, to photograph what a player who did not tap
+			# first is given instead.
+			if b <= 0.0:
+				jack.top_sound()
+			player._top_press()
+			for i in 2000:
+				jack.top_lever(0.01)
+				if float(jack.top_state().get("load", 0.0)) >= a:
+					break
+			await _wait(2)
 		"tieoff":
 			player._tie_off()
 		"top":
