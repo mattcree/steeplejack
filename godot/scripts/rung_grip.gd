@@ -55,6 +55,11 @@ const CHAINS := [
 	["thigh.l", "calf.l", "foot.l"],
 	["thigh.r", "calf.r", "foot.r"],
 ]
+## The arm that holds the section he is carrying. It is the right one because the ladder rides on
+## the right shoulder, and a five-metre section balanced on a shoulder with both arms swinging free
+## is the silliest thing in the game. Nobody has ever carried a ladder that way. One hand goes up
+## and holds the stile, always, and the other is what you have left for everything else.
+const CARRY_LIMB := 1
 const PAIR := [0, 1, 1, 0]
 const SIDE := [-1.0, 1.0, -1.0, 1.0]    ## which side of the ladder's centre, along its tangent
 
@@ -262,6 +267,11 @@ func on_wall(limb: int) -> bool:
 
 ## Once a physics tick, after the player has moved. `holding` says which limbs are on the ladder
 ## at all: an arm that is tapping, striking or lashing is doing that instead.
+## A point on the stile of the section he is carrying, in world space, or ZERO for none. Set by
+## the player every frame while he is walking with one on his shoulder.
+var carry_point := Vector3.ZERO
+
+
 func update(dt: float, on_ladder: bool, holding: Array) -> void:
 	var feet: float = _feet()
 	if on_ladder and not _was_on:
@@ -282,6 +292,8 @@ func update(dt: float, on_ladder: bool, holding: Array) -> void:
 
 	for i in 4:
 		var want: float = 1.0 if on_ladder and holding[i] else 0.0
+		if i == CARRY_LIMB and not on_ladder and carry_point != Vector3.ZERO:
+			want = 1.0
 		_grip[i] = move_toward(_grip[i], want, dt * FADE_RATE)
 		_ik[i].influence = _grip[i]
 		_ik[i].active = _grip[i] > 0.0
@@ -323,6 +335,22 @@ func _step(dt: float, feet: float, rate: float) -> void:
 
 
 func _place(limb: int, _dt: float) -> void:
+	# Carrying, on the ground: this hand is not on a rung of the stack, it is on the stile of the
+	# section over his shoulder, and there is no stepping to do.
+	if limb == CARRY_LIMB and not _was_on and carry_point != Vector3.ZERO:
+		var hand_root: Vector3 = _root[limb] if _have_root else (skeleton.global_transform
+			* skeleton.get_bone_global_rest(skeleton.find_bone(CHAINS[limb][0])).origin)
+		var hold: Vector3 = _within_reach(limb, hand_root, carry_point)
+		_target[limb].global_position = hold
+		# The elbow hangs down and out, away from his ribs — where an elbow goes when the hand is
+		# up at shoulder height holding something. Aimed off the HAND, like the knee is aimed off
+		# the foot, because that is the joint whose position is actually known.
+		var side: Vector3 = (hold - hand_root)
+		side.y = 0.0
+		if side.length() < 0.01:
+			side = Vector3(1.0, 0.0, 0.0)
+		_pole[limb].global_position = hold - Vector3.UP * 0.52 + side.normalized() * 0.30
+		return
 	var to: Vector3 = _rung_point(limb, _rung[limb])
 	var at: Vector3 = to
 	if _moving == PAIR[limb] and _step_t < 1.0:

@@ -54,6 +54,10 @@ const WALK_TO_RUN := 2.1
 ## prising.
 const TOP_REACH_BELOW := 1.35
 
+## Where on the carried section his hand takes hold, in the section's own space: up its length
+## towards the front end, on the stile nearest his head.
+const CARRY_HAND_LOCAL := Vector3(0.0, 0.62, -0.22)
+
 const BOOM_LENGTH := 3.0
 const BOOM_SIDE := 0.65
 const WORK_BOOM_LENGTH := 1.4        ## 11-camera-controls-feel.md, "pulls in to 1.4 m"
@@ -82,7 +86,13 @@ const BODY_OFF_LADDER := 0.40
 ## Where a carried section rides. On the shoulder for walking; `_stow_carried_ladder()` stands it
 ## up his back the moment he is on a ladder, because five metres held out sideways at height goes
 ## through the chimney.
-const CARRY_ON_SHOULDER := Vector3(-0.20, 0.30, 0.0)
+## Carried ON EDGE — the stiles one above the other, his shoulder between the rungs, his head
+## between the rails — which is how a ladder is actually carried by one man and what the tilt below
+## was always producing. The height is the thing that has to be right: the LOWER stile bears on the
+## shoulder and takes the weight, and the hand comes up to the upper one. Sat 12 cm too low it rode
+## behind his neck taking no weight at all, which is what made it look like a prop rather than a
+## load.
+const CARRY_ON_SHOULDER := Vector3(-0.18, 0.435, 0.0)
 const CARRY_TILT := Vector3(1.361, 0.0, 0.0)   ## 78 degrees: nearly level, front end a little up
 const MOUNT_HEIGHT := 1.6        ## You get on a ladder from the ground, not by brushing past it.
 const SHUFFLE_SPEED := 1.3       ## Metres per second sideways along the face.
@@ -2565,6 +2575,22 @@ func _make_carried_ladder(skel: Skeleton3D) -> Node3D:
 	return att
 
 
+## Where his hand goes on the section he is carrying, in world space, or ZERO if he is not.
+##
+## A point up the near stile, forward of the shoulder — which is where you hold a ladder you are
+## carrying, because that is the only place your arm reaches that is also in front of the balance
+## point.
+func _carry_hold() -> Vector3:
+	if not carrying_ladder or on_ladder or falling or at_top:
+		return Vector3.ZERO
+	if _carried_ladder == null or not _carried_ladder.visible:
+		return Vector3.ZERO
+	var root: Node3D = _carried_ladder.get_child(0)
+	if root == null or not root.is_inside_tree():
+		return Vector3.ZERO
+	return root.global_transform * CARRY_HAND_LOCAL
+
+
 ## Where the section he is carrying sits, which depends entirely on whether his feet are on the
 ## ground or on a ladder.
 ##
@@ -3096,6 +3122,11 @@ func _update_grip(dt: float) -> void:
 	# without rigging anything, so from that stance up it is the trailing leg that does it — and
 	# you can watch it happen rather than read that it has.
 	grip.hooked = 3 if (climbing and jack.get_stance() >= 1) else -1
+	# A hand on the section he is carrying, while his feet are on the ground. On the ladder it
+	# stands up his back and both hands are on the rungs, which is the only thing that works up
+	# there — but walking across a yard with five metres of ladder resting on a shoulder and both
+	# arms swinging is not a thing a man has ever done.
+	grip.carry_point = _carry_hold()
 	grip.update(dt, climbing, [not lashing, not right_busy, true, true])
 
 
