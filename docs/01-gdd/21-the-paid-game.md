@@ -23,7 +23,7 @@ The gap is not where it feels like it is. The engine is far ahead of the content
 | BAND | yes | 2 |
 | FELL | yes | **4** |
 | STRAIGHTEN | yes | 1 |
-| **TOP** | **yes, fully, with tests** | **0** |
+| **TOP** | yes | **2** — Shawclough, Ladyshore *(wired 2026-09-24)* |
 | GILD | no | 0 |
 | MECHANISM | no | 0 |
 | LATTICE | no | 0 |
@@ -162,12 +162,34 @@ Three mechanisms, none of which is a tutorial level:
 
 ## 6. Order of work
 
-1. **Wire TOP to a level.** An entire tested archetype for the cost of a level file and its
-   geometry. Biggest variety-per-hour in the project.
-2. **Re-space the campaign** so no archetype repeats back to back.
-3. **The "what this is" panel on the board.** Two sentences per archetype, in the trade's voice.
-4. **The skyline as the save file**, and the engine where you can see it.
-5. **EMERGENCY**, then **GILD**.
+1. ~~**Wire TOP to a level.**~~ Done 2026-09-24: bindings, two levels, the stroke instrument, its
+   own checklist, a settlement that pays on how much of her came down and how much came down
+   whole, and the flue audible through the floor.
+2. ~~**Re-space the campaign.**~~ Done. Fifteen levels, no archetype following itself, gates
+   untouched and still monotonic.
+3. ~~**The "what this is" panel on the board.**~~ Done, keyed on archetype so a level cannot ship
+   without one, and guarded by a test.
+4. ~~**The skyline as the save file**, and the engine where you can see it.~~ Done, and the same
+   bug was found a second time in the ending — both now ask `District`. The engine is drawn as an
+   engine through six stages rather than as three shapes.
+5. **EMERGENCY**, then **GILD**. Not started.
 
-Everything above 4 is content and copy over systems that already exist and are already tested. That
-is the good news, and it is why this is a £15 game with about a month in it rather than a rewrite.
+### Still open, in rough order of value
+
+- **The game has no font.** Every screen is Godot's fallback, which is most of what makes the menus
+  read as generic whatever else is done to them. It wants a condensed grotesque for the trade's own
+  lettering and a typewriter for the clients' letters, and that is a file somebody has to choose
+  and put in the repo.
+- **The character.** He is primitives with good materials on them now; he will not go further
+  without a sculpt and painted maps. See the honest note in `worn.gdshader`. The open question is
+  whether the environment should chase photoreal without him — a half-photoreal world with a
+  primitive man in it looks worse than a coherently stylised one.
+- **The climb cycle in motion.** The gait is rebuilt on the six determinants and the stride now
+  matches the ground speed, but it has only been judged from a six-frame strip.
+- **EMERGENCY** — a chimney that is already going. Reuses FELL's collapse and the slip model; the
+  highest drama per line of new code left in the project.
+- **Keycaps on the felling screen**, which still writes "[B]" and "[P]" inline.
+
+Everything in 1 to 4 was content and copy over systems that already existed and were already
+tested. That is the good news, and it is why this is a £15 game with about a month in it rather
+than a rewrite.
