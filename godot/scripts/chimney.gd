@@ -233,7 +233,13 @@ func _cap() -> void:
 		"plain":
 			# Two courses of header brick and nothing else. A working chimney in a back yard.
 			_cap_ring(r * 1.06, r * 1.04, 0.36, height_m + 0.18, stone)
-			_flue(r * 0.58, height_m + 0.36)
+			# `at` is the flue cylinder's CENTRE and the cylinder is 3 m tall, so the top of it
+			# lands 1.5 m above whatever you pass. Passed the cap's own top, as this did, the
+			# result is a three-metre black tube standing proud of the chimney — a plain-capped
+			# stack had a drum on it, wider and darker than her own brickwork, visible from the
+			# ground on every job that used this cap. The corbelled branch below has always
+			# subtracted the 1.5 and this one never did.
+			_flue(r * 0.58, height_m + 0.36 - 1.5)
 		"capped":
 			# Slabbed over: a flue taken out of service, which is why she is a gasworks job.
 			_cap_ring(r * 1.10, r * 1.06, 0.44, height_m + 0.22, stone)
