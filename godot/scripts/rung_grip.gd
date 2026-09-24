@@ -16,14 +16,32 @@
 class_name RungGrip
 extends Node
 
-const HAND_ABOVE_FEET := [1.78, 1.50]   ## each pair's hand rung, above the feet: staggered a rung apart so the pairs alternate
+## Each pair's hand rung, above the feet, staggered a rung apart so the pairs alternate.
+##
+## Was [1.78, 1.50], which is a full-stretch reach on every rung of every climb: with the chest
+## leaned in where it belongs the rung still sat 0.37 m above the shoulder and 0.42 m out, and an
+## arm is 0.52 m. Measured, not guessed — `make shot CMDS="climb 12,climbfor 0.8,legs"` prints the
+## raw ask against the limb's own length, and it read 1.07 of it.
+const HAND_ABOVE_FEET := [1.54, 1.26]
 const FOOT_ABOVE_FEET := [0.16, 0.44]   ## and its foot rung, a rung apart. A leg is 0.84 m: lower than 0.15 it cannot reach, higher than this it jack-knifes
-const HAND_SPREAD := 0.15               ## off the ladder's centre line, along the rung
+## Off the ladder's centre line, along the rung.
+##
+## Was 0.15, and the stiles are at 0.22 — so the wrist sat 70 mm inside the rail and the hand mesh,
+## which is 90 mm across, reached to within 25 mm of it. Reported from play as "he holds the side
+## of the ladder rather than the rungs", and from four metres away that is exactly what it looks
+## like. At 0.11 the whole hand is clear of the rail and on the rung it is holding.
+const HAND_SPREAD := 0.11
 const FOOT_SPREAD := 0.12
 const HAND_PROUD := 0.035               ## the wrist sits a little in front of the rung it grips
 const FOOT_LIFT := 0.06                 ## the ankle sits above the rung the sole is on
 const FOOT_BACK := 0.055                ## and behind it, so the rung is under the arch
-const HAND_ON_WALL_ABOVE_FEET := 1.55   ## at the head of the ladder, where a hand goes on the brick
+## At the head of the ladder, where there is no rung left and a hand goes on the brick.
+##
+## Was 1.55, which is higher than a rung and further out — the brick is past the ladder — so at
+## the head of a section BOTH hands went to a point 0.56 m from a shoulder that reaches 0.52, and
+## locked out straight pointing at it. Measured at 1.32 it comes to 0.84 of the arm, which is a
+## man with his palm flat on the brickwork rather than a man lunging at it.
+const HAND_ON_WALL_ABOVE_FEET := 1.32
 const WALL_PALM := 0.06                 ## the wrist, off the face of the brick
 const MIN_ANKLE_ABOVE_FEET := 0.20     ## the lowest a straight leg puts the ankle, plus a little bend
 const LEG := 0.84                       ## hip to sole on the rig
@@ -88,6 +106,9 @@ var _reach := [0.0, 0.0, 0.0, 0.0]  ## root to end with the limb straight, measu
 ## metres from its own shoulder. So RungOrient fills these in while it has the real thing.
 var watch_limbs := false
 var _watch := ["", "", "", ""]
+var _raw := [0.0, 0.0, 0.0, 0.0]   ## how far the rung was, before the reach clamp
+var _rawpos := [Vector3.ZERO, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO]
+var _rawroot := [Vector3.ZERO, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO]
 
 ## Where each chain starts — the shoulder or the hip — in the world. Kept here because a bone's
 ## solved position can only be read from inside the modifier pass, and `_place()` needs it a frame
@@ -360,6 +381,12 @@ func _place(limb: int, _dt: float) -> void:
 	var along: Vector3 = Vector3(0, 0, 1) * float(SIDE[limb])
 	var root: Vector3 = _root[limb] if _have_root else (skeleton.global_transform
 		* skeleton.get_bone_global_rest(skeleton.find_bone(CHAINS[limb][0])).origin)
+	# What the rung actually asked for, before the clamp. `asked` in the report is measured off
+	# the TARGET, which has already been pulled in — so it reads 0.960 whenever the clamp fires and
+	# can never tell you by how much. This can.
+	_raw[limb] = root.distance_to(at) / maxf(_reach[limb], 0.001)
+	_rawpos[limb] = at
+	_rawroot[limb] = root
 	at = _within_reach(limb, root, at)
 	_target[limb].global_position = at
 	# Well off the limb's own line, or the bend has no plane to happen in and the joint flips to
@@ -423,8 +450,15 @@ func capture(skel: Skeleton3D) -> void:
 		var lean: float = rad_to_deg(Vector3.DOWN.angle_to(lower)) if lower.length() > 0.001 else 0.0
 		var asked: float = _root[i].distance_to(_target[i].global_position) / maxf(_reach[i], 0.001)
 		var drift: float = root.distance_to(_root[i])
-		_watch[i] = "%-7s straight %.3f  asked %.3f  infl %.2f  drift %.3f  lower %5.1f deg" % [
-			names[i], straight, asked, _grip[i], drift, lean]
+		var rp: Vector3 = _rawpos[i]
+		var rr: Vector3 = _rawroot[i]
+		# RAW is the one that matters and it was not here: `asked` is measured off the target,
+		# which `_within_reach` has already pulled in, so it reads NEVER_STRAIGHT whenever the
+		# clamp fires and can never tell you BY HOW MUCH. Both hands sat at 0.960 for a day while
+		# the rung they were pointing at was 1.33 of an arm away.
+		_watch[i] = ("%-7s straight %.3f  RAW %.3f  up %+.2f  out %.2f  rung %d  lower %5.1f deg") % [
+			names[i], straight, float(_raw[i]), rp.y - rr.y,
+			Vector2(rp.x - rr.x, rp.z - rr.z).length(), _rung[i], lean]
 
 
 func describe_limbs() -> String:

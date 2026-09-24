@@ -57,11 +57,20 @@ const AIM := {
 	# Leaned in further than it was, because the hips now hang further back (player.gd's
 	# CLIMB_IN). The two go together: take the bum off the ladder without bringing the chest
 	# towards it and he is not climbing, he is sitting down in mid air.
-	# Nearly upright. The hips hang back (player.gd's CLIMB_IN) and the shoulders come back with
-	# them, so he stands straight up the ladder rather than folding over it — which is what takes
-	# the knees off the rails. Leaning the chest in was the wrong half of the fix.
-	"spine_01":   [Vector3(0.0, 0.985, 0.17), Vector3(0.0, 0.985, 0.17)],
-	"spine_02":   [Vector3(0.0, 0.991, 0.13), Vector3(0.0, 0.991, 0.13)],
+	# Hips back, CHEST IN. Both halves, and they are not the same half.
+	#
+	# Taking the bum off the ladder (player.gd's CLIMB_IN) was right and it fixed the knees. Then
+	# the shoulders were brought back with it, on the reasoning that he should stand straight up
+	# the ladder rather than fold over it — and that put his shoulders 21 cm FURTHER from the
+	# rungs than his hips, measured. The arm reaches 0.52 m and the rung was 0.69 m away, so both
+	# arms locked out straight at NEVER_STRAIGHT and stayed there, pointing at rungs they could
+	# not touch. That is every symptom at once: hands out near the stiles instead of on the rungs,
+	# a hand that never moves because it can never satisfy its target, and a descent that thrashes.
+	#
+	# A climber's chest is near the rungs and his weight is over his feet. It is the hips that
+	# hang back, and only the hips.
+	"spine_01":   [Vector3(0.0, 0.66, 0.75), Vector3(0.0, 0.66, 0.75)],
+	"spine_02":   [Vector3(0.0, 0.74, 0.67), Vector3(0.0, 0.74, 0.67)],
 }
 
 ## Which child each posed bone points at. A bone has no direction of its own; it has the direction
