@@ -3760,6 +3760,8 @@ func _conductor_earth() -> void:
 var top_job := false
 var top_working := false        ## leaning on the bar right now
 var _top_said := ""
+var _flue_fall := -1.0          ## seconds until the brick he dropped lands, or -1
+var _flue_pitch := 1.0
 
 
 func _top_setup() -> void:
@@ -3826,6 +3828,7 @@ func _top_release_stroke() -> void:
 		# A packed flue is not a different route. It is a stop.
 		jack.top_drop(true)
 		_top_shorten()
+		_flue_listen()
 
 
 ## She has to get shorter. A course coming off that leaves the chimney the height it was is the
@@ -3838,9 +3841,29 @@ func _top_shorten() -> void:
 		chimney.set_top(now)
 
 
+## The brick, on its way down the inside of her.
+##
+## You drop it and then you wait, and how long you wait is how far it has to go — which is how far
+## down the pile at the bottom has got to. The flue filling up is a bar on the screen; a brick that
+## takes three seconds to land at the start of the day and one by the end of it is the same fact,
+## arriving through the floor, and you do not have to be looking at anything.
+func _flue_listen() -> void:
+	var st: Dictionary = jack.top_state()
+	var drop_m: float = maxf(float(st.get("height_now_m", 0.0))
+		* (1.0 - clampf(float(st.get("flue_full", 0.0)), 0.0, 1.0)), 1.0)
+	# s = sqrt(2h/g), which is the only physics in this game that is done for a sound.
+	_flue_fall = sqrt(2.0 * drop_m / 9.81)
+	# Further down is deeper and quieter; near the top it is a sharper knock.
+	_flue_pitch = clampf(1.25 - 0.5 * clampf(drop_m / 45.0, 0.0, 1.0), 0.6, 1.3)
+
+
 func _update_top(dt: float) -> void:
 	if not top_job:
 		return
+	if _flue_fall > 0.0:
+		_flue_fall -= dt
+		if _flue_fall <= 0.0 and foley != null:
+			foley.cue("thump", _flue_pitch)
 	_top_lever(dt)
 	var st: Dictionary = jack.top_state()
 	if bool(st.get("jammed", false)) and _top_said != "jam":

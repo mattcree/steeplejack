@@ -159,6 +159,23 @@ func _init() -> void:
 		_check(dead > 0, "%d collision segments above the new top are switched off" % dead)
 		_check(live > 0, "%d below it are still there to stand on" % live)
 
+	# --- you hear where the bottom of the flue has got to -----------------------------------------
+	#
+	# The brick falls the length of what is left of her, above the pile it is landing on, so the
+	# wait gets shorter as the flue fills. The meter says the same thing; this says it through the
+	# floor while you are looking at your hands.
+	_put_on_ladder(player, chimney,
+		maxf(float(jack.top_state().get("height_now_m", 34.0)) - 0.7, 1.0))
+	await physics_frame
+	player._flue_listen()
+	var empty_fall: float = player._flue_fall
+	_check(empty_fall > 1.0, "a brick takes %.1f s to reach the bottom" % empty_fall)
+	for i in 400:
+		jack.top_drop(true)
+	player._flue_listen()
+	_check(player._flue_fall < empty_fall,
+		"and less once the flue has filled up under it: %.1f s" % player._flue_fall)
+
 	# --- a packed flue is a STOP, not a different route -------------------------------------------
 	#
 	# The drop used to be `top_drop(not jammed)`, so the moment the flue packed every brick went

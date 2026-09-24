@@ -59,7 +59,9 @@ while the flue is packed he cannot start another prise at all — "the flue is p
 nowhere to put them. Clear it first." That is what makes clearing it cost you the afternoon
 rather than cost you nothing, and it is the reason the meter is on the screen.
 
-## Open
+## You hear where the bottom has got to
 
-- A sound at the bottom when a brick lands, so the flue filling is something you hear as well as
-  something you watch.
+The brick falls the length of what is left of her, above the pile it is landing on, so it lands
+2.6 seconds after you drop it at the start of the day and half a second after by the end of it.
+The meter on the right says the same thing. This says it through the floor while you are looking
+at your hands, and it is the only physics in this game that is done for a sound.
