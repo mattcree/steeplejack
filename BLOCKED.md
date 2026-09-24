@@ -123,6 +123,17 @@ Found by asking whether the game can actually be finished, which nothing had ask
 | **Three levels run on an archetype they were not designed for.** St Anne's ships as a conductor rather than a gild, the Corn Mill as a banding rather than a mechanism, Hollin Bank as a survey rather than a topping | They are real jobs of real types and they are not empty placeholders — but the campaign's variety is three archetypes thinner than the table says | **Fine for now, and marked as such in the table.** Each becomes its designed archetype when that archetype is built |
 | **Packing** | a block under the third rung holds the ladder off the wall *so boots fit on the rungs* | not modelled; the drawn body's standoff does the same job by accident | Cosmetic but cheap, and it explains on screen why the body hangs back |
 
+## Raised 2026-09-24, by a night on the interface and the topping archetype
+
+Three calls the implementer should not make. Nothing is waiting on any of them — the work below
+them is built and gated — but each one decides what the next month of art and feel is spent on.
+
+| Where | The question | Recommendation |
+|---|---|---|
+| **The font** | The game has none. Every screen is `ThemeDB.fallback_font`, and that is most of what still makes the menus read as generic whatever else is done to them. It wants two faces: a condensed grotesque for the trade's own lettering — enamel works signage, stencil on a crate, paint on a van door — and a typewriter for the clients' letters, so the moment you see one you know somebody outside the trade is talking to you. | Pick two and put the files in the repo. I did not fetch them: shipping a typeface is a licensing decision and it is yours. Anything under the SIL OFL is safe. This is the single cheapest visual upgrade left in the project. |
+| **Photoreal, or not** | The designer asked whether the game could edge towards photorealism. The environment can go a good way — the brickwork already proves it. **The character cannot**, not without a sculpt and painted maps; he is spheres, boxes and tubes with good materials on them, and materials are as far as that goes. | Do not chase it. A half-photoreal world with a primitive man in it looks worse than a coherently stylised one, and the gap between them is exactly where the eye lands. If the answer is to chase it anyway, the character has to be bought or sculpted **first**, not last. |
+| **How fast he walks** | `WALK_SPEED` is 4.2 m/s. That is 15 km/h — a sprint, and the only ground speed in the game, so a sixty-year-old crosses a works yard with a five-metre ladder on his shoulder at a dead run. The gait now has a real walk cycle at 1.36 m/s that almost never plays because nothing ever moves that slowly. | Not touched, because it is game feel and it is yours. Worth knowing the walk exists and is currently unreachable. Lowering it would make the yard tedious unless the arrival fly-in keeps doing the work of getting him to the foot of the stack, which it now does. |
+
 ## Standing decisions the lead owes the project
 
 These are not agent escalations — they are preflight items that nothing can proceed past.
