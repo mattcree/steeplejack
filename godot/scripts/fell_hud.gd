@@ -15,12 +15,12 @@ extends Control
 
 const STEPS := [
 	"Strip her out first — bands off, conductor down. That is a climb, from the board",
-	"Walk round and read the lean with the plumb bob [B], twice, from well apart",
+	"Walk round and read the lean with the plumb bob [B] — twice, from well apart",
 	"Cut the gob on the fall line — hold the chimney's own lean in mind",
 	"Prop behind you as you go — the prop goes in BEFORE the last course comes out",
 	"Watch the margin. Finish UNEASY, not SAFE — safe does not fall",
 	"Drive two pegs down the line you want [P]",
-	"Pack the gob [hold F], light it [L], and RUN",
+	"Pack the gob — hold [F] — then light it [L] and RUN",
 ]
 
 ## What a felling costs you in daylight, and the one thing you can spend it on for accuracy.
@@ -182,8 +182,12 @@ func _draw_steps() -> void:
 		# used "x" for done, which everywhere else in this game — and on every chimney in it —
 		# means the opposite.
 		var mark := "✓" if done and not here else ("▶" if here else "·")
-		draw_string(_font, Vector2(24, y), "%s  %s" % [mark, STEPS[i]],
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, colour)
+		draw_string(_font, Vector2(24, y), "%s  " % mark, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, colour)
+		# The keys in these lines were written as "[B]", "[P]", "[hold F]" — bare letters in
+		# brackets, on the climax screen of a game whose control list has drawn keys as keys for a
+		# day. `Keycap.inline` renders the sentence with its keys turned into keys wherever they
+		# fall in it, and leaves the words alone.
+		Keycap.inline(self, _font, String(STEPS[i]), Vector2(44, y), colour, 13)
 		y += 19.0
 
 

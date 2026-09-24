@@ -704,83 +704,22 @@ func _draw_topping(jack: Jack) -> void:
 
 
 # ------------------------------------------------------------------------------------------ keys
-# A key should look like a key. "[E]" is a programmer's notation for a keyboard, not a picture of
-# one, and this game already asks the player to learn a trade they have never heard of — sounding
-# joints, seating dogs, pulling a band up in a star. The one thing that should cost them nothing
-# is working out which button to press.
-const CAP_H := 17.0
-const CAP_PAD := 5.0
-const CAP_GAP := 3.0
-const MOUSE_W := 13.0
-
-
-func _cap_width(label: String) -> float:
-	return maxf(CAP_H, _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
-		+ CAP_PAD * 2.0)
-
-
-func _draw_cap(label: String, at: Vector2, col: Color) -> float:
-	var w := _cap_width(label)
-	draw_rect(Rect2(at, Vector2(w, CAP_H)), Color(0.09, 0.09, 0.10, col.a * 0.62), true)
-	draw_rect(Rect2(at, Vector2(w, CAP_H)), Color(col.r, col.g, col.b, col.a * 0.70), false, 1.0)
-	# The lip along the bottom edge. It is two pixels and it is the whole difference between a
-	# keycap and a rectangle with a letter in it.
-	draw_line(at + Vector2(2.0, CAP_H - 2.0), at + Vector2(w - 2.0, CAP_H - 2.0),
-		Color(col.r, col.g, col.b, col.a * 0.32), 1.5)
-	var tw := _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
-	draw_string(_font, at + Vector2((w - tw) * 0.5, CAP_H - 5.0), label,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(col.r, col.g, col.b, col.a * 0.95))
-	return w
-
-
-## A mouse seen from above, with the button that matters filled in. "RMB" is three letters the
-## player has to decode; a lit right button is not.
-func _draw_mouse(which: String, at: Vector2, col: Color) -> float:
-	var body := Rect2(at, Vector2(MOUSE_W, CAP_H))
-	draw_rect(body, Color(0.09, 0.09, 0.10, col.a * 0.62), true)
-	var line := Color(col.r, col.g, col.b, col.a * 0.70)
-	draw_rect(body, line, false, 1.0)
-	var split := CAP_H * 0.42
-	draw_line(at + Vector2(0.0, split), at + Vector2(MOUSE_W, split), line, 1.0)
-	draw_line(at + Vector2(MOUSE_W * 0.5, 0.0), at + Vector2(MOUSE_W * 0.5, split), line, 1.0)
-	var lit := Color(col.r, col.g, col.b, col.a * 0.85)
-	if which == "L":
-		draw_rect(Rect2(at + Vector2(1.0, 1.0), Vector2(MOUSE_W * 0.5 - 1.5, split - 2.0)), lit, true)
-	elif which == "R":
-		draw_rect(Rect2(at + Vector2(MOUSE_W * 0.5 + 0.5, 1.0),
-			Vector2(MOUSE_W * 0.5 - 1.5, split - 2.0)), lit, true)
-	return MOUSE_W
-
-
-## What a control's key draws as: a run of caps, or a mouse with one button lit.
-func _glyphs(key: String) -> Array:
-	match key:
-		"RMB": return [["m", "R"]]
-		"LMB": return [["m", "L"]]
-		"mouse": return [["m", ""]]
-		"WASD": return [["c", "W"], ["c", "A"], ["c", "S"], ["c", "D"]]
-		"W/S": return [["c", "W"], ["c", "S"]]
-		"C / V": return [["c", "C"], ["c", "V"]]
-		_: return [["c", key]]
+#
+# A key looks like a key. The drawing lives in `Keycap` because the felling screen needs it too,
+# and two copies of a thing is how the skyline ended up wrong in two places at once.
+const CAP_H := Keycap.H
+const CAP_GAP := Keycap.GAP
 
 
 ## One line of the control list, right-aligned: the keys as keys, then what they do.
 ## Returns the height it used.
 func _controls_row(key: String, text: String, baseline: float) -> float:
 	var col := Color(0.93, 0.90, 0.84, 0.90)
-	var gl := _glyphs(key)
-	var gw := 0.0
-	for g in gl:
-		gw += (MOUSE_W if g[0] == "m" else _cap_width(String(g[1]))) + CAP_GAP
+	var gw := Keycap.run_width(_font, key)
 	var tw := _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
 	var x: float = size.x - 28.0 - (gw + 8.0 + tw)
-	var top := baseline - CAP_H + 4.0
-	for g in gl:
-		if g[0] == "m":
-			x += _draw_mouse(String(g[1]), Vector2(x, top), col) + CAP_GAP
-		else:
-			x += _draw_cap(String(g[1]), Vector2(x, top), col) + CAP_GAP
-	_label(text, Vector2(x + 5.0, baseline), col, 13)
+	Keycap.run(self, _font, key, Vector2(x, baseline - CAP_H + 4.0), col)
+	_label(text, Vector2(x + gw + 5.0, baseline), col, 13)
 	return 22.0
 
 
@@ -1758,7 +1697,8 @@ func _draw_slip(jack: Jack) -> void:
 
 ## A single key, drawn as a key, centred. For the prompts that are the whole screen.
 func _draw_prompt_key(label: String, y: float, col: Color) -> void:
-	_draw_cap(label, Vector2((size.x - _cap_width(label)) * 0.5, y - CAP_H), col)
+	Keycap.cap(self, _font, label, Vector2((size.x - Keycap.width(_font, label)) * 0.5,
+		y - CAP_H), col)
 
 
 
