@@ -199,11 +199,44 @@ func _reachable_stars() -> int:
 # nothing whatever. That is the same lesson with the second copy missing rather than wrong, and it
 # is worse, because a menu that ignores the mouse looks broken rather than merely off by a row.
 
+## How far down the board we are looking. **Not** derived from the selection.
+##
+## It used to be: `first = selected - shown / 2`, which centred the window on whatever was
+## selected. The mouse selects what it is hovering over, so moving the pointer down the list
+## selected the next card, which scrolled the board, which put a different card under the pointer,
+## which selected that one. The list crept away from the mouse. With five jobs on the board it was
+## a twitch; with fifteen it is unusable, and it is the fault the designer reported as "the mouse
+## makes the job list scroll".
+##
+## Hovering now changes the selection and nothing else. The board moves when you ask it to.
+var scroll_top := 0
+
+
+func rows_shown() -> int:
+	return maxi(int((size.y - 64.0 - BOARD_TOP) / CARD_STEP), 1)
+
+
 ## Which cards are on the board: [first, how many].
 func visible_rows() -> Vector2i:
-	var shown: int = maxi(int((size.y - 64.0 - BOARD_TOP) / CARD_STEP), 1)
-	var first: int = clampi(selected - shown / 2, 0, maxi(jobs.size() - shown, 0))
+	var shown := rows_shown()
+	var first: int = clampi(scroll_top, 0, maxi(jobs.size() - shown, 0))
 	return Vector2i(first, clampi(shown, 0, maxi(jobs.size() - first, 0)))
+
+
+## Bring card `i` onto the board, moving as little as possible. Keyboard navigation calls this;
+## the mouse never does.
+func reveal(i: int) -> void:
+	var shown := rows_shown()
+	if i < scroll_top:
+		scroll_top = i
+	elif i >= scroll_top + shown:
+		scroll_top = i - shown + 1
+	scroll_top = clampi(scroll_top, 0, maxi(jobs.size() - shown, 0))
+
+
+## The wheel, because a list of fifteen letters wants one.
+func scroll_by(lines: int) -> void:
+	scroll_top = clampi(scroll_top + lines, 0, maxi(jobs.size() - rows_shown(), 0))
 
 
 ## Which job a point is over, or -1.
@@ -240,9 +273,15 @@ func _input(event: InputEvent) -> void:
 				van_step(int(hit["step"]))
 		queue_redraw()
 		return
+	if event is InputEventMouseButton and event.pressed \
+			and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		scroll_by(-1 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1)
+		queue_redraw()
+		return
 	if event is InputEventMouseMotion or event is InputEventMouseButton:
 		var over := card_at(event.position)
 		if over >= 0:
+			# Selection only. `reveal` is deliberately not called here.
 			selected = over
 			if event is InputEventMouseButton and event.pressed \
 					and event.button_index == MOUSE_BUTTON_LEFT:
@@ -262,9 +301,11 @@ func _input(event: InputEvent) -> void:
 	match event.keycode:
 		KEY_DOWN, KEY_S, KEY_RIGHT, KEY_D:
 			selected = (selected + 1) % maxi(jobs.size(), 1)
+			reveal(selected)
 			queue_redraw()
 		KEY_UP, KEY_W, KEY_LEFT, KEY_A:
 			selected = (selected - 1 + maxi(jobs.size(), 1)) % maxi(jobs.size(), 1)
+			reveal(selected)
 			queue_redraw()
 		KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
 			open_van()

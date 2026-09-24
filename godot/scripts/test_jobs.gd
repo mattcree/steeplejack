@@ -28,6 +28,47 @@ func _init() -> void:
 	_check(String(board.jobs[board.jobs.size() - 1]["id"]) == "00-greybox",
 		"so it sorts last, on its own order of 99")
 
+	# --- the mouse does not move the board --------------------------------------------------------
+	#
+	# Reported from play as "the mouse makes the job list scroll". The window used to be centred on
+	# whatever was selected, and hovering selects — so moving the pointer down the list selected
+	# the next card, which scrolled the board, which put a different card under the pointer. With
+	# five jobs it was a twitch. With fifteen the list crawls away from you.
+	board.selected = 0
+	board.scroll_top = 0
+	board.van_open = false
+	var shown: int = board.rows_shown()
+	if board.jobs.size() > shown:
+		var last_slot := Vector2(board.CARD_X + 40.0,
+			board.BOARD_TOP + board.CARD_STEP * float(shown - 1) + 20.0)
+		var hover := InputEventMouseMotion.new()
+		hover.position = last_slot
+		board._input(hover)
+		await process_frame
+		_check(board.selected == shown - 1,
+			"hovering the bottom card selects it (%d)" % board.selected)
+		_check(board.visible_rows().x == 0,
+			"and the board has not moved (top is %d)" % board.visible_rows().x)
+		# Hover again at the same point: it must still be the same job.
+		var was: int = board.selected
+		board._input(hover)
+		await process_frame
+		_check(board.selected == was, "and hovering the same place twice is the same job")
+
+		# The keyboard does move it, because that is how you get to the rest of them.
+		board.selected = board.jobs.size() - 1
+		board.reveal(board.selected)
+		_check(board.visible_rows().x > 0,
+			"arrowing to the last letter brings the board down to it (%d)"
+				% board.visible_rows().x)
+		# And the wheel, because a list of fifteen letters wants one.
+		var top_before: int = board.visible_rows().x
+		board.scroll_by(-2)
+		_check(board.visible_rows().x == maxi(top_before - 2, 0),
+			"the wheel moves it two (%d -> %d)" % [top_before, board.visible_rows().x])
+		board.scroll_top = 0
+		board.selected = 0
+
 	# --- every job explains itself ---------------------------------------------------------------
 	#
 	# The designer played it and said none of it made any sense — bands, jigs, the lot. The letter
