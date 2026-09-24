@@ -1734,19 +1734,38 @@ func _draw_band(jack: Jack) -> void:
 	var col := GOOD if fit == "SEATED" else (
 		DANGER if fit == "OVAL" else (WATCH if fit == "TRUE" else FAINT))
 
-	# The ring itself, drawn out of round in proportion to how out of round it is. The number is
-	# on screen too, but the shape is what you read.
+	var here: int = player._band_bolt_here(index)
+	var tension: PackedFloat32Array = st.get("tension", PackedFloat32Array())
+
+	# The circle she is supposed to be, dashed, behind everything. Without it an oval is just a
+	# shape: nobody can judge eight per cent out of round against nothing, and the instrument was
+	# asking them to.
+	for i in 24:
+		var a0: float = TAU * float(i) / 24.0
+		draw_arc(at, RING_R, a0, a0 + TAU / 42.0, 4, Color(FAINT, 0.32), 1.0)
+
+	# Which way she is out of round.
+	#
+	# The sim gives ovality as a scalar and the direction was drawn as whatever the maths happened
+	# to produce — long axis along x, always. But the direction is not a mystery: a band stands off
+	# where its bolts are slack. Point the long axis at the slackest part of the ring and the shape
+	# stops being a warning and becomes an instruction. You can see where to go next without being
+	# told, which is the whole difference between an instrument and a label.
+	var slack := Vector2.ZERO
+	for b in n:
+		var ab: float = TAU * float(b) / float(n) - PI * 0.5
+		var loose: float = 1.0 - clampf(tension[b] if b < tension.size() else 0.0, 0.0, 1.0)
+		slack += Vector2(cos(ab), sin(ab)) * loose
+	var axis: float = slack.angle() if slack.length() > 0.001 else 0.0
+
 	var oval: float = clampf(float(st.get("ovality", 0.0)), 0.0, 1.0)
 	var pts := PackedVector2Array()
 	for i in 49:
 		var a: float = TAU * float(i) / 48.0
 		pts.append(at + Vector2(cos(a) * RING_R * (1.0 + oval * 0.5),
-			sin(a) * RING_R * (1.0 - oval * 0.5)))
+			sin(a) * RING_R * (1.0 - oval * 0.5)).rotated(axis))
 	for i in pts.size() - 1:
-		draw_line(pts[i], pts[i + 1], Color(col, 0.55), 2.0)
-
-	var here: int = player._band_bolt_here(index)
-	var tension: PackedFloat32Array = st.get("tension", PackedFloat32Array())
+		draw_line(pts[i], pts[i + 1], Color(col, 0.7), 2.0)
 	var seat: float = player.jack.tuning_f("bandSeatTension", 0.72)
 	for b in n:
 		# Bearing zero at the top, going round the way he goes round.
@@ -1773,6 +1792,11 @@ func _draw_band(jack: Jack) -> void:
 	var ww: float = _font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, SMALL).x
 	_label(word, at - Vector2(ww * 0.5, -RING_R - 30.0), Color(col, 0.9), SMALL)
 	if fit == "OVAL":
+		# And the side to go to, marked on the ring rather than described. "The other side" is a
+		# sentence; this is a place.
+		var to := at + Vector2(cos(axis), sin(axis)) * (RING_R + 14.0)
+		draw_arc(at, RING_R + 14.0, axis - 0.55, axis + 0.55, 16, Color(DANGER, 0.75), 3.0)
+		draw_line(to, to + Vector2(cos(axis), sin(axis)) * 9.0, Color(DANGER, 0.75), 3.0)
 		var msg := "work the other side of her"
 		var mw: float = _font.get_string_size(msg, HORIZONTAL_ALIGNMENT_LEFT, -1, TINY).x
 		_label(msg, at - Vector2(mw * 0.5, -RING_R - 46.0), Color(DANGER, 0.85), TINY)
