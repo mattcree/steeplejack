@@ -29,6 +29,7 @@
 #   fall             come off, untied, from where he is
 #   strip <n> <s> [d]  n frames of him walking for s seconds, from d degrees round — a gait cycle
 #   prise <load> [raw]  a topping stroke leaned to `load` (0..1); raw>0 skips sounding it first
+#   arrival <s>      the establishing fly-in, s seconds in — the one mode a shot otherwise skips
 #   gin              rig the gin wheel on the highest dog in reach, and start a haul
 #   haulfor <s> [1]  haul flat out for s seconds, steering against the swing if 1
 #   stance <0-4>     one hand / hooked leg / clipped / belted / chair
@@ -59,6 +60,7 @@ var world: Node
 var player: Node
 var chimney: Node
 var jack
+var _keep_arrival := false   ## the capture asked for the establishing shot rather than past it
 var _taken := 0
 
 
@@ -248,6 +250,13 @@ func _run(cmd: String) -> void:
 			for i in int(a * 60.0):
 				player._lash_spin += TAU * rate / 60.0
 				await physics_frame
+		"arrival":
+			# The establishing fly-in, `a` seconds into it. The one mode `_shot` skips by design.
+			_keep_arrival = true
+			player._begin_arrival_for_test()
+			await _wait(2)
+			player.arriving = maxf(player.ARRIVAL_SECONDS - maxf(a, 0.0), 0.05)
+			await _wait(1)
 		"prise":
 			# Sound the joint, bolster in, and lean on the bar to `a` of a full load — so the
 			# topping instrument can be photographed mid-pull, which is the only state it says
@@ -422,7 +431,13 @@ func _shot(name: String) -> void:
 	# A capture wants the frame it asked for. The establishing shot is five seconds long and puts
 	# a title card over everything, and `_ready` starts it after this script has taken its
 	# reference to the player, so skipping it once at startup is not enough.
-	player.skip_arrival()
+	# The establishing shot is skipped, because it is five seconds long and puts a title card over
+	# everything — unless the capture has asked for it, which is the only way that mode can ever be
+	# photographed. A harness that silently hides a mode from you is worse than no harness: it
+	# hid the arrival for long enough that the arrival did not run AT ALL for two days and every
+	# frame I took looked correct.
+	if not _keep_arrival:
+		player.skip_arrival()
 	# Two settles, because the spring arm interpolates and the first frame after a pose catches the
 	# camera mid-flight. Every automated capture on the last engine came out smeared for want of it.
 	await _wait(SETTLE_FRAMES)
