@@ -321,6 +321,16 @@ const BAND_STEPS := [
 	"Opposite pairs — work round and she goes oval",
 ]
 
+## Taking her down. Every other archetype had a checklist and this one did not, so a man topping a
+## chimney was given the stack-building list — "drive a dog into the marked band above the top" —
+## for the entire job, which is instructions for the commute repeated over the work.
+const TOP_STEPS := [
+	"Ladder her to the top — you work a course from just under it",
+	"Sound the joint before you lever it  [E]",
+	"Lean on the bar, and let go the moment she gives",
+	"Down the flue with them — and clear it when it packs  [G]",
+]
+
 const PLUMB_STEPS := [
 	"Ladder her to where you want the hinge",
 	"Dial the cut  [X] — read what it will do",
@@ -350,6 +360,23 @@ func _look_state_steps() -> Array:
 	var sounded: bool = player.taps_made > 0
 	var topped: bool = player.top_reached or bool(r.get("complete", false))
 	var done := [laddered, looked, sounded, topped]
+	var current := 0
+	for i in 4:
+		current = i
+		if not done[i]:
+			break
+	return [done, current]
+
+
+func _top_state_steps() -> Array:
+	var st: Dictionary = player.jack.top_state()
+	var reach: bool = player.top_at_work()
+	var sounded: bool = bool(st.get("sounded", false))
+	var prised: bool = int(st.get("clean", 0)) + int(st.get("snapped", 0)) > 0
+	# The flue is not "done" so much as "you have met it". Once a brick has gone down it the
+	# player knows the meter is there, and once it jams they know what it costs.
+	var flue: bool = float(st.get("flue_full", 0.0)) > 0.0 and not bool(st.get("jammed", false))
+	var done := [reach, sounded, prised, flue]
 	var current := 0
 	for i in 4:
 		current = i
@@ -444,6 +471,9 @@ func _draw_steps() -> void:
 	elif player.band_job:
 		steps = BAND_STEPS
 		state = _band_state_steps()
+	elif player.top_job:
+		steps = TOP_STEPS
+		state = _top_state_steps()
 	elif player.plumb_job:
 		steps = PLUMB_STEPS
 		state = _plumb_state_steps()
@@ -463,6 +493,11 @@ func _draw_steps() -> void:
 		header = "THE RUN"
 	elif player.band_job:
 		header = "THE BANDS"
+	elif player.top_job:
+		var ts: Dictionary = player.jack.top_state()
+		header = "TAKING HER DOWN   %.1f m of %.1f" % [
+			float(ts.get("removed_m", 0.0)),
+			float(ts.get("removed_m", 0.0)) + float(ts.get("to_go_m", 0.0))]
 	elif player.plumb_job:
 		header = "BRINGING HER BACK"
 	elif player.survey_job:
@@ -488,7 +523,7 @@ func _draw_steps() -> void:
 		# runs a step ahead in places, and advice about tapping under "climb to the top" was
 		# exactly the confusion this list is here to end.
 		var special: bool = player.conductor_job or player.band_job or player.plumb_job \
-			or player.survey_job
+			or player.survey_job or player.top_job
 		var detail := "" if special else _next_step()
 		if player.conductor_job and i == 0:
 			detail = "She has to be laddered before any of it goes on"
