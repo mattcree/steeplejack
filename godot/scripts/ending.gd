@@ -35,7 +35,7 @@ const ROAD_LENGTH := 9200.0
 @onready var jack: Jack = Jack.new()
 
 var career := {}
-var chimneys: Array = []       ## [x, height, felled]
+var chimneys: Array = []       ## [x, height, felled, topped]
 var lines: Array = []          ## the tally, revealed one at a time
 var _t := 0.0
 var _font: Font
@@ -68,11 +68,13 @@ func _load_career() -> void:
 ## ones nobody ever sent you to — because a town is not only the parts of it you worked on.
 func _build_town() -> void:
 	chimneys = []
-	var jobs: Array = career.get("jobs", []) as Array
-	var felled: int = 0
-	for j in jobs:
-		if not bool((j as Dictionary).get("failed", false)):
-			felled += 1
+	# What he actually took down, not what he was paid for. This counted every job in the career
+	# that had not been failed, so a season of conductor runs and bandings drove him past their
+	# stumps — the yard's skyline had the identical bug, separately, which is why the answer now
+	# lives in District and not in either screen.
+	var t: Dictionary = District.tally(career)
+	var felled: int = int(t.get("felled", 0))
+	var shortened: int = int(t.get("shortened", 0))
 	var n := 26
 	# Which ones are gone, spread evenly along the road. A stump only means anything next to
 	# something still standing, so putting all the felled ones first would drive the player past
@@ -80,13 +82,21 @@ func _build_town() -> void:
 	var gone_at := {}
 	for k in mini(felled, n):
 		gone_at[int(float(k) * float(n) / float(maxi(felled, 1)))] = true
+	# And the ones he took the top off, which are still there and are not what they were.
+	var cut_at := {}
+	for k in mini(shortened, n):
+		var slot: int = int(float(k) * float(n) / float(maxi(shortened, 1))) + 1
+		if slot < n and not gone_at.has(slot):
+			cut_at[slot] = true
 	for i in n:
 		var seed_x: float = absf(fmod(sin(float(i * 31 + 5)) * 43758.5453, 1.0))
 		var seed_h: float = absf(fmod(sin(float(i * 67 + 11)) * 24634.6345, 1.0))
+		var tall: float = 170.0 + 300.0 * seed_h
 		chimneys.append([
 			ROAD_LENGTH * (0.04 + 0.92 * (float(i) / float(n)) + 0.02 * seed_x),
-			170.0 + 300.0 * seed_h,
+			tall * (0.55 if cut_at.has(i) else 1.0),
 			gone_at.has(i),
+			cut_at.has(i),
 		])
 
 

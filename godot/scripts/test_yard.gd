@@ -103,22 +103,22 @@ func _init() -> void:
 	# job. That is only worth saying if it is TRUE, and it was not — every completed job took a
 	# chimney off the skyline, so running a lightning conductor down one demolished it, and so did
 	# reading one.
-	_check(again.stack_state("x", "FELL", true) == "felled",
+	_check(District.state("FELL", true) == "felled",
 		"a felling takes her off the skyline")
-	_check(again.stack_state("x", "TOP", true) == "shortened",
+	_check(District.state("TOP", true) == "shortened",
 		"topping her out leaves a shorter chimney, not a gap")
-	_check(again.stack_state("x", "CONDUCTOR", true) == "standing",
+	_check(District.state("CONDUCTOR", true) == "standing",
 		"a conductor run leaves her standing — you made her safer")
-	_check(again.stack_state("x", "BAND", true) == "standing", "and so does banding her")
-	_check(again.stack_state("x", "SURVEY", true) == "standing", "and so does reading her")
-	_check(again.stack_state("x", "FELL", false) == "standing",
+	_check(District.state("BAND", true) == "standing", "and so does banding her")
+	_check(District.state("SURVEY", true) == "standing", "and so does reading her")
+	_check(District.state("FELL", false) == "standing",
 		"a felling you have not done yet has not happened")
 
-	var district: Array = again._district()
+	var district: Array = District.levels()
 	_check(district.size() >= 10, "the town has %d chimneys in it" % district.size())
 	var all_known := true
 	for lvl in district:
-		if not (again.stack_state(String(lvl["id"]), String(lvl["archetype"]), true)
+		if not (District.state(String(lvl["archetype"]), true)
 				in ["standing", "felled", "shortened"]):
 			all_known = false
 	_check(all_known, "and every archetype in the level set resolves to a state it can draw")

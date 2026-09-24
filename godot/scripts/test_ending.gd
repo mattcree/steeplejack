@@ -17,9 +17,13 @@ func _check(ok: bool, what: String) -> void:
 
 
 func _init() -> void:
+	# Real jobs off the real board, because what the credits drive shows is what you DID to those
+	# chimneys — four fellings, one topping, and two that left her standing. Seven anonymous
+	# "job-N" records meant the district had never heard of any of them.
 	var jobs := []
-	for i in range(7):
-		jobs.append({"id": "job-%d" % i, "paid": 400.0, "error": 1.0, "failed": false})
+	for id in ["06-waterside", "07-kershaws-yard", "10-sowerby-bridge", "12-great-aire",
+			"13-shawclough", "02-chapel-street", "03-briggs-dyeworks"]:
+		jobs.append({"id": id, "paid": 400.0, "error": 1.0, "failed": false})
 	var f := FileAccess.open(TIN, FileAccess.WRITE)
 	f.store_string(JSON.stringify({"money": 900.0, "reputation": 70, "day": 61,
 		"engineParts": 41, "jobs": jobs}))
@@ -67,7 +71,27 @@ func _init() -> void:
 	for c in end.chimneys:
 		if bool(c[2]):
 			gone += 1
-	_check(gone == 7, "and seven of them are not there any more, one per job: %d" % gone)
+	# Four fellings, so four gaps. Not seven — the conductor run and the banding left her standing
+	# and the topping left her shorter, and a jack who spent a season making chimneys SAFER was
+	# being driven past their stumps in his own credits. The yard's skyline had the identical bug,
+	# separately, which is why both now ask District.
+	_check(gone == 4, "four fellings, four gaps — and only the fellings: %d" % gone)
+	var tally: Dictionary = District.tally(end.career)
+	_check(int(tally.get("felled", 0)) == 4, "the district agrees: %d felled" % tally.get("felled", 0))
+	_check(int(tally.get("shortened", 0)) == 1,
+		"one she is shorter for: %d" % tally.get("shortened", 0))
+	_check(int(tally.get("standing", 0)) >= 9,
+		"and %d still standing" % tally.get("standing", 0))
+
+	# The one he topped is still there and is not what she was. Asked of the entry rather than
+	# guessed from its height: a cut chimney and a short one overlap, so a threshold cannot tell
+	# them apart and the first version of this check quietly could not fail.
+	var cut := 0
+	for c in end.chimneys:
+		if c.size() > 3 and bool(c[3]):
+			cut += 1
+			_check(not bool(c[2]), "a topped chimney is not also a gap")
+	_check(cut >= 1, "and one of them has had her top taken off: %d" % cut)
 
 	# Spread rather than bunched: the absence only means anything next to something standing.
 	var first_standing := -1
