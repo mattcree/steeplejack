@@ -540,38 +540,6 @@ func _card(job: Dictionary, x: float, y: float, here: bool) -> float:
 #
 # Keyed on archetype rather than carried per level, deliberately. A level cannot then ship without
 # one, and test_levels.gd checks that every archetype in the level set has a note here.
-const TRADE_NOTE := {
-	"SURVEY":
-		"She has to be read before anyone spends money on her. You climb her, sound every joint "
-		+ "you can reach, and chalk what you find. A joint that rings dead is perished mortar "
-		+ "behind a sound face — you cannot see it from the ground, and that is the whole reason "
-		+ "somebody pays a man to go up.",
-	"CONDUCTOR":
-		"Lightning earths itself through a chimney whether you help it or not, and if it goes "
-		+ "through wet brick the steam blows the shaft apart. A terminal at the apex, copper tape "
-		+ "run down her and clipped to holdfasts, and a plate buried in wet ground at the bottom. "
-		+ "A run with no earth at the end of it is not protection, it is an attraction.",
-	"BAND":
-		"Brickwork has nothing holding it together round its girth, so a shaft cracked down its "
-		+ "length is a bundle of staves. Steel bands go round her, and the bolts in them are what "
-		+ "squeeze — a loose band does nothing at all. Pull them up in opposite pairs, the way you "
-		+ "would do wheel nuts. Work round the ring in order instead and she draws in where you "
-		+ "have been, stands off where you have not, and goes oval on you.",
-	"TOP":
-		"She comes down brick by brick, from the top, with you standing on what is left of her. "
-		+ "Bolster into the joint, lean on the bar, and let go the instant the mortar gives — hold "
-		+ "on a moment past that and you are loading the brick rather than the joint, and it "
-		+ "breaks. Sound a joint before you lever it and you will know where it lets go.",
-	"FELL":
-		"You are not knocking her down, you are choosing which way she falls. Cut a gob out of the "
-		+ "base on the side she is to go and prop it with timber as you cut, so she is standing on "
-		+ "wood by the end. Then you burn the props. Everything that decides where she lands "
-		+ "happened before the fire was lit.",
-	"STRAIGHTEN":
-		"She is out of plumb and the owner wants her back. You cut a wedge out of the high side, a "
-		+ "course at a time, and she settles down into it under her own weight. It is done in "
-		+ "millimetres over a day, and there is no putting brick back.",
-}
 
 
 ## The letter that came with it, which is where the job is actually described. The level files
@@ -625,7 +593,7 @@ func _letter(job: Dictionary, x: float, y: float) -> void:
 ## The trade's own voice, under the client's. Two different kinds of writing and they must not look
 ## the same: his is on paper because he posted it, ours is chalked on the board beside it.
 func _trade_note(arch: String, x: float, y: float, w: float) -> void:
-	var text: String = String(TRADE_NOTE.get(arch, ""))
+	var text: String = Trade.note(arch)
 	if text == "":
 		return
 	var text_w := int(w - 52)

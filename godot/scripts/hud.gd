@@ -544,6 +544,15 @@ func _draw_steps() -> void:
 		w = maxf(w, float(row[3]) + _font.get_string_size(String(row[0]),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, int(row[2])).x)
 		h += float(row[4])
+	# The "what this is" line is part of the block, so the plate has to be the size of it. Measured
+	# first and added to the height: drawn after the plate without this, it landed on the sky below
+	# it in pale grey, which is the one fault this plate exists to prevent.
+	var what := _what_it_is_now()
+	var what_h := 0.0
+	if what != "":
+		what_h = _font.get_multiline_string_size(what, HORIZONTAL_ALIGNMENT_LEFT,
+			int(maxf(w, 240.0)), TINY).y + 10.0
+		h += what_h
 	draw_rect(Rect2(Vector2(x - 14.0, y - 20.0), Vector2(w + 28.0, h + 14.0)),
 		Color(0.05, 0.05, 0.06, 0.42))
 	# A rule down the left edge rather than a border all the way round. It gives the block an
@@ -553,6 +562,11 @@ func _draw_steps() -> void:
 	for row in rows:
 		_label(String(row[0]), Vector2(x + float(row[3]), y), row[1], int(row[2]))
 		y += float(row[4])
+	# And what the job IS, under the list of what to do about it — for the first few minutes, in
+	# the place where the player is already looking.
+	if what != "":
+		draw_multiline_string(_font, Vector2(x, y + 6.0), what, HORIZONTAL_ALIGNMENT_LEFT,
+			int(maxf(w, 240.0)), TINY, -1, Color(0.84, 0.80, 0.72, 0.80 * _what_fade()))
 
 
 ## Pointers in the world for the step in hand: the cradle when the job is on the ground, the dog to
@@ -1710,6 +1724,22 @@ func _draw_prompt_key(label: String, y: float, col: Color) -> void:
 ## wants every failure telegraphed, and "the run is already too long" is a failure you can only
 ## act on if you can watch it coming.
 const RUN_W := 210.0
+
+
+## The one line that says what the job is, under the instrument that measures it.
+##
+## "THE RUN — 100 m of tape" is a read-out for somebody who already knows what tape is. Reported
+## from play, verbatim: "I have no idea what tape is or why it's on my screen." It fades once he
+## has started, because by then he does know.
+## Gone by the time he has been at it a few minutes. It is an introduction, not a caption.
+func _what_fade() -> float:
+	return clampf(1.0 - (player._now - 20.0) / 220.0, 0.0, 1.0)
+
+
+func _what_it_is_now() -> String:
+	if _what_fade() <= 0.02:
+		return ""
+	return Trade.what_it_is(String(player.jack.level_archetype()))
 
 
 func _draw_conductor(jack: Jack) -> void:

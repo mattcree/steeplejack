@@ -80,9 +80,11 @@ func _init() -> void:
 	for job in board.jobs:
 		seen[String(job["archetype"])] = true
 	for arch in seen:
-		_check(String(board.TRADE_NOTE.get(arch, "")) != "",
+		_check(Trade.note(arch) != "",
 			"a %s job explains what a %s job is" % [arch, arch])
-		var note := String(board.TRADE_NOTE.get(arch, ""))
+		_check(Trade.what_it_is(arch) != "",
+			"and says it again in one line where the instrument is")
+		var note := Trade.note(arch)
 		_check(note.length() > 120,
 			"and does it in more than a label (%d characters)" % note.length())
 
