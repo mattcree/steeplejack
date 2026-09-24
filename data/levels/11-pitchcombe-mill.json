@@ -2,7 +2,7 @@
   "$schema": "../schemas/level.schema.json",
   "id": "11-pitchcombe-mill",
   "name": "Pitchcombe Mill",
-  "order": 12,
+  "order": 13,
   "archetype": "STRAIGHTEN",
   "reputationGate": 4,
   "fee": 2150,

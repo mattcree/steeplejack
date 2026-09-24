@@ -2,7 +2,7 @@
   "$schema": "../schemas/level.schema.json",
   "id": "10-sowerby-bridge",
   "name": "Sowerby Bridge",
-  "order": 11,
+  "order": 12,
   "archetype": "FELL",
   "reputationGate": 4,
   "fee": 1900,
