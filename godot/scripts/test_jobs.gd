@@ -28,6 +28,38 @@ func _init() -> void:
 	_check(String(board.jobs[board.jobs.size() - 1]["id"]) == "00-greybox",
 		"so it sorts last, on its own order of 99")
 
+	# --- every job explains itself ---------------------------------------------------------------
+	#
+	# The designer played it and said none of it made any sense — bands, jigs, the lot. The letter
+	# is the client asking for work in his own words, which says what he wants and nothing about
+	# how it is done. The trade note is the other half. A level whose archetype has no note ships a
+	# job the player has no way to understand, and that is the single most expensive kind of gap
+	# this game can have.
+	var seen := {}
+	for job in board.jobs:
+		seen[String(job["archetype"])] = true
+	for arch in seen:
+		_check(String(board.TRADE_NOTE.get(arch, "")) != "",
+			"a %s job explains what a %s job is" % [arch, arch])
+		var note := String(board.TRADE_NOTE.get(arch, ""))
+		_check(note.length() > 120,
+			"and does it in more than a label (%d characters)" % note.length())
+
+	# --- no archetype follows itself ---------------------------------------------------------
+	# Four of thirteen levels were fellings and two ran back to back. Variety is not more verbs, it
+	# is better spacing of the verbs there are.
+	var run_prev := ""
+	var doubled := ""
+	for job in board.jobs:
+		var a := String(job["archetype"])
+		if String(job["id"]).begins_with("00-"):
+			continue   # the grey box is a tool, not a job, and sorts last on its own
+		if a == run_prev:
+			doubled = a
+		run_prev = a
+	_check(doubled == "", "no archetype follows itself down the board (%s)"
+		% ("none" if doubled == "" else doubled))
+
 	var earlier := -1
 	var ordered := true
 	for job in board.jobs:

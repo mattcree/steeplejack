@@ -325,8 +325,8 @@ shot: godot-build godot-import
 
 ## ui-shot: photograph a menu — the board, the van, the yard, the shed, the ending
 ##
-##   make ui-shot SCENE=res://scenes/jobs.tscn CMDS="enter,shot the-van"
-##   make ui-shot SCENE=res://scenes/yard.tscn CMDS="down,down,enter,shot the-shed"
+##   make ui-shot UI_SCENE=res://scenes/jobs.tscn CMDS="enter,shot the-van"
+##   make ui-shot UI_SCENE=res://scenes/yard.tscn CMDS="down,down,enter,shot the-shed"
 ##
 ## See the command vocabulary at the top of godot/scripts/ui_shot.gd. It spends a tin of its own,
 ## never the player's.

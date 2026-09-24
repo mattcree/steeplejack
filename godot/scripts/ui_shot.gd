@@ -5,8 +5,8 @@
 # those screens was a claim nobody had looked at. This is the other half of the same rule:
 # **if you changed something visual and have not looked at a frame of it, you have not finished.**
 #
-#   make ui-shot SCENE=res://scenes/jobs.tscn CMDS="key:enter,shot the-van"
-#   make ui-shot SCENE=res://scenes/yard.tscn CMDS="down,down,enter,shot the-shed"
+#   make ui-shot UI_SCENE=res://scenes/jobs.tscn CMDS="key:enter,shot the-van"
+#   make ui-shot UI_SCENE=res://scenes/yard.tscn CMDS="down,down,enter,shot the-shed"
 #
 # Commands, comma separated:
 #   up down left right enter esc space   one key press
