@@ -61,6 +61,7 @@ var van_said := ""
 ## or it is not, and the gate is a lie. Ladders are stock you buy and keep, and a job you have not
 ## got the sections for is one you cannot take. Dogs are free: nobody wants to be told they have
 ## run out of sixpenny ironmongery at forty metres.
+## Everything that can go on the cart. What is actually LISTED is `van_rows()` — the ones he owns.
 const VAN_ROWS := ["gloves", "bosunsChair"]
 const KIT_ROWS := ["gloves", "bosunsChair"]
 const KIT_NAME := {"gloves": "Gloves", "bosunsChair": "Bosun's chair"}
@@ -314,9 +315,9 @@ func _van_key(key: int) -> void:
 		KEY_ESCAPE:
 			van_open = false
 		KEY_UP, KEY_W:
-			van_row = (van_row - 1 + VAN_ROWS.size()) % VAN_ROWS.size()
+			van_row = (van_row - 1 + maxi(van_rows().size(), 1)) % maxi(van_rows().size(), 1)
 		KEY_DOWN, KEY_S:
-			van_row = (van_row + 1) % VAN_ROWS.size()
+			van_row = (van_row + 1) % maxi(van_rows().size(), 1)
 		KEY_LEFT, KEY_A:
 			van_step(-1)
 		KEY_RIGHT, KEY_D:
@@ -326,7 +327,10 @@ func _van_key(key: int) -> void:
 
 
 func van_step(_dir: int) -> void:
-	van_toggle(VAN_ROWS[van_row])
+	var rows_now: Array = van_rows()
+	if rows_now.is_empty():
+		return
+	van_toggle(String(rows_now[mini(van_row, rows_now.size() - 1)]))
 
 
 ## A kit row is on or off, and either arrow does the same thing — there is no more or less of a
@@ -624,16 +628,32 @@ func van_rect() -> Rect2:
 
 
 ## Which row a point is over, and whether it is on the minus or the plus. -1 for neither.
+## The kit on this screen: what he owns, and nothing else.
+##
+## The van used to list the whole catalogue with "not bought" beside the things he had not bought —
+## two greyed rows on a screen with four rows on it. 08-hub-and-meta.md is explicit that buying
+## happens at the shed and ONLY at the shed, "because two screens that both decide the same thing
+## is how a player ends up certain they took the chair and arrives without it". A row that can
+## only tell you no is that second screen, in miniature.
+func van_rows() -> Array:
+	var out: Array = []
+	for key in VAN_ROWS:
+		if jack.career_owns(key):
+			out.append(key)
+	return out
+
+
 func van_hit(p: Vector2) -> Dictionary:
 	var r := van_rect()
 	if not r.has_point(p):
 		return {}
-	for i in VAN_ROWS.size():
+	var rows_: Array = van_rows()
+	for i in rows_.size():
 		var y: float = r.position.y + 106.0 + VAN_ROW_H * float(i)
 		if p.y >= y - 26.0 and p.y <= y + 14.0:
 			# A kit row is a switch, so the whole row is the switch. Making the player find an
 			# 18-pixel box is a worse version of the same click.
-			if VAN_ROWS[i] in KIT_ROWS:
+			if String(rows_[i]) in KIT_ROWS:
 				return {"row": i, "step": 1}
 			var step := 0
 			if p.x >= r.position.x + VAN_W - 90.0:
@@ -655,21 +675,24 @@ func _draw_van() -> void:
 	draw_string(_font, r.position + Vector2(28, 74), String(job.get("name", "")),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 21, INK)
 
-	for i in VAN_ROWS.size():
-		var key: String = VAN_ROWS[i]
+	var listed: Array = van_rows()
+	if listed.is_empty():
+		draw_string(_font, r.position + Vector2(28, 118),
+			"No kit on the cart. Gloves and a bosun's chair are in the shed, at the yard.",
+			HORIZONTAL_ALIGNMENT_LEFT, int(VAN_W - 56), 13, FADED)
+	for i in listed.size():
+		var key: String = String(listed[i])
 		var y: float = r.position.y + 106.0 + VAN_ROW_H * float(i)
 		var on: bool = i == van_row
 		if on:
 			draw_rect(Rect2(Vector2(r.position.x + 16.0, y - 26.0),
 				Vector2(VAN_W - 32.0, 36.0)), Color(0.16, 0.14, 0.12, 0.07))
-		var owned: bool = jack.career_owns(key)
+		# Everything listed here is his, so there is no "you have not bought this" state to draw.
 		var taking: bool = jack.career_carrying(key)
-		var col: Color = (INK if on else FADED) if owned else Color(0.16, 0.14, 0.12, 0.3)
+		var col: Color = INK if on else FADED
 		draw_string(_font, Vector2(r.position.x + 28.0, y), String(KIT_NAME.get(key, key)),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 17, col)
-		draw_string(_font, Vector2(r.position.x + 28.0, y + 17.0),
-			String(KIT_WHY.get(key, "")) if owned
-				else "£%.0f at the yard" % jack.career_kit_cost(key),
+		draw_string(_font, Vector2(r.position.x + 28.0, y + 17.0), String(KIT_WHY.get(key, "")),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.16, 0.14, 0.12, 0.45))
 		# A drawn box rather than a word: it is the one row on this screen whose state you
 		# should be able to take in without reading anything.
@@ -678,7 +701,7 @@ func _draw_van() -> void:
 		if taking:
 			draw_rect(Rect2(box.position + Vector2(4, 4), Vector2(10, 10)), INK)
 		draw_string(_font, Vector2(r.position.x + VAN_W - 104.0, y),
-			"on the cart" if taking else ("in the shed" if owned else "not bought"),
+			"on the cart" if taking else "left behind",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, col)
 
 
