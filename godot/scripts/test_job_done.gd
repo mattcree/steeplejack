@@ -33,6 +33,19 @@ func _init() -> void:
 	player._arrive_at_top()
 	await physics_frame
 
+	# He is STANDING on the cap, not falling off it.
+	#
+	# A chimney cap is a lid and there is no collision under the middle of it, so `is_on_floor()`
+	# is false up there — and the clip chooser read that as "in the air" and played air_jump, which
+	# is arms up and out for balance. He stood at the top of a hundred-foot chimney, at the
+	# emotional peak of the entire game, doing a star jump. Found by rendering a frame of every
+	# archetype and looking at them, which is the only way this class of thing is ever found.
+	for i in 8:
+		await physics_frame
+	_check(player.at_top, "he is on the cap")
+	_check(player._playing != "air_jump",
+		"and he is not in mid-air up there (playing %s)" % player._playing)
+
 	var paid: Dictionary = player.settlement
 	_check(not paid.is_empty(), "reaching the top settles the job")
 	_check(not bool(paid.get("failed", true)), "and it counts as done")

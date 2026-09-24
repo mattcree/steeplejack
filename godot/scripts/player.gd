@@ -1714,6 +1714,13 @@ func _animate() -> void:
 		return
 	if on_ladder:
 		want = "climb"
+	elif at_top:
+		# Standing on the cap. He is not in the air and he is not falling, whatever the character
+		# body thinks about what is under his feet — and what it thinks is "nothing", because a
+		# chimney cap is a lid with no collision under the middle of it. So the air_jump clip was
+		# playing: arms up and out for balance. He stood at the top of a hundred-foot chimney, at
+		# the emotional peak of the whole game, doing a star jump.
+		want = "idle"
 	elif not is_on_floor():
 		want = "air_jump"
 	elif speed > 0.6:
