@@ -95,6 +95,32 @@ func _init() -> void:
 	_check(player.sections.size() == 1 and player.sections[0]["lashing"] >= 1,
 		"and the stack remembers how it was lashed")
 
+	# --- the rope goes round BOTH of them ---------------------------------------------------------
+	#
+	# A lashing binds two members crossing at right angles: the ladder's stile, which is vertical,
+	# and the dog, which is an iron spike out of the wall. Every turn used to be laid round the
+	# same vertical axis — a coil round the stile, binding it to nothing at all. The dog was not in
+	# the knot, on any frame, in any job, and the verb the entire climb depends on was tying a
+	# ladder to thin air.
+	var face: Node = world.get_node_or_null("Face")
+	_check(face != null, "there is a face to lash to")
+	if face != null and player.lash_joint >= 0:
+		var j: Dictionary = face.joint(player.lash_joint)
+		_check(not j.is_empty(), "and the joint it went round is a real one")
+		if not j.is_empty():
+			var a0: Vector3 = face._wrap_frame(j, 0)["axis"]
+			var a1: Vector3 = face._wrap_frame(j, 1)["axis"]
+			var a2: Vector3 = face._wrap_frame(j, 2)["axis"]
+			_check(absf(a0.dot(a1)) < 0.2,
+				"turn 1 and turn 2 are square to each other (dot %.2f)" % a0.dot(a1))
+			_check(absf(a0.dot(a2)) > 0.9,
+				"and turn 3 is back round the stile, so it alternates")
+			print("        the lashing sits at %.2f m, %.2f m off the face, turns %.3f m across"
+				% [(j["pos"] as Vector3).y, 0.10, face.WRAP_R * 2.0])
+			_check(a0.dot(Vector3.UP) > 0.9, "the stile turns lie flat, round a vertical rail")
+			_check(absf(a1.dot(Vector3.UP)) < 0.2,
+				"and the dog turns stand on edge, round a spike out of the wall")
+
 	_done()
 
 

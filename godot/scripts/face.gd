@@ -369,17 +369,22 @@ func _laying(j: Dictionary, k: int, laid: float) -> Array:
 	var out: Array = []
 	if laid <= 0.01:
 		return out
-	var centre: Vector3 = _coil_turn(j, k).origin
+	var f: Dictionary = _wrap_frame(j, k)
+	var centre: Vector3 = f["c"]
+	var u: Vector3 = f["u"]
+	var v: Vector3 = f["v"]
+	var axis: Vector3 = f["axis"]
 	var steps: int = maxi(int(ceil(laid * float(ARC_STEPS))), 1)
 	# A turn climbs by its own thickness as it goes round, which is what stops a coil being a
-	# stack of rings and makes it a spiral — and it is visible at this range.
+	# stack of rings and makes it a spiral — and it is visible at this range. It climbs along the
+	# turn's OWN axis, so a turn round the dog walks out along the dog rather than upwards.
 	for i in steps:
 		var a0: float = TAU * (float(i) / float(ARC_STEPS))
 		var a1: float = TAU * (float(i + 1) / float(ARC_STEPS))
 		var h0: float = WRAP_PITCH * (float(i) / float(ARC_STEPS))
 		var h1: float = WRAP_PITCH * (float(i + 1) / float(ARC_STEPS))
-		var p0: Vector3 = centre + Vector3(cos(a0) * WRAP_R, h0, sin(a0) * WRAP_R)
-		var p1: Vector3 = centre + Vector3(cos(a1) * WRAP_R, h1, sin(a1) * WRAP_R)
+		var p0: Vector3 = centre + (u * cos(a0) + v * sin(a0)) * WRAP_R + axis * h0
+		var p1: Vector3 = centre + (u * cos(a1) + v * sin(a1)) * WRAP_R + axis * h1
 		out.append(_segment(p0, p1))
 	return out
 
@@ -409,13 +414,37 @@ func _coil(j: Dictionary, wraps: int) -> Array:
 	return xs
 
 
-func _coil_turn(j: Dictionary, k: int) -> Transform3D:
+## The frame one turn of the lashing is laid in: its centre and the two axes it sweeps through.
+##
+## A lashing binds two members that cross at right angles — the ladder's stile, which is vertical
+## and lies against the wall, and the dog, which is an iron spike standing straight out of it. So
+## the turns ALTERNATE: one flat round the stile, the next on edge round the dog, square to the one
+## before it. That is a square lashing, and it is the figure of eight the designer asked to be able
+## to watch being drawn.
+##
+## Every turn used to go round the same vertical axis. That is a coil round the stile, binding it
+## to nothing — the dog was not in the knot, on any frame, in any job, and the verb the whole
+## climb depends on was tying a ladder to thin air.
+func _wrap_frame(j: Dictionary, k: int) -> Dictionary:
 	var n: Vector3 = j["normal"]
-	# Round the lug, which stands 0.21 m off the face, climbing up the lug turn by turn.
-	# Close in to the wall, where the stile lies, rather than out at the tip of the lug: a lashing
-	# binds the ladder to the dog, so the turns have to be round both of them.
-	var origin: Vector3 = j["pos"] + n * 0.10 + Vector3.UP * (float(k) - 2.5) * WRAP_PITCH
-	return Transform3D(Basis(), origin)
+	var tang: Vector3 = n.cross(Vector3.UP).normalized()
+	var base: Vector3 = j["pos"] + n * 0.10
+	# Two turns make one figure of eight, so the pair number is what climbs.
+	var pair: float = floor(float(k) * 0.5)
+	var up_by: Vector3 = Vector3.UP * (pair - 1.5) * WRAP_PITCH
+	if k % 2 == 0:
+		# Flat, round the stile.
+		return {"c": base + up_by, "u": n, "v": tang, "axis": Vector3.UP}
+	# On edge, round the dog, and stepped a little further out along it so the turns lie beside
+	# each other on the spike instead of through each other.
+	return {"c": base + up_by + n * (pair * WRAP_PITCH * 0.5),
+		"u": Vector3.UP, "v": -tang, "axis": n}
+
+
+func _coil_turn(j: Dictionary, k: int) -> Transform3D:
+	var f: Dictionary = _wrap_frame(j, k)
+	# A TorusMesh lies in XZ with its axis up +Y, so the basis puts the turn's own axis there.
+	return Transform3D(Basis(f["u"], f["axis"], f["v"]), f["c"])
 
 
 ## The dog going in: at `id`, `depth` of the way home. -1 hides it.
