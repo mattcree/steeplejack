@@ -88,24 +88,24 @@
       "to": 42.0,
       "type": "perished",
       "quality": {
-        "sound": 0.22,
-        "fair": 0.34,
-        "perished": 0.38,
-        "cracked": 0.06
+        "sound": 0.40,
+        "fair": 0.36,
+        "perished": 0.20,
+        "cracked": 0.04
       },
-      "note": "Sixty years of flue gas and frost. The mortar here is sand — which makes the levering easy and makes standing on it a decision."
+      "note": "Sixty years of flue gas and frost. Two joints in five will still take a dog and the rest will not, so this is the part of her you sound before you trust — it is the same skill as the survey and here it decides whether you get home."
     },
     {
       "from": 42.0,
       "to": 46.0,
       "type": "perished",
       "quality": {
-        "sound": 0.08,
-        "fair": 0.20,
-        "perished": 0.52,
-        "cracked": 0.20
+        "sound": 0.26,
+        "fair": 0.34,
+        "perished": 0.32,
+        "cracked": 0.08
       },
-      "note": "The course the mill manager says you can pull out by hand. He is right, and that is the problem: there is nothing up here to lash to."
+      "note": "The course the mill manager says you can pull out by hand. He is very nearly right, and that is the problem: one joint in four up here is worth a dog and you have to find it. Nothing you seat without sounding it first is going to hold you."
     }
   ],
   "weather": {

@@ -52,8 +52,14 @@ you have stopped loading the joint and started loading the brick.
 | 0–12 m | Sound brick, nothing happening | The commute. Eleven sections gets you started. |
 | 12–22 m | **Old fixtures** — a previous jack's dogs, forty years in the wall | The first real decision. A rusted dog is a free anchor or a fall, and sounding it is how you find out. |
 | 22–34 m | Sound brick. **The finish line.** | Everything above this is coming off; this course must not be damaged. |
-| 34–42 m | Perished — the mortar is sand | Levering is *easy* here, which is the trap: easy to prise is also nothing to stand on. |
-| 42–46 m | All but gone | The manager said you could pull this out by hand. He is right, and that is the problem: **there is nothing up here to lash to.** You have to build your own security out of the thing you are dismantling. |
+| 34–42 m | Perished. Two joints in five will take a dog | Levering is *easy* here, which is the trap: easy to prise is also easy to pull out of. |
+| 42–46 m | All but gone. One joint in four is worth a dog | The manager said you could pull this out by hand. He is very nearly right, and that is the problem: **you have to find the joints that will hold, and nothing you seat without sounding it first is going to.** |
+
+> **Authored at sound 0.22 and 0.08 first, and that was wrong.** At those fractions almost nothing
+> up there takes a dog, and the level was not dangerous, it was *impassable* — a puzzle with no
+> solution is not a hard puzzle. At 0.40 and 0.26 the good joints are there and rare, so the answer
+> is to sound before you trust, which is the skill the whole game is built on. Difficulty here is
+> that finding them costs you daylight, not that they do not exist.
 
 That last row is the level's idea. You work downwards, and the material you are standing on is the
 material you are removing. The dogs you seat at 40 m are seated in mortar you have already been

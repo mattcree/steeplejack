@@ -318,11 +318,41 @@ func _run(cmd: String) -> void:
 func _fill_stack_to(height: float) -> void:
 	var h: float = maxf(jack.stack_top(), 0.0) + 4.0
 	while h <= height:
-		var d: Dictionary = jack.seat_anchor(h, 1.0, 0.0)
+		var d: Dictionary = _anchor_that_holds(h)
 		jack.stack_lash(float(d.get("height", h)), 2)
 		h = float(d.get("height", h)) + 4.0
 	if player.face != null:
 		player.face.touch()
+
+
+## A dog near `h` in a joint that will actually take one.
+##
+## `seat_anchor` drives into whatever joint happens to sit at the height you name, and on
+## brickwork that is half perished that is a coin toss. A player does not climb that way: he
+## SOUNDS a joint before he trusts it and takes another when it rings dead — that is the skill the
+## whole game is built on.
+##
+## So a capture that climbs blind falls off levels a player can climb, and then reports the level
+## as broken. It did exactly that on the first topping job, whose top eight metres are patchy on
+## purpose: two frames in a row came back with the dogs pulled out at 40 m and 36 m and the man
+## hanging on a slip, and the level looked unplayable when what was unplayable was the harness.
+##
+## Dogs that do not hold are left in the wall, because that is what happens to them.
+func _anchor_that_holds(h: float) -> Dictionary:
+	const GOOD := 2        # AnchorRate: Failed, Poor, Fair, Sound — Fair will carry a ladder
+	var best := {}
+	var best_rate := -1
+	for step in [0.0, 0.34, -0.34, 0.68, -0.68, 1.02, 1.36]:
+		var d: Dictionary = jack.seat_anchor(h + step, 1.0, 0.0)
+		if d.is_empty():
+			continue
+		var rate := int(d.get("rate", 0))
+		if rate > best_rate:
+			best_rate = rate
+			best = d
+		if rate >= GOOD:
+			break
+	return best
 
 
 func _lash_to(height: float) -> void:
