@@ -1,0 +1,177 @@
+{
+  "$schema": "../schemas/level.schema.json",
+  "id": "13-shawclough",
+  "name": "Shawclough Mill",
+  "order": 6,
+  "archetype": "TOP",
+  "reputationGate": 3,
+  "fee": 1040,
+  "briefing": {
+    "from": "Shawclough Spinning Co.",
+    "lines": [
+      "We have put a new boiler in and the old stack draws far too hard for it, and the",
+      "top of her is going anyway — there is a course near the cap you can pull out by",
+      "hand. We want twelve metres off her and a new cap on what is left.",
+      "",
+      "She is good brick and we have a buyer for it, so we will pay you by what comes out",
+      "whole. Anything you break is ours to cart away and yours to explain."
+    ]
+  },
+  "shiftMinutes": 420,
+  "targetMinutes": 240,
+  "structure": {
+    "type": "chimney",
+    "height": 46.0,
+    "baseRadius": 2.1,
+    "topRadius": 1.15,
+    "profile": "round",
+    "batter": [
+      {
+        "at": 0.0,
+        "step": 0.0
+      }
+    ],
+    "bands": [],
+    "cap": "plain",
+    "leanDegrees": 0.0,
+    "leanBearing": 0,
+    "jointGrid": {
+      "courseHeight": 0.075,
+      "brickLength": 0.225,
+      "candidateDensity": 4.0
+    },
+    "weathering": {
+      "sootTo": 0.68,
+      "bleachFrom": 0.88,
+      "seed": 1013
+    }
+  },
+  "bands": [
+    {
+      "from": 0.0,
+      "to": 12.0,
+      "type": "plain",
+      "quality": {
+        "sound": 0.80,
+        "fair": 0.17,
+        "perished": 0.03,
+        "cracked": 0.0
+      },
+      "note": "Nothing wrong with her down here and nothing is being asked of her either. This is the part you only have to climb."
+    },
+    {
+      "from": 12.0,
+      "to": 22.0,
+      "type": "old-fixtures",
+      "quality": {
+        "sound": 0.74,
+        "fair": 0.21,
+        "perished": 0.05,
+        "cracked": 0.0
+      },
+      "note": "Somebody laddered her before, and left his dogs in. They are forty years old and they look it. Whether a rusted dog is a gift or a trap is the first real decision of the day, and you find out by sounding it."
+    },
+    {
+      "from": 22.0,
+      "to": 34.0,
+      "type": "plain",
+      "quality": {
+        "sound": 0.66,
+        "fair": 0.26,
+        "perished": 0.08,
+        "cracked": 0.0
+      },
+      "note": "Where she will finish. Everything above this line is coming off; this course is the one the new cap sits on, so it is the one you must not damage."
+    },
+    {
+      "from": 34.0,
+      "to": 42.0,
+      "type": "perished",
+      "quality": {
+        "sound": 0.22,
+        "fair": 0.34,
+        "perished": 0.38,
+        "cracked": 0.06
+      },
+      "note": "Sixty years of flue gas and frost. The mortar here is sand — which makes the levering easy and makes standing on it a decision."
+    },
+    {
+      "from": 42.0,
+      "to": 46.0,
+      "type": "perished",
+      "quality": {
+        "sound": 0.08,
+        "fair": 0.20,
+        "perished": 0.52,
+        "cracked": 0.20
+      },
+      "note": "The course the mill manager says you can pull out by hand. He is right, and that is the problem: there is nothing up here to lash to."
+    }
+  ],
+  "weather": {
+    "windBase": 3.5,
+    "windBearing": 248,
+    "windVeerPerHour": 2.0,
+    "windAtHeight": [
+      [
+        0,
+        1.0
+      ],
+      [
+        23,
+        1.3
+      ],
+      [
+        46,
+        1.65
+      ]
+    ],
+    "gustIntervalSeconds": [
+      95,
+      170
+    ],
+    "precipitation": "none",
+    "ramp": null
+  },
+  "site": {
+    "safeLineDistance": 0,
+    "exclusions": [],
+    "corridor": null,
+    "crowd": null,
+    "backdrop": "mill-town-yard"
+  },
+  "mission": {
+    "type": "TOP",
+    "takeDownToM": 34.0,
+    "flueCapacityNote": "She is not connected to anything any more, so the bricks go down the flue and get barrowed out of the base. When it packs, it packs.",
+    "payPerCleanBrick": true,
+    "softLanding": false
+  },
+  "complications": [],
+  "scoring": {
+    "bonuses": [
+      {
+        "id": "she_came_down_whole",
+        "condition": "craftsmanshipGrade>=3",
+        "amount": 260
+      },
+      {
+        "id": "a_saleable_stack_of_brick",
+        "condition": "bricksSalvaged>=900",
+        "amount": 110
+      },
+      {
+        "id": "down_to_the_line",
+        "condition": "heightRemoved>=12",
+        "amount": 60
+      }
+    ],
+    "hardFailConditions": []
+  },
+  "loadoutHint": {
+    "ladders": 11,
+    "dogs": 26,
+    "rope": 3
+  },
+  "designDoc": "docs/02-levels/level-13-shawclough.md"
+}

@@ -107,8 +107,23 @@ func _open(id: String) -> void:
 				why = "a band at %.1f m on a %.0f m chimney" % [bh, jack.total_height()]
 				break
 
+	# A topping job has to name how far down it goes, or there is no job — only a chimney.
+	if ok and arch == "TOP":
+		var down: float = float(player._mission().get("takeDownToM", -1.0))
+		if down < 0.0:
+			ok = false
+			why = "a TOP job with no takeDownToM: nothing says when she is finished"
+		elif down >= float(jack.total_height()) - 0.5:
+			ok = false
+			why = "takes her down to %.1f m from %.0f m, which is no work at all" % [
+				down, jack.total_height()]
+
 	# And the archetype has to be one the game can actually run.
-	if ok and not (arch in ["SURVEY", "FELL", "CONDUCTOR", "BAND", "STRAIGHTEN"]):
+	#
+	# This list is the thing that should have caught TOP: the sim for it was finished, tuned and
+	# under test, and there were no Jack bindings and no level naming it, so the guard never fired
+	# because nothing ever asked it to. A built archetype only counts when a level points at it.
+	if ok and not (arch in ["SURVEY", "FELL", "CONDUCTOR", "BAND", "STRAIGHTEN", "TOP"]):
 		ok = false
 		why = "archetype %s has no code behind it" % arch
 

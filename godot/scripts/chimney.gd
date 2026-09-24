@@ -140,9 +140,17 @@ func build(jack: Jack) -> void:
 		# Tagged so the lean can be changed later without rebuilding the stack: a straightening
 		# moves her a few centimetres a day and she has to move while the player is looking.
 		inst.set_meta("shaft_at", mid)
+		# `from` and `to` as well as the midpoint, so a topping job can clip her back without a
+		# rebuild — see `set_top`.
+		inst.set_meta("shaft_from", from)
+		inst.set_meta("shaft_to", to)
 		add_child(inst)
 
+	var before_cap := get_child_count()
 	_cap()
+	# The cap is the first thing off a chimney you are topping and it has to go when she does.
+	for ci in range(before_cap, get_child_count()):
+		get_child(ci).set_meta("cap_part", true)
 
 	# Collision. The stack was mesh only, which meant it was scenery rather than a thing: you could
 	# walk into it, and letting go of the ladder dropped you straight through seventy metres of
@@ -170,6 +178,8 @@ func build(jack: Jack) -> void:
 			col.shape = shape
 			var cmid: float = (lo + hi) * 0.5
 			col.position = Vector3(0, cmid, 0) + lean_offset(cmid)
+			col.set_meta("shaft_from", lo)
+			col.set_meta("shaft_to", hi)
 			solid.add_child(col)
 
 	_cradle()
@@ -419,6 +429,58 @@ func _cradle() -> void:
 	glow.light_energy = 3.0
 	glow.omni_range = 7.0
 	node.add_child(glow)
+
+
+## Take her down to `h` metres. For TOP jobs, where the player removes brickwork while standing on
+## it.
+##
+## This CLIPS rather than rebuilds. `build()` frees every child it has, which would take the
+## ladders, the dogs, the bands and the cradle with it — and the player is stood on those. So the
+## shaft segments are shortened in place and the ones entirely above the new top are hidden,
+## collision included, because a chimney you have taken twelve metres off that still stops you
+## walking through the twelve metres is worse than one that never shortened at all.
+func set_top(h: float) -> void:
+	if h <= 0.0:
+		return
+	height_m = h
+	for child in get_children():
+		if bool(child.get_meta("cap_part", false)):
+			# She has no cap while she is coming down. A new one goes on at the finish.
+			child.visible = false
+		if child.has_meta("shaft_from"):
+			_clip(child, h, true)
+	var solid := get_node_or_null("Solid")
+	if solid != null:
+		for col in solid.get_children():
+			if col.has_meta("shaft_from"):
+				_clip(col, h, false)
+
+
+## One segment, shaft or collision, cut off at `h`.
+func _clip(node: Node3D, h: float, is_mesh: bool) -> void:
+	var from: float = float(node.get_meta("shaft_from"))
+	var to: float = float(node.get_meta("shaft_to"))
+	if from >= h:
+		node.visible = false
+		if not is_mesh and node is CollisionShape3D:
+			(node as CollisionShape3D).disabled = true
+		return
+	node.visible = true
+	if not is_mesh and node is CollisionShape3D:
+		(node as CollisionShape3D).disabled = false
+	var top: float = minf(to, h)
+	var tall: float = maxf(top - from, 0.01)
+	var mid: float = (from + top) * 0.5
+	if is_mesh:
+		var mesh: CylinderMesh = (node as MeshInstance3D).mesh as CylinderMesh
+		if mesh != null:
+			mesh.height = tall
+			mesh.top_radius = _mesh_radius(top)
+	elif node is CollisionShape3D:
+		var shape: CylinderShape3D = (node as CollisionShape3D).shape as CylinderShape3D
+		if shape != null:
+			shape.height = tall
+	node.position = Vector3(0, mid, 0) + lean_offset(mid)
 
 
 ## Where the ladder sits at a height, in local space.

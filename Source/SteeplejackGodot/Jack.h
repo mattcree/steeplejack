@@ -24,6 +24,7 @@
 #include "Rng.h"
 #include "Slip.h"
 #include "Band.h"
+#include "Top.h"
 #include "Conductor.h"
 #include "Stack.h"
 #include "Straighten.h"
@@ -393,6 +394,31 @@ public:
 	/** How it reads: fit, ovality, how many are up, and the order you have been working in. */
 	godot::Dictionary band_state(int64_t index) const;
 
+	// --- topping: taking her down brick by brick ------------------------------------------------
+	//
+	// The sim for this has been finished, tuned and under test since TOP-001 and nothing in the
+	// game could reach it: there were no bindings at all, and no level named the archetype. An
+	// entire mission type, the one the vision is actually about — "a hard day's craft work at the
+	// top" — was dead code.
+	/** Start topping her out, taking her down to `take_down_to_m`. */
+	void top_begin(double take_down_to_m);
+	/** Sound the joint under the bolster. Tells you where this brick will give. */
+	void top_sound();
+	/** Bolster in. */
+	void top_seat();
+	/** Lean on the bar for `seconds`. Past the give point it keeps loading, which is the snap. */
+	void top_lever(double seconds);
+	/** Let go. 0 nothing, 1 clean, 2 snapped. */
+	int64_t top_release();
+	/** Down the flue, or over the side. */
+	void top_drop(bool down_the_flue);
+	/** Drop a weight on a rope and haul it back. */
+	void top_clear_jam();
+	/** Stroke, load, give, what is left of the course, the flue, and how far down she is. */
+	godot::Dictionary top_state() const;
+	/** 0 abandoned, 1 rough, 2 workmanlike, 3 craftsman. */
+	int64_t top_judge(double daylight_left_share) const;
+
 	// --- the conductor run --------------------------------------------------------------------
 	/** Start a run with `reels` reels of tape on the van. */
 	void conductor_begin(int64_t reels);
@@ -517,6 +543,8 @@ private:
 	sj::WindModel wind{};
 	sj::Conductor conductor{};
 	std::vector<sj::Band> bands;
+	sj::Top               top;
+	bool                  top_live{false};
 	sj::Survey survey;
 	sj::Straighten plumb;
 	/** The weather's own substream, forked once, so adding a subsystem cannot shift its values. */

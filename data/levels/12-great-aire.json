@@ -2,7 +2,7 @@
   "$schema": "../schemas/level.schema.json",
   "id": "12-great-aire",
   "name": "The Great Aire Chimney",
-  "order": 12,
+  "order": 13,
   "archetype": "FELL",
   "reputationGate": 5,
   "fee": 3400,

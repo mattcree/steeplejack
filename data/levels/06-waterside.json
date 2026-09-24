@@ -2,7 +2,7 @@
   "$schema": "../schemas/level.schema.json",
   "id": "06-waterside",
   "name": "Waterside Bleachworks",
-  "order": 6,
+  "order": 7,
   "archetype": "FELL",
   "reputationGate": 3,
   "fee": 1100,

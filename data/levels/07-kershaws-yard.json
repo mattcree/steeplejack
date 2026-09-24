@@ -2,7 +2,7 @@
   "$schema": "../schemas/level.schema.json",
   "id": "07-kershaws-yard",
   "name": "Kershaw's Yard",
-  "order": 7,
+  "order": 9,
   "archetype": "FELL",
   "reputationGate": 3,
   "fee": 1250,

@@ -49,6 +49,11 @@ const WALK_CLIP_SPEED := 1.36       ## m/s the walk clip covers: WALK_STRIDE_M /
 ## overlap either side of the crossing so neither is ever stretched far from its own pace.
 const WALK_TO_RUN := 2.1
 
+## How far below the working course he stands to reach it. You take the top off a chimney from just
+## under it — standing level with the course you are prising is standing on the course you are
+## prising.
+const TOP_REACH_BELOW := 1.35
+
 const BOOM_LENGTH := 3.0
 const BOOM_SIDE := 0.65
 const WORK_BOOM_LENGTH := 1.4        ## 11-camera-controls-feel.md, "pulls in to 1.4 m"
@@ -378,6 +383,7 @@ func _ready() -> void:
 	_band_setup()
 	_survey_setup()
 	_plumb_setup()
+	_top_setup()
 	var tree_root := get_tree().root
 	if tree_root.has_meta("job_ladders"):
 		ladders_at_base = maxi(int(tree_root.get_meta("job_ladders")), 1)
@@ -1138,11 +1144,25 @@ func _unhandled_input(event: InputEvent) -> void:
 		if _refused(KEY_IDS.get(event.keycode, "")):
 			return
 		match event.keycode:
-			KEY_E: _tap()
+			KEY_E:
+				# On a topping job the joint that matters is the one under the bolster, not one out
+				# on the face. Sounding it is the whole skill: it tells you where this brick gives,
+				# and a brick you have sounded gives you the sharp-bolster window instead of the
+				# base one. The game never says so and should not have to.
+				if top_at_work():
+					jack.top_sound()
+					_say("sounded — now you know where she lets go")
+				else:
+					_tap()
 			KEY_R: _lash()
 			KEY_F: _pick_up()
 			KEY_Q: _cycle_stance()
-			KEY_G: _gin_wheel()
+			KEY_G:
+				if top_job and bool(jack.top_state().get("jammed", false)):
+					jack.top_clear_jam()
+					_say("weight down the flue and hauled back — she runs again")
+				else:
+					_gin_wheel()
 			KEY_B: _band_act()
 			KEY_X: _plumb_dial()
 			KEY_T: _recover(REC_TEA)
@@ -1155,6 +1175,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _refused("RMB"):
 				return
 			_toggle_work_mode()
+		elif event.button_index == MOUSE_BUTTON_LEFT and top_at_work():
+			_top_press()
 		elif event.button_index == MOUSE_BUTTON_LEFT and work_mode:
 			drawing = true
 			# The hammer goes up as the draw starts: anticipation, the first thing on the feel list.
@@ -1163,7 +1185,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				anim.speed_scale = 1.0
 				_playing = "windup"
 	if event is InputEventMouseButton and not event.pressed:
-		if event.button_index == MOUSE_BUTTON_LEFT and drawing:
+		if event.button_index == MOUSE_BUTTON_LEFT and top_working:
+			_top_release_stroke()
+		elif event.button_index == MOUSE_BUTTON_LEFT and drawing:
 			_release_strike()
 
 
@@ -1241,6 +1265,7 @@ func _physics_process(dt: float) -> void:
 	_update_work(dt)
 	_update_lash(dt)
 	_update_haul(dt)
+	_update_top(dt)
 	_update_stack(dt)
 	_update_recovery()
 	_update_fall(dt)
@@ -3652,6 +3677,100 @@ func _conductor_earth() -> void:
 # bolts, and the order you pull them up in is the whole job: opposite pairs and it comes in true,
 # round the ring and it goes oval and will not seat.
 #
+# ---------------------------------------------------------------------------------- topping out
+#
+# Taking her down brick by brick. The sim has been finished and under test since TOP-001 and there
+# was no way to reach it from the game: no bindings on Jack at all, and no level naming the
+# archetype. This is the verb the vision is actually about — "a hard day's craft work at the top" —
+# and the game has been keeping the first half of that sentence and not the second.
+#
+# The stroke: bolster in the joint, lean on the bar, let go the instant the mortar gives. The give
+# point is a fact about the brick, fixed before you touch it, and sounding the joint first is what
+# tells you where it is. So the skill is read-ahead, not reflex.
+
+var top_job := false
+var top_working := false        ## leaning on the bar right now
+var _top_said := ""
+
+
+func _top_setup() -> void:
+	top_job = String(jack.level_archetype()) == "TOP"
+	if not top_job:
+		return
+	jack.top_begin(float(_mission().get("takeDownToM", 0.0)))
+
+
+## The course he is taking off, or -1 if he is not level with it. You work the top of her from
+## just below it, which is where a ladder can reach.
+func top_reach() -> float:
+	if not top_job:
+		return -1.0
+	return float(jack.top_state().get("height_now_m", 0.0))
+
+
+func top_at_work() -> bool:
+	if not top_job:
+		return false
+	var d: float = top_reach() - height_m()
+	return d >= -0.4 and d <= TOP_REACH_BELOW
+
+
+## Lean on the bar. Held, so the load builds; released, that is the prise.
+func _top_lever(dt: float) -> void:
+	if not top_working:
+		return
+	jack.top_lever(dt)
+
+
+func _top_press() -> void:
+	if not top_at_work():
+		return
+	jack.top_seat()
+	top_working = true
+
+
+func _top_release_stroke() -> void:
+	if not top_working:
+		return
+	top_working = false
+	var out: int = int(jack.top_release())
+	var st: Dictionary = jack.top_state()
+	match out:
+		1:
+			_say("clean — she came away whole")
+		2:
+			_say("snapped. You held on past the give, and that loads the brick, not the joint.")
+		_:
+			_say("nothing. The bolster was not in far enough to shift her.")
+	if out != 0:
+		# Down the flue, because she is disconnected and that is where they go. When it packs it
+		# packs, and then the afternoon is about a gin wheel and a weight.
+		jack.top_drop(not bool(st.get("jammed", false)))
+		_top_shorten()
+
+
+## She has to get shorter. A course coming off that leaves the chimney the height it was is the
+## same bug as a banding job with no bands on it.
+func _top_shorten() -> void:
+	if chimney == null or not top_job:
+		return
+	var now: float = float(jack.top_state().get("height_now_m", 0.0))
+	if absf(now - chimney.height_m) >= 0.07:
+		chimney.set_top(now)
+
+
+func _update_top(dt: float) -> void:
+	if not top_job:
+		return
+	_top_lever(dt)
+	var st: Dictionary = jack.top_state()
+	if bool(st.get("jammed", false)) and _top_said != "jam":
+		_top_said = "jam"
+		_say("the flue is packed. Drop a weight down it on the gin wheel and haul it back.")
+	elif not bool(st.get("jammed", false)) and _top_said == "jam":
+		_top_said = ""
+
+
 # The bolts are laid out round the chimney, so which one you are on is where you are standing —
 # the lateral shuffle the climb already has, turned into a dial.
 

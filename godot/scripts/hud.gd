@@ -658,6 +658,37 @@ func _controls_row(key: String, text: String, baseline: float) -> float:
 	return 22.0
 
 
+## Topping. The stroke is one verb held down: bolster in, lean on the bar, let go when she gives.
+## The label says which half of it he is in, because the load building and the load having passed
+## the give point look identical from outside and are the difference between a brick and a bit of
+## rubble.
+func _top_label() -> String:
+	if not player.top_job:
+		return ""
+	var st: Dictionary = player.jack.top_state()
+	if bool(st.get("jammed", false)):
+		return "the flue is packed — [G] a weight down it"
+	if player.top_working:
+		return "let go the moment she gives" if float(st.get("give", -1.0)) < 0.0 \
+			else "let go — she is at %d%% of her give" % int(
+				100.0 * float(st.get("load", 0.0)) / maxf(float(st.get("give", 1.0)), 0.01))
+	if bool(st.get("sounded", false)):
+		return "lean on the bar — you know where this one gives"
+	return "lean on the bar — sound it first [E] and the window is wider"
+
+
+func _top_why() -> String:
+	if not player.top_job:
+		return ""
+	var h: float = player.top_reach()
+	if h < 0.0:
+		return ""
+	var d: float = h - player.height_m()
+	if d < -0.4:
+		return "you are above the course you are taking off — come down to it"
+	return "climb to %.1f m, just under the top of her" % (h - 0.9)
+
+
 ## Why the key you just pressed did nothing, or "" if it was a fair press.
 ##
 ## The list on screen shows only what he can do, so the reasons had nowhere left to live — and they
@@ -724,6 +755,7 @@ func _affordances() -> Array:
 		["T", "brew up", jack_free_hands(),
 			"you need both hands — belt on first", "T"],
 		["G", _gin_label(), true, "", "G"],
+		["LMB", _top_label(), player.top_at_work(), _top_why(), "LMB"],
 		["C / V", "a cigarette  ·  look at the view (hold)", true, "", "CV"],
 	]
 	# A key with nothing to say on this job is not dimmed, it is absent. The list is what THIS job

@@ -2,7 +2,7 @@
   "$schema": "../schemas/level.schema.json",
   "id": "09-the-gasworks",
   "name": "The Gasworks",
-  "order": 9,
+  "order": 10,
   "archetype": "CONDUCTOR",
   "reputationGate": 4,
   "fee": 1750,

@@ -227,6 +227,15 @@ void Jack::_bind_methods()
 	ClassDB::bind_method(D_METHOD("band_begin", "index", "bolts"), &Jack::band_begin);
 	ClassDB::bind_method(D_METHOD("band_tighten", "index", "bolt", "amount"), &Jack::band_tighten);
 	ClassDB::bind_method(D_METHOD("band_state", "index"), &Jack::band_state);
+	ClassDB::bind_method(D_METHOD("top_begin", "take_down_to_m"), &Jack::top_begin);
+	ClassDB::bind_method(D_METHOD("top_sound"), &Jack::top_sound);
+	ClassDB::bind_method(D_METHOD("top_seat"), &Jack::top_seat);
+	ClassDB::bind_method(D_METHOD("top_lever", "seconds"), &Jack::top_lever);
+	ClassDB::bind_method(D_METHOD("top_release"), &Jack::top_release);
+	ClassDB::bind_method(D_METHOD("top_drop", "down_the_flue"), &Jack::top_drop);
+	ClassDB::bind_method(D_METHOD("top_clear_jam"), &Jack::top_clear_jam);
+	ClassDB::bind_method(D_METHOD("top_state"), &Jack::top_state);
+	ClassDB::bind_method(D_METHOD("top_judge", "daylight_left_share"), &Jack::top_judge);
 	ClassDB::bind_method(D_METHOD("conductor_begin", "reels"), &Jack::conductor_begin);
 	ClassDB::bind_method(D_METHOD("conductor_set_terminal"), &Jack::conductor_set_terminal);
 	ClassDB::bind_method(D_METHOD("conductor_fix", "height", "tape_paid", "tightness"),
@@ -1692,6 +1701,85 @@ Dictionary Jack::survey_report() const
 }
 
 // --- banding -------------------------------------------------------------------------------------
+
+// ------------------------------------------------------------------------------ topping her out
+//
+// The bolster goes in the joint, you lean on the bar until the mortar lets go, and the whole skill
+// is letting go at that moment and not a fifth of a second later. Hold on past the give and you
+// are no longer loading the joint, you are loading the brick — and it breaks, and a broken brick is
+// worth nothing to the man buying them off you.
+
+void Jack::top_begin(double take_down_to_m)
+{
+	if (!tuning || !level) { return; }
+	top.Begin(level->TotalHeight(), static_cast<float>(take_down_to_m),
+	          static_cast<uint64_t>(level->Structure().weatherSeed), *tuning);
+	top_live = true;
+}
+
+void Jack::top_sound()
+{
+	if (top_live) { top.Sound(); }
+}
+
+void Jack::top_seat()
+{
+	if (top_live) { top.Seat(); }
+}
+
+void Jack::top_lever(double seconds)
+{
+	if (top_live && tuning) { top.Lever(static_cast<float>(seconds), *tuning); }
+}
+
+int64_t Jack::top_release()
+{
+	if (!top_live || !tuning) { return 0; }
+	return static_cast<int64_t>(top.Release(*tuning));
+}
+
+void Jack::top_drop(bool down_the_flue)
+{
+	if (top_live && tuning) { top.Drop(down_the_flue, *tuning); }
+}
+
+void Jack::top_clear_jam()
+{
+	if (top_live) { top.ClearJam(); }
+}
+
+Dictionary Jack::top_state() const
+{
+	Dictionary d;
+	if (!top_live) { return d; }
+	static const char* kStrokes[] = {"IDLE", "SEATED", "LEVERING", "GIVEN"};
+	const sj::TopState& s = top.State();
+	d["stroke"] = static_cast<int64_t>(s.stroke);
+	d["stroke_name"] = String(kStrokes[static_cast<int>(s.stroke)]);
+	d["load"] = static_cast<double>(s.load);
+	// The give point is a fact about the brick, not about the attempt — but the player has only
+	// earned it if they sounded the joint first. Handing it over unsounded would delete the verb.
+	d["give"] = s.sounded ? static_cast<double>(s.give) : -1.0;
+	d["sounded"] = s.sounded;
+	d["bricks_left"] = static_cast<int64_t>(s.bricksLeft);
+	d["clean"] = static_cast<int64_t>(s.clean);
+	d["snapped"] = static_cast<int64_t>(s.snapped);
+	d["removed_m"] = static_cast<double>(s.removedM);
+	d["flue_full"] = static_cast<double>(s.flueFullShare);
+	d["jammed"] = s.jammed;
+	d["height_now_m"] = static_cast<double>(top.HeightNowM());
+	d["to_go_m"] = static_cast<double>(top.ToGoM());
+	d["done"] = top.Done();
+	d["clean_share"] = static_cast<double>(top.CleanShare());
+	return d;
+}
+
+int64_t Jack::top_judge(double daylight_left_share) const
+{
+	if (!top_live || !tuning) { return 0; }
+	return static_cast<int64_t>(
+		top.Judge(static_cast<float>(daylight_left_share), *tuning));
+}
 
 void Jack::band_begin(int64_t index, int64_t bolts)
 {
