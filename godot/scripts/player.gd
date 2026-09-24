@@ -49,6 +49,10 @@ const WALK_CLIP_SPEED := 1.36       ## m/s the walk clip covers: WALK_STRIDE_M /
 ## overlap either side of the crossing so neither is ever stretched far from its own pace.
 const WALK_TO_RUN := 2.1
 
+## Under this the stick is not being pushed. Sticks rest off centre and a drifting one that walks
+## him off a roof is the worst bug a deadzone prevents.
+const STICK_DEADZONE := 0.18
+
 ## How far below the working course he stands to reach it. You take the top off a chimney from just
 ## under it — standing level with the course you are prising is standing on the course you are
 ## prising.
@@ -1483,6 +1487,21 @@ func _climb(dt: float, ladder_world: Vector3) -> void:
 func _walk(dt: float) -> void:
 	var f := _key(KEY_W) - _key(KEY_S)
 	var r := _key(KEY_D) - _key(KEY_A)
+	# The stick, if there is one.
+	#
+	# A key is binary, and `wish` is only normalised when it is longer than 1 — so a keyboard can
+	# only ever ask for the full 4.2 m/s, and the walk cycle, which plays below 2.1, could not be
+	# seen at all. It was built, rigged and gated and no player had ever been able to make it
+	# happen. A stick gives the speed the animation was made for, and it is the same fix as
+	# letting a man cross a yard at the pace a man crosses a yard.
+	#
+	# The felling half of the game has read `Input.get_axis` since it was written; the climbing
+	# half reads raw keycodes, so a controller could not move him at all.
+	var stick := Vector2(Input.get_joy_axis(0, JOY_AXIS_LEFT_X),
+		-Input.get_joy_axis(0, JOY_AXIS_LEFT_Y))
+	if stick.length() > STICK_DEADZONE:
+		r = stick.x
+		f = stick.y
 	if walk_input != Vector2.ZERO:
 		r = walk_input.x
 		f = walk_input.y

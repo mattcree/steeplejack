@@ -27,7 +27,8 @@
 #   top              all the way up, and onto the cap
 #   tea              belt on and brew up
 #   fall             come off, untied, from where he is
-#   strip <n> <s> [d]  n frames of him walking for s seconds, from d degrees round — a gait cycle
+#   strip <n> <s> [deg] [push]  n frames of him walking s seconds, from deg round; push 0..1 is
+#                    how far the stick goes, which is what decides walk or run
 #   prise <load> [raw]  a topping stroke leaned to `load` (0..1); raw>0 skips sounding it first
 #   arrival <s>      the establishing fly-in, s seconds in — the one mode a shot otherwise skips
 #   gin              rig the gin wheel on the highest dog in reach, and start a haul
@@ -106,6 +107,8 @@ func _run(cmd: String) -> void:
 	var a := float(parts[1]) if parts.size() > 1 else 0.0
 	var b := float(parts[2]) if parts.size() > 2 else 0.0
 	var c := float(parts[3]) if parts.size() > 3 else 0.0
+	# `d` is taken by the anchor dictionaries in the verbs below.
+	var push := float(parts[4]) if parts.size() > 4 else 0.0
 
 	match verb:
 		"climb":
@@ -228,7 +231,10 @@ func _run(cmd: String) -> void:
 			# and let you believe you have looked at his walk.
 			var n := maxi(int(a), 2)
 			var gap := maxi(int(maxf(b, 0.5) * 60.0 / float(n)), 1)
-			player.walk_input = Vector2(0.0, 1.0)
+			# `d` is how hard the stick is pushed, 0..1, because that is what decides which cycle
+			# plays: a keyboard can only ask for all of it, and the walk was therefore a clip
+			# nobody had ever seen.
+			player.walk_input = Vector2(0.0, clampf(push, 0.05, 1.0) if push > 0.0 else 1.0)
 			await _wait(50)                       # let him reach a steady pace first
 			for i in n:
 				await _wait(gap)
