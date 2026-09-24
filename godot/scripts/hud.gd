@@ -1827,9 +1827,22 @@ func _draw_conductor(jack: Jack) -> void:
 		why = "%.0f ohms — that will not do" % st.get("earth_ohms", 0.0)
 	elif int(st.get("too_loose", 0)) > 0:
 		why = "%d loose — they will work off in a gale" % st.get("too_loose", 0)
+	# What the inspector WOULD say, not what you have done.
+	#
+	# This read "0 clips · FAILED" in red on the first frame of the job, before the player had
+	# touched anything — which is true of the run as it stands and reads as a verdict on them. A
+	# man who has just arrived at the top of a gasworks chimney and is told he has FAILED has been
+	# told something about himself, not about the work.
 	var name_ := String(st.get("verdict_name", ""))
+	var begun: bool = int(st.get("clips", 0)) > 0 or bool(st.get("terminal", false))
+	var words := {"SOUND": "she would pass", "MARGINAL": "she would scrape through",
+		"FAILED": "she would not pass yet"}
+	var said: String = String(words.get(name_, name_.to_lower()))
 	var vcol := GOOD if name_ == "SOUND" else (WATCH if name_ == "MARGINAL" else DANGER)
-	_label("%d clips  ·  %s" % [st.get("clips", 0), name_], at + Vector2(0.0, 106.0), vcol, SMALL)
+	if not begun:
+		said = "nothing on her yet"
+		vcol = FAINT
+	_label("%d clips  ·  %s" % [st.get("clips", 0), said], at + Vector2(0.0, 106.0), vcol, SMALL)
 	if why != "":
 		_label(why, at + Vector2(0.0, 122.0), Color(vcol, 0.8), TINY)
 
