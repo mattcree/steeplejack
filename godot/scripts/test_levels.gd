@@ -12,6 +12,11 @@ extends SceneTree
 
 var failures := 0
 
+## Every archetype the game has code for. The whitelist at the bottom of `_open` uses it to refuse
+## a level naming something unbuilt; `_init` uses it to refuse the OPPOSITE, which is the case
+## nothing was checking.
+const RUNNABLE := ["SURVEY", "FELL", "CONDUCTOR", "BAND", "STRAIGHTEN", "TOP"]
+
 
 func _check(ok: bool, what: String) -> void:
 	print("  %s  %s" % ["ok  " if ok else "FAIL", what])
@@ -28,14 +33,29 @@ func _init() -> void:
 	ids.sort()
 	_check(ids.size() >= 10, "%d level files" % ids.size())
 
+	var used := {}
 	for id in ids:
-		await _open(String(id))
+		used[await _open(String(id))] = true
+
+	# --- and the other direction ------------------------------------------------------------
+	#
+	# This is the check that was missing, and it is the one that mattered. `_open` refuses a level
+	# whose archetype has no code behind it — which can only ever catch a level with no code. It
+	# can never catch CODE WITH NO LEVEL, and that is what we had: the TOP archetype was
+	# implemented, tuned and under three hundred and seventy passing tests, with no bindings on
+	# Jack and no level file naming it. Every signal said it was finished. Nothing in the build
+	# could say it was unreachable.
+	#
+	# An archetype the game can run and no job asks for is work already paid for and thrown away.
+	for arch in RUNNABLE:
+		_check(used.has(arch), "something in the district is a %s job" % arch)
 
 	print("LEVELS: %s" % ("ok" if failures == 0 else "%d failure(s)" % failures))
 	quit(1 if failures > 0 else 0)
 
 
-func _open(id: String) -> void:
+## Returns the archetype it opened, so `_init` can check that every runnable one is asked for.
+func _open(id: String) -> String:
 	root.set_meta("job_level", id)
 	var world: Node = load("res://scenes/steeplejack.tscn").instantiate()
 	root.add_child(world)
@@ -48,7 +68,7 @@ func _open(id: String) -> void:
 		_check(false, "%s — no player or chimney" % id)
 		world.queue_free()
 		await process_frame
-		return
+		return ""
 	var jack = player.jack
 
 	var ok := true
@@ -123,10 +143,11 @@ func _open(id: String) -> void:
 	# This list is the thing that should have caught TOP: the sim for it was finished, tuned and
 	# under test, and there were no Jack bindings and no level naming it, so the guard never fired
 	# because nothing ever asked it to. A built archetype only counts when a level points at it.
-	if ok and not (arch in ["SURVEY", "FELL", "CONDUCTOR", "BAND", "STRAIGHTEN", "TOP"]):
+	if ok and not (arch in RUNNABLE):
 		ok = false
 		why = "archetype %s has no code behind it" % arch
 
 	_check(ok, "%-22s %-10s %5.0f m  %s" % [id, arch, h, why])
 	world.queue_free()
 	await process_frame
+	return arch
