@@ -28,7 +28,7 @@ const GOOD := Color(0.56, 0.80, 0.50)
 const RUST := Color(0.45, 0.28, 0.18)
 const GREEN := Color(0.20, 0.42, 0.26)
 
-const ROW_GAP := 52.0
+const ROW_GAP := 64.0
 
 @onready var jack: Jack = Jack.new()
 
@@ -394,14 +394,20 @@ func _open_board() -> void:
 # --- geometry, shared by the drawing and the hit-testing -------------------------------------------
 
 func _rows_origin() -> Vector2:
-	return Vector2(size.x * 0.08, size.y * 0.46)
+	return Vector2(size.x * 0.08, size.y * 0.44)
+
+
+## One station's panel. Geometry the drawing and the clicking SHARE, so a panel cannot be moved
+## without its hit box coming with it — the job board shipped without that once and every click on
+## a card fell through to nothing.
+func row_rect(i: int) -> Rect2:
+	var at := _rows_origin()
+	return Rect2(Vector2(at.x - 26.0, at.y + ROW_GAP * float(i) - 30.0), Vector2(428.0, 52.0))
 
 
 func row_at(p: Vector2) -> int:
-	var at := _rows_origin()
 	for i in rows.size():
-		var y: float = at.y + ROW_GAP * float(i)
-		if p.y >= y - 26.0 and p.y <= y + 14.0 and p.x >= at.x - 24.0 and p.x <= at.x + 420.0:
+		if row_rect(i).has_point(p):
 			return i
 	return -1
 
@@ -413,19 +419,39 @@ func _draw() -> void:
 	_draw_yard()
 	_draw_header()
 
+	# The stations hang. Each one is tied to the one above it and the top one is tied to the sky,
+	# which is a ladder stack — the shape this whole game is about — and it is also the rule the
+	# man obeys: nothing here floats, and you are only ever as safe as the thing you tied to.
+	#
+	# What this replaces was one flat grey box laid across the middle of the screen, over the
+	# skyline, which is the single image the yard exists to show you.
 	var at := _rows_origin()
-	draw_rect(Rect2(Vector2(at.x - 34.0, at.y - 46.0),
-		Vector2(440.0, ROW_GAP * float(rows.size()) + 44.0)), Color(0.04, 0.04, 0.05, 0.55))
 	for i in rows.size():
 		var y: float = at.y + ROW_GAP * float(i)
 		var on: bool = i == selected
-		if on:
-			draw_rect(Rect2(Vector2(at.x - 18.0, y - 20.0), Vector2(4.0, 22.0)), WATCH)
+		var box := row_rect(i)
+		var tie_x: float = box.position.x + 26.0
+		# The line it hangs from: the bottom of the panel above, or the sky for the first one.
+		var from_y: float = row_rect(i - 1).end.y if i > 0 else at.y - 96.0
+		draw_line(Vector2(tie_x, from_y), Vector2(tie_x, box.position.y),
+			Color(WATCH.r, WATCH.g, WATCH.b, 0.55) if on else Color(GHOST.r, GHOST.g, GHOST.b, 0.34),
+			1.0)
+		if i == 0:
+			# The dog it is all hung off. One shape, and it is the shape the whole game turns on.
+			draw_line(Vector2(tie_x - 7.0, from_y), Vector2(tie_x + 7.0, from_y),
+				Color(WATCH.r, WATCH.g, WATCH.b, 0.6), 2.0)
+
+		draw_rect(box, Color(0.05, 0.05, 0.06, 0.66 if on else 0.40))
+		# The heavy edge is along the TOP, because that is the edge carrying the weight.
+		draw_rect(Rect2(box.position, Vector2(box.size.x, 2.0)),
+			Color(WATCH.r, WATCH.g, WATCH.b, 0.9) if on
+			else Color(GHOST.r, GHOST.g, GHOST.b, 0.22))
+
 		_label(String(rows[i][1]), Vector2(at.x, y), INK if on else Color(DIM, 0.7), 24)
 		var note := String(rows[i][2])
 		if String(rows[i][0]) == "engine":
 			note = _engine_note()
-		_label(note, Vector2(at.x, y + 19.0), Color(GHOST, 0.85 if on else 0.55), 13)
+		_label(note, Vector2(at.x, y + 16.0), Color(GHOST, 0.85 if on else 0.55), 13)
 
 	if _said != "" and not shed_open:
 		_label(_said, Vector2(at.x, size.y - 62.0), Color(WATCH, 0.9), 16)
