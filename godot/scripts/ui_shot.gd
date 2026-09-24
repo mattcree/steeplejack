@@ -7,6 +7,7 @@
 #
 #   make ui-shot UI_SCENE=res://scenes/jobs.tscn CMDS="key:enter,shot the-van"
 #   make ui-shot UI_SCENE=res://scenes/yard.tscn CMDS="down,down,enter,shot the-shed"
+#   make ui-shot UI_SCENE=res://scenes/yard.tscn CMDS="did 06-waterside,did 12-great-aire,shot town"
 #
 # Commands, comma separated:
 #   up down left right enter esc space   one key press
@@ -26,6 +27,7 @@ const CAREER := "user://uishot_career.json"
 var scene_path := "res://scenes/yard.tscn"
 var screen: Node = null
 var taken := 0
+var _did: Array = []   ## jobs the capture has marked done, for the skyline
 
 const KEYS := {
 	"up": KEY_UP, "down": KEY_DOWN, "left": KEY_LEFT, "right": KEY_RIGHT,
@@ -88,6 +90,23 @@ func _run(cmd: String) -> void:
 				screen._t = float(arg)
 				screen.queue_redraw()
 			await _wait(3)
+		"did":
+			# Mark a job done, so a career part way through can be photographed — the yard's
+			# skyline is the one screen whose whole meaning is what you have already done to the
+			# town, and it could only ever be captured on day one with everything still standing.
+			# Through career_load, which is the path a save file takes.
+			_did.append(arg)
+			var j2 = _jack()
+			if j2 != null:
+				var recs: Array = []
+				for id in _did:
+					recs.append('{"id": "%s", "paid": 900, "error": 1.0, "failed": false}' % id)
+				j2.career_load('{"money": 2400, "reputation": 44, "jobs": [%s]}'
+					% ", ".join(recs))
+				if "career" in screen:
+					screen.career = j2.career_state()
+			screen.queue_redraw()
+			await _wait(2)
 		"money":
 			_tin(float(arg))
 		"own":

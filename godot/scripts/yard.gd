@@ -11,6 +11,7 @@
 extends Control
 
 const BOARD_SCENE := "res://scenes/jobs.tscn"
+const LEVELS_DIR := "res://../data/levels"
 const CAREER_PATH := "user://career.json"
 
 var career_path := CAREER_PATH
@@ -506,28 +507,114 @@ func _draw_yard() -> void:
 ## job, and that the game should not soften it. This is that sentence as a picture, visible from
 ## the one place in the game where nothing is trying to kill you.
 func _draw_town(base: float) -> void:
-	var felled := {}
+	var done := {}
 	for j in (career.get("jobs", []) as Array):
-		felled[String((j as Dictionary).get("id", ""))] = true
-	# Deterministic placement, so the skyline is the same town every night.
-	var n := 9
-	for i in n:
+		done[String((j as Dictionary).get("id", ""))] = true
+
+	# What you DID to her, not merely that you were paid for her.
+	#
+	# This used to be `i < felled.size()` — the count of every job in the career, so surveying a
+	# chimney took it off the skyline and running a lightning conductor down one demolished it.
+	# The picture this screen exists to make is that the trade destroys the world it lives in, and
+	# it is not worth making if it is not true: a jack who spends a career on conductors and bands
+	# leaves the town exactly as he found it, and should be shown a full skyline.
+	var town: Array = _district()
+	for i in town.size():
+		var lvl: Dictionary = town[i]
+		var arch := String(lvl.get("archetype", ""))
+		var was_done: bool = done.has(String(lvl.get("id", "")))
 		var seed_x: float = absf(fmod(sin(float(i * 53 + 7)) * 43758.5453, 1.0))
 		var seed_h: float = absf(fmod(sin(float(i * 29 + 3)) * 24634.6345, 1.0))
-		var x: float = size.x * (0.06 + 0.88 * seed_x)
-		var full: float = 90.0 + 150.0 * seed_h
-		# A job done on a chimney is a chimney that is not there any more.
-		var gone: bool = i < felled.size()
-		var h: float = 16.0 if gone else full
-		var col := Color(0.15, 0.13, 0.13, 0.85 if gone else 0.95)
+		var x: float = size.x * (0.05 + 0.90 * seed_x)
+		var full: float = 74.0 + 150.0 * seed_h
+
+		var state := stack_state(String(lvl.get("id", "")), arch, was_done)
+		var felled: bool = state == "felled"
+		var shortened: bool = state == "shortened"
+		var h: float = full
+		if felled:
+			# Not nothing: a felled chimney leaves a base and a heap, and the heap is the point.
+			h = 24.0
+		elif shortened:
+			h = full * 0.68
+
+		var col := Color(0.19, 0.16, 0.15, 0.9) if felled else Color(0.15, 0.13, 0.13, 0.95)
 		var w: float = maxf(full / 11.5, 6.0)
 		var top_w: float = w * 0.70
 		draw_colored_polygon(PackedVector2Array([
 			Vector2(x - w * 0.5, base), Vector2(x + w * 0.5, base),
 			Vector2(x + top_w * 0.5, base - h), Vector2(x - top_w * 0.5, base - h)]), col)
-		if not gone:
+		# A stack you have topped has no cap on it any more — you took it off to get at her, and
+		# the new one is the client's business. That missing cap is the whole tell.
+		if not felled and not shortened:
 			draw_rect(Rect2(Vector2(x - top_w * 0.5 - 3.0, base - h - 5.0),
 				Vector2(top_w + 6.0, 5.0)), col)
+		if felled:
+			# The spoil, spread where she fell.
+			draw_colored_polygon(PackedVector2Array([
+				Vector2(x - w * 1.9, base), Vector2(x + w * 1.9, base),
+				Vector2(x + w * 0.9, base - 9.0), Vector2(x - w * 1.1, base - 11.0)]),
+				Color(0.17, 0.14, 0.13, 0.9))
+			_chalk_cross(Vector2(x, base - 26.0), 13.0)
+
+
+## What a career has done to one chimney: "standing", "shortened" or "felled".
+##
+## Pulled out of the drawing so it can be asserted on, because it is the one piece of arithmetic on
+## this screen that carries a meaning — and it was wrong. Every completed job took a chimney off
+## the skyline, so a conductor run demolished one and a survey demolished one, and a jack who had
+## never felled anything was shown a flattened town.
+func stack_state(_id: String, archetype: String, was_done: bool) -> String:
+	if not was_done:
+		return "standing"
+	if archetype == "FELL":
+		return "felled"
+	if archetype == "TOP":
+		return "shortened"
+	# Banding her, straightening her, running a conductor down her, reading her: she is still
+	# there, and in three of those four she is there for longer because of you.
+	return "standing"
+
+
+## The mark a jack makes on a thing he has finished with. Two strokes, drawn rather than typed,
+## and the same glyph everywhere in this game: a joint that is gone, a job that is done, a chimney
+## that is not there any more.
+func _chalk_cross(at: Vector2, r: float) -> void:
+	var c := Color(0.86, 0.38, 0.28, 0.72)
+	draw_line(at + Vector2(-r, -r), at + Vector2(r, r), c, 2.4)
+	draw_line(at + Vector2(r, -r), at + Vector2(-r, r), c, 2.4)
+
+
+## Every chimney in the district, in the order a career meets them. Read once and kept: this is a
+## menu, and it is drawn every frame.
+var _town_cache: Array = []
+
+
+func _district() -> Array:
+	if not _town_cache.is_empty():
+		return _town_cache
+	# Globalized, like jobs.gd does it. `res://../data/levels` is outside the project, and
+	# DirAccess will not follow it — it opens nothing and returns no error, so the skyline was
+	# simply empty and the screen looked fine.
+	var base := ProjectSettings.globalize_path(LEVELS_DIR)
+	var dir := DirAccess.open(base)
+	if dir == null:
+		push_error("yard: no %s" % LEVELS_DIR)
+		return _town_cache
+	for f in dir.get_files():
+		if not f.ends_with(".json"):
+			continue
+		var text := FileAccess.get_file_as_string("%s/%s" % [base, f])
+		var doc = JSON.parse_string(text)
+		if typeof(doc) != TYPE_DICTIONARY:
+			continue
+		# The grey box is a tool rather than a job and is not a chimney in this town.
+		if String(doc.get("id", "")).begins_with("00-"):
+			continue
+		_town_cache.append({"id": doc.get("id", ""), "archetype": doc.get("archetype", ""),
+			"order": int(doc.get("order", 0))})
+	_town_cache.sort_custom(func(a, b): return int(a["order"]) < int(b["order"]))
+	return _town_cache
 
 
 ## The shelf against the wall, and what is on it.

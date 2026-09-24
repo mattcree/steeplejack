@@ -97,6 +97,32 @@ func _init() -> void:
 			"a click on row %d finds it" % i)
 	_check(again.row_at(Vector2(4.0, 4.0)) == -1, "and a click on the wall finds nothing")
 
+	# --- the skyline is the save file -----------------------------------------------------------
+	#
+	# 19-the-complete-game.md: the melancholy is that the world shrinks as you get better at your
+	# job. That is only worth saying if it is TRUE, and it was not — every completed job took a
+	# chimney off the skyline, so running a lightning conductor down one demolished it, and so did
+	# reading one.
+	_check(again.stack_state("x", "FELL", true) == "felled",
+		"a felling takes her off the skyline")
+	_check(again.stack_state("x", "TOP", true) == "shortened",
+		"topping her out leaves a shorter chimney, not a gap")
+	_check(again.stack_state("x", "CONDUCTOR", true) == "standing",
+		"a conductor run leaves her standing — you made her safer")
+	_check(again.stack_state("x", "BAND", true) == "standing", "and so does banding her")
+	_check(again.stack_state("x", "SURVEY", true) == "standing", "and so does reading her")
+	_check(again.stack_state("x", "FELL", false) == "standing",
+		"a felling you have not done yet has not happened")
+
+	var district: Array = again._district()
+	_check(district.size() >= 10, "the town has %d chimneys in it" % district.size())
+	var all_known := true
+	for lvl in district:
+		if not (again.stack_state(String(lvl["id"]), String(lvl["archetype"]), true)
+				in ["standing", "felled", "shortened"]):
+			all_known = false
+	_check(all_known, "and every archetype in the level set resolves to a state it can draw")
+
 	again.queue_free()
 	await process_frame
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SCRATCH))
