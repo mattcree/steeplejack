@@ -29,13 +29,19 @@ The gap is not where it feels like it is. The engine is far ahead of the content
 | LATTICE | no | 0 |
 | EMERGENCY | no | 0 |
 
-**`Top.h` is the finding.** Taking a chimney down brick by brick — seat the bolster, lever until
-the joint gives, release in the window, drop it down the flue and clear the jam when it blocks — is
-implemented, tuned and under test, and not one level in the game points at it. The most
-characterful verb in the design is dead code.
+**`Top.h` was the finding.** Taking a chimney down brick by brick — seat the bolster, lever until
+the joint gives, release in the window, drop it down the flue and clear the jam when it blocks —
+was implemented, tuned and under test, with **no bindings on Jack at all and no level naming the
+archetype.** The most characterful verb in the design was dead code. It is wired now, with an
+instrument, its own checklist, a settlement that pays on what came down whole, and two levels.
 
-And four of thirteen levels are fellings. **The repetition the designer felt is in the level data,
-not the engine.** That is the cheapest variety win this project will ever get.
+And four of thirteen levels were fellings, two of them back to back. **The repetition the designer
+felt was in the level data, not the engine**, and it was the cheapest variety win this project will
+ever get. Fifteen levels now, and no archetype follows itself anywhere on the board.
+
+`test_levels.gd` asserts the mapping in **both** directions since 2026-09-24 — a level may not name
+an archetype the game cannot run, and nothing the game can run may go unasked-for by the district.
+The old check could only ever have caught the first.
 
 ---
 
@@ -75,10 +81,15 @@ Variety is not more verbs, it is better spacing of the verbs we have.
 ### Act one — learning to read a chimney (jobs 1–4)
 SURVEY, CONDUCTOR, BAND, SURVEY. Low, forgiving, and each one teaches exactly one noun.
 
-### Act two — the trade proper (jobs 5–9)
-**TOP** (new, and it is the act's centrepiece), FELL, BAND, **TOP**, STRAIGHTEN. Topping is where
-the game stops being about getting up and starts being about the work at the top, which is the
-promise the vision makes and the game currently does not keep.
+### Act two — the trade proper (jobs 6–10) — **built**
+**TOP** (Shawclough, the act's centrepiece), FELL, SURVEY, **TOP** (Ladyshore), FELL. Topping is
+where the game stops being about getting up and starts being about the work at the top, which is
+the promise the vision makes and the game did not keep until this was wired.
+
+The two topping jobs are deliberately not the same job. Shawclough is a **shortening** — twelve
+metres off a sound stack whose top has gone — and Ladyshore is a **hand-demolition**, all
+thirty-eight metres of her, because there is an infants' school nine metres away and there is
+nowhere for her to go.
 
 ### Act three — jobs nobody sane takes (jobs 10–13)
 FELL, CONDUCTOR (in weather), **EMERGENCY**, FELL (the Great Aire).
@@ -107,14 +118,20 @@ asking about.* From the existing doc: it has **zero mechanical benefit**, it vis
 yard with every part, and finishing it costs about £9,000 against £16,000 of career earnings — so
 it is a real choice against better ladders.
 
-What is missing is not a system. It is **visibility**:
+What was missing was not a system. It was **visibility**, and both halves are built:
 
-- The engine is a grey shape under a tarpaulin behind a menu. It should be the thing you walk past
-  every single morning, changing.
-- **The skyline should be the save file.** The chimneys behind the yard are the ones still
-  standing; a stump with a chalk cross is one you took down. The game's melancholy is that the job
-  destroys the world it lives in, and right now that is a line in a design document instead of the
-  first thing you see each day.
+- **The engine** was a rectangle, two circles and a stick — a diagram of a reward rather than one.
+  She is an engine now, through the six part-bearing stages: spoked wheels on their hornplates, the
+  boiler with its smokebox and firebox, the flywheel and the rod to the crosshead, the steam dome
+  and the safety valve, the canopy and the chimney and the red lining out, and finally her plate.
+  The caption goes from "under restoration · <stage>" to "**in steam**".
+- **The skyline is the save file.** The chimneys behind the yard are the ones still standing, a
+  stump with a chalk cross and its spoil is one you felled, and one you topped is still there and
+  shorter with no cap on her.
+
+Both of those counted *every completed job* as a demolition when they were first written, so a
+season of conductor runs flattened the town. The ending had the identical bug independently. The
+answer lives in `District` now and nowhere else.
 
 ### Why this is the right loop and not a cynical one
 
