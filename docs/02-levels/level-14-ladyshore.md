@@ -46,14 +46,20 @@ it here loses the job.
 | 12–24 m | Good brick, well laid | Nothing wrong with her. That is the difficulty. |
 | 0–12 m | Ivy to the first twelve metres | Under it the brick is perfectly sound. Eleven years shut and nobody near her. |
 
-## Open, and it matters
+## Nothing over the side
 
-**Nothing enforces "nothing over the side" yet.** The sim's `Top::Drop(downTheFlue)` takes the
-choice and the comment says over the side is "somebody else's problem and the level decides what
-they hit" — but no level decides anything, and the Godot side drops down the flue automatically
-unless it is jammed, in which case it silently goes over instead. On this chimney that is a brick
-into a school playground.
+Written as an open problem when this level was authored, and closed the same morning, because it
+was not a gap in the level — it was a bug in the game. The drop was `top_drop(not jammed)`, so the
+moment the flue packed every brick went over the side instead, silently, with nothing on screen
+about it. On this chimney that is a brick into an infants' playground nine metres away, which is
+the whole reason she is being taken down by hand.
 
-This level is playable without it and the letter carries the intent, but the job is only really
-*about* something when the site can refuse. That wants an exclusion in `site` that the drop reads,
-and it is the natural next piece of work on this archetype.
+**A packed flue is not a different route. It is a stop.** Bricks always go down the inside, and
+while the flue is packed he cannot start another prise at all — "the flue is packed, you have
+nowhere to put them. Clear it first." That is what makes clearing it cost you the afternoon
+rather than cost you nothing, and it is the reason the meter is on the screen.
+
+## Open
+
+- A sound at the bottom when a brick lands, so the flue filling is something you hear as well as
+  something you watch.

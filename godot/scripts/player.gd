@@ -3791,6 +3791,12 @@ func _top_lever(dt: float) -> void:
 func _top_press() -> void:
 	if not top_at_work():
 		return
+	# Nowhere to put them. The flue is the only road off this chimney and while it is packed the
+	# job stops — which is what makes clearing it cost you the afternoon rather than cost you
+	# nothing, and is the whole reason the meter is on the screen.
+	if bool(jack.top_state().get("jammed", false)):
+		_say("the flue is packed — you have nowhere to put them. Clear it first  [G]")
+		return
 	jack.top_seat()
 	top_working = true
 
@@ -3809,9 +3815,13 @@ func _top_release_stroke() -> void:
 		_:
 			_say("nothing. The bolster was not in far enough to shift her.")
 	if out != 0:
-		# Down the flue, because she is disconnected and that is where they go. When it packs it
-		# packs, and then the afternoon is about a gin wheel and a weight.
-		jack.top_drop(not bool(st.get("jammed", false)))
+		# ALWAYS down the flue. This used to pass `not jammed`, which means that the moment the
+		# flue packed every brick silently went over the side instead — and "over the side" on
+		# Ladyshore is a brick into an infants' school playground nine metres away, which is the
+		# entire reason that chimney is being taken down by hand rather than dropped.
+		#
+		# A packed flue is not a different route. It is a stop.
+		jack.top_drop(true)
 		_top_shorten()
 
 

@@ -159,6 +159,35 @@ func _init() -> void:
 		_check(dead > 0, "%d collision segments above the new top are switched off" % dead)
 		_check(live > 0, "%d below it are still there to stand on" % live)
 
+	# --- a packed flue is a STOP, not a different route -------------------------------------------
+	#
+	# The drop used to be `top_drop(not jammed)`, so the moment the flue packed every brick went
+	# over the side instead — silently, with nothing on screen about it. On Ladyshore, which is
+	# taken down by hand precisely because there is an infants' school nine metres off her, that
+	# is a brick into a playground. The flue is the only road off a chimney you are topping.
+	while not bool(jack.top_state().get("jammed", false)):
+		jack.top_seat()
+		jack.top_lever(100.0)
+		jack.top_release()
+		jack.top_drop(true)
+	_check(bool(jack.top_state().get("jammed", false)), "the flue packs eventually")
+	# Stand him under what is left of her: by now she is down to the line and he is still up where
+	# the top used to be, which is eleven metres above the work.
+	_put_on_ladder(player, chimney,
+		maxf(float(jack.top_state().get("height_now_m", 34.0)) - 0.7, 1.0))
+	await physics_frame
+	_check(player.top_at_work(), "he is back under the course he is working")
+	player.top_working = false
+	player.message = ""
+	player._top_press()
+	_check(not player.top_working, "and while it is packed he cannot start another one")
+	_check(String(player.message).contains("nowhere to put them"),
+		"and is told why: %s" % player.message)
+	jack.top_clear_jam()
+	player._top_press()
+	_check(player.top_working, "cleared, he can work again")
+	player.top_working = false
+
 	# --- and it does not pay for the climb --------------------------------------------------------
 	# Reaching the cap on a topping job is where the work STARTS. The general settlement path pays
 	# the level fee for getting to the top, and topping fell straight into it — the whole £1,040
