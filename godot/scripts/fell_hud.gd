@@ -167,6 +167,9 @@ func _draw_steps() -> void:
 	var below := _state_height()
 	if below > 0.0:
 		draw_rect(Rect2(0, _state_top() + 4.0, w, below), Color(0.05, 0.05, 0.06, 0.55))
+	# The weight on the top edge, like every other panel in the game. This is the climax screen and
+	# it was the one that still looked like a different game's.
+	draw_rect(Rect2(0, 0, w, 2), Color(0.86, 0.72, 0.36, 0.55))
 	var y := 26.0
 	draw_string(_font, Vector2(24, y), "FELLING — %s" % level_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK)
 	y += 24.0
@@ -174,8 +177,12 @@ func _draw_steps() -> void:
 		var done := i < step or (i == 0 and stripped)
 		var here := i == step
 		var colour := INK if here else (DIM if not done else Color(0.55, 0.78, 0.50, 0.7))
-		var mark := "x" if done else (">" if here else " ")
-		draw_string(_font, Vector2(24, y), "%s %s" % [mark, STEPS[i]],
+		# The same three marks the climbing checklist uses, which are the same three a jack chalks
+		# on a joint: a tick for done, an arrow for the one in hand, a dot for not yet. This screen
+		# used "x" for done, which everywhere else in this game — and on every chimney in it —
+		# means the opposite.
+		var mark := "✓" if done and not here else ("▶" if here else "·")
+		draw_string(_font, Vector2(24, y), "%s  %s" % [mark, STEPS[i]],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, colour)
 		y += 19.0
 
