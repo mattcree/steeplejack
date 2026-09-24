@@ -77,6 +77,11 @@ func _run(cmd: String) -> void:
 		return
 	var verb := parts[0]
 	var arg := parts[1] if parts.size() > 1 else ""
+	# The whole of the rest of the line, for the verbs whose argument is a sentence. `arg` is the
+	# first word, which for `keep a chalked brick out of the perished course` is "a" — and the
+	# salvage shelf picks what to DRAW out of that sentence, so five different keepsakes all came
+	# out as the same brick.
+	var rest := cmd.substr(verb.length()).strip_edges()
 	match verb:
 		"shot":
 			await _shot(arg if arg != "" else "ui")
@@ -126,6 +131,19 @@ func _run(cmd: String) -> void:
 						break
 					if "career" in screen:
 						screen.career = j3.career_state()
+			screen.queue_redraw()
+			await _wait(2)
+		"keep":
+			# Put something on the salvage shelf, so the museum in the yard can be photographed
+			# with anything on it. The shelf draws each object as the thing it is — a bolt is a
+			# bolt, a coil of copper is a coil of copper — and every capture of the yard until now
+			# was taken with the shelf empty and therefore not drawn at all.
+			var j4 = _jack()
+			if j4 != null:
+				j4.career_keep("cap-%d" % _did.size(), rest)
+				_did.append(rest)
+				if "career" in screen:
+					screen.career = j4.career_state()
 			screen.queue_redraw()
 			await _wait(2)
 		"money":

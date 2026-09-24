@@ -680,6 +680,9 @@ func _keep_something() -> void:
 		"BAND": "the band bolt that had nothing left of it",
 		"FELL": "a brick off the top, picked up off the ground",
 		"STRAIGHTEN": "one of the wedges, still bright where it bore",
+		# The shelf is a list of the things you have done, and what you did here was take the top
+		# off a chimney one brick at a time. The first one is the one you keep.
+		"TOP": "the first brick off the top of her, the one that came away whole",
 	}
 	var arch := String(jack.level_archetype())
 	jack.career_keep(_level_id(), String(what.get(arch, "something off her")))
