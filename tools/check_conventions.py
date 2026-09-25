@@ -111,7 +111,11 @@ def check_likeness():
         for fn in files:
             path = os.path.join(dirpath, fn)
             rel = os.path.relpath(path, ROOT)
-            if rel.startswith("tools/likeness_denylist.txt"):
+            # Both denylists, not just the public one. The private list is where the terms
+            # actually live, so scanning it reports every term as a violation of itself —
+            # which is why rule 16 has been sitting at "INERT" since the day it was written.
+            # Nobody could turn it on.
+            if rel in ("tools/likeness_denylist.txt", "tools/likeness_denylist.local.txt"):
                 continue
             if os.path.splitext(fn)[1] not in {".h", ".cpp", ".hpp", ".inl", ".cs", ".md",
                                                ".json", ".txt", ".yml", ".yaml", ".usf",

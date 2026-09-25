@@ -154,7 +154,7 @@ wrong. He's optional, he's cheap, and he's funny.
 
 Three, chosen at the start and changeable at any time in the hub, with no judgement from the game:
 
-| | **Assisted** | **Jack** (default) | **Owd Fred**† |
+| | **Assisted** | **Jack** (default) | **Owd Hand** |
 |---|---|---|---|
 | Tap-test visual pip | on | off (toggleable) | off |
 | Anchor rating shown | always | always | always (never hidden — core principle) |
@@ -165,8 +165,12 @@ Three, chosen at the start and changeable at any time in the hub, with no judgem
 | Injuries persist | no | yes | yes, and worse |
 | Fall = | resume at stack | resume at stack, lose fee | resume at stack, lose fee + 2 ladders |
 
-† placeholder name — see [`../05-legal/ip-and-likeness.md`](../05-legal/ip-and-likeness.md), must not
-reference a real person. Suggested: **"Owd Hand"**.
+> The hardest setting used to carry the forename of a real steeplejack — the one whose television
+> work is the reason most people have heard of this trade at all. Renamed to **Owd Hand** on
+> 2026-09-25, which is what this document already recommended and what
+> [`../05-legal/ip-and-likeness.md`](../05-legal/ip-and-likeness.md) requires. Writing the old
+> name here to explain the change would have reintroduced it, which is the same trap
+> `tools/likeness_denylist.txt` is deliberately empty to avoid.
 
 **Note the row that doesn't change.** Anchor ratings are always visible on every difficulty. Hiding
 information is not difficulty; it's noise.
