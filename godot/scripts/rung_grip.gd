@@ -80,6 +80,23 @@ const CHAINS := [
 ## the right shoulder, and a five-metre section balanced on a shoulder with both arms swinging free
 ## is the silliest thing in the game. Nobody has ever carried a ladder that way. One hand goes up
 ## and holds the stile, always, and the other is what you have left for everything else.
+## Coming down the stiles rather than the rungs.
+##
+## `slideSpeedMetresPerSecond` is 6.0 and that is DESIGNED — 02-climbing-system.md specifies the
+## slide and even has an injury that takes it away from you. Six metres a second is twenty-one
+## rungs a second, and this rig plants every hand and foot on a real rung and takes STEP_SECONDS
+## to move one limb one rung. It can manage about six. So it was being asked for three and a half
+## times what it can do, and what you saw was four limbs thrashing between rungs they could never
+## reach. Reported as "going down the animation is crazy", and it was not the speed that was wrong.
+##
+## A man sliding down a ladder does not touch the rungs at all. He wraps both hands round the
+## stiles and lets his boots ride the outsides of them. So: no stepping, no rungs, both hands on
+## the rails and the whole pose travelling down continuously.
+const SLIDE_BELOW := -2.6          ## descending faster than this is a slide, not a climb
+const SLIDE_HAND_ABOVE := 1.46     ## the hands, above his feet, wrapped round the rails
+const SLIDE_FOOT_ABOVE := 0.06     ## and the boots riding the outside of them
+const SLIDE_RAIL_OUT := 0.015      ## a little proud of the rail's centre line, on the outside
+
 const CARRY_LIMB := 1
 const PAIR := [0, 1, 1, 0]
 const SIDE := [-1.0, 1.0, -1.0, 1.0]    ## which side of the ladder's centre, along its tangent
@@ -296,8 +313,13 @@ func on_wall(limb: int) -> bool:
 var carry_point := Vector3.ZERO
 
 
+## True while he is coming down the stiles. The player sets the rate; this decides what it means.
+var sliding := false
+
+
 func update(dt: float, on_ladder: bool, holding: Array) -> void:
 	var feet: float = _feet()
+	sliding = on_ladder and float(player.get("_climb_rate")) < SLIDE_BELOW
 	if on_ladder and not _was_on:
 		# Taking hold: every limb straight onto its rung, so he does not start by reaching from
 		# wherever the walk cycle left him.
@@ -307,10 +329,15 @@ func update(dt: float, on_ladder: bool, holding: Array) -> void:
 		_moving = -1
 	_was_on = on_ladder
 
-	if on_ladder:
+	if on_ladder and not sliding:
 		_step(dt, feet, float(player.get("_climb_rate")))
 		# Eased, so he rises with the push rather than snapping when a foot takes a new rung.
 		_drop = move_toward(_drop, _wanted_drop(), dt * DROP_RATE)
+	elif sliding:
+		# Nothing steps while he is sliding, and the body does not settle onto a stance it is not
+		# standing on. Every limb is simply travelling.
+		_moving = -1
+		_drop = move_toward(_drop, 0.0, dt * DROP_RATE * 2.0)
 	else:
 		_drop = 0.0
 
@@ -359,6 +386,32 @@ func _step(dt: float, feet: float, rate: float) -> void:
 
 
 func _place(limb: int, _dt: float) -> void:
+	# Coming down the stiles: a continuous hold on the rails, travelling with him, no rungs at all.
+	if sliding:
+		var f: float = _feet()
+		var at_h: float = f + (SLIDE_HAND_ABOVE if limb < 2 else SLIDE_FOOT_ABOVE)
+		var base_s: Vector3 = chimney.global_position + chimney.face_point(maxf(at_h, 0.0)) \
+			+ chimney.bow_at(maxf(at_h, 0.0))
+		var along_s := Vector3(0, 0, 1)
+		var out_s := _out()
+		var rail: float = float(player.RAIL_HALF)
+		var side_s: float = float(SIDE[limb])
+		var hold_s: Vector3 = base_s + along_s * side_s * (rail + SLIDE_RAIL_OUT) \
+			+ out_s * (HAND_PROUD if limb < 2 else -0.02)
+		var root_s: Vector3 = _root[limb] if _have_root else (skeleton.global_transform
+			* skeleton.get_bone_global_rest(skeleton.find_bone(CHAINS[limb][0])).origin)
+		_raw[limb] = root_s.distance_to(hold_s) / maxf(_reach[limb], 0.001)
+		_rawpos[limb] = hold_s
+		_rawroot[limb] = root_s
+		hold_s = _within_reach(limb, root_s, hold_s)
+		_target[limb].global_position = hold_s
+		var side_v: Vector3 = along_s * side_s
+		if limb < 2:
+			_pole[limb].global_position = hold_s - Vector3.UP * 0.5 + side_v * 0.28
+		else:
+			_pole[limb].global_position = hold_s + Vector3.UP * SHIN + out_s * KNEE_PROUD
+		return
+
 	# Carrying, on the ground: this hand is not on a rung of the stack, it is on the stile of the
 	# section over his shoulder, and there is no stepping to do.
 	if limb == CARRY_LIMB and not _was_on and carry_point != Vector3.ZERO:

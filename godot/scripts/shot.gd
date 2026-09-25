@@ -31,6 +31,8 @@
 #                    how far the stick goes, which is what decides walk or run
 #   prise <load> [raw]  a topping stroke leaned to `load` (0..1); raw>0 skips sounding it first
 #   arrival <s>      the establishing fly-in, s seconds in — the one mode a shot otherwise skips
+#   ladcam <d> <up>  a camera square to the LADDER rather than to the player's yaw
+#   climbstrip <n> <s> [dir]  n frames of him climbing for s seconds; dir < 0 goes down
 #   gin              rig the gin wheel on the highest dog in reach, and start a haul
 #   haulfor <s> [1]  haul flat out for s seconds, steering against the swing if 1
 #   stance <0-4>     one hand / hooked leg / clipped / belted / chair
@@ -61,6 +63,7 @@ var world: Node
 var player: Node
 var chimney: Node
 var jack
+var _eye: Camera3D = null   ## the capture camera, reused so it is current when the shutter goes
 var _keep_arrival := false   ## the capture asked for the establishing shot rather than past it
 var _taken := 0
 
@@ -263,6 +266,32 @@ func _run(cmd: String) -> void:
 			await _wait(2)
 			player.arriving = maxf(player.ARRIVAL_SECONDS - maxf(a, 0.0), 0.05)
 			await _wait(1)
+		"where":
+			print("WHERE: %.2f m  on_ladder %s  climb_rate %.2f m/s  vel %.2f" % [
+				player.height_m(), str(player.on_ladder),
+				float(player.get("_climb_rate")), player.velocity.length()])
+		"ladcam":
+			# A camera square to the LADDER, not to the player.
+			#
+			# `orbit` works off `player._yaw`, which is near the wall bearing but not exactly it,
+			# and the error is invisible: an oblique view projects lateral offsets into depth and
+			# makes a man centred on a ladder look like he is standing a foot to one side of it. I
+			# spent three renders certain of that before measuring and finding him centred to
+			# within a millimetre.
+			_ladder_cam(a, b, c)
+		"climbstrip":
+			# `a` frames of him climbing for `b` seconds, square to the ladder, camera keeping
+			# pace. `c` negative climbs DOWN, which is the direction reported as "crazy" and the
+			# one no capture in this project has ever looked at.
+			var cn := maxi(int(a), 2)
+			var cgap := maxi(int(maxf(b, 0.5) * 60.0 / float(cn)), 1)
+			player.climb_input = -1.0 if c < 0.0 else 1.0
+			await _wait(30)
+			for i in cn:
+				await _wait(cgap)
+				_ladder_cam(2.3, 0.0, 0.0)
+				await _shot_now("climb%d" % (i + 1))
+			player.climb_input = 0.0
 		"prise":
 			# Sound the joint, bolster in, and lean on the bar to `a` of a full load — so the
 			# topping instrument can be photographed mid-pull, which is the only state it says
@@ -433,6 +462,45 @@ func _orbit(a: float, b: float, c: float) -> void:
 	eye.make_current()
 
 
+## Square on to the ladder line, from `dist` out and `rise` above his chest.
+func _ladder_cam(dist: float, rise: float, _spare: float) -> void:
+	var h: float = player.height_m()
+	var line: Vector3 = chimney.global_position + chimney.face_point(h)
+	var out: Vector3 = line - chimney.global_position
+	out.y = 0.0
+	out = out.normalized() if out.length() > 0.01 else Vector3.FORWARD
+	# ONE camera, reused. A fresh Camera3D per frame does not become current until the frame after
+	# `make_current()`, so a strip that creates one and grabs immediately photographs whatever was
+	# current before — which for a man who has just slid to the ground is the boom, forty metres
+	# back. Six frames of a slide came back as postcards of the whole chimney.
+	if _eye == null or not is_instance_valid(_eye):
+		_eye = Camera3D.new()
+		_eye.fov = player.get_node("Boom/Camera").fov
+		root.add_child(_eye)
+		_eye.make_current()
+	var at: Vector3 = line + Vector3.UP * 1.0
+	_eye.global_position = at + out * maxf(dist, 0.6) + Vector3.UP * rise
+	_eye.look_at(at, Vector3.UP)
+	_eye.make_current()
+
+
+## A frame taken NOW, with no settle.
+##
+## `_shot` waits for the spring arm to stop moving before it grabs, which is right for a posed
+## capture and wrong for a moving one: place the camera on a descending man, wait eleven frames,
+## and he is no longer in shot. Five frames of a six-frame descent strip came back empty because
+## of it, and the empty frames looked like a rendering fault rather than a timing one.
+func _shot_now(name: String) -> void:
+	# The establishing fly-in owns the camera for its first five and a half seconds and `_shot`
+	# skips past it. This did not, so a six-frame strip came back as six postcards of the whole
+	# chimney taken from the fly-in — which look like a broken camera rather than a missed skip.
+	if not _keep_arrival:
+		player.skip_arrival()
+	await process_frame
+	await process_frame
+	_grab(name)
+
+
 func _shot(name: String) -> void:
 	# A capture wants the frame it asked for. The establishing shot is five seconds long and puts
 	# a title card over everything, and `_ready` starts it after this script has taken its
@@ -450,6 +518,11 @@ func _shot(name: String) -> void:
 	for i in 3:
 		await process_frame
 
+	_grab(name)
+
+
+## The pixels, written out.
+func _grab(name: String) -> void:
 	var img: Image = root.get_texture().get_image()
 	if img == null:
 		printerr("shot: nothing rendered — is there a display?")
